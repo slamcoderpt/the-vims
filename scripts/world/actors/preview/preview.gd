@@ -16,6 +16,8 @@ func _ready() -> void:
 	Game.set_time(1, 14, 16)
 	var lighting: Node = preload("res://scripts/world/lighting.gd").new()
 	add_child(lighting)
+	if mode != "ref":
+		lighting.post.visible = false
 	var rig: Node3D = preload("res://scripts/world/camera_rig.gd").new()
 	add_child(rig)
 	# Floor: warm wood planks + a rug.
@@ -42,13 +44,63 @@ func _ready() -> void:
 				add_child(a)
 				a.position = s[1]
 			rig.apply({"target": Vector3(0.2, 0.75, 0), "yaw": 15.0, "pitch": 14.0, "distance": 5.0, "fov": 30.0})
+		"kidsit":
+			var x := -2.4
+			for yy in [0.0, 90.0, 45.0, 180.0]:
+				var a := SimActor.create("cat_girl")
+				a.position = Vector3(x, 0, 0)
+				a.rotation_degrees.y = yy
+				add_child(a)
+				a.set_pose("play")
+				x += 1.2
+			for yy in [0.0, 90.0]:
+				var a := SimActor.create("bunny_girl")
+				a.position = Vector3(x - 5.4, 0, -1.8)
+				a.rotation_degrees.y = yy
+				a.seat_height = 0.375
+				add_child(a)
+				a.set_pose("sit_paint")
+				x += 1.2
+			rig.apply({"target": Vector3(-0.6, 0.4, -0.4), "yaw": 0.0, "pitch": 25.0, "distance": 5.0, "fov": 30.0})
+		"dadturn":
+			var x := -2.0
+			for yy in [1.3, -1.3]:
+				var a := SimActor.create("dad")
+				a.position = Vector3(x, 0, 0)
+				add_child(a)
+				a.set_pose("idle")
+				a.set_meta("dbg_head_yaw", yy)
+				x += 1.5
+			rig.apply({"target": Vector3(-1.2, 1.2, 0), "yaw": 0.0, "pitch": 10.0, "distance": 6.0, "fov": 30.0})
+		"stage":
+			# Home-day camera angle, close, with seats so seated poses read.
+			var specs := [
+				["dad", Vector3(-1.4, 0, -0.6), "type", -90.0, 0.44],
+				["bunny_girl", Vector3(0.2, 0, -1.4), "sit_paint", 125.0, 0.375],
+				["cat_girl", Vector3(1.0, 0, 0.6), "play", 45.0, 0.0],
+				["beagle", Vector3(-0.6, 0, 0.9), "play", 30.0, 0.0],
+			]
+			var seat := VoxelBuilder.new()
+			for s2 in specs:
+				var a := SimActor.create(s2[0])
+				a.position = s2[1]
+				a.rotation_degrees.y = s2[3]
+				if s2[4] > 0.0:
+					a.seat_height = s2[4]
+					var c := Vector3i(roundi(s2[1].x / 0.0625), 0, roundi(s2[1].z / 0.0625))
+					var h := roundi(s2[4] / 0.0625)
+					seat.box(c - Vector3i(3, 0, 3), Vector3i(7, h, 7), Color(0.35, 0.35, 0.38))
+				add_child(a)
+				a.set_pose(s2[2])
+			add_child(seat.build_instance(0.0625))
+			rig.apply({"target": Vector3(-0.2, 0.5, -0.2), "yaw": 46.0, "pitch": 35.0, "distance": 9.0, "fov": 19.0})
 		"ref":
 			# Approximate ref1 camera and staging (home_day preset camera).
 			var specs := [
-				["dad", Vector3(-1.5, 0, -1.2), "type", 215.0],
+				["dad", Vector3(-1.5, 0, -1.2), "type", 270.0],
 				["bunny_girl", Vector3(0.6, 0, -1.8), "sit_paint", 150.0],
-				["cat_girl", Vector3(1.6, 0, 1.0), "play", 10.0],
-				["beagle", Vector3(-0.6, 0, 0.8), "lie", 60.0],
+				["cat_girl", Vector3(1.6, 0, 1.0), "play", 45.0],
+				["beagle", Vector3(-0.6, 0, 0.8), "play", 45.0],
 				["npc_3", Vector3(-2.6, 0, 1.4), "talk", 40.0],
 				["npc_1", Vector3(-3.4, 0, 0.6), "wave", 60.0],
 			]
@@ -58,7 +110,7 @@ func _ready() -> void:
 				a.rotation_degrees.y = s[3]
 				add_child(a)
 				a.set_pose(s[2])
-			rig.apply({"target": Vector3(0, 0.8, 0), "yaw": 35.0, "pitch": 38.0, "distance": 11.0, "fov": 30.0})
+			rig.apply({"target": Vector3(0, 0.8, 0), "yaw": 46.0, "pitch": 35.0, "distance": 7.0, "fov": 30.0})
 		"poses", "poses2":
 			var poses := ["idle", "walk", "sit", "sit_floor", "type", "paint", "read", "talk", "wave", "grill", "brush_teeth", "play", "sleep"]
 			if mode == "poses2":

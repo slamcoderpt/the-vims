@@ -59,6 +59,7 @@ static func _walls(root: Node3D) -> void:
 	# back-wall windows (daylight) above the fridges
 	var win := VoxelBuilder.new()
 	win.jitter = 0.0
+	var night := Game.is_night()
 	for wx in [-5.5, -2.75, 0.0, 2.75, 5.5]:
 		var a := cc(wx - 1.1)
 		var w := cc(2.2)
@@ -78,6 +79,8 @@ static func _walls(root: Node3D) -> void:
 					var tree_h := 4.0 + 3.0 * sin(float(a + x) * 0.7) + 2.0 * sin(float(a + x) * 1.9)
 					if float(y) < tree_h:
 						sky = Color(0.42, 0.66, 0.36) if (x + y) % 3 != 0 else Color(0.52, 0.74, 0.4)
+					if night:
+						sky = Color(0.08, 0.1, 0.22).lerp(Color(0.16, 0.18, 0.34), 1.0 - t) if float(y) >= tree_h else Color(0.05, 0.08, 0.1)
 					win.set_v(p + Vector3i(0, 0, -1), sky, true)
 				# sill
 			vb.set_v(Vector3i(a + x, y0 - 1, z0 + 1), Color("e9dfcf"))
@@ -118,7 +121,7 @@ static func _ceiling(root: Node3D, halo_pts: Array) -> void:
 	for p: Vector3 in pts:
 		var cord := int((H - 0.19 - p.y) / U) - 4
 		Fx.pendant(lamps, Vector3i(int(round(p.x / U)), int(round(p.y / U)), int(round(p.z / U))), cord)
-		halo_pts.append([p + Vector3(0.03, -0.06, 0.03), 1.1, Color(1.0, 0.7, 0.38, 1.0) * 0.8])
+		halo_pts.append([p + Vector3(0.03, -0.08, 0.03), 1.4, Color(1.0, 0.68, 0.36, 1.0)])
 	Kit.add(root, lamps, U, "Pendants", false, Kit.glow_mat("warm"), Vector3.ZERO, Vector3.ZERO, false, false)
 	# A handful of real lights (Compatibility renderer: keep this small).
 	Kit.light(root, Vector3(-3.4, 3.0, 1.2), Color(1.0, 0.78, 0.52), 1.6, 6.0)

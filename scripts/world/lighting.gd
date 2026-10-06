@@ -96,7 +96,7 @@ func _apply() -> void:
 	else:
 		heading = 180.0 - t * 160.0 + profile.get("sun_yaw", 0.0)
 	sun.rotation_degrees = Vector3(-elev, heading, 0)
-	var warm := Color(1.0, 0.66, 0.4).lerp(Color(1.0, 0.88, 0.7), golden)
+	var warm := Color(1.0, 0.66, 0.4).lerp(Color(1.0, 0.94, 0.84), golden)
 	sun.light_color = warm
 	sun.light_energy = lerpf(0.0, profile.get("sun_energy", 1.35), day)
 	sun.visible = day > 0.02
@@ -121,7 +121,7 @@ func _apply() -> void:
 	var fog_d: Color = profile.get("fog_day", Color(0.9, 0.86, 0.78))
 	env.fog_light_color = fog_n.lerp(fog_d, day)
 	env.fog_density = profile.get("fog_density", 0.006)
-	env.tonemap_exposure = profile.get("exposure", lerpf(1.15, 1.0, day))
+	env.tonemap_exposure = profile.get("exposure", lerpf(1.12, 0.95, day))
 	env.adjustment_brightness = 1.0
 	env.adjustment_contrast = 1.0
 	env.adjustment_saturation = 1.0
@@ -138,9 +138,9 @@ func _apply() -> void:
 	# --- Post
 	var pp := {
 		"focus_y": 0.55, "band": 0.14, "falloff": 0.3, "blur_px": 7.0, "top_boost": 1.3,
-		"saturation": lerpf(1.12, 1.08, night), "contrast": 1.05,
-		"tint": Vector3(1.025, 1.0, 0.96).lerp(Vector3(0.97, 0.98, 1.06), night),
-		"lift": Vector3(0.012, 0.006, 0.0).lerp(Vector3(0.0, 0.004, 0.02), night),
+		"saturation": lerpf(1.03, 1.08, night), "contrast": lerpf(1.08, 1.06, night),
+		"tint": Vector3(1.005, 1.0, 0.985).lerp(Vector3(0.99, 0.98, 1.03), night),
+		"lift": Vector3(0.004, 0.004, 0.006).lerp(Vector3(0.0, 0.004, 0.02), night),
 		"vignette": lerpf(0.22, 0.32, night), "gamma": 1.0,
 	}
 	pp.merge(profile.get("post", {}), true)

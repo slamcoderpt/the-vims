@@ -220,6 +220,33 @@ def sprout_pot():
     return im.resize((SIZE, SIZE), Image.LANCZOS)
 
 
+def need_fun():
+    """Flat green smiley like the ref need column (not a glossy emoji)."""
+    im, s = big()
+    d = ImageDraw.Draw(im)
+    d.ellipse((16, 16, 240, 240), fill=(104, 214, 80, 255))
+    d.ellipse((36, 30, 200, 150), fill=(134, 228, 108, 255))
+    d.ellipse((36, 40, 236, 236), fill=(104, 214, 80, 255))
+    ink = (34, 92, 40, 255)
+    d.rounded_rectangle((82, 82, 108, 124), radius=13, fill=ink)
+    d.rounded_rectangle((148, 82, 174, 124), radius=13, fill=ink)
+    d.arc((66, 104, 190, 196), start=20, end=160, fill=ink, width=18)
+    return im.resize((SIZE, SIZE), Image.LANCZOS)
+
+
+def need_social():
+    """Pink pair of heads (social), soft flat style."""
+    im, s = big()
+    d = ImageDraw.Draw(im)
+    back, front, hi = (238, 120, 136, 255), (250, 150, 160, 255), (255, 196, 202, 255)
+    d.ellipse((128, 40, 220, 132), fill=back)
+    d.rounded_rectangle((112, 128, 246, 230), radius=50, fill=back)
+    d.ellipse((30, 60, 138, 168), fill=front)
+    d.ellipse((50, 74, 96, 110), fill=hi)
+    d.rounded_rectangle((8, 160, 162, 246), radius=56, fill=front)
+    return im.resize((SIZE, SIZE), Image.LANCZOS)
+
+
 def main():
     os.makedirs(OUT, exist_ok=True)
     for name, (ch, t) in EMOJI.items():
@@ -227,6 +254,8 @@ def main():
         if t:
             im = tint(im, t)
         save(name, im)
+    save("need_fun", need_fun())
+    save("need_social", need_social())
     save("house_white", house_white())
     save("arrow_up", arrow_up((70, 196, 60)))
     save("moon_blue", moon_blue())

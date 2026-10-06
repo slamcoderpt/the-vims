@@ -5,7 +5,7 @@ extends RefCounted
 const LOOKS := {
 	"dad": {
 		"body": "big", "skin": Color(0.93, 0.69, 0.54),
-		"hair": Color(0.40, 0.22, 0.12), "hair_style": "messy", "beard": "full",
+		"hair": Color(0.44, 0.24, 0.12), "hair_style": "shaggy", "beard": "full",
 		"brow": Color(0.26, 0.14, 0.08), "eye": Color(0.3, 0.18, 0.1),
 		"top": "plaid", "top_color": Color(0.80, 0.13, 0.12), "top_color2": Color(0.16, 0.05, 0.06),
 		"tee": Color(0.2, 0.2, 0.23), "sleeves": "long", "untucked": true,
@@ -25,7 +25,7 @@ const LOOKS := {
 	},
 	"cat_girl": {
 		"body": "child", "skin": Color(0.74, 0.50, 0.35), "lashes": true,
-		"hair": Color(0.19, 0.11, 0.07), "hair_style": "long", "eye": Color(0.28, 0.16, 0.1),
+		"hair": Color(0.27, 0.15, 0.09), "hair_style": "long", "eye": Color(0.28, 0.16, 0.1),
 		"hat": "cat", "hat_color": Color(0.67, 0.65, 0.92),
 		"ear_color": Color(0.67, 0.65, 0.92), "ear_inner": Color(0.96, 0.7, 0.8),
 		"top": "striped", "top_color": Color(0.22, 0.30, 0.58), "top_color2": Color(0.97, 0.97, 0.98),
@@ -37,7 +37,7 @@ const LOOKS := {
 	"beagle": {
 		"species": "dog",
 		"tan": Color(0.74, 0.42, 0.19), "saddle": Color(0.36, 0.21, 0.11),
-		"white": Color(0.97, 0.95, 0.91), "ear": Color(0.50, 0.28, 0.13),
+		"white": Color(0.97, 0.95, 0.91), "ear": Color(0.45, 0.24, 0.11),
 		"collar": Color(0.86, 0.18, 0.18),
 	},
 	# --- Neighbours / townsfolk -------------------------------------------

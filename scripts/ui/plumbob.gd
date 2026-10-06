@@ -7,7 +7,7 @@ const BASE := Color(0.27, 0.86, 0.3)
 
 var tip := Vector2.ZERO   # screen point just above the head
 var active := false
-var gem_scale := 1.0
+var gem_scale := 1.15
 var _t := 0.0
 var _pts := PackedVector2Array()
 var _cols := PackedColorArray()

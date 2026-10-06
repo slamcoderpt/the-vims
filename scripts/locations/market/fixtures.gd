@@ -248,7 +248,7 @@ static func crate(vb: VoxelBuilder, o: Vector3i, w: int, d: int, h: int, col := 
 					cc = Kit.shade(col, 0.86)
 				if (x == 0 or x == w - 1) and (z == 0 or z == d - 1):
 					cc = Kit.shade(col, 0.75)
-				vb.set_v(p, Kit.vary(cc, p, 0.06, 1))
+				vb.set_v(p, Kit.shade(cc, 0.94 + 0.12 * Kit.h(Vector3i(o.x, y, o.z), 1)))
 
 
 ## Pendant lamp (black dome, glowing underside). o = bottom centre cell.

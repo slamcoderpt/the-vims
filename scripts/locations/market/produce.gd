@@ -105,9 +105,9 @@ static func bananas(vb: VoxelBuilder, o: Vector3i, fingers := 4) -> void:
 	for f in fingers:
 		for i in curve.size():
 			var p := o + Vector3i(i, curve[i] + (f % 2), f)
-			var cc := YELLOW if i > 0 and i < curve.size() - 1 else Color("9a7a2a")
+			var cc := YELLOW if i > 0 and i < curve.size() - 1 else Color("a7a83a")
 			if i == curve.size() - 1:
-				cc = Color("5a3d1c")
+				cc = Color("c49a2c")
 			vb.set_v(p, Kit.vary(cc, p, 0.05, 8))
 			if i > 1 and i < curve.size() - 2:
 				vb.set_v(p + Vector3i(0, 1, 0), Kit.vary(Color("fbe05a"), p, 0.04, 9))

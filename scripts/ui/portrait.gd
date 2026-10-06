@@ -12,12 +12,19 @@ uniform vec2 rect_size = vec2(100.0, 130.0);
 uniform float radius = 9.0;
 uniform vec4 bg_top : source_color = vec4(0.98, 0.9, 0.8, 1.0);
 uniform vec4 bg_bottom : source_color = vec4(0.9, 0.72, 0.56, 1.0);
+uniform float seed = 0.0;
 void fragment() {
 	vec4 t = texture(TEXTURE, UV);
 	vec3 bg = mix(bg_top.rgb, bg_bottom.rgb, UV.y);
 	// soft vignette so the head pops
 	float v = 1.0 - 0.18 * length((UV - vec2(0.5, 0.42)) * vec2(1.2, 1.0));
 	bg *= v;
+	// out-of-focus room behind the sim: a few soft warm bokeh blobs
+	vec2 bu = UV * vec2(rect_size.x / rect_size.y, 1.0);
+	float asp = rect_size.x / rect_size.y;
+	bg += vec3(1.0, 0.93, 0.8) * 0.16 * smoothstep(0.2, 0.0, length(bu - vec2(0.12 * asp, 0.2 + seed * 0.2)));
+	bg += vec3(1.0, 0.97, 0.9) * 0.12 * smoothstep(0.26, 0.0, length(bu - vec2(0.92 * asp, 0.14 + seed * 0.1)));
+	bg -= vec3(0.06, 0.05, 0.03) * smoothstep(0.3, 0.0, length(bu - vec2(0.85 * asp, 0.8 - seed * 0.2)));
 	vec3 c = mix(bg, t.rgb / max(t.a, 0.001), t.a);
 	vec2 p = (UV - 0.5) * rect_size;
 	vec2 q = abs(p) - (rect_size * 0.5 - vec2(radius));
@@ -53,6 +60,20 @@ var _refresh_t := 0.0
 var _gem_phase := 0.0
 var _gem: Control
 var _inner: StyleBoxFlat
+var _key: DirectionalLight3D
+var _fill: DirectionalLight3D
+
+## Framing (fractions of the head height neck->top-of-hat), tuned so the face
+## fills the card like the refs.
+const ADULT_TOP := 0.2
+const ADULT_BELOW := 0.42
+const KID_TOP := -0.2
+const KID_BELOW := 0.2
+const PERSON_YAW := -6.0
+const PERSON_PITCH := -2.0
+const DOG_YAW := -32.0
+const DOG_PITCH := -8.0
+const DOG_ZOOM := 1.06
 
 
 func _ready() -> void:
@@ -106,10 +127,23 @@ func _layout() -> void:
 	var bg: Array = BG_TINTS.get(member.get("look", ""), BG_TINTS["default"])
 	_mat.set_shader_parameter("bg_top", bg[0])
 	_mat.set_shader_parameter("bg_bottom", bg[1])
+	_mat.set_shader_parameter("seed", float(index % 4) * 0.33)
 	if _vp:
-		var s := _tex.size * 2.0
-		_vp.size = Vector2i(int(s.x), int(s.y))
+		_resize_viewport()
 		_frame_camera()
+
+
+## Supersample: render at 2x the on-screen pixel size of the card so the
+## voxel edges stay crisp after the (bilinear) downscale on any screen.
+func _resize_viewport() -> void:
+	var px := 1.0
+	if is_inside_tree():
+		px = get_global_transform_with_canvas().get_scale().y * get_viewport().get_final_transform().get_scale().y
+	var k := clampf(px * 2.0, 2.0, 4.0)
+	var s := (_tex.size * k).round()
+	var want := Vector2i(int(s.x), int(s.y))
+	if _vp.size != want:
+		_vp.size = want
 
 
 func _build_viewport() -> void:
@@ -123,23 +157,26 @@ func _build_viewport() -> void:
 	var env := Environment.new()
 	env.background_mode = Environment.BG_CLEAR_COLOR
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color("fff1e0")
-	env.ambient_light_energy = 0.95
-	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
-	env.tonemap_white = 6.0
+	env.ambient_light_color = Color("fff3e6")
+	env.ambient_light_energy = 0.9
+	env.tonemap_mode = Environment.TONE_MAPPER_LINEAR
 	var we := WorldEnvironment.new()
 	we.environment = env
 	_vp.add_child(we)
+	# Warm key from camera-left and above, cool soft fill from the right, a
+	# rim from behind: a studio portrait light that keeps the face bright.
 	var key := DirectionalLight3D.new()
-	key.light_color = Color("ffe6c8")
-	key.light_energy = 1.45
-	key.rotation_degrees = Vector3(-28, 28, 0)
+	key.light_color = Color("fff0dc")
+	key.light_energy = 0.85
+	key.rotation_degrees = Vector3(-24, -24, 0)
 	_vp.add_child(key)
+	_key = key
 	var fill := DirectionalLight3D.new()
-	fill.light_color = Color("c8d8ff")
-	fill.light_energy = 0.35
-	fill.rotation_degrees = Vector3(-10, -120, 0)
+	fill.light_color = Color("dfe8ff")
+	fill.light_energy = 0.3
+	fill.rotation_degrees = Vector3(-8, 40, 0)
 	_vp.add_child(fill)
+	_fill = fill
 	_cam = Camera3D.new()
 	_cam.projection = Camera3D.PROJECTION_ORTHOGONAL
 	_cam.keep_aspect = Camera3D.KEEP_HEIGHT
@@ -161,46 +198,60 @@ func _spawn_actor() -> void:
 	var script: Script = load(SIM_ACTOR)
 	if script == null or not script.can_instantiate():
 		return
-	_actor = script.create(look)
-	_actor.name = "PortraitActor"
-	_vp.add_child(_actor)
-	if _actor.has_method("set_pose"):
-		_actor.set_pose("sit" if member.get("kind", "") == "dog" else "idle")
-	# Let the actor build its meshes and settle its pose, then frame it.
+	var a: Node3D = script.create(look)
+	_actor = a
+	a.name = "PortraitActor"
+	_vp.add_child(a)
+	if a.has_method("set_pose"):
+		a.set_pose("idle")
+	# Let the actor build its meshes and snap into its pose, then freeze it:
+	# a portrait is a still (eyes open, no idle sway), rendered on demand.
 	for i in 3:
 		await get_tree().process_frame
+	if not is_instance_valid(a) or a != _actor:
+		return
+	a.process_mode = Node.PROCESS_MODE_DISABLED
 	_frame_camera()
 
 
-## Fit the camera to the head (people) or the whole body (pets). Prefers the
-## actor's optional portrait_focus() -> [center: Vector3, view_height: float],
-## then its head bone + head_top(), then the mesh AABB.
+func _bone_pos(sk: Skeleton3D, idx: int) -> Vector3:
+	return sk.global_transform * sk.get_bone_global_pose(idx).origin
+
+
+## Frame a head-and-shoulders shot (people) or the whole pet, front-on at eye
+## level. Prefers the actor's optional portrait_focus() -> [center, view_h].
 func _frame_camera() -> void:
 	if _actor == null or not is_instance_valid(_actor) or not _actor.is_inside_tree():
 		return
 	var dog: bool = member.get("kind", "") == "dog"
+	var kid: bool = member.get("kind", "") == "child"
 	var center := Vector3.ZERO
 	var view_h := 0.0
+	var aspect := _tex.size.x / maxf(_tex.size.y, 1.0)
+	var sk = _actor.get("skeleton")
+	var hb := int(_actor.get("b_head")) if _actor.get("b_head") != null else -1
 	if _actor.has_method("portrait_focus"):
 		var f: Array = _actor.portrait_focus()
 		center = f[0]
 		view_h = f[1]
-	elif _actor.has_method("head_top") and _actor.get("skeleton") is Skeleton3D and int(_actor.get("b_head")) >= 0:
-		var sk: Skeleton3D = _actor.get("skeleton")
-		var neck: Vector3 = sk.global_transform * sk.get_bone_global_pose(int(_actor.get("b_head"))).origin
+	elif sk is Skeleton3D and hb >= 0 and _actor.has_method("head_top"):
+		var neck := _bone_pos(sk, hb)
 		var top: Vector3 = _actor.head_top()
 		if dog:
 			var base := _actor.global_position
 			var hh := top.y - base.y
-			center = Vector3((base.x + neck.x) * 0.5, base.y + hh * 0.5, (base.z + neck.z) * 0.5)
-			view_h = hh * 1.02
+			var body_i := int(_actor.get("b_body"))
+			var body := _bone_pos(sk, body_i) if body_i >= 0 else base
+			var mid := (body + neck) * 0.5
+			center = Vector3(mid.x, base.y + hh * 0.46, mid.z)
+			view_h = hh * DOG_ZOOM
 		else:
 			var hh := top.y - neck.y
-			# chibi kids: big hatted heads, frame from just above the hat to the chin/shoulders
-			var kid: bool = member.get("kind", "") == "child"
-			var y0 := neck.y - hh * (0.16 if kid else 0.45)
-			var y1 := top.y + hh * (0.06 if kid else 0.14)
-			center = Vector3(neck.x, (y0 + y1) * 0.5, neck.z)
+			var eyes_i := int(_actor.get("b_eyes"))
+			var eyes := _bone_pos(sk, eyes_i) if eyes_i >= 0 else neck + Vector3(0, hh * 0.4, 0)
+			var y1 := top.y + hh * (KID_TOP if kid else ADULT_TOP)
+			var y0 := neck.y - hh * (KID_BELOW if kid else ADULT_BELOW)
+			center = Vector3(eyes.x, (y0 + y1) * 0.5, eyes.z)
 			view_h = y1 - y0
 	else:
 		var box := _actor_aabb()
@@ -211,14 +262,17 @@ func _frame_camera() -> void:
 			center = box.get_center()
 			view_h = maxf(h, maxf(box.size.x, box.size.z) * 0.8) * 1.05
 		else:
-			view_h = h * 0.55
-			center = Vector3(box.get_center().x, box.end.y - view_h * 0.46, box.get_center().z)
-	var yaw := deg_to_rad(-16.0 if not dog else -32.0) + _actor.global_rotation.y
-	var pitch := deg_to_rad(-6.0 if not dog else -14.0)
+			view_h = h * 0.5
+			center = Vector3(box.get_center().x, box.end.y - view_h * 0.5, box.get_center().z)
+	var yaw := deg_to_rad(DOG_YAW if dog else PERSON_YAW) + _actor.global_rotation.y
+	var pitch := deg_to_rad(DOG_PITCH if dog else PERSON_PITCH)
 	var dir := Vector3(sin(yaw) * cos(pitch), -sin(pitch), cos(yaw) * cos(pitch))
 	_cam.size = view_h
 	_cam.global_position = center + dir * 6.0
 	_cam.look_at(center, Vector3.UP)
+	# Key light follows the camera so every portrait gets the same look.
+	_key.rotation = Vector3(deg_to_rad(-26.0), yaw - deg_to_rad(30.0), 0)
+	_fill.rotation = Vector3(deg_to_rad(-6.0), yaw + deg_to_rad(55.0), 0)
 	_vp.render_target_update_mode = SubViewport.UPDATE_ONCE
 
 
@@ -240,12 +294,6 @@ func _actor_aabb() -> AABB:
 
 
 func _process(delta: float) -> void:
-	# Re-render the portrait now and then so idle animation shows, cheaply.
-	_refresh_t += delta
-	if _refresh_t > 0.6:
-		_refresh_t = 0.0
-		if _vp:
-			_vp.render_target_update_mode = SubViewport.UPDATE_ONCE
 	if selected:
 		_gem_phase += delta
 		_gem.queue_redraw()

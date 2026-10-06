@@ -16,6 +16,18 @@ signal bubble_requested(anchor: Node3D, data: Dictionary)
 signal bubble_cleared(anchor: Node3D, id: String)
 ## Object action menu (pie menu) for a tapped interactable.
 signal menu_requested(title: String, actions: Array, screen_pos: Vector2)
+## Emitted by the HUD when a row of the action menu is picked (hud.gd forwards it).
+signal action_chosen(title: String, action: Dictionary)
+## Close any open action menu (HUD may listen; gameplay emits it on mode switches).
+signal menu_closed
+## A household member's skill went up. level is the new whole level (1..10).
+signal skill_changed(index: int, skill: String, level: int)
+## Needs were changed by gameplay (actions); the clock also refreshes need bars.
+signal needs_changed(index: int)
+## Short toast/notification line ("Not enough money", "Bought Armchair").
+signal notify(text: String, icon: String)
+## A placed (bought) object was added / moved / sold in the current location.
+signal furniture_changed
 
 const DAY_NAMES := ["Mon.", "Tue.", "Wed.", "Thu.", "Fri.", "Sat.", "Sun."]
 const SEASONS := ["Spring", "Summer", "Autumn", "Winter"]
@@ -52,6 +64,20 @@ var household: Array[Dictionary] = []
 var tasks: Array[Dictionary] = []
 ## When true the clock is frozen by a screenshot preset.
 var frozen := false
+## True while the sim layer runs (live play / playtest); false for screenshot presets.
+var live := false
+## Need decay per in-game hour (default for unknown needs: NEED_DECAY_DEFAULT).
+const NEED_DECAY := {"hunger": 0.055, "energy": 0.04, "fun": 0.05, "hygiene": 0.035, "social": 0.04, "bladder": 0.08}
+const NEED_DECAY_DEFAULT := 0.04
+## Skill XP needed per level (in-game hours of practice per level grows a bit).
+const SKILL_HOURS_PER_LEVEL := 1.0
+const LOCATIONS := ["home", "backyard", "festival", "market"]
+const LOCATION_NAMES := {"home": "Home", "backyard": "Backyard BBQ", "festival": "Autumn Festival", "market": "Grocery Market"}
+## Per-location task lists (kept when you travel away and back).
+var location_tasks := {}
+## Bought furniture per location: Array of {uid, item, pos: Vector3, rot: int}.
+var placed := {}
+var _uid := 0
 
 
 func _ready() -> void:
@@ -90,6 +116,91 @@ func complete_task(id: String) -> void:
 			t.done = true
 			tasks_changed.emit()
 			return
+
+
+## Tick off a task by its title (case-insensitive). Returns true if one changed.
+func complete_task_title(title: String) -> bool:
+	var want := title.strip_edges().to_lower()
+	for t in tasks:
+		if str(t.title).to_lower() == want and not t.done:
+			t.done = true
+			tasks_changed.emit()
+			return true
+	return false
+
+
+func has_open_task(title: String) -> bool:
+	var want := title.strip_edges().to_lower()
+	for t in tasks:
+		if str(t.title).to_lower() == want and not t.done:
+			return true
+	return false
+
+
+## Add (or with a negative amount, spend) money. Returns false when it can't be afforded.
+func add_money(amount: int) -> bool:
+	if amount < 0 and money + amount < 0:
+		return false
+	money += amount
+	return true
+
+
+func can_afford(cost: int) -> bool:
+	return money >= cost
+
+
+func member_index(member_name: String) -> int:
+	for i in household.size():
+		if household[i].name == member_name:
+			return i
+	return -1
+
+
+## Change one need of member i by delta (clamped 0..1). Unknown needs are ignored.
+func change_need(i: int, need: String, delta: float) -> void:
+	if i < 0 or i >= household.size():
+		return
+	var n: Dictionary = household[i].needs
+	if not n.has(need):
+		return
+	n[need] = clampf(n[need] + delta, 0.0, 1.0)
+
+
+## Skill level as a float (whole part = level shown to the player).
+func skill_level(i: int, skill: String) -> float:
+	if i < 0 or i >= household.size():
+		return 0.0
+	return float(household[i].skills.get(skill, 0.0))
+
+
+## Practise a skill for `hours` in-game hours. Emits skill_changed on level up.
+func add_skill_xp(i: int, skill: String, hours: float) -> void:
+	if i < 0 or i >= household.size() or skill == "":
+		return
+	var sk: Dictionary = household[i].skills
+	var before: float = sk.get(skill, 0.0)
+	var lvl := floorf(before)
+	var gain := hours / (SKILL_HOURS_PER_LEVEL * (1.0 + lvl * 0.35))
+	var after := minf(10.0, before + gain)
+	sk[skill] = after
+	if floorf(after) > lvl:
+		skill_changed.emit(i, skill, int(floorf(after)))
+
+
+## Go to another lot. main.gd rebuilds the world on location_changed.
+func travel(loc: String) -> void:
+	if not loc in LOCATIONS:
+		push_warning("Game.travel: unknown location " + loc)
+		return
+	location_tasks[location] = tasks.duplicate(true)
+	location = loc
+	mode = "live"
+	location_changed.emit(loc)
+
+
+func next_uid() -> int:
+	_uid += 1
+	return _uid
 
 
 func show_bubble(anchor: Node3D, data: Dictionary) -> void:
@@ -138,5 +249,13 @@ func _process(delta: float) -> void:
 	var hours := dm / 60.0
 	for s in household:
 		for k in s.needs:
-			s.needs[k] = clampf(s.needs[k] - hours * 0.04, 0.0, 1.0)
+			s.needs[k] = clampf(s.needs[k] - hours * NEED_DECAY.get(k, NEED_DECAY_DEFAULT), 0.0, 1.0)
 	time_changed.emit(day, minutes)
+
+
+## In-game minutes that pass this frame (0 when paused / frozen). The sim layer
+## uses this so everything follows pause / play / fast.
+func game_minutes(delta: float) -> float:
+	if frozen or speed == 0:
+		return 0.0
+	return delta / SECONDS_PER_MINUTE * SPEED_MULT[speed]

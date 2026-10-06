@@ -353,14 +353,14 @@ func _clock(cx: int, cy: int, z: int) -> void:
 
 func _house_left() -> void:
 	# Brick townhouse, front gable, close to the left of the square.
-	var x0 := -18.0
-	var x1 := -8.0
-	var z := -14.0
+	var x0 := -14.5
+	var x1 := -5.5
+	var z := -14.5
 	var h := 5.6
 	_wall("brick2", Vector3(x0, 0, z - 5.0), Vector3(x1 - x0, h, 5.0))
 	_band(x0 - 0.1, x1 + 0.1, 0, z - 0.1, 0.375, 0.375)
 	_band(x0 - 0.1, x1 + 0.1, 2.75, z - 0.1, 0.25, 0.375)
-	var cols := [x0 + 1.0, x0 + 3.2, x0 + 5.6, x0 + 7.8]
+	var cols := [x0 + 0.9, x0 + 3.0, x0 + 5.2, x0 + 7.3]
 	for fl in 2:
 		for i in cols.size():
 			var lit := K.hs(i, fl, 4) < 0.45

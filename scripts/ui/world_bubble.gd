@@ -16,6 +16,7 @@ var icon_tex: Texture2D
 var progress := -1.0
 var bar_color := UI.GREEN
 var tail_frac := 0.36
+var base_tail_frac := 0.36
 var tip := Vector2.ZERO
 var ttl := -1.0
 var anchor: Node3D
@@ -61,7 +62,7 @@ func _measure() -> void:
 			var tw := f.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 18).x
 			if sub != "":
 				tw = maxf(tw, UI.font(700).get_string_size(sub, HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x)
-			size = Vector2(maxf(152.0 if progress >= 0.0 else 120.0, tw + 82.0), 56.0 if (progress >= 0.0 or sub != "") else 50.0)
+			size = Vector2(maxf(176.0 if progress >= 0.0 else 120.0, tw + 92.0), 60.0 if (progress >= 0.0 or sub != "") else 50.0)
 		"speech":
 			var tw2 := UI.font(700).get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x
 			size = Vector2(tw2 + (58.0 if icon_tex else 30.0), 46.0)
@@ -74,6 +75,9 @@ func _measure() -> void:
 		tail_frac = 0.16
 	elif kind != "action":
 		tail_frac = 0.4
+	else:
+		tail_frac = 0.36
+	base_tail_frac = tail_frac
 
 
 ## Top-left position so the tail touches `tip`.
@@ -111,13 +115,14 @@ func _draw() -> void:
 	match kind:
 		"action":
 			if icon_tex:
-				draw_texture_rect(icon_tex, Rect2(13, (size.y - 38.0) * 0.5, 38, 38), false)
-			var ty := 25.0 if (progress >= 0.0 or sub != "") else 32.0
+				draw_texture_rect(icon_tex, Rect2(12, (size.y - 40.0) * 0.5, 40, 40), false)
+			var ty := 27.0 if (progress >= 0.0 or sub != "") else 32.0
 			draw_string(f, Vector2(62, ty), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, UI.INK)
 			if sub != "" and progress < 0.0:
 				draw_string(UI.font(700), Vector2(62, 45), sub, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, UI.INK_SOFT)
 			if progress >= 0.0:
-				UI.draw_bar(self, Rect2(62, 35, size.x - 80.0, 9.0), _shown_progress, bar_color, UI.TRACK)
+				# full-width rounded track under the label (ref1 "Work"/"Paint")
+				UI.draw_bar(self, Rect2(62, 38, size.x - 62.0 - 15.0, 9.0), _shown_progress, bar_color, UI.TRACK)
 		"speech":
 			var x := 14.0
 			if icon_tex:

@@ -46,16 +46,16 @@ func camera_home() -> Dictionary:
 
 func lighting_profile() -> Dictionary:
 	return {
-		"sun_heading": 215.0, "sun_elev": 58.0, "sun_energy": 1.1,
-		"ambient_day": Color(1.0, 0.88, 0.74), "ambient_energy": 0.62,
+		"sun_heading": 200.0, "sun_elev": 52.0, "sun_energy": 1.45,
+		"ambient_day": Color(1.0, 0.86, 0.72), "ambient_energy": 0.5,
 		"ambient_night": Color(0.75, 0.62, 0.5), "ambient_night_energy": 0.7,
 		"lamp_night_mult": 1.2,
 		"sky_day": Color(0.36, 0.27, 0.2), "sky_night": Color(0.2, 0.14, 0.1),
 		"fog_day": Color(0.98, 0.9, 0.78), "fog_night": Color(0.4, 0.3, 0.22), "fog_density": 0.004,
 		"exposure": 1.02,
 		"shadow_distance": 24.0,
-		"post": {"focus_y": 0.52, "band": 0.2, "falloff": 0.26, "blur_px": 6.0, "top_boost": 0.9,
-			"saturation": 1.2, "contrast": 1.1, "tint": Vector3(1.03, 1.0, 0.94), "vignette": 0.2},
+		"post": {"focus_y": 0.52, "band": 0.2, "falloff": 0.3, "blur_px": 6.5, "top_boost": 0.6,
+			"saturation": 1.2, "contrast": 1.14, "tint": Vector3(1.03, 1.0, 0.94), "vignette": 0.26},
 	}
 
 
@@ -125,7 +125,7 @@ func _stage() -> void:
 	_hold(lily, "carrots")
 	_hold(maya, "cereal")
 	_place("cashier", Vector3(2.95, 0, 0.75), Vector3(0.6, 0, 3.0), "idle")
-	_place("npc_2", Vector3(-1.75, 0, -2.6), Vector3(-3.0, 0, -3.4), "idle")
+	_place("npc_2", Vector3(-0.85, 0, -2.4), Vector3(-2.6, 0, -3.4), "idle")
 	_place("npc_5", Vector3(0.9, 0, -6.4), Vector3(0.6, 0, -10.0), "idle")
 	_place("npc_4", Vector3(-0.2, 0, -4.4), Vector3(-0.4, 0, -9.0), "idle")
 	_place("npc_0", Vector3(1.95, 0, -3.6), Vector3(3.0, 0, -3.8), "stand_read")

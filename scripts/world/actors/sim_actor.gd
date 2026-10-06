@@ -17,7 +17,8 @@ extends Node3D
 ##   "type" and "read" are seated by default; the rest stand.
 ##   lie/sleep: place the actor at the middle of the mattress; the head points
 ##   along the actor's local -Z (use face() towards the foot end).
-##   Dog poses: idle, walk, sit, lie, sleep, play (play bow), talk (bark);
+##   Dog poses: idle, walk, sit, lie, sleep, play/chew (lying, gnawing a chew
+##   bone), bow (play bow), talk (bark);
 ##   anything else falls back to idle.
 ##
 ## Rendering: every body part is its own voxel model on its own bone; the parts
@@ -318,6 +319,8 @@ func _compute_targets(_delta: float) -> void:
 		_dog_pose()
 	else:
 		_human_pose()
+	if has_meta("dbg_head_yaw"):
+		_tgt[b_head].y = get_meta("dbg_head_yaw")
 
 
 func _sb(i: int, x: float, y := 0.0, z := 0.0) -> void:
@@ -397,13 +400,18 @@ func _human_pose() -> void:
 				_sb(b_torso, 0.025 * slow)
 				_sb(b_head, -0.02 * slow, 0.35, 0.0)
 		"type":
+			# Hands on the keyboard, shoulders hunched in; the head is turned a
+			# little to the sim's left (glancing at the laptop beside the
+			# monitor) so the face and beard read in 3/4 from a Sims camera.
 			var tap := sin(t * 13.0)
-			_sb(b_arm_l, -0.55, 0.0, -0.06)
-			_sb(b_arm_r, -0.55, 0.0, 0.06)
-			_sb(b_fore_l, -0.95 + 0.07 * maxf(0.0, tap))
-			_sb(b_fore_r, -0.95 + 0.07 * maxf(0.0, -tap))
-			_ab(b_torso, 0.1)
-			_ab(b_head, 0.06 + 0.02 * sin(t * 0.8), 0.06 * sin(t * 0.4), 0.0)
+			var tap2 := sin(t * 11.0 + 1.3)
+			_sb(b_arm_l, -0.62, -0.18, -0.05)
+			_sb(b_arm_r, -0.62, 0.18, 0.05)
+			_sb(b_fore_l, -0.85 + 0.08 * maxf(0.0, tap), 0.0, 0.0)
+			_sb(b_fore_r, -0.85 + 0.08 * maxf(0.0, tap2), 0.0, 0.0)
+			_ab(b_torso, 0.1, 0.26, 0.0)
+			_ab(b_hips, 0.0, 0.08, 0.0)
+			_ab(b_head, 0.0 + 0.02 * sin(t * 0.8), 0.68 + 0.05 * sin(t * 0.4), 0.05)
 		"read":
 			_sb(b_arm_l, -0.45, 0.0, -0.18)
 			_sb(b_arm_r, -0.45, 0.0, 0.18)
@@ -412,13 +420,15 @@ func _human_pose() -> void:
 			_ab(b_torso, 0.06)
 			_ab(b_head, 0.2, 0.05 * sin(t * 0.6), 0.0)
 		"paint":
+			# Brush arm raised to the canvas, palette held low in the other hand.
 			var dab := sin(t * 3.2)
-			_sb(b_arm_r, -1.05 + 0.12 * dab, 0.0, 0.18)
-			_sb(b_fore_r, -0.55 - 0.15 * dab)
-			_sb(b_arm_l, -0.35, 0.0, 0.12)
-			_sb(b_fore_l, -1.25)
-			_ab(b_head, 0.05, -0.08, 0.06 * sin(t * 0.7))
-			_ab(b_torso, 0.05, -0.08, 0.0)
+			var dab2 := sin(t * 1.3 + _phase)
+			_sb(b_arm_r, -1.75 + 0.12 * dab, 0.1 * dab2, 0.28)
+			_sb(b_fore_r, -0.45 - 0.2 * dab)
+			_sb(b_arm_l, -0.45, 0.0, 0.18)
+			_sb(b_fore_l, -1.15)
+			_ab(b_head, -0.05, -0.12 + 0.05 * dab2, 0.06 * sin(t * 0.7))
+			_ab(b_torso, 0.06, -0.12, 0.0)
 		"talk":
 			var g := sin(t * 2.3 + _phase)
 			_sb(b_arm_r, -0.45 + 0.2 * g, 0.0, -0.15)
@@ -447,14 +457,17 @@ func _human_pose() -> void:
 			_sb(b_arm_l, 0.0, 0.0, 0.08)
 			_ab(b_head, -0.05, 0.0, 0.0)
 		"play":
+			# Cross-legged on the rug, leaning in over the toys, both hands busy.
 			_sit_floor()
 			var pl := sin(t * 3.0 + _phase)
-			_sb(b_arm_l, -0.85 + 0.2 * pl, 0.0, -0.1)
-			_sb(b_arm_r, -0.85 - 0.2 * pl, 0.0, 0.1)
-			_sb(b_fore_l, -0.45)
-			_sb(b_fore_r, -0.45)
-			_ab(b_torso, 0.1)
-			_ab(b_head, -0.12, 0.12 * sin(t * 0.7), 0.05 * sin(t * 1.1))
+			var pl2 := sin(t * 2.2 + _phase * 2.0)
+			_sb(b_arm_l, -0.95 + 0.18 * pl, -0.25, -0.05)
+			_sb(b_arm_r, -0.75 - 0.22 * pl2, 0.3, 0.05)
+			_sb(b_fore_l, -0.7 - 0.15 * pl2)
+			_sb(b_fore_r, -0.85 + 0.15 * pl)
+			_ab(b_torso, 0.04)
+			# Head tips back up so the face stays visible from above.
+			_ab(b_head, -0.22, 0.14 * sin(t * 0.7), 0.08 * sin(t * 1.1))
 
 
 func _sit_chair() -> void:
@@ -470,14 +483,17 @@ func _sit_chair() -> void:
 
 
 func _sit_floor() -> void:
-	_sb(b_thigh_l, -PI * 0.5 + 0.08, 0.32, 0.0)
-	_sb(b_thigh_r, -PI * 0.5 + 0.08, -0.32, 0.0)
-	_sb(b_shin_l, 0.45, 0.0, 0.0)
-	_sb(b_shin_r, 0.45, 0.0, 0.0)
-	_sb(b_arm_l, -0.25, 0.0, 0.15)
-	_sb(b_arm_r, -0.25, 0.0, -0.15)
-	_sb(b_fore_l, -0.6)
-	_sb(b_fore_r, -0.6)
+	# Cross-legged: thighs forward and splayed out, shins folded across in
+	# front, feet tucked under the opposite knee.
+	_sb(b_thigh_l, -PI * 0.5 + 0.05, 0.85, 0.0)
+	_sb(b_thigh_r, -PI * 0.5 + 0.05, -0.85, 0.0)
+	_sb(b_shin_l, 0.0, 0.0, -PI * 0.5 - 0.55)
+	_sb(b_shin_r, 0.08, 0.0, PI * 0.5 + 0.55)
+	_sb(b_arm_l, -0.35, 0.0, 0.12)
+	_sb(b_arm_r, -0.35, 0.0, -0.12)
+	_sb(b_fore_l, -0.7)
+	_sb(b_fore_r, -0.7)
+	_ab(b_torso, 0.05)
 	_tgt_pos.y += float(_meta.leg_half) - float(_meta.hip_y)
 
 
@@ -533,18 +549,21 @@ func _dog_pose() -> void:
 			_ab(b_head, 0.3)
 			_sb(b_tail, -1.3, 0.0, 0.25 * wag)
 		"lie", "sleep":
-			_tgt_pos.y = -3.4 * vs
-			_sb(b_leg_fl, -1.45, 0.08, 0.0)
-			_sb(b_leg_fr, -1.45, -0.08, 0.0)
-			_sb(b_leg_bl, -1.35, 0.35, 0.0)
-			_sb(b_leg_br, -1.35, -0.35, 0.0)
-			_sb(b_tail, -1.35, 0.0, 0.12 * wag)
+			_dog_lie()
 			if bp == "sleep":
 				_eyes_closed = true
 				_sb(b_head, 0.35 + 0.02 * breath, 0.55, 0.15)
 				_sb(b_tail, -1.4, 0.9, 0.0)
 				_sb(b_body, 0.0, 0.0, 0.0)
-		"play":
+		"play", "chew":
+			# Lying on the rug gnawing a chew toy held across the mouth.
+			_dog_lie()
+			var chew := sin(t * 7.0)
+			_sb(b_head, 0.02 + 0.05 * maxf(0.0, chew), 0.18 * sin(t * 0.9 + _phase), 0.1 * sin(t * 1.7))
+			_sb(b_tail, -0.9, 0.0, 0.55 * sin(t * 14.0))
+			_sb(b_ear_l, 0.05 * chew, 0.0, 0.12)
+			_sb(b_ear_r, 0.05 * chew, 0.0, -0.12)
+		"bow":
 			var hop := absf(sin(t * 5.0))
 			_sb(b_body, 0.32)
 			_tgt_pos.y = -1.6 * vs + 0.02 * hop
@@ -562,6 +581,19 @@ func _dog_pose() -> void:
 			_sb(b_tail, -0.6, 0.0, 0.5 * sin(t * 15.0))
 
 
+func _dog_lie() -> void:
+	# Sphinx pose: belly on the floor, front legs stretched forward, hind legs
+	# folded out to the sides.
+	var vs: float = RigBuilder.VS
+	_tgt_pos.y = -float(_meta.leg) + 0.3 * vs
+	_sb(b_leg_fl, -1.5, 0.1, 0.0)
+	_sb(b_leg_fr, -1.5, -0.1, 0.0)
+	_sb(b_leg_bl, -1.45, 0.55, 0.0)
+	_sb(b_leg_br, -1.45, -0.55, 0.0)
+	_sb(b_tail, -1.25, 0.0, 0.15 * sin(_t * 11.0))
+	_ab(b_head, 0.1)
+
+
 # ---------------------------------------------------------------------------
 # Props
 
@@ -570,14 +602,18 @@ const _PROPS_FOR := {
 	"paint": [["brush", "fore_r"], ["palette", "fore_l"]],
 	"grill": [["spatula", "fore_r"]],
 	"brush_teeth": [["toothbrush", "fore_r"]],
-	"play": [["block", "fore_r"]],
+	"play": [["block", "fore_r"], ["robot", "fore_l"]],
+}
+const _DOG_PROPS_FOR := {
+	"play": [["bone", "head"]],
+	"chew": [["bone", "head"]],
 }
 
 
 func _update_props() -> void:
-	if _dog or skeleton == null:
+	if skeleton == null:
 		return
-	var want: Array = _PROPS_FOR.get(_base_pose(), [])
+	var want: Array = (_DOG_PROPS_FOR.get(pose, []) if _dog else _PROPS_FOR.get(_base_pose(), []))
 	for n: String in _props:
 		(_props[n] as Node3D).visible = false
 	for entry: Array in want:
@@ -599,6 +635,10 @@ func _make_prop(pname: String, bone: String) -> MeshInstance3D:
 		_attach[bone] = att
 	var mi := MeshInstance3D.new()
 	mi.mesh = RigBuilder.prop_mesh(pname)
+	if _dog:
+		mi.position = _meta.mouth
+		att.add_child(mi)
+		return mi
 	var hand: float = -float(_meta.fore_len) + 0.03
 	var ax: float = _meta.arm_x
 	match pname:
@@ -616,5 +656,7 @@ func _make_prop(pname: String, bone: String) -> MeshInstance3D:
 			mi.rotation = Vector3(0, 0, PI * 0.5)
 		"block":
 			mi.position = Vector3(0, hand - 0.04, 0.03)
+		"robot":
+			mi.position = Vector3(0, hand - 0.05, 0.04)
 	att.add_child(mi)
 	return mi

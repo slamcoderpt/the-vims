@@ -49,6 +49,8 @@ var _bubbles := {}
 var _actor_cache := {}
 var _actor_cache_loc: Object
 var _cam: Camera3D
+## Screen area of the household column; world bubbles are nudged off it.
+var _household_rect := Rect2()
 
 
 func _ready() -> void:
@@ -64,6 +66,7 @@ func _ready() -> void:
 	root.add_child(bubble_layer)
 	plumbob = Plumbob.new()
 	plumbob.name = "Plumbob"
+	plumbob.z_index = 1
 	bubble_layer.add_child(plumbob)
 
 	household_box = Control.new()
@@ -178,6 +181,14 @@ func _layout_household() -> void:
 		np.size = Vector2(176.0 if sel else 172.0, ph)
 		np.queue_redraw()
 		y = maxf(y + ch, py + ph) + (8.0 if compact else (12.0 if sel else 10.0))
+	_household_rect = Rect2(household_box.position, Vector2(cw_max(), y))
+
+
+func cw_max() -> float:
+	var w := 0.0
+	for np in _needs:
+		w = maxf(w, np.position.x + np.size.x)
+	return w
 
 
 func _on_portrait_tapped(i: int) -> void:
@@ -253,6 +264,7 @@ func _is_selected_actor(a: Node3D) -> bool:
 
 func _position_bubble(b) -> void:
 	var tip := Vector2.INF
+	b.tail_frac = b.base_tail_frac
 	var a: Node3D = b.anchor
 	if a != null and is_instance_valid(a) and a.is_inside_tree():
 		tip = _project(_anchor_point(a))
@@ -276,6 +288,21 @@ func _position_bubble(b) -> void:
 	if b.visible:
 		b.tip = tip
 		b.place()
+		_keep_off_hud(b)
+
+
+## Slide a bubble right so it never sits on top of the portrait/needs column;
+## the tail follows the anchor as far as the bubble's width allows.
+func _keep_off_hud(b) -> void:
+	var hr := _household_rect.grow(8.0)
+	var r := Rect2(b.position, b.size)
+	if hr.size.x <= 0.0 or not hr.intersects(r):
+		return
+	var nx := hr.end.x
+	var tx: float = b.tip.x
+	b.tail_frac = clampf((tx - nx) / b.size.x, 0.12, 0.5)
+	b.position.x = nx
+	b.queue_redraw()
 
 
 # --------------------------------------------------------------- actors
@@ -410,7 +437,7 @@ func apply_preset(preset_name: String, p: Dictionary) -> void:
 	menu.close()
 	Game.selected = int(p.get("selected", 0))
 	var spec: Dictionary = HudPresets.get_spec(preset_name)
-	clock.set_show_season(spec.get("show_season", false))
+	clock.set_show_season(spec.get("show_season", true))
 	plumbob_fallback = spec.get("plumbob", Vector2.INF)
 	if spec.has("needs"):
 		var nd: Dictionary = spec.needs

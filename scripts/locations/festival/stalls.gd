@@ -20,7 +20,7 @@ var glow_points: Array = []   # [pos, size, color] for halos
 
 
 func build(parent: Node3D) -> void:
-	treats = _place(parent, "TreatsStall", _treats_stall(), Vector3(-3.3, 0, 0.4), 26.0)
+	treats = _place(parent, "TreatsStall", _treats_stall(), Vector3(-3.0, 0, 0.1), 20.0)
 	_sign(treats, "FALL TREATS", Vector3(0.22, 2.66, 0.975), 0.0042, 0.0)
 	game = _place(parent, "GameStall", _game_stall(), Vector3(1.2, 0, 0.6), -8.0)
 	crafts = _place(parent, "CraftsStall", _crafts_table(), Vector3(5.5, 0, 3.0), -25.0)
@@ -28,11 +28,11 @@ func build(parent: Node3D) -> void:
 	_place(parent, "BlueStall", _side_stall(BLUE, CREAM, 1), Vector3(9.2, 0, -7.4), -60.0)
 	# Chalkboards.
 	var menu := _chalkboard(parent, Vector3(-2.5, 0, 3.1), 18.0, 0.9)
-	K.label(menu, "Apple Cider\n· Pumpkin Pie\n· Pretzels\nCandy Apples", Vector3(0.0, 0.86, 0.13), 0.0018, Color("f4f1e6"), 0.0, Color(0, 0, 0, 0), 64, HORIZONTAL_ALIGNMENT_LEFT)
+	K.label(menu, "Apple Cider\n· Pumpkin Pie\n· Pretzels\nCandy Apples", Vector3(-0.1, 0.86, 0.13), 0.00155, Color("f4f1e6"), 0.0, Color(0, 0, 0, 0), 64, HORIZONTAL_ALIGNMENT_LEFT)
 	var hm := _chalkboard(parent, Vector3(4.4, 0, 4.8), -25.0, 0.8)
 	K.label(hm, "HANDMADE", Vector3(0, 0.95, 0.13), 0.0021, Color("f4f1e6"))
-	var gm := _chalkboard(parent, Vector3(2.3, 0, 1.2), -20.0, 0.5)
-	K.label(gm, "3 TRIES\n$2", Vector3(0, 0.4, 0.13), 0.0016, Color("f8e9a0"))
+	var gm := _chalkboard(parent, Vector3(2.3, 0, 1.2), -20.0, 0.6)
+	K.label(gm, "3 TRIES", Vector3(-0.02, 0.62, 0.13), 0.0015, Color("f8e9a0"))
 
 
 func _place(parent: Node3D, nm: String, vb: VoxelBuilder, pos: Vector3, rot: float) -> Node3D:
@@ -363,7 +363,7 @@ func _chalkboard(parent: Node3D, pos: Vector3, rot: float, scale: float) -> Node
 	root.add_child(pivot)
 	var vb := VoxelBuilder.new()
 	vb.jitter = 0.0
-	var w := int(16 * scale)
+	var w := int(18 * scale)
 	var h := int(22 * scale)
 	# Frame.
 	K.box(vb, 0, 0, 0, w + 2, h + 2, 1, K.wood(WOOD, 0, 2))

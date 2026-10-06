@@ -46,8 +46,7 @@ static func wood(base: Color, plank := 3, along := 0) -> Callable:
 		var row := p.y if along != 1 else p.x
 		var k := int(floor(float(row) / plank))
 		var f := 0.9 + 0.2 * h(Vector3i(k, 7, along), 3)
-		var g := 0.96 + 0.06 * h(p, 9)
-		return shade(base, f * g)
+		return shade(base, f)
 
 
 static func noise(base: Color, amt := 0.08, s := 1) -> Callable:
@@ -212,7 +211,7 @@ static func glow_mat(kind: String) -> StandardMaterial3D:
 	m.emission_enabled = true
 	match kind:
 		"warm":
-			m.emission = Color(1.0, 0.8, 0.5); m.emission_energy_multiplier = 1.4
+			m.emission = Color(1.0, 0.78, 0.45); m.emission_energy_multiplier = 2.2
 		"cool":
 			m.emission = Color(0.85, 0.95, 1.0); m.emission_energy_multiplier = 0.12
 		"sky":

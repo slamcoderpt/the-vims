@@ -102,7 +102,7 @@ func _cobbles(w: int, h: int) -> Image:
 		Color("ad9f96"), Color("cfc6ba"), Color("a69a96"), Color("b9a493"), Color("d6cdbf"),
 		Color("c2a898"), Color("9c958f"), Color("c9b5a8"), Color("b0aaa2"),
 	]
-	var grout := Color("7a726a")
+	var grout := Color("6a625b")
 	var tile := _stone_tile()
 	var ids: PackedInt32Array = tile[0]
 	var shd: PackedFloat32Array = tile[1]
@@ -133,7 +133,7 @@ func _cobbles(w: int, h: int) -> Image:
 			else:
 				var sid := ids[k] + (tx / TILE) * 997 + tiy * 7919
 				c = K.pick(tones, K.hs(sid, 1, 3))
-				c = K.shade(c, f * (0.97 + K.hs(tx, ty, 5) * 0.06))
+				c = K.shade(c, f * (0.82 + K.hs(tx, ty, 5) * 0.05))
 			# Painted leaf litter (denser towards the edges and under trees).
 			var dens := dmap[(ty / 8) * cw + tx / 8]
 			var lh := K.hs(tx / 2, ty / 2, 31)

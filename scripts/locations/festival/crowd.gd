@@ -52,7 +52,7 @@ func build(parent: Node3D, stalls, stage) -> void:
 		["npc_6", Vector3(-1.9, 0, -6.3), Vector3(-2.6, 0, -7.2), "idle"],
 		["npc_7", Vector3(0.9, 0, -2.4), Vector3(0.4, 0, 6.0), "walk"],
 		["npc_5", Vector3(-2.6, 0, -1.6), Vector3(-2.8, 0, 6.0), "walk"],
-		["npc_0", Vector3(5.6, 0, -1.4), Vector3(6.9, 0, -2.6), "idle"],
+		["npc_5", Vector3(5.6, 0, -1.4), Vector3(4.0, 0, 1.0), "talk"],
 		["npc_1", Vector3(7.8, 0, -5.8), Vector3(9.2, 0, -7.4), "talk"],
 		["npc_3", Vector3(-1.2, 0, -2.4), Vector3(-0.2, 0, -2.0), "talk"],
 		["npc_6", Vector3(-0.3, 0, -2.0), Vector3(-1.2, 0, -2.4), "idle"],
@@ -74,7 +74,7 @@ func build(parent: Node3D, stalls, stage) -> void:
 	# Seated at the picnic table (bench tops at 0.5 m).
 	var seated := [
 		["npc_2", Vector3(2.95, 0, -3.45), Vector3(2.95, 0, 0.0)],
-		["npc_0", Vector3(3.75, 0, -2.2), Vector3(3.75, 0, -6.0)],
+		["npc_6", Vector3(3.75, 0, -2.2), Vector3(3.75, 0, -6.0)],
 	]
 	for s: Array in seated:
 		var key := "neighbor_%d" % i
@@ -109,8 +109,8 @@ func _hold(a: SimActor, prop: String, bone: String) -> void:
 	var hand: float = -float(meta.get("fore_len", 0.22)) + 0.02
 	match prop:
 		"candy_apple":
-			mi.position = Vector3(0.0, hand - 0.02, 0.04)
-			mi.rotation = Vector3(-1.2, 0, 0)
+			mi.position = Vector3(0.0, hand - 0.02, 0.03)
+			mi.rotation = Vector3(1.1, 0, -0.6)
 		"fox_plush":
 			mi.position = Vector3(0.0, 0.1, 0.17)
 			mi.rotation = Vector3(0, 0, 0)
@@ -128,11 +128,10 @@ func _prop_mesh(prop: String) -> ArrayMesh:
 	var origin := Vector3.ZERO
 	match prop:
 		"candy_apple":
-			K.box(vb, 0, 0, 0, 1, 5, 1, Color("e8d4a0"))
-			K.box(vb, -2, 5, -2, 5, 4, 5, Color("c0141c"))
-			K.box(vb, -1, 9, -1, 3, 1, 3, Color("a8101a"))
-			vb.set_v(Vector3i(-1, 8, 2), Color("ff6a6a"))
-			vb.set_v(Vector3i(0, 10, 0), Color("6a3a1a"))
+			K.box(vb, 0, 0, 0, 1, 3, 1, Color("e8d4a0"))
+			K.box(vb, -1, 3, -1, 3, 3, 3, Color("c0141c"))
+			vb.set_v(Vector3i(-1, 5, 1), Color("ff6a6a"))
+			vb.set_v(Vector3i(0, 6, 0), Color("6a3a1a"))
 			origin = Vector3(0.5, 0, 0.5)
 		"fox_plush":
 			var o := Color("ec7a26")

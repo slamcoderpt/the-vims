@@ -17,14 +17,14 @@ static func u(m: float) -> int:
 
 static func build(root: Node3D, halo_pts: Array) -> void:
 	var fix := VoxelBuilder.new()     # wooden produce fixtures (U)
-	fix.jitter = 0.04
+	fix.jitter = 0.0
 	var prod := VoxelBuilder.new()    # produce (P)
 	prod.jitter = 0.05
 	_produce_wall(root, fix, prod)
 	_produce_island(root, fix, prod)
 	_produce_table(root, fix, prod)
-	Kit.add(root, fix, U, "ProduceFixtures", true)
-	Kit.add(root, prod, P, "Produce", true)
+	Kit.add(root, fix, U, "ProduceFixtures", true, null, Vector3.ZERO, Vector3.ZERO, true)
+	Kit.add(root, prod, P, "Produce", false)
 	_chalkboard(root)
 	_fridges(root)
 	_aisles(root)
@@ -106,7 +106,7 @@ static func _produce_wall(root: Node3D, fix: VoxelBuilder, prod: VoxelBuilder) -
 	var z := -10.2
 	var sec := 0
 	var xw := -6.7
-	while z < 0.6 and sec < kinds.size():
+	while z < -1.5 and sec < kinds.size():
 		var lenz := 1.45
 		var ks: Array = kinds[sec]
 		# tiers: front low -> back high
@@ -135,9 +135,9 @@ static func _produce_island(root: Node3D, fix: VoxelBuilder, prod: VoxelBuilder)
 	var wood := Kit.wood(Color("8f5a31"), 2)
 	# rows: [base y, z, depth, crate h, [[kind, width]...]] back (high) -> front (low)
 	var rows := [
-		[0.78, -0.95, 0.85, 0.24, [["broccoli", 0.95], ["lettuce", 0.95], ["apple", 1.0]]],
-		[0.5, -0.05, 0.9, 0.26, [["greens", 0.95], ["tomato", 0.95]]],
-		[0.22, 0.9, 0.9, 0.28, [["carrot", 0.9], ["banana", 0.9]]],
+		[0.78, -0.95, 0.85, 0.24, [["broccoli", 0.95], ["lettuce", 0.95], ["apple", 1.0]], 2],
+		[0.5, -0.05, 0.9, 0.26, [["greens", 0.95], ["tomato", 0.95]], 3],
+		[0.22, 0.9, 0.9, 0.28, [["carrot", 0.9], ["banana", 0.9]], 3],
 	]
 	var names := {"broccoli": "Broccoli", "lettuce": "Lettuce", "apple": "Apples", "greens": "Greens", "tomato": "Tomatoes",
 		"pepper_red": "Peppers", "carrot": "Carrots", "banana": "Bananas", "pepper_mix": "Peppers"}
@@ -153,7 +153,7 @@ static func _produce_island(root: Node3D, fix: VoxelBuilder, prod: VoxelBuilder)
 		for e: Array in r[4]:
 			var w: float = e[1]
 			var kind: String = e[0]
-			_crate(fix, prod, Vector3(xs, r[0], r[1]), Vector3(w, r[3], r[2]), kind, 40 + ri * 5 + int(xs * 3.0), 3)
+			_crate(fix, prod, Vector3(xs, r[0], r[1]), Vector3(w, r[3], r[2]), kind, 40 + ri * 5 + int(xs * 3.0), r[5])
 			Interactable.attach(root, names[kind], _produce_actions(names[kind], prices[kind]), Vector3(w, 0.5, r[2]),
 				Vector3(xs + w * 0.5, r[0] + 0.25, r[1] + r[2] * 0.5), Vector3(xs + w * 0.5, 0, 2.2))
 			xs += w + 0.02
@@ -206,13 +206,13 @@ static func _chalkboard(root: Node3D) -> void:
 
 static func _fridges(root: Node3D) -> void:
 	var vb := VoxelBuilder.new()
-	vb.jitter = 0.02
+	vb.jitter = 0.0
 	var bank := Fx.fridge(u(6.4), 3)
 	Fx.put(vb, bank, Vector3i(u(-1.9), 0, u(-11.15)))
 	# second bank on the right of the back wall (beverages)
 	var bank2 := Fx.fridge(u(2.6), 9)
 	Fx.put(vb, bank2, Vector3i(u(4.7), 0, u(-11.15)))
-	Kit.add(root, vb, U, "Fridges", false, Kit.glow_mat("cool"))
+	Kit.add(root, vb, U, "Fridges", false, Kit.glow_mat("cool"), Vector3.ZERO, Vector3.ZERO, true)
 	Interactable.attach(root, "Dairy Fridge", [
 		_act("buy", "Buy Milk", "milk", 2.0, {"money": -2, "item": "Milk"}),
 		_act("compare", "Compare", "scale", 3.0),
@@ -223,14 +223,14 @@ static func _fridges(root: Node3D) -> void:
 
 static func _aisles(root: Node3D) -> void:
 	var vb := VoxelBuilder.new()
-	vb.jitter = 0.03
+	vb.jitter = 0.0
 	var kinds_a := ["cereal", "cereal", "bag", "can", "jar"]
 	var kinds_b := ["bottle", "bottle", "can", "cereal", "bag"]
 	# Row 1: faces -x, runs along z from -9.4 to -2.2 at x = 2.25.
 	var g1 := Fx.gondola(u(8.3), 1, kinds_a)
 	Fx.put(vb, g1, Vector3i(u(3.5), 0, u(-9.3)), 3)
 	# Row 2 (further right, partly visible above row 1).
-	var g2 := Fx.gondola(u(7.6), 2, kinds_b)
+	var g2 := Fx.gondola(u(5.0), 2, kinds_b)
 	Fx.put(vb, g2, Vector3i(u(6.3), 0, u(-9.3)), 3)
 	# End-cap facing the camera at the front of row 1.
 	var e1 := Fx.gondola(u(1.1), 4, ["cereal", "bag"])
@@ -261,7 +261,7 @@ static func _aisles(root: Node3D) -> void:
 			var bc: Color = [Color("d39a52"), Color("b8763a"), Color("e4b56e")][(b + s) % 3]
 			vb.box(bp, Vector3i(3, 2, 3), bc)
 			vb.set_v(bp + Vector3i(1, 2, 1), Kit.shade(bc, 1.15))
-	Kit.add(root, vb, U, "Aisles", true)
+	Kit.add(root, vb, U, "Aisles", false, null, Vector3.ZERO, Vector3.ZERO, true)
 	Interactable.attach(root, "Cereal Shelf", [
 		_act("buy", "Buy Cereal", "cereal", 2.0, {"money": -4, "item": "Cereal"}),
 		_act("compare", "Compare", "scale", 3.0),
@@ -324,7 +324,7 @@ static func _checkout(root: Node3D, _halo_pts: Array) -> void:
 	vb.box(Vector3i(x0 + 3, by + 4, belt0 + 13), Vector3i(1, 1, 1), Color("2e7de0"))
 	vb.box(Vector3i(x0 + 7, by, belt0 + 18), Vector3i(3, 3, 3), Color("e8402f"))     # red box
 	vb.box(Vector3i(x0 + 7, by + 1, belt0 + 17), Vector3i(3, 1, 1), Color("fde46a"))
-	var kb := Vector3i(x0 + 9, by, belt0 + 34)   # ketchup, near the camera
+	var kb := Vector3i(x0 + 9, by, belt0 + 25)   # ketchup
 	vb.box(kb, Vector3i(3, 7, 3), Color("d82a22"))
 	vb.box(kb + Vector3i(1, 7, 1), Vector3i(1, 2, 1), Color("f2f2f2"))
 	vb.box(kb + Vector3i(-1, 2, 0), Vector3i(1, 3, 3), Color("fbf3dc"))
@@ -364,8 +364,8 @@ static func _checkout(root: Node3D, _halo_pts: Array) -> void:
 	pv.jitter = 0.05
 	var py := (Hc + 2) * 2
 	var b0 := z0 + u(0.9)
-	Produce.bananas(pv, Vector3i((x0 + 2) * 2, py, (b0 + 28) * 2), 4)
-	Produce.bananas(pv, Vector3i((x0 + 2) * 2 + 1, py + 2, (b0 + 28) * 2 + 1), 3)
+	Produce.bananas(pv, Vector3i((x0 + 2) * 2, py, (b0 + 30) * 2), 5)
+	Produce.bananas(pv, Vector3i((x0 + 2) * 2 + 1, py + 2, (b0 + 30) * 2 + 1), 4)
 	Produce.broccoli(pv, Vector3i((x0 + 3) * 2, py, (b0 + 22) * 2))
 	Produce.lettuce(pv, Vector3i((x0 + 8) * 2, py, (b0 + 24) * 2))
 	for t in 3:

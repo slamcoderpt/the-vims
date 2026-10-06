@@ -86,20 +86,20 @@ func build() -> void:
 
 
 func camera_home() -> Dictionary:
-	return {"target": Vector3(-4.65, 3.75, -0.75), "yaw": 46.0, "pitch": 35.0, "distance": 12.6, "fov": 30.0}
+	return ShotPresets.PRESETS["home_day"].camera.duplicate()
 
 
 func lighting_profile() -> Dictionary:
 	return {
-		"sun_heading": 205.0, "sun_elev": 34.0, "sun_energy": 1.7,
-		"ambient_day": Color(0.96, 0.88, 0.8), "ambient_energy": 0.78,
-		"ambient_night": Color(0.3, 0.34, 0.62), "ambient_night_energy": 0.22, "lamp_night_mult": 2.8,
+		"sun_heading": 205.0, "sun_elev": 36.0, "sun_energy": 1.55,
+		"ambient_day": Color(0.9, 0.88, 0.86), "ambient_energy": 0.72,
+		"ambient_night": Color(0.42, 0.4, 0.62), "ambient_night_energy": 0.34, "lamp_night_mult": 3.2,
 		"sky_day": Color(0.64, 0.8, 0.94), "sky_night": Color(0.07, 0.09, 0.22),
-		"fog_day": Color(0.92, 0.88, 0.8), "fog_night": Color(0.1, 0.12, 0.28), "fog_density": 0.004,
-		"moon_heading": 150.0, "moon_energy": 0.22,
-		"shadow_distance": 34.0,
-		"post_day": {"focus_y": 0.5, "band": 0.27, "falloff": 0.22, "blur_px": 4.5, "top_boost": 1.15},
-		"post_night": {"focus_y": 0.55, "band": 0.27, "falloff": 0.22, "blur_px": 4.5, "top_boost": 1.15},
+		"fog_day": Color(0.9, 0.9, 0.88), "fog_night": Color(0.1, 0.12, 0.28), "fog_density": 0.004,
+		"moon_heading": 150.0, "moon_energy": 0.3,
+		"shadow_distance": 40.0,
+		"post_day": {"focus_y": 0.52, "band": 0.24, "falloff": 0.22, "blur_px": 5.0, "top_boost": 1.2},
+		"post_night": {"focus_y": 0.56, "band": 0.24, "falloff": 0.2, "blur_px": 5.0, "top_boost": 1.3},
 	}
 
 
@@ -560,32 +560,38 @@ func _build_pink() -> void:
 	var y := UF
 	var fx := -0.75
 	var bz := -4.75
-	PropLib.rug(_f(R), Vector3i(fc(0.0), fc(y), fc(-3.4)), fc(2.7), fc(2.7), "patch_pink")
-	var bed := _put(R, "bed", Vector3(0.45, y, bz + 0.02), 0, 0)
-	_put(R, "nightstand", Vector3(1.7, y, bz + 0.05), 0, 2)
-	_put(R, "lamp_table", Vector3(1.8, y + 10 * U, bz + 0.12), 0, 1)
-	_lamp(Vector3(1.95, y + 1.0, bz + 0.5), 1.3, 3.4, 0.2)
-	_put(R, "plush", Vector3(0.55, y + 10 * U, bz + 0.25), 0, 0)
+	PropLib.rug(_f(R), Vector3i(fc(-0.35), fc(y), fc(-3.7)), fc(3.1), fc(2.9), "patch_pink")
+	# Bed with its headboard on the left wall (like ref3), dad's reading chair beside it.
+	var bed := _put(R, "bed", Vector3(-0.73, y, -3.95), 1, 0)
 	_put(R, "nightstand", Vector3(-0.72, y, bz + 0.05), 0, 2)
-	_put(R, "book_stack", Vector3(-0.65, y + 10 * U, bz + 0.15), 0, 2)
-	_put(R, "frame", Vector3(fx, y + 1.45, -3.9), 1, 2)
-	_put(R, "frame", Vector3(fx, y + 1.3, -3.05), 1, 5)
-	_put(R, "frame", Vector3(fx, y + 1.75, -2.55), 1, 6)
+	_put(R, "lamp_table", Vector3(-0.62, y + 10 * U, bz + 0.12), 0, 1)
+	_lamp(Vector3(-0.42, y + 0.95, bz + 0.45), 1.4, 3.6, 0.2)
+	_put(R, "book_stack", Vector3(-0.3, y + 10 * U, bz + 0.1), 0, 2)
+	_put(R, "plush", Vector3(-0.6, y + 13 * U, -3.85), 1, 0)
+	_put(R, "plush", Vector3(1.1, y + 5 * U, -3.0), 3, 2)
+	_put(R, "frame", Vector3(fx, y + 1.45, -3.75), 1, 2)
+	_put(R, "frame", Vector3(fx, y + 1.35, -2.85), 1, 5)
+	_put(R, "frame", Vector3(fx, y + 1.8, -2.25), 1, 6)
+	_put(R, "wall_shelf", Vector3(fx, y + 1.95, -4.4), 1, 1)
 	_put(R, "wall_shelf", Vector3(0.6, y + 1.65, bz), 0, 1)
+	_put(R, "plant", Vector3(0.75, y + 1.65 + U, bz + 0.02), 0, 6)
+	_put(R, "frame", Vector3(1.4, y + 1.25, bz), 0, 1)
 	_put(R, "dresser", Vector3(2.45, y, bz + 0.05), 0, 2)
 	_put(R, "lamp_table", Vector3(2.5, y + 14 * U, bz + 0.1), 0, 1)
-	_lamp(Vector3(2.7, y + 1.3, bz + 0.45), 0.9, 2.8, 0.2)
+	_lamp(Vector3(2.7, y + 1.3, bz + 0.45), 1.0, 3.0, 0.2)
 	_put(R, "plant", Vector3(3.0, y + 14 * U, bz + 0.1), 0, 6)
-	_put(R, "frame", Vector3(2.55, y + 1.5, bz), 0, 1)
+	_put(R, "frame", Vector3(2.55, y + 1.55, bz), 0, 1)
 	_put(R, "bookshelf", Vector3(3.5 - 0.4, y, -1.6), 3, 1)
-	_put(R, "plant", Vector3(3.08, y + 12 * U, -1.45), 0, 0)
+	_put(R, "plant", Vector3(3.08, y + 30 * U, -1.45), 0, 0)
 	_put(R, "plant", Vector3(fx + 0.05, y, -0.6), 0, 1)
-	_put(R, "plant", Vector3(fx + 0.05, y, -2.35), 0, 4)
-	var chair := _putc(R, "chair", -0.25, y, -3.45, 1, 2)
+	_put(R, "plant", Vector3(2.55, y, -3.9), 0, 4)
+	_put(R, "toy_box", Vector3(fx + 0.05, y, -1.75), 1)
+	var chair := _putc(R, "chair", 0.55, y, -2.35, 2, 2)
 	_put(R, "plush", Vector3(1.9, y + U, -1.3), 3, 2)
-	_put(R, "toy_blocks", Vector3(1.2, y + U, -1.9), 0, 3)
-	_put(R, "sconce", Vector3(fx, y + 1.6, -1.4), 1, 1)
-	_lamp(Vector3(fx + 0.4, y + 1.8, -1.2), 0.7, 2.6, 0.2)
+	_put(R, "toy_blocks", Vector3(1.6, y + U, -2.2), 0, 3)
+	_put(R, "sconce", Vector3(fx, y + 1.6, -1.15), 1, 1)
+	_lamp(Vector3(fx + 0.4, y + 1.8, -1.0), 0.8, 2.8, 0.2)
+	_lamp(Vector3(1.4, y + 2.25, -2.2), 0.8, 4.5, 0.0, Color(1.0, 0.76, 0.52), 0.0)
 	_use(bed, "Pink Bed", [
 		_act("sleep", "Sleep", "bed", 480, {"energy": 1.0}, {"pose": "sleep", "task": "Go to Sleep"}),
 		_act("story", "Read Story", "book_open", 20, {"social": 0.2, "fun": 0.1}, {"pose": "sit_read", "task": "Read Story", "who": ["adult"]}),
@@ -928,9 +934,9 @@ func _stage(preset: String) -> void:
 		return
 	var y := UF
 	if preset == "home_night":
-		var lily := _place("bunny_girl", Vector3(0.45 + 9 * U, y, -4.73 + 17 * U + 0.1), Vector3(0.45 + 9 * U, y, 2.0), "lie")
+		var lily := _place("bunny_girl", Vector3(-0.73 + 17 * U + 0.08, y, -3.95 + 9 * U), Vector3(3.0, y, -3.95 + 9 * U), "lie")
 		lily.lie_height = 0.53
-		var jack := _place("dad", Vector3(-0.25, y, -3.45), Vector3(2.0, y, -3.1), "sit_read", 0.44)
+		var jack := _place("dad", Vector3(0.55, y, -2.3), Vector3(0.55, y, -4.5), "sit_read", 0.44)
 		var maya := _place("cat_girl", Vector3(7.85, y + 6 * U, 1.25), Vector3(9.0, y, 2.2), "brush_teeth")
 		var dog := _place("beagle", Vector3(1.15, y + 0.12, 2.25), Vector3(2.5, y, 3.0), "sleep")
 		Game.show_bubble(jack, {"text": "Read Story", "icon": "book_open", "kind": "action", "id": "action", "progress": -1})
@@ -940,7 +946,8 @@ func _stage(preset: String) -> void:
 		if _blanket == null:
 			_blanket = PropLib.instance("blanket", 0)
 			add_child(_blanket)
-		_blanket.position = Vector3(0.45 + 9 * U, y + 8 * U, -4.73 + 26 * U)
+		_blanket.position = Vector3(-0.73 + 25 * U, y + 8 * U, -3.95 + 9 * U)
+		_blanket.rotation_degrees.y = 90.0
 		_blanket.visible = true
 	else:
 		if _blanket:
@@ -987,6 +994,8 @@ func _process(delta: float) -> void:
 				continue
 			var tris := 0
 			for si in mi.mesh.get_surface_count():
+				if not (mi.mesh is ArrayMesh):
+					continue
 				var il: int = mi.mesh.surface_get_array_index_len(si)
 				tris += (il if il > 0 else mi.mesh.surface_get_array_len(si)) / 3
 			rows.append([tris, mi.name])

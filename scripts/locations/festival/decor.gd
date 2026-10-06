@@ -172,7 +172,7 @@ func _catenary(vb: VoxelBuilder, a: Vector3, b: Vector3, sag: float, bunting := 
 			vb.set_v(q + Vector3i(0, -2, 0), Color("ffc048"), true)
 			vb.set_v(q + Vector3i(1, -2, 0), Color("ffc048"), true)
 			vb.set_v(q + Vector3i(0, -2, 1), Color("ffc048"), true)
-			glow_points.append([(Vector3(q) + Vector3(0.5, -1.0, 0.5)) * SU, 0.55, Color(1.0, 0.74, 0.38)])
+			glow_points.append([(Vector3(q) + Vector3(0.5, -1.0, 0.5)) * SU, 0.8, Color(1.0, 0.7, 0.34)])
 		if bunting and i % 6 == 0 and i > 2 and i < n - 2:
 			var c: Color = flag_cols[(i / 6) % flag_cols.size()]
 			var dir := (cb - ca).normalized()
@@ -266,7 +266,7 @@ func _props(parent: Node3D) -> void:
 		_barrel_planter(near, int(b[0] * C), int(b[1] * C), 5.0, b[2], i)
 		i += 1
 	# Ground lanterns.
-	for l in [[1.6, 5.1], [-6.0, 4.6], [6.6, 1.6], [1.0, -4.6]]:
+	for l in [[1.7, 4.4], [-6.0, 4.6], [6.6, 1.6], [1.0, -4.6]]:
 		_ground_lantern(near, int(l[0] * C), int(l[1] * C))
 	# Picnic tables.
 	_picnic_table(near, int(2.4 * C), int(-3.2 * C))
