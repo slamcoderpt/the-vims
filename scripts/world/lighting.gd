@@ -138,6 +138,10 @@ func _apply() -> void:
 				var df: float = l.get_meta("day_factor", 0.25)
 				l.light_energy = base * lerpf(df, profile.get("lamp_night_mult", 1.0), night)
 				l.visible = l.light_energy > 0.01 and OS.get_environment("VIMS_NOLAMPS") == ""
+				# Shadowed practicals (a couple per scene) only cast after dark:
+				# omni shadows are expensive on phones and invisible in daylight.
+				if l.has_meta("night_shadow"):
+					l.shadow_enabled = night > 0.5
 	# --- Post
 	var pp := {
 		"focus_y": 0.55, "band": 0.14, "falloff": 0.3, "blur_px": 7.0, "top_boost": 1.3,

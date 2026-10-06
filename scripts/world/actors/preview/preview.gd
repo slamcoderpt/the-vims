@@ -94,6 +94,31 @@ func _ready() -> void:
 				a.set_pose(s2[2])
 			add_child(seat.build_instance(0.0625))
 			rig.apply({"target": Vector3(-0.2, 0.5, -0.2), "yaw": 46.0, "pitch": 35.0, "distance": 9.0, "fov": 19.0})
+		"homeclose", "homefar":
+			# Exact home_day placements, camera closer.
+			var specs := [
+				["dad", Vector3(-7.5, 0, -2.0), Vector3(-9.5, 0, -2.0), "type", 0.44],
+				["bunny_girl", Vector3(-5.75, 0, -2.75), Vector3(-4.6, 0, -3.55), "sit_paint", 0.375],
+				["cat_girl", Vector3(-2.85, 0, -0.1), Vector3(-2.1, 0, 0.9), "play", 0.0],
+				["beagle", Vector3(-5.6, 0, 0.2), Vector3(-4.9, 0, 0.95), "play", 0.0],
+			]
+			var seat := VoxelBuilder.new()
+			for s2 in specs:
+				var a := SimActor.create(s2[0])
+				a.position = s2[1]
+				add_child(a)
+				a.face(s2[2])
+				if s2[4] > 0.0:
+					a.seat_height = s2[4]
+					var c := Vector3i(roundi(s2[1].x / 0.0625), 0, roundi(s2[1].z / 0.0625))
+					var h := roundi(s2[4] / 0.0625)
+					seat.box(c - Vector3i(3, 0, 3), Vector3i(7, h, 7), Color(0.35, 0.35, 0.38))
+				a.set_pose(s2[3])
+			add_child(seat.build_instance(0.0625))
+			if mode == "homeclose":
+				rig.apply({"target": Vector3(-5.2, 0.6, -1.3), "yaw": 46.0, "pitch": 37.0, "distance": 9.0, "fov": 30.0})
+			else:
+				rig.apply({"target": Vector3(-5.0, 3.1, -0.3), "yaw": 46.0, "pitch": 37.0, "distance": 17.0, "fov": 30.0})
 		"ref":
 			# Approximate ref1 camera and staging (home_day preset camera).
 			var specs := [

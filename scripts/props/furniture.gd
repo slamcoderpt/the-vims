@@ -194,6 +194,7 @@ static func m_nightstand(vb: VoxelBuilder, v: int) -> void:
 static func m_bed(vb: VoxelBuilder, v: int) -> void:
 	var w := 18 if v != 2 else 28
 	var l := 34
+	v = v % 3
 	var frame: Color = [Color("f3a9c0"), WOOD, WOOD_R][v]
 	var fr := V.noisy(frame, 0.04) if v == 0 else V.wood(frame, 2, 2)
 	# Legs & rails.
@@ -206,6 +207,16 @@ static func m_bed(vb: VoxelBuilder, v: int) -> void:
 	V.b(vb, 1, 17, 0, w - 2, 1, 2, fr)
 	V.b(vb, 3, 18, 0, w - 6, 1, 2, fr)
 	V.b(vb, 0, 5, l - 2, w, 4, 2, fr)
+	if v == 0:
+		# Bunny ears on the headboard (ref3).
+		for ex: int in [3, w - 6]:
+			V.b(vb, ex, 19, 0, 3, 6, 2, fr)
+			V.b(vb, ex + 1, 25, 0, 1, 1, 2, fr)
+			V.b(vb, ex + 1, 20, 2, 1, 4, 1, Color("fbe3ea"))
+	if v == 1:
+		# Star on the headboard.
+		for q in [Vector2i(8, 19), Vector2i(9, 19), Vector2i(8, 20), Vector2i(9, 20), Vector2i(7, 19), Vector2i(10, 19), Vector2i(8, 21), Vector2i(9, 21)]:
+			V.p(vb, q.x, q.y, 0, Color("f7d454"))
 	if v == 0:
 		# Heart cut-out on the headboard.
 		for q in [Vector2i(7, 13), Vector2i(8, 12), Vector2i(9, 12), Vector2i(10, 13), Vector2i(8, 14), Vector2i(9, 14), Vector2i(7, 14), Vector2i(10, 14), Vector2i(8, 13), Vector2i(9, 13)]:

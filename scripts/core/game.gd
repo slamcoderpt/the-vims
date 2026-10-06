@@ -37,6 +37,11 @@ signal queue_changed(index: int)
 ## UI asks gameplay to cancel slot `slot` of member index's action queue
 ## (slot 0 = the action in progress).
 signal queue_cancel_requested(index: int, slot: int)
+## Friendship between two people (household names or townie names) changed.
+## value -100..100; see rel_level().
+signal relationship_changed(a: String, b: String, value: float)
+## Two people reached a new relationship level ("Friend", "Good Friend"...).
+signal relationship_level_changed(a: String, b: String, level: String)
 
 const DAY_NAMES := ["Mon.", "Tue.", "Wed.", "Thu.", "Fri.", "Sat.", "Sun."]
 const SEASONS := ["Spring", "Summer", "Autumn", "Winter"]
@@ -99,6 +104,24 @@ var placed := {}
 var _uid := 0
 var _mood_acc := 0.0
 
+## Townies: non-household people the locations stage, keyed by their look.
+## They keep their name (and your relationship with them) from lot to lot.
+const TOWNIES := {
+	"npc_0": {"name": "Rosie Maple", "kind": "adult", "trait": "Friendly"},
+	"npc_1": {"name": "Marcus Bell", "kind": "adult", "trait": "Good Sense of Humor"},
+	"npc_2": {"name": "June Harlow", "kind": "adult", "trait": "Neighborly"},
+	"npc_3": {"name": "Omar Reed", "kind": "adult", "trait": "Charismatic"},
+	"npc_4": {"name": "Toby Finch", "kind": "child", "trait": "Artistic"},
+	"npc_5": {"name": "Hana Sato", "kind": "adult", "trait": "Bookworm"},
+	"npc_6": {"name": "Walter Moss", "kind": "adult", "trait": "Grumpy"},
+	"npc_7": {"name": "Kai Ortiz", "kind": "child", "trait": "Athletic"},
+}
+## Relationship levels (friendship value -100..100), lowest first: [max, label].
+const REL_LEVELS := [[-60.0, "Enemy"], [-20.0, "Disliked"], [15.0, "Acquaintance"],
+	[40.0, "Friend"], [70.0, "Good Friend"], [101.0, "Best Friend"]]
+## "a|b" (sorted names) -> {value: float, met: float (total_minutes), last: float}
+var relationships := {}
+
 
 func _ready() -> void:
 	_default_household()
@@ -122,6 +145,15 @@ func _default_household() -> void:
 	for i in household.size():
 		_ensure_member(household[i])
 		_recompute_mood(i, false)
+	# Family starts close; the dog adores everyone.
+	_seed_rel("Jack", "Lily", 72.0)
+	_seed_rel("Jack", "Maya", 66.0)
+	_seed_rel("Lily", "Maya", 48.0)
+	_seed_rel("Jack", "Biscuit", 58.0)
+	_seed_rel("Lily", "Biscuit", 74.0)
+	_seed_rel("Maya", "Biscuit", 52.0)
+	# Jack already knows the grocer a little.
+	_seed_rel("Jack", "Omar Reed", 18.0)
 	household_changed.emit()
 
 
@@ -380,6 +412,132 @@ func update_moods() -> void:
 			moodlets_changed.emit(i)
 
 
+# =================================================================== relationships
+
+static func rel_key(a: String, b: String) -> String:
+	return a + "|" + b if a < b else b + "|" + a
+
+
+func _seed_rel(a: String, b: String, v: float) -> void:
+	relationships[rel_key(a, b)] = {"value": v, "met": 0.0, "last": 0.0}
+
+
+## Have these two people met?
+func has_met(a: String, b: String) -> bool:
+	return relationships.has(rel_key(a, b))
+
+
+## Friendship value -100..100 (0 for strangers).
+func rel(a: String, b: String) -> float:
+	var r = relationships.get(rel_key(a, b))
+	return 0.0 if r == null else float(r.value)
+
+
+## Change friendship by delta (meeting them if they hadn't). Emits
+## relationship_changed and, on crossing a level, relationship_level_changed.
+func change_rel(a: String, b: String, delta: float) -> float:
+	if a == b or a == "" or b == "":
+		return 0.0
+	var k := rel_key(a, b)
+	if not relationships.has(k):
+		relationships[k] = {"value": 0.0, "met": total_minutes(), "last": total_minutes()}
+	var r: Dictionary = relationships[k]
+	var before: float = r.value
+	r.value = clampf(before + delta, -100.0, 100.0)
+	r.last = total_minutes()
+	relationship_changed.emit(a, b, r.value)
+	var l0 := rel_level(before)
+	var l1 := rel_level(r.value)
+	if l0 != l1:
+		relationship_level_changed.emit(a, b, l1)
+	return r.value
+
+
+static func rel_level(v: float) -> String:
+	for lv in REL_LEVELS:
+		if v < lv[0]:
+			return lv[1]
+	return "Best Friend"
+
+
+## -2 Enemy .. 0 Acquaintance .. 3 Best Friend.
+static func rel_tier(v: float) -> int:
+	for k in REL_LEVELS.size():
+		if v < REL_LEVELS[k][0]:
+			return k - 2
+	return 3
+
+
+## Is this name a household member?
+func is_family(person: String) -> bool:
+	return member_index(person) >= 0
+
+
+func townie_by_look(look: String) -> Dictionary:
+	return TOWNIES.get(look, {})
+
+
+func townie_names() -> Array:
+	var out: Array = []
+	for k in TOWNIES:
+		out.append(TOWNIES[k].name)
+	return out
+
+
+## Everyone member i knows: [{name, value, level, family: bool, kind, look}],
+## family first, then by friendship.
+func rel_list(i: int) -> Array:
+	var out: Array = []
+	if i < 0 or i >= household.size():
+		return out
+	var me: String = household[i].name
+	for k in relationships:
+		var parts: PackedStringArray = (k as String).split("|")
+		if parts.size() != 2 or not me in parts:
+			continue
+		var other: String = parts[1] if parts[0] == me else parts[0]
+		var v: float = relationships[k].value
+		var fam := is_family(other)
+		var kind := "adult"
+		var look := ""
+		if fam:
+			var m: Dictionary = household[member_index(other)]
+			kind = m.get("kind", "adult")
+			look = m.get("look", "")
+		else:
+			for tk in TOWNIES:
+				if TOWNIES[tk].name == other:
+					kind = TOWNIES[tk].kind
+					look = tk
+		out.append({"name": other, "value": v, "level": rel_level(v), "family": fam, "kind": kind, "look": look})
+	out.sort_custom(func(x, y): return x.family and not y.family or (x.family == y.family and x.value > y.value))
+	return out
+
+
+## Townies member i has met (for "Meet N Neighbors" tasks).
+func townies_met(i: int) -> int:
+	var n := 0
+	for r in rel_list(i):
+		if not r.family:
+			n += 1
+	return n
+
+
+## Slow drift toward neutral for relationships nobody tends (per in-game day:
+## -1.5 for friends you haven't seen in two days; family never drops below 30).
+func _decay_relationships(days: float) -> void:
+	var now := total_minutes()
+	for k in relationships:
+		var r: Dictionary = relationships[k]
+		if now - float(r.last) < 2880.0:
+			continue
+		var parts: PackedStringArray = (k as String).split("|")
+		var fam := is_family(parts[0]) and is_family(parts[1])
+		var floor_v := 30.0 if fam else 0.0
+		if r.value > floor_v:
+			r.value = maxf(floor_v, r.value - 1.5 * days)
+
+
 # =================================================================== action queue view
 
 ## What the selected sim's queue strip shows: [{label, icon, progress, auto,
@@ -469,6 +627,7 @@ func _process(delta: float) -> void:
 	if _mood_acc >= 2.0:
 		_mood_acc = 0.0
 		update_moods()
+		_decay_relationships(2.0 / 1440.0)
 	time_changed.emit(day, minutes)
 
 

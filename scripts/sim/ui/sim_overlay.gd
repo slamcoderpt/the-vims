@@ -19,6 +19,9 @@ const GAP := 7.0
 const CHIP := 34.0
 const PANEL_W := 318.0
 const TOAST_TTL := 3.2
+const TAB_W := 84.0
+const TABS := [["mood", "Mood", 12.0], ["skills", "Skills", 100.0], ["rels", "Friends", 188.0]]
+const REL_ROWS := 7
 const HUE_SHADER := """
 shader_type canvas_item;
 uniform float hue_shift = 0.0;
@@ -54,7 +57,7 @@ var root: Control
 var strip: Control
 var panel: Control
 var toasts: Control
-var panel_tab := "mood"   # "mood" | "skills"
+var panel_tab := "mood"   # "mood" | "skills" | "rels"
 var panel_open := false
 
 var _hits: Array = []        # [Rect2 (global), kind, arg]
@@ -114,6 +117,7 @@ func _ready() -> void:
 	Game.mood_changed.connect(func(_i, _m): _dirty())
 	Game.selected_changed.connect(func(_i): _dirty())
 	Game.skill_changed.connect(func(_i, _s, _l): _dirty())
+	Game.relationship_changed.connect(func(_a, _b, _v): _dirty())
 	Game.household_changed.connect(_dirty)
 	Game.mode_changed.connect(_on_mode)
 	Game.notify.connect(toast)
@@ -274,6 +278,8 @@ func _on_hit(kind: String, arg) -> void:
 			open_panel("mood")
 		"skills":
 			open_panel("skills")
+		"rels":
+			open_panel("rels")
 		"tab":
 			panel_tab = str(arg)
 			panel.queue_redraw()
@@ -394,6 +400,13 @@ func _draw_strip() -> void:
 	if sic:
 		strip.draw_texture_rect(sic, Rect2(sb.position + Vector2(6, 6), Vector2(22, 22)), false)
 	_add_hit(strip, sb, "skills")
+	# relationships button
+	var rb := Rect2(sb.end.x + 6, y, 34, 34)
+	strip.draw_style_box(_card_dark, rb)
+	var ric := UI.icon("heart")
+	if ric:
+		strip.draw_texture_rect(ric, Rect2(rb.position + Vector2(6, 6), Vector2(22, 22)), false)
+	_add_hit(strip, rb, "rels")
 	if panel.visible:
 		_panel_hits()
 		_add_hit(panel, Rect2(Vector2.ZERO, panel.size), "panel")
@@ -442,12 +455,14 @@ func _panel_rows() -> int:
 	var sel := Game.selected
 	if panel_tab == "skills":
 		return maxi(1, Game.skills_list(sel).size())
+	if panel_tab == "rels":
+		return clampi(Game.rel_list(sel).size(), 1, REL_ROWS)
 	return maxi(1, Game.moodlets(sel).size())
 
 
 func _panel_hits() -> void:
-	_add_hit(panel, Rect2(12, 12, 96, 30), "tab", "mood")
-	_add_hit(panel, Rect2(112, 12, 96, 30), "tab", "skills")
+	for t in TABS:
+		_add_hit(panel, Rect2(t[2], 12, TAB_W, 30), "tab", t[0])
 	_add_hit(panel, Rect2(PANEL_W - 40, 12, 30, 30), "close")
 
 
@@ -462,8 +477,8 @@ func _draw_panel() -> void:
 	var f := UI.font(800)
 	var f7 := UI.font(700)
 	# tabs
-	for t in [["mood", "Mood", 12.0], ["skills", "Skills", 112.0]]:
-		var r := Rect2(t[2], 12, 96, 30)
+	for t in TABS:
+		var r := Rect2(t[2], 12, TAB_W, 30)
 		var on: bool = panel_tab == t[0]
 		panel.draw_style_box(_tab_on if on else _tab_off, r)
 		panel.draw_string(f, r.position + Vector2(0, 21), t[1], HORIZONTAL_ALIGNMENT_CENTER, r.size.x, 14, UI.WHITE if on else UI.INK_SOFT)
@@ -499,6 +514,8 @@ func _draw_panel() -> void:
 		_draw_mood_face(panel, Vector2(28, y + 28), 11.0, Game.MOOD_COLORS[band], band)
 		panel.draw_string(f, Vector2(48, y + 33), "%s  %+d" % [Game.mood_word(sel), roundi(Game.mood(sel))], HORIZONTAL_ALIGNMENT_LEFT, -1, 14, UI.INK)
 		panel.draw_string(f7, Vector2(PANEL_W - 170, y + 33), "Skills & pay x%.2f" % Game.mood_mult(sel), HORIZONTAL_ALIGNMENT_RIGHT, 156, 12, UI.INK_SOFT)
+	elif panel_tab == "rels":
+		_draw_rels(sel, y, row_h)
 	else:
 		var sk: Array = Game.skills_list(sel)
 		if sk.is_empty():
@@ -521,6 +538,45 @@ func _draw_panel() -> void:
 			y += row_h
 		panel.draw_line(Vector2(14, y + 6), Vector2(PANEL_W - 14, y + 6), Color("e3e7ee"), 1.0)
 		panel.draw_string(f7, Vector2(16, y + 33), "Mood boosts practice: x%.2f" % Game.mood_mult(sel), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, UI.INK_SOFT)
+
+
+## Relationships tab: everyone this sim knows, family first, with a
+## -100..100 friendship bar and the Sims 3 level name.
+func _draw_rels(sel: int, y: float, row_h: float) -> void:
+	var f := UI.font(800)
+	var f7 := UI.font(700)
+	var list: Array = Game.rel_list(sel)
+	if list.is_empty():
+		panel.draw_string(f7, Vector2(16, y + 26), "%s hasn't met anyone yet" % Game.household[sel].name, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, UI.INK_SOFT)
+	var shown := mini(list.size(), REL_ROWS)
+	for k in shown:
+		var r: Dictionary = list[k]
+		var c := Vector2(30, y + row_h * 0.5)
+		var ring: Color = UI.BLUE if r.family else Color("f0a43a")
+		panel.draw_circle(c, 16.0, ring)
+		panel.draw_circle(c, 13.0, Color(1, 1, 1, 0.96))
+		var ic := UI.icon("paw" if r.kind == "dog" else ("people" if not r.family else "smile"))
+		if ic:
+			panel.draw_texture_rect(ic, Rect2(c - Vector2(10, 10), Vector2(20, 20)), false)
+		panel.draw_string(f, Vector2(54, y + 18), r.name, HORIZONTAL_ALIGNMENT_LEFT, 150, 14, UI.INK)
+		var tag: String = ("Family · " if r.family else "") + r.level
+		panel.draw_string(f7, Vector2(PANEL_W - 176, y + 18), tag, HORIZONTAL_ALIGNMENT_RIGHT, 160, 11, UI.INK_SOFT)
+		# centred bar: left half red (dislike), right half green (friendship)
+		var bar := Rect2(54, y + 26, PANEL_W - 54 - 16, 9)
+		panel.draw_rect(bar, UI.TRACK)
+		var mid := bar.position.x + bar.size.x * 0.5
+		var v: float = clampf(r.value / 100.0, -1.0, 1.0)
+		var wv := bar.size.x * 0.5 * absf(v)
+		if v >= 0.0:
+			panel.draw_rect(Rect2(mid, bar.position.y, wv, bar.size.y), UI.GREEN)
+		else:
+			panel.draw_rect(Rect2(mid - wv, bar.position.y, wv, bar.size.y), Color("e5544a"))
+		panel.draw_rect(Rect2(mid - 1, bar.position.y - 2, 2, bar.size.y + 4), Color(0.3, 0.35, 0.45, 0.5))
+		y += row_h
+	panel.draw_line(Vector2(14, y + 6), Vector2(PANEL_W - 14, y + 6), Color("e3e7ee"), 1.0)
+	var more := list.size() - shown
+	var foot := "Socialize to unlock new interactions" if more <= 0 else "+%d more · socialize to unlock interactions" % more
+	panel.draw_string(f7, Vector2(16, y + 33), foot, HORIZONTAL_ALIGNMENT_LEFT, PANEL_W - 32, 12, UI.INK_SOFT)
 
 
 func _draw_toasts() -> void:

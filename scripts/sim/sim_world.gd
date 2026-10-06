@@ -45,6 +45,8 @@ var _touch_long_done := false
 var _touches := 0
 var _select_by_tap := false
 var _frames := 0
+## Townies socialized with on this lot this visit (for "Meet N Neighbors").
+var met_here := {}
 ## Counters for tests / debugging.
 var stats := {"taps": 0, "menus": 0, "orders": 0, "done": 0, "autonomous": 0}
 
@@ -59,12 +61,22 @@ func _ready() -> void:
 	Game.action_chosen.connect(_on_action_chosen)
 	Game.mode_changed.connect(_on_mode)
 	Game.selected_changed.connect(_on_selected)
-	Game.furniture_changed.connect(refresh_interactables)
+	Game.furniture_changed.connect(_on_furniture_changed)
 	Game.queue_cancel_requested.connect(_on_queue_cancel)
+	Game.relationship_level_changed.connect(_on_rel_level)
 	overlay = SimOverlay.new()
 	overlay.name = "SimOverlay"
 	overlay.hud = main.hud if main else null
 	add_child(overlay)
+
+
+## Bought / moved / sold furniture: new objects to use, and routes that
+## failed before may work now.
+func _on_furniture_changed() -> void:
+	refresh_interactables()
+	for a in agents:
+		if a:
+			a.unreachable.clear()
 
 
 func _on_queue_cancel(i: int, slot: int) -> void:
@@ -101,9 +113,88 @@ func bind_location(loc: Node3D, p_name: String) -> void:
 		ag.setup(self, i, a)
 		agents.append(ag)
 	_init_tasks()
+	met_here.clear()
+	_setup_townies()
 	refresh_interactables()
 	build.spawn_saved()
 	_adopt_staged()
+
+
+## Give every non-household person on the lot a townie identity (name,
+## persistent relationship) and make sure each one can be tapped.
+func _setup_townies() -> void:
+	for n in location.find_children("*", "Node3D", true, false):
+		if not n is SimActor or is_household_actor(n):
+			continue
+		var info := Game.townie_by_look(str(n.get("look")))
+		if info.is_empty():
+			continue
+		n.set_meta("townie", info.name)
+		var has_it := false
+		for c in n.get_children():
+			if c is Interactable:
+				has_it = true
+		if not has_it:
+			Interactable.attach(n, "Neighbor", [], Vector3(0.6, 1.7, 0.6), Vector3(0, 0.85, 0), Vector3(0, 0, 0.9))
+
+
+## Townie name of an Interactable that sits on a townie ("" otherwise).
+func townie_of(it: Node) -> String:
+	if it == null or not is_instance_valid(it):
+		return ""
+	var p := it.get_parent()
+	if p != null and p.has_meta("townie"):
+		return str(p.get_meta("townie"))
+	return ""
+
+
+func townie_info(tname: String) -> Dictionary:
+	for k in Game.TOWNIES:
+		if Game.TOWNIES[k].name == tname:
+			return Game.TOWNIES[k]
+	return {}
+
+
+## Menu rows for a townie: the lot's own non-chat actions (Pay at Checkout,
+## Ask About Deals...) plus socials tiered by friendship. The lot's chat task
+## ("Meet 3 Neighbors") rides on every social.
+func townie_rows(ag, it: Interactable) -> Array:
+	var tname := townie_of(it)
+	var info := townie_info(tname)
+	var task := ""
+	var rows: Array = []
+	for a in SimActions.actions_for(it, ag.member):
+		if a.get("id", "") in ["chat", "wave"]:
+			task = str(a.get("task", task))
+			continue
+		rows.append(a)
+	var me: String = ag.display_name()
+	var soc := SimActions.socials_by_rel(ag.kind, info.get("kind", "adult"), tname, Game.has_met(me, tname), Game.rel(me, tname), true)
+	for a in soc:
+		if task != "" and not a.has("task") and not a.get("locked", false):
+			a["task"] = task
+		a["townie"] = tname
+	return soc + rows
+
+
+func _on_rel_level(a: String, b: String, level: String) -> void:
+	if Game.mode != "live" and not Game.live:
+		return
+	var up := Game.rel(a, b) > 0.0
+	var tier := Game.rel_tier(Game.rel(a, b))
+	var text := "%s and %s are now %s" % [a, b, level + "s" if not level.ends_with("s") else level]
+	if level == "Acquaintance":
+		text = "%s met %s" % [a, b]
+	Game.notify.emit(text, "heart" if up else "dots")
+	for nm in [a, b]:
+		var i := Game.member_index(nm)
+		if i < 0:
+			continue
+		var other: String = b if nm == a else a
+		if tier >= 1:
+			Game.add_moodlet(i, "new_friend", "Made a Friend" if tier == 1 else ("Close Friends" if tier == 2 else "Best Friends!"), "heart", 10.0 + tier * 4.0, 8.0, "With %s" % other)
+		elif tier <= -1:
+			Game.add_moodlet(i, "argued", "Had an Argument", "dots", -12.0, 6.0, "With %s" % other)
 
 
 func find_actor(member_name: String, look: String) -> Node3D:
@@ -342,8 +433,9 @@ func long_press(screen: Vector2) -> void:
 	var ag = pick_agent(screen)
 	var sel = selected_agent()
 	if ag != null and sel != null and ag != sel:
-		var acts := SimActions.socials(sel.kind, ag.kind, ag.display_name())
-		open_menu(ag.display_name(), acts, {"type": "social", "other": ag}, screen)
+		var acts := SimActions.socials_for(sel, ag, true)
+		var lvl := Game.rel_level(Game.rel(sel.display_name(), ag.display_name()))
+		open_menu("%s · %s" % [ag.display_name(), lvl], acts, {"type": "social", "other": ag}, screen)
 	elif ag != null:
 		_open_self_menu(ag, screen)
 
@@ -354,10 +446,12 @@ func _open_self_menu(ag, screen: Vector2) -> void:
 	for other in agents:
 		if other == null or other == ag:
 			continue
-		var acts := SimActions.socials(ag.kind, other.kind, other.display_name())
+		var acts := SimActions.socials_for(ag, other)
 		if not acts.is_empty():
 			var a: Dictionary = acts[0].duplicate()
 			a["other_index"] = other.index
+			if not other.display_name() in str(a.label):
+				a.label = "%s with %s" % [a.label, other.display_name()]
 			rows.append(a)
 	if ag.is_busy():
 		rows.append({"id": "cancel", "label": "Stop %s" % ag.current_label(), "icon": "dots"})
@@ -486,6 +580,11 @@ func open_object_menu(it: Interactable, screen: Vector2) -> void:
 	var sel = selected_agent()
 	if sel == null:
 		return
+	var tn := townie_of(it)
+	if tn != "":
+		var lvl := Game.rel_level(Game.rel(sel.display_name(), tn)) if Game.has_met(sel.display_name(), tn) else "Stranger"
+		open_menu("%s · %s" % [tn, lvl], townie_rows(sel, it), {"type": "object", "target": it}, screen)
+		return
 	var acts := SimActions.actions_for(it, sel.member)
 	if acts.is_empty():
 		Game.show_bubble(sel.actor, {"kind": "thought", "icon": "dots", "id": "say", "ttl": 1.6})
@@ -498,6 +597,10 @@ func _on_action_chosen(title: String, action: Dictionary) -> void:
 	var ctx := _menu_ctx
 	_menu_ctx = {}
 	var t: String = ctx.get("type", "")
+	if action.get("locked", false):
+		var who: String = str(ctx.get("title", "them")).get_slice(" · ", 0)
+		Game.notify.emit("Become %s with %s to unlock %s" % [action.get("need_tier", "closer"), who, action.get("unlock_label", "that")], "heart")
+		return
 	if t == "" and title == "Travel":
 		t = "travel"
 	match t:
@@ -664,6 +767,18 @@ func approach(ag, o: Dictionary) -> Dictionary:
 		var chair := _free_seat_near(ag, center, maxf(_box_half(it).x, _box_half(it).z) + 1.2)
 		if chair != Vector3.INF:
 			return {"spot": chair, "face": center}
+	var lying: bool = pose in ["lie", "sleep"] and ag.kind != "dog"
+	if nav and not seated and not lying and nav.in_bounds(spot):
+		# Use spots inside furniture (the fridge's own footprint, behind a
+		# counter): stand on the reachable floor cell in front of it instead.
+		var li := nav.level_of(spot)
+		var sc := nav.cell_of(spot)
+		var reg := nav.entry_region(ag.actor.global_position, li)
+		if not nav.is_walkable(li, sc) or (reg >= 0 and nav.region_of(li, sc) != reg):
+			var st := nav.stand_spot(ag.actor.global_position, spot)
+			if st != Vector3.INF:
+				spot = st
+				face = center
 	if _flat(face, spot) < 0.3:
 		face = _open_face(it, spot, a)
 	return {"spot": spot, "face": face}
@@ -764,37 +879,46 @@ func _open_face(it: Node, spot: Vector3, a: Dictionary) -> Vector3:
 # =================================================================== autonomy
 
 func choose_autonomous(ag) -> Dictionary:
-	var best: Dictionary = {}
-	var bs := 0.1
+	var cands: Array = []   # [score, order]
 	var p: Vector3 = ag.actor.global_position
 	for it in interactables:
-		if not is_instance_valid(it):
+		if not is_instance_valid(it) or ag.is_unreachable(it):
 			continue
 		var u = user_of(it)
 		if u != null and u != ag and not shareable(it):
 			continue
 		var wp: Vector3 = it.world_use_spot() if it.use_spot != Vector3.ZERO else it.global_position
 		var dist := _flat(wp, p) + absf(wp.y - p.y) * 3.0
-		for a in SimActions.actions_for(it, ag.member):
+		var best_s := 0.1
+		var best_a: Dictionary = {}
+		var acts: Array = townie_rows(ag, it) if townie_of(it) != "" else SimActions.actions_for(it, ag.member)
+		for a in acts:
+			if a.get("mean", false) or a.get("locked", false):
+				continue
 			var cost := -int(a.get("money", 0))
 			if cost > 0:
 				# Free will never spends money unless a need is desperate and this fixes it.
 				if not Game.can_afford(cost) or not _desperate_fix(ag, a):
 					continue
 			var s := SimActions.score(a, ag.member, dist) + randf() * 0.05
-			if s > bs:
-				bs = s
-				best = {"action": a, "target": it}
-	# Socials with idle family members.
+			if s > best_s:
+				best_s = s
+				best_a = a
+		if not best_a.is_empty():
+			cands.append([best_s, {"action": best_a, "target": it}])
+	# Socials with idle family members (and townies the location staged).
 	if ag.member.needs.has("social") or ag.kind == "dog":
 		for other in agents:
 			if other == null or other == ag or other.phase != "idle":
 				continue
-			for a in SimActions.socials(ag.kind, other.kind, other.display_name()):
+			for a in SimActions.socials_for(ag, other):
+				if a.get("mean", false):
+					continue
 				var s := SimActions.score(a, ag.member, _flat(other.actor.global_position, p)) + randf() * 0.04
-				if s > bs:
-					bs = s
-					best = {"action": a, "other": other}
+				s += SimActions.social_bias(ag.index, other.index)
+				if s > 0.1:
+					cands.append([s, {"action": a, "other": other}])
+	var best := _first_reachable(ag, cands)
 	if best.is_empty():
 		# Nothing worth doing: potter about (dogs trot after the selected sim).
 		var target := p
@@ -811,14 +935,35 @@ func choose_autonomous(ag) -> Dictionary:
 	return best
 
 
+## Highest-scoring candidate whose spot the grid can actually reach (checked
+## for the best few only; unreachable objects are remembered by the agent).
+func _first_reachable(ag, cands: Array) -> Dictionary:
+	cands.sort_custom(func(x, y): return x[0] > y[0])
+	var checked := 0
+	for c in cands:
+		var o: Dictionary = c[1]
+		if nav == null or checked >= 6:
+			return o
+		checked += 1
+		var r := approach(ag, o)
+		if r.is_empty():
+			continue
+		nav.find_path(ag.actor.global_position, r.spot, true)
+		if nav.last_ok:
+			return o
+		if o.get("target") != null:
+			ag.unreachable[o.target] = Game.total_minutes() + ag.UNREACHABLE_FOR
+		stats["unreachable"] = int(stats.get("unreachable", 0)) + 1
+	return {}
+
+
 ## Best way to fix one need right now (used when a need hits zero). Money is
 ## allowed when affordable; distance matters less than in normal free will.
 func choose_for_need(ag, need: String) -> Dictionary:
-	var best: Dictionary = {}
-	var bs := -INF
+	var cands: Array = []
 	var p: Vector3 = ag.actor.global_position
 	for it in interactables:
-		if not is_instance_valid(it):
+		if not is_instance_valid(it) or ag.is_unreachable(it):
 			continue
 		var u = user_of(it)
 		if u != null and u != ag and not shareable(it):
@@ -833,10 +978,8 @@ func choose_for_need(ag, need: String) -> Dictionary:
 			if cost > 0 and not Game.can_afford(cost):
 				continue
 			var s := gain * 2.0 - dist * 0.02 - float(a.get("minutes", 30.0)) / 600.0
-			if s > bs:
-				bs = s
-				best = {"action": a, "target": it}
-	return best
+			cands.append([s, {"action": a, "target": it}])
+	return _first_reachable(ag, cands)
 
 
 func _desperate_fix(ag, a: Dictionary) -> bool:

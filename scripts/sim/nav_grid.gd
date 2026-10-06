@@ -14,6 +14,8 @@ const STEP := 0.16        # anything lower than this above the floor is walkable
 const HEAD := 1.55        # clearance needed above the floor
 const SEAT_MIN := 0.25
 const SEAT_MAX := 0.85
+## A* cost of walking through the clearance margin (dilated cells).
+const MARGIN_COST := 4.0
 
 static var _cache := {}   # key -> NavGrid (static geometry never changes per location)
 
@@ -35,6 +37,12 @@ var astars: Array[AStarGrid2D] = []
 var links: Array[Dictionary] = []
 var obstacles := {}   # id -> {level, cells: PackedInt32Array}
 var build_ms := 0
+## Connected region id of every open cell per level (-1 = not walkable).
+var comps: Array[PackedInt32Array] = []
+## Result of the last find_path(): did it really reach `to` (false = it only
+## gets as close as the walkable region allows), and how far from `to` it ends.
+var last_ok := true
+var last_gap := 0.0
 
 
 # =================================================================== build
@@ -86,6 +94,8 @@ func build(root: Node3D, cfg: Dictionary) -> void:
 		dyn.append(d)
 	var tris := _collect(root)
 	_rasterize(tris)
+	for cv: Dictionary in cfg.get("carve", []):
+		carve(int(cv.get("level", 0)), cv.rect)
 	for i in level_y.size():
 		block.append(PackedByteArray())
 		_rebuild_level(i)
@@ -249,6 +259,24 @@ func _rasterize(tris: PackedFloat32Array) -> void:
 							st[c] = miny
 
 
+## Force a rectangle (xz) walkable where it has floor: doorways that the
+## set dressing crowds (a bath right behind the bathroom door) stay passable.
+func carve(li: int, r: Rect2) -> void:
+	if li < 0 or li >= level_y.size():
+		return
+	var x0 := maxi(0, int(floor((r.position.x - ox) / cs)))
+	var x1 := mini(w - 1, int(floor((r.end.x - ox) / cs - 0.001)))
+	var z0 := maxi(0, int(floor((r.position.y - oz) / cs)))
+	var z1 := mini(h - 1, int(floor((r.end.y - oz) / cs - 0.001)))
+	var f := floors[li]
+	var rb := raw_block[li]
+	for z in range(z0, z1 + 1):
+		for x in range(x0, x1 + 1):
+			var c := z * w + x
+			if f[c] != INF:
+				rb[c] = 0
+
+
 ## Recompute the A* view of one level: no-floor + geometry (dilated) + dynamic.
 func _rebuild_level(li: int) -> void:
 	var f := floors[li]
@@ -276,6 +304,7 @@ func _rebuild_level(li: int) -> void:
 			if bl[c - 1] == 1 or bl[c + 1] == 1 or bl[c - w] == 1 or bl[c + w] == 1:
 				out[c] = 3
 	block[li] = out
+	_label_regions(li)
 	var a: AStarGrid2D
 	if li < astars.size():
 		a = astars[li]
@@ -289,11 +318,73 @@ func _rebuild_level(li: int) -> void:
 		a.update()
 		astars.append(a)
 	a.fill_solid_region(a.region, false)
+	a.fill_weight_scale_region(a.region, 1.0)
+	# The clearance margin is walkable but costly: paths keep away from walls
+	# and furniture, yet a gap narrower than the margin (a kitchen between the
+	# island and the counters) never cuts a room in two.
 	for z in h:
 		var row := z * w
 		for x in w:
-			if out[row + x] != 0:
+			var v := out[row + x]
+			if v == 1 or v == 2:
 				a.set_point_solid(Vector2i(x, z), true)
+			elif v == 3:
+				a.set_point_weight_scale(Vector2i(x, z), MARGIN_COST)
+
+
+## Flood-fill the open cells of a level into connected regions (4-neighbour:
+## A* only moves diagonally when both side cells are open, so this matches).
+func _label_regions(li: int) -> void:
+	var bl := block[li]
+	var cm := PackedInt32Array()
+	cm.resize(w * h)
+	cm.fill(-1)
+	var stack := PackedInt32Array()
+	var next_id := 0
+	for c0 in w * h:
+		if not _walk_v(bl[c0]) or cm[c0] >= 0:
+			continue
+		cm[c0] = next_id
+		stack.clear()
+		stack.append(c0)
+		while not stack.is_empty():
+			var c: int = stack[stack.size() - 1]
+			stack.resize(stack.size() - 1)
+			var x := c % w
+			if x > 0 and _walk_v(bl[c - 1]) and cm[c - 1] < 0:
+				cm[c - 1] = next_id
+				stack.append(c - 1)
+			if x < w - 1 and _walk_v(bl[c + 1]) and cm[c + 1] < 0:
+				cm[c + 1] = next_id
+				stack.append(c + 1)
+			if c >= w and _walk_v(bl[c - w]) and cm[c - w] < 0:
+				cm[c - w] = next_id
+				stack.append(c - w)
+			if c < w * (h - 1) and _walk_v(bl[c + w]) and cm[c + w] < 0:
+				cm[c + w] = next_id
+				stack.append(c + w)
+		next_id += 1
+	if li < comps.size():
+		comps[li] = cm
+	else:
+		comps.append(cm)
+
+
+static func _walk_v(v: int) -> bool:
+	return v == 0 or v == 3
+
+
+## Walkable at all (open or in the clearance margin).
+func is_walkable(li: int, c: Vector2i) -> bool:
+	if c.x < 0 or c.y < 0 or c.x >= w or c.y >= h:
+		return false
+	return _walk_v(block[li][c.y * w + c.x])
+
+
+func region_of(li: int, c: Vector2i) -> int:
+	if c.x < 0 or c.y < 0 or c.x >= w or c.y >= h or li >= comps.size():
+		return -1
+	return comps[li][c.y * w + c.x]
 
 
 # =================================================================== queries
@@ -373,9 +464,10 @@ func seat_height(p: Vector3) -> float:
 	return best
 
 
-## Nearest open cell to c on level li (ring search), or (-1,-1).
-func nearest_open(li: int, c: Vector2i, max_r := 24) -> Vector2i:
-	if is_open(li, c):
+## Nearest open cell to c on level li (ring search), or (-1,-1). With
+## region >= 0 only cells of that connected region count.
+func nearest_open(li: int, c: Vector2i, max_r := 24, region := -1) -> Vector2i:
+	if is_open(li, c) and (region < 0 or region_of(li, c) == region):
 		return c
 	for r in range(1, max_r + 1):
 		var best := Vector2i(-1, -1)
@@ -412,17 +504,26 @@ func add_link(a: Vector3, b: Vector3, via: Array = []) -> void:
 
 
 ## Path from -> to as world waypoints (y follows the floor; stairs are straight
-## segments between levels). Always returns at least [to] so callers can fall
-## back to walking straight. `exact` appends `to` itself after the last open cell.
+## segments between levels). Always returns at least one point so callers can
+## fall back to walking straight. `exact` appends `to` itself after the last
+## open cell (the final approach onto a seat / into a use spot) -- but only when
+## `to` is really reached: when the walkable region of `from` does not connect
+## to `to`, the path stops at the closest reachable cell and last_ok is false.
 func find_path(from: Vector3, to: Vector3, exact := true) -> PackedVector3Array:
 	var out := PackedVector3Array()
 	var la := level_of(from)
 	var lb := level_of(to)
+	last_ok = true
+	var ok := true
 	if la == lb:
 		out = _level_path(la, from, to)
+		ok = _seg_ok
 	else:
-		var best: Dictionary = {}
-		var bd := INF
+		# Try every stair link that joins the two levels; keep the shortest
+		# one that actually connects (both halves reachable).
+		var best := PackedVector3Array()
+		var best_len := INF
+		var best_ok := false
 		for l in links:
 			for dirn in [0, 1]:
 				var s: int = l.la if dirn == 0 else l.lb
@@ -431,40 +532,134 @@ func find_path(from: Vector3, to: Vector3, exact := true) -> PackedVector3Array:
 					continue
 				var pa: Vector3 = l.a if dirn == 0 else l.b
 				var pb: Vector3 = l.b if dirn == 0 else l.a
-				var d := Vector2(from.x - pa.x, from.z - pa.z).length() + Vector2(to.x - pb.x, to.z - pb.z).length()
-				if d < bd:
-					bd = d
-					var v: Array = (l.via as Array).duplicate()
-					if dirn == 1:
-						v.reverse()
-					best = {"pa": pa, "pb": pb, "via": v}
+				var v: Array = (l.via as Array).duplicate()
+				if dirn == 1:
+					v.reverse()
+				var p1 := _level_path(la, from, pa)
+				var ok1 := _seg_ok
+				var p2 := _level_path(lb, pb, to)
+				var ok2 := _seg_ok
+				var cand := PackedVector3Array()
+				cand.append_array(p1)
+				cand.append(pa)
+				for vp: Vector3 in v:
+					cand.append(vp)
+				cand.append(pb)
+				cand.append_array(p2)
+				var ln := path_length(from, cand)
+				var good := ok1 and ok2
+				if (good and not best_ok) or (good == best_ok and ln < best_len):
+					best = cand
+					best_len = ln
+					best_ok = good
 		if best.is_empty():
 			out = _level_path(la, from, Vector3(to.x, from.y, to.z))
+			ok = false
 		else:
-			out = _level_path(la, from, best.pa)
-			out.append(best.pa)
-			for vp: Vector3 in best.via:
-				out.append(vp)
-			out.append(best.pb)
-			out.append_array(_level_path(lb, best.pb, to))
+			out = best
+			ok = best_ok
+	last_ok = ok
+	var end_p: Vector3 = out[out.size() - 1] if not out.is_empty() else from
+	last_gap = Vector2(end_p.x - to.x, end_p.z - to.z).length() if level_of(end_p) == lb or out.is_empty() else INF
 	if exact:
-		if out.is_empty() or out[out.size() - 1].distance_to(to) > 0.04:
-			out.append(to)
-	elif out.is_empty():
-		out.append(to)
+		# The last open cell is next to `to` (use spots sit on chairs, in front
+		# of counters): finish the approach. Never walk a long straight line
+		# through walls to a place the grid could not reach.
+		if (ok and last_gap < 1.0) or last_gap < 0.5:
+			if out.is_empty() or out[out.size() - 1].distance_to(to) > 0.04:
+				out.append(to)
+			last_ok = true
+			last_gap = 0.0
+		else:
+			# Reachable region ends too far from `to` (behind a wall of
+			# furniture): the caller must treat it as a route failure.
+			last_ok = false
+	if out.is_empty():
+		out.append(to if ok else from)
 	return out
 
 
+## Region a walker coming from `from` arrives in on level li (its own region
+## on the same storey, else the region at the foot / head of the stairs).
+func entry_region(from: Vector3, li: int) -> int:
+	var la := level_of(from)
+	if la == li:
+		return region_of(la, approach_cell(la, cell_of(from), -1, 40))
+	for l in links:
+		if l.la == la and l.lb == li:
+			return region_of(li, approach_cell(li, cell_of(l.b), -1, 40))
+		if l.lb == la and l.la == li:
+			return region_of(li, approach_cell(li, cell_of(l.a), -1, 40))
+	return -1
+
+
+## Where to stand to use something whose spot is inside furniture (a fridge,
+## a counter): the walkable cell, reachable from `from`, that approaches
+## `target` most directly. Vector3.INF when nothing reachable is near.
+func stand_spot(from: Vector3, target: Vector3, max_cost := 32) -> Vector3:
+	if not in_bounds(target):
+		return Vector3.INF
+	var li := level_of(target)
+	var tc := cell_of(target)
+	var reg := entry_region(from, li)
+	var c := approach_cell(li, tc, reg, max_cost)
+	if c.x < 0:
+		return Vector3.INF
+	if c == tc:
+		return Vector3(target.x, floor_y(target, li), target.z)
+	var p := center_of(li, c)
+	# Step a little toward the object (stay inside the cell).
+	var d := Vector3(target.x - p.x, 0, target.z - p.z)
+	if d.length() > 0.01:
+		p += d.normalized() * minf(d.length(), cs * 0.35)
+	return p
+
+
+## Walking length of a path that starts at `from`.
+static func path_length(from: Vector3, p: PackedVector3Array) -> float:
+	var d := 0.0
+	var prev := from
+	for q in p:
+		d += prev.distance_to(q)
+		prev = q
+	return d
+
+
+var _seg_ok := true
+
 func _level_path(li: int, from: Vector3, to: Vector3) -> PackedVector3Array:
 	var out := PackedVector3Array()
+	_seg_ok = false
 	if not in_bounds(from) or not in_bounds(to):
 		return out
-	var a := nearest_open(li, cell_of(from), 8)
-	var b := nearest_open(li, cell_of(to), 24)
-	if a.x < 0 or b.x < 0:
+	var fc := cell_of(from)
+	var tc := cell_of(to)
+	# Start: the walkable cell the sim steps into (off a chair, out of a bed).
+	# Goal: the cell of that same region from which `to` is approached most
+	# cheaply (crossing at most a little furniture, never a cut wall).
+	var a := approach_cell(li, fc, -1, 40)
+	if a.x < 0:
 		return out
+	var b := approach_cell(li, tc, region_of(li, a), 48)
+	if b.x >= 0:
+		_seg_ok = true
+	else:
+		# The sim may stand in a pocket (between a bed and the wall): try the
+		# region of the goal's own approach cell from where the sim stands.
+		var b0 := approach_cell(li, tc, -1, 48)
+		var a2 := approach_cell(li, fc, region_of(li, b0), 40) if b0.x >= 0 else Vector2i(-1, -1)
+		if a2.x >= 0:
+			a = a2
+			b = b0
+			_seg_ok = true
+		else:
+			# Not connected: get as close to `to` as the start region allows.
+			b = _closest_in_region(li, region_of(li, a), to)
+			if b.x < 0:
+				return out
 	var ids: Array[Vector2i] = astars[li].get_id_path(a, b, true)
 	if ids.is_empty():
+		_seg_ok = false
 		return out
 	# String-pull: keep only the cells where line of sight breaks.
 	var keep: Array[Vector2i] = [ids[0]]
@@ -475,11 +670,79 @@ func _level_path(li: int, from: Vector3, to: Vector3) -> PackedVector3Array:
 			j -= 1
 		keep.append(ids[j])
 		i = j
+	# Start cell too when the sim isn't standing in it (stepping out of a
+	# chair or off the stair foot must go through the open cell, not a wall).
+	if fc != a and center_of(li, a).distance_to(from) > cs * 0.75 and not _los(li, a, fc):
+		out.append(center_of(li, a))
 	for k in range(1, keep.size()):
 		out.append(center_of(li, keep[k]))
 	if out.is_empty():
 		out.append(center_of(li, b))
 	return out
+
+
+## The open cell a sim reaches c from: a cheapest-first search out of c that
+## may cross furniture (cost 4 per cell) and the dilated margin (cost 1) but
+## never a floorless cell (the cut walls / holes). So the final approach to a
+## fridge against the back wall comes from the kitchen, not from the garden
+## behind the wall, even when the garden cell is a little closer.
+## With region >= 0 only open cells of that region count. (-1,-1) if none.
+func approach_cell(li: int, c: Vector2i, region := -1, max_cost := 64) -> Vector2i:
+	if c.x < 0 or c.y < 0 or c.x >= w or c.y >= h:
+		return Vector2i(-1, -1)
+	var bl := block[li]
+	var cm := comps[li]
+	var c0 := c.y * w + c.x
+	if _walk_v(bl[c0]) and (region < 0 or cm[c0] == region):
+		return c
+	var buckets: Array[PackedInt32Array] = []
+	buckets.resize(max_cost + 5)
+	for k in buckets.size():
+		buckets[k] = PackedInt32Array()
+	var best := {c0: 0}
+	buckets[0].append(c0)
+	for cost in max_cost + 1:
+		var bk: PackedInt32Array = buckets[cost]
+		var i := 0
+		while i < bk.size():
+			var cur: int = bk[i]
+			i += 1
+			if int(best.get(cur, 1 << 30)) < cost:
+				continue
+			if _walk_v(bl[cur]) and (region < 0 or cm[cur] == region):
+				return Vector2i(cur % w, cur / w)
+			var x := cur % w
+			for n in [cur - 1 if x > 0 else -1, cur + 1 if x < w - 1 else -1, cur - w, cur + w]:
+				if n < 0 or n >= w * h or bl[n] == 2:
+					continue
+				var step := 1 if _walk_v(bl[n]) else 4
+				var nc := cost + step
+				if nc > max_cost or int(best.get(n, 1 << 30)) <= nc:
+					continue
+				best[n] = nc
+				buckets[nc].append(n)
+			bk = buckets[cost]
+	return Vector2i(-1, -1)
+
+
+## Open cell of region `reg` closest (straight line) to world point p.
+func _closest_in_region(li: int, reg: int, p: Vector3) -> Vector2i:
+	if reg < 0:
+		return Vector2i(-1, -1)
+	var cm := comps[li]
+	var pc := cell_of(p)
+	var best := Vector2i(-1, -1)
+	var bd := INF
+	for c in w * h:
+		if cm[c] != reg:
+			continue
+		var dx := c % w - pc.x
+		var dz := c / w - pc.y
+		var d := float(dx * dx + dz * dz)
+		if d < bd:
+			bd = d
+			best = Vector2i(c % w, c / w)
+	return best
 
 
 ## Grid line of sight (supercover walk, all cells must be open).

@@ -181,7 +181,7 @@ func _apply_scale() -> void:
 	walk_speed = (1.5 if _dog else (1.1 if _meta.kind == "child" else 1.3)) * sqrt(_s)
 
 
-const AUTO_SCALE := {"adult": 1.1, "child": 1.05, "dog": 1.4}
+const AUTO_SCALE := {"adult": 1.1, "child": 1.05, "dog": 1.28}
 
 
 func kind() -> String:
@@ -464,7 +464,7 @@ func _human_pose() -> void:
 			var tap2 := sin(t * 11.0 + 1.3)
 			var body_yaw := 0.0
 			if _seated():
-				body_yaw = _cheat(1.55, 0.32, 0.22, 0.8)
+				body_yaw = _cheat(1.55, 0.36, 0.28, 0.8)
 			_sb(b_arm_l, -0.62, -0.18 - body_yaw, -0.05)
 			_sb(b_arm_r, -0.62, 0.18 - body_yaw, 0.05)
 			_sb(b_fore_l, -0.85 + 0.08 * maxf(0.0, tap), 0.0, 0.0)
@@ -483,10 +483,10 @@ func _human_pose() -> void:
 			# Brush arm raised to the canvas, palette held low in the other hand.
 			var dab := sin(t * 3.2)
 			var dab2 := sin(t * 1.3 + _phase)
-			_sb(b_arm_r, -1.75 + 0.12 * dab, 0.1 * dab2, 0.28)
-			_sb(b_fore_r, -0.45 - 0.2 * dab)
-			_sb(b_arm_l, -0.45, 0.0, 0.18)
-			_sb(b_fore_l, -1.15)
+			_sb(b_arm_r, -1.5 + 0.12 * dab, 0.12 * dab2, 0.12)
+			_sb(b_fore_r, -0.2 - 0.2 * dab)
+			_sb(b_arm_l, -0.35, 0.0, 0.42)
+			_sb(b_fore_l, -1.1)
 			_ab(b_head, -0.05, 0.05 * dab2, 0.06 * sin(t * 0.7))
 			_ab(b_torso, 0.06, 0.0, 0.0)
 			# Glance back toward the player now and then, otherwise a gentle
@@ -664,7 +664,9 @@ func _dog_lie() -> float:
 	# then the head looks back toward the player.
 	if camera_cheat and is_inside_tree():
 		var a := _cam_a
-		var sg := 1.0 if a >= 0.0 else -1.0
+		# Nearly head-on: swing the head to the camera's right (reads like the
+		# ref's dog stretched along the rug); otherwise take the short way.
+		var sg := (1.0 if a >= 0.0 else -1.0) if absf(a) > 0.5 else -1.0
 		var after := clampf(absf(a), 1.15, 1.65) * sg
 		_tgt_root_rot.y = a - after
 		look_yaw = 0.45 * sg

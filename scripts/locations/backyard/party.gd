@@ -4,6 +4,7 @@ extends RefCounted
 ## pit, outdoor lounge sofa, lanterns and the string lights on posts.
 
 const V := preload("res://scripts/locations/backyard/vox.gd")
+const Halos := preload("res://scripts/locations/backyard/halos.gd")
 const F := 16
 
 const WOOD := Color("b07a46")
@@ -16,8 +17,32 @@ const BULB := Color("ffd889")
 const TABLE_POS := Vector3(0.9, 0.0, 0.5)
 const TABLE_ROT := 0.30
 const GRILL_POS := Vector3(-2.9, 0.0, 0.0)
-const GRILL_ROT := 2.3
+const GRILL_ROT := PI + 0.55
 const PIT_POS := Vector3(4.1, 0.0, 2.4)
+## Lanterns (fine cells: x, y, z of the base corner; 7x7 footprint).
+const LANTERNS := [Vector3i(-66, 0, 14), Vector3i(24, 0, -38), Vector3i(122, 0, -10), Vector3i(-88, 0, -58), Vector3i(150, 0, 50),
+		Vector3i(44, 6, -50), Vector3i(118, 6, -50), Vector3i(-22, 0, 30), Vector3i(66, 0, 40),
+		Vector3i(-118, 0, 42), Vector3i(100, 0, 62), Vector3i(-140, 0, -20)]
+## Lanterns that also get a real OmniLight (the rest only bake a pool on the lawn).
+const LIT_LANTERNS := [0, 2, 7, 8, 10]
+
+
+## Warm light pools on the ground (world x, z, radius m, strength) for the
+## baked lawn glow: lanterns, fire pit, grill, table candles, deck spill.
+static func light_pools() -> Array:
+	var out := []
+	for lp in LANTERNS:
+		if lp.y == 0:
+			out.append([(lp.x + 3.5) / F, (lp.z + 3.5) / F, 1.5, 0.85])
+	out.append([PIT_POS.x, PIT_POS.z, 2.8, 1.25])
+	out.append([GRILL_POS.x, GRILL_POS.z, 1.9, 0.7])
+	out.append([TABLE_POS.x, TABLE_POS.z, 2.6, 0.55])
+	out.append([6.5, -2.4, 4.2, 0.6])
+	out.append([3.0, -2.2, 2.6, 0.45])
+	# Under the string lights.
+	for sp in [Vector3(-4.0, 0, -3.0), Vector3(-2.0, 0, -3.2), Vector3(-1.5, 0, -1.6), Vector3(3.6, 0, -1.8), Vector3(5.0, 0, -0.9)]:
+		out.append([sp.x, sp.z, 2.0, 0.3])
+	return out
 
 ## Seats in table-local cells: Vector3(x, z, unused) — facing is derived in _facing().
 const SEATS := {
@@ -37,6 +62,7 @@ var grill_node: Node3D
 var pit_light: OmniLight3D
 var coal_light: OmniLight3D
 var smoke: CPUParticles3D
+var halos := Halos.new()
 var _rng := RandomNumberGenerator.new()
 
 
@@ -53,9 +79,9 @@ func build(parent: Node3D) -> void:
 	_fire_pit(yard, int(PIT_POS.x * F), int(PIT_POS.z * F))
 	_sofa(yard, 100, 28)
 	_side_table(yard, 96, 8)
-	for lp in [Vector3i(-66, 0, 14), Vector3i(24, 0, -38), Vector3i(122, 0, -10), Vector3i(-88, 0, -58), Vector3i(150, 0, 50),
-			Vector3i(44, 6, -50), Vector3i(118, 6, -50), Vector3i(-22, 0, 30), Vector3i(66, 0, 40)]:
+	for lp in LANTERNS:
 		_lantern(yard, lp.x, lp.y, lp.z, 1.0)
+		halos.add(Vector3((lp.x + 3.5) / F, (lp.y + 5.5) / F, (lp.z + 3.5) / F), 1.5, Color(1.0, 0.6, 0.24, 1.0))
 	_posts(yard)
 	# Planters around the lounge and the patio.
 	for pp in [Vector3i(94, 0, -10), Vector3i(92, 0, 66), Vector3i(-50, 0, -60), Vector3i(-96, 0, -20), Vector3i(60, 0, -30)]:
@@ -64,9 +90,23 @@ func build(parent: Node3D) -> void:
 	var lights := VoxelBuilder.new()
 	lights.jitter = 0.02
 	_string_lights(lights)
-	V.inst(lights, root, V.SIZE_FINE, Vector3.ZERO, 0.0, Vector3.ZERO, false, true, "StringLights")
+	var lmi := V.inst(lights, root, V.SIZE_FINE, Vector3.ZERO, 0.0, Vector3.ZERO, false, true, "StringLights")
+	lmi.set_surface_override_material(lmi.mesh.get_surface_count() - 1, V.glow_bulb())
 	# Light sources.
 	pit_light = V.omni(root, PIT_POS + Vector3(0, 0.75, 0), Color(1.0, 0.55, 0.22), 2.6, 5.5)
+	# Glow sprites: fire pit, grill coals, table candles, house lamps + doors.
+	halos.add(PIT_POS + Vector3(0, 0.55, 0), 2.8, Color(1.0, 0.45, 0.12, 1.0))
+	var tb := Transform3D(Basis(Vector3.UP, TABLE_ROT), TABLE_POS)
+	for cx in [-14, 11, 23]:
+		halos.add(tb * Vector3((cx + 1) / 16.0, 0.95, 0.0), 0.6, Color(1.0, 0.65, 0.3, 0.9))
+	for wx in [50.5 / 16.0, 164.5 / 16.0]:
+		halos.add(Vector3(wx, 2.4, -5.9), 0.9, Color(1.0, 0.7, 0.35, 0.6))
+	for dx in [4.2, 5.8, 7.4, 9.0]:
+		halos.add(Vector3(dx, 1.5, -5.7), 2.4, Color(1.0, 0.62, 0.3, 0.16))
+	halos.build(root)
+	for i in LIT_LANTERNS:
+		var lp: Vector3i = LANTERNS[i]
+		V.omni(root, Vector3((lp.x + 3.5) / F, (lp.y + 6.0) / F, (lp.z + 3.5) / F), Color(1.0, 0.66, 0.32), 1.1, 2.2)
 	V.omni(root, Vector3(-3.9, 0.7, 1.1), Color(1.0, 0.7, 0.4), 1.2, 3.5)
 	V.omni(root, Vector3(-1.0, 2.6, -1.0), Color(1.0, 0.78, 0.5), 1.1, 6.5)
 	V.omni(root, Vector3(3.6, 2.6, 0.2), Color(1.0, 0.78, 0.5), 0.9, 6.0)
@@ -94,7 +134,7 @@ func process(t: float) -> void:
 	if pit_light:
 		pit_light.light_energy = 2.4 + sin(t * 11.0) * 0.25 + sin(t * 23.7) * 0.15
 	if coal_light:
-		coal_light.light_energy = 1.0 + sin(t * 9.0) * 0.12
+		coal_light.light_energy = 0.45 + sin(t * 9.0) * 0.06
 
 
 # ------------------------------------------------------------------ table
@@ -261,12 +301,12 @@ func _grill() -> void:
 		V.b(vb, -7 + i * 3, 17, 2, 2, 1, 1, Color("8a4426"))
 	V.b(vb, 6, 17, 0, 1, 1, 3, Color("f3d24a")); V.b(vb, 8, 17, 0, 1, 1, 3, Color("f3d24a"))
 	V.p(vb, 6, 17, 3, Color("6cb04a")); V.p(vb, 8, 17, 3, Color("6cb04a"))
-	# Open lid, swung right back on its hinge (low, so the grate stays visible).
-	for k in 7:
-		V.b(vb, -10, 16 + k, -7 - k, 20, 1, 2, V.noisy(IRON, 0.05))
-	V.b(vb, -9, 23, -14, 18, 1, 1, IRON)
-	V.b(vb, -6, 21, -13, 12, 1, 1, steel)
-	V.p(vb, 0, 22, -12, Color("e8e8ea"))
+	# Open lid, flipped down over the back of the firebox (faces the camera,
+	# so the grate and food stay visible).
+	V.b(vb, -10, 7, -8, 20, 9, 2, V.noisy(IRON, 0.05))
+	V.b(vb, -6, 9, -9, 12, 1, 1, steel)
+	V.b(vb, -9, 11, -9, 18, 1, 1, V.shade(IRON, 1.3))
+	V.p(vb, 0, 13, -9, Color("e8e8ea"))
 	# Side shelves.
 	V.b(vb, -17, 13, -5, 7, 1, 9, V.wood(WOOD, 0, 2))
 	V.b(vb, 10, 13, -5, 7, 1, 9, V.wood(WOOD, 0, 2))
@@ -277,20 +317,22 @@ func _grill() -> void:
 	V.b(vb, -16, 14, -3, 5, 1, 1, steel)
 	V.b(vb, -16, 14, 0, 4, 2, 2, Color("d02a24"))
 	grill_node = V.inst(vb, root, V.SIZE_FINE, GRILL_POS, GRILL_ROT, Vector3.ZERO, true, true, "Grill")
-	coal_light = V.omni(grill_node, Vector3(0, 1.3, 0.1), Color(1.0, 0.55, 0.25), 1.0, 3.0)
+	coal_light = V.omni(grill_node, Vector3(0, 1.05, -0.35), Color(1.0, 0.62, 0.35), 0.45, 2.2)
 	# Smoke.
 	smoke = CPUParticles3D.new()
 	smoke.name = "Smoke"
-	smoke.position = Vector3(0, 1.15, -0.05)
+	# Rises off the right end of the grate (between Jack and the table) and
+	# drifts back, so it never veils his face.
+	smoke.position = Vector3(-0.5, 1.12, 0.0)
 	smoke.amount = 30
 	smoke.lifetime = 3.2
 	smoke.preprocess = 3.2
 	smoke.local_coords = false
 	smoke.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
-	smoke.emission_box_extents = Vector3(0.45, 0.02, 0.2)
+	smoke.emission_box_extents = Vector3(0.12, 0.02, 0.1)
 	smoke.direction = Vector3(0, 1, 0)
 	smoke.spread = 12.0
-	smoke.gravity = Vector3(0.12, 0.25, 0.0)
+	smoke.gravity = Vector3(0.18, 0.22, -0.35)
 	smoke.initial_velocity_min = 0.25
 	smoke.initial_velocity_max = 0.45
 	smoke.scale_amount_min = 0.7
@@ -301,8 +343,8 @@ func _grill() -> void:
 	curve.add_point(Vector2(1, 1.6))
 	smoke.scale_amount_curve = curve
 	var grad := Gradient.new()
-	grad.set_color(0, Color(0.9, 0.86, 0.88, 0.6))
-	grad.set_color(1, Color(0.8, 0.75, 0.85, 0.0))
+	grad.set_color(0, Color(0.92, 0.86, 0.86, 0.42))
+	grad.set_color(1, Color(0.78, 0.72, 0.84, 0.0))
 	smoke.color_ramp = grad
 	var bm := BoxMesh.new()
 	bm.size = Vector3.ONE * 0.2
@@ -428,8 +470,8 @@ func _lantern(vb: VoxelBuilder, x: int, y: int, z: int, _s: float) -> void:
 	V.b(vb, x + 3, y + 13, z + 3, 1, 2, 1, IRON)
 
 
-const POSTS := [Vector3(-5.6, 3.1, -3.6), Vector3(-0.6, 3.2, -3.4), Vector3(7.6, 3.0, -0.8)]
-const PORCH_POSTS := [Vector3(1.69, 3.15, -2.69), Vector3(6.81, 3.15, -2.69), Vector3(12.81, 3.15, -2.69)]
+const POSTS := [Vector3(-5.6, 3.6, -3.6), Vector3(-0.6, 3.9, -3.4), Vector3(7.6, 3.8, -0.8)]
+const PORCH_POSTS := [Vector3(1.69, 3.3, -2.62), Vector3(6.81, 3.3, -2.62), Vector3(12.81, 3.3, -2.62)]
 
 
 func _posts(vb: VoxelBuilder) -> void:
@@ -455,17 +497,22 @@ func _strand(vb: VoxelBuilder, a: Vector3, b: Vector3, sag: float, spacing := 0.
 		if t * length >= next_bulb and t * length < length - 0.15:
 			next_bulb += spacing
 			vb.set_v(q + Vector3i(0, -1, 0), Color("3a3530"))
-			V.b(vb, q.x - 1, q.y - 4, q.z - 1, 3, 3, 3, BULB, true)
-			V.b(vb, q.x, q.y - 5, q.z, 1, 1, 1, BULB, true)
+			# Small pear-shaped bulb: amber skin, hot core, rounded tip.
+			V.b(vb, q.x, q.y - 2, q.z, 1, 1, 1, Color("3a3530"))
+			V.b(vb, q.x - 1, q.y - 4, q.z, 3, 2, 1, Color("ffc35a"), true)
+			V.b(vb, q.x, q.y - 4, q.z - 1, 1, 2, 3, Color("ffc35a"), true)
+			V.b(vb, q.x, q.y - 4, q.z, 1, 2, 1, Color("fff0c0"), true)
+			V.b(vb, q.x, q.y - 5, q.z, 1, 1, 1, Color("ffd27a"), true)
+			halos.add(Vector3((q.x + 0.5) / F, (q.y - 3.0) / F, (q.z + 0.5) / F), 0.62, Color(1.0, 0.66, 0.28, 0.95))
 
 
 func _string_lights(vb: VoxelBuilder) -> void:
 	var p0: Vector3 = POSTS[0]
 	var p1: Vector3 = POSTS[1]
 	var p2: Vector3 = POSTS[2]
-	_strand(vb, Vector3(-13.0, 3.0, -2.6), p0, 0.5)
+	_strand(vb, Vector3(-13.0, 3.2, -2.6), p0, 0.5)
 	_strand(vb, p0, p1, 0.55)
-	_strand(vb, p1, PORCH_POSTS[0], 0.35)
-	_strand(vb, p1, p2, 0.9)
-	_strand(vb, PORCH_POSTS[0], PORCH_POSTS[1], 0.35)
-	_strand(vb, PORCH_POSTS[1], PORCH_POSTS[2], 0.4)
+	_strand(vb, p1, PORCH_POSTS[0], 0.25)
+	_strand(vb, p1, p2, 0.6)
+	_strand(vb, PORCH_POSTS[0], PORCH_POSTS[1], 0.14)
+	_strand(vb, PORCH_POSTS[1], PORCH_POSTS[2], 0.16)

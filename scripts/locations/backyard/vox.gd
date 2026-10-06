@@ -122,8 +122,22 @@ static func glow_hot() -> StandardMaterial3D:
 		_glow_hot.vertex_color_use_as_albedo = true
 		_glow_hot.vertex_color_is_srgb = true
 		_glow_hot.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		_glow_hot.albedo_color = Color(2.2, 1.9, 1.5)
+		_glow_hot.albedo_color = Color(2.1, 1.55, 0.95)
 	return _glow_hot
+
+
+static var _glow_bulb: StandardMaterial3D
+
+
+## String-light bulbs: hot amber so they bloom warm instead of clipping white.
+static func glow_bulb() -> StandardMaterial3D:
+	if _glow_bulb == null:
+		_glow_bulb = StandardMaterial3D.new()
+		_glow_bulb.vertex_color_use_as_albedo = true
+		_glow_bulb.vertex_color_is_srgb = true
+		_glow_bulb.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		_glow_bulb.albedo_color = Color(2.6, 1.7, 0.75)
+	return _glow_bulb
 
 
 static func glow_soft() -> StandardMaterial3D:

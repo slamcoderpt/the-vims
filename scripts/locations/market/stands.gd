@@ -278,9 +278,9 @@ static func _checkout(root: Node3D, _halo_pts: Array) -> void:
 	var vb := VoxelBuilder.new()
 	vb.jitter = 0.035
 	var x0 := u(1.6)
-	var z0 := u(0.45)
+	var z0 := u(1.5)
 	var W := u(0.85)
-	var L := u(4.3)
+	var L := u(3.4)
 	var Hc := u(0.92)
 	# body: wood front panels (facing -x)
 	vb.box(Vector3i(x0, 0, z0), Vector3i(W, Hc, L), func(p: Vector3i) -> Color:
@@ -332,14 +332,8 @@ static func _checkout(root: Node3D, _halo_pts: Array) -> void:
 	vb.box(kb, Vector3i(3, 7, 3), Color("d82a22"))
 	vb.box(kb + Vector3i(1, 7, 1), Vector3i(1, 2, 1), Color("f2f2f2"))
 	vb.box(kb + Vector3i(-1, 2, 0), Vector3i(1, 3, 3), Color("fbf3dc"))
-	vb.box(Vector3i(x0 + 8, by, belt0 + 40), Vector3i(4, 3, 4), Color("f6c22c"))     # yellow box
-	vb.box(Vector3i(x0 + 7, by + 1, belt0 + 40), Vector3i(1, 1, 4), Color("e8402f"))
-	# candy rack at the front end of the counter
-	var cr := Vector3i(x0 + 1, 0, z0 + L)
-	vb.box(cr, Vector3i(W - 2, u(1.1), 2), Color("6a4a30"))
-	for sy in 4:
-		for sx in range(1, W - 3, 2):
-			vb.box(cr + Vector3i(sx, 3 + sy * 4, 2), Vector3i(2, 3, 1), Fx.BOX_COLS[(sx + sy * 3) % Fx.BOX_COLS.size()])
+	vb.box(Vector3i(x0 + 8, by, belt0 + 33), Vector3i(4, 3, 4), Color("f6c22c"))     # yellow box
+	vb.box(Vector3i(x0 + 7, by + 1, belt0 + 33), Vector3i(1, 1, 4), Color("e8402f"))
 	# green tote bags hanging on the front
 	for i in 3:
 		var tz := z0 + u(0.5) + i * u(1.0)
@@ -362,7 +356,7 @@ static func _checkout(root: Node3D, _halo_pts: Array) -> void:
 				vb.set_v(Vector3i(x0 - 3, u(0.1) + 1 + p.y / 2, tz + 1 + p.x / 2), lv.vox[p])
 	# back counter behind the cashier
 	var bx := u(3.55)
-	var bz := u(-0.2)
+	var bz := u(1.25)
 	var bh := u(0.9)
 	vb.box(Vector3i(bx, 0, bz), Vector3i(u(0.6), bh, u(2.2)), Kit.wood(Fx.WOOD_D, 2))
 	vb.box(Vector3i(bx - 1, bh, bz - 1), Vector3i(u(0.6) + 1, 1, u(2.2) + 2), Color("e8ddc8"))
@@ -393,19 +387,19 @@ static func _checkout(root: Node3D, _halo_pts: Array) -> void:
 	pv.jitter = 0.05
 	var py := (Hc + 2) * 2
 	var b0 := z0 + u(0.9)
-	Produce.bananas(pv, Vector3i((x0 + 2) * 2, py, (b0 + 30) * 2), 5)
-	Produce.bananas(pv, Vector3i((x0 + 2) * 2 + 1, py + 2, (b0 + 30) * 2 + 1), 4)
-	Produce.broccoli(pv, Vector3i((x0 + 3) * 2, py, (b0 + 22) * 2))
-	Produce.lettuce(pv, Vector3i((x0 + 8) * 2, py, (b0 + 24) * 2))
+	Produce.bananas(pv, Vector3i((x0 + 2) * 2, py, (b0 + 22) * 2), 5)
+	Produce.bananas(pv, Vector3i((x0 + 2) * 2 + 1, py + 2, (b0 + 22) * 2 + 1), 4)
+	Produce.broccoli(pv, Vector3i((x0 + 3) * 2, py, (b0 + 15) * 2))
+	Produce.lettuce(pv, Vector3i((x0 + 8) * 2, py, (b0 + 9) * 2))
 	for t in 3:
-		Produce.tomato(pv, Vector3i((x0 + 3) * 2 + t * 4, py, (b0 + 37) * 2 + (t % 2)))
-	Produce.apple(pv, Vector3i((x0 + 3) * 2, py, (b0 + 41) * 2))
-	Produce.apple(pv, Vector3i((x0 + 3) * 2 + 4, py, (b0 + 41) * 2 + 2))
+		Produce.tomato(pv, Vector3i((x0 + 3) * 2 + t * 4, py, (b0 + 29) * 2 + (t % 2)))
+	Produce.apple(pv, Vector3i((x0 + 3) * 2, py, (b0 + 34) * 2))
+	Produce.apple(pv, Vector3i((x0 + 3) * 2 + 4, py, (b0 + 34) * 2 + 2))
 	Kit.add(root, pv, P, "CheckoutProduce", true)
 	Interactable.attach(root, "Checkout", [
 		_act("pay", "Pay", "register", 3.0, {"task": "Pay at Checkout"}),
 		_act("bag", "Bag Groceries", "bag", 2.0),
-	], Vector3(0.85, 1.0, 4.3), Vector3(2.02, 0.5, 2.6), Vector3(1.2, 0, 1.0))
+	], Vector3(0.85, 1.0, 3.4), Vector3(2.02, 0.5, 3.2), Vector3(1.2, 0, 2.4))
 
 
 # ------------------------------------------------------------------ foreground dressing

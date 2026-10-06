@@ -35,12 +35,12 @@ func _ready() -> void:
 	get_tree().quit(0 if fails == 0 else 1)
 
 
-## Sections can be picked with --only=boot,loop,money,mood,queue,autonomy,clock,gohere,build,travel
+## Sections can be picked with --only=boot,loop,money,mood,queue,autonomy,clock,gohere,build,social,townies,travel
 func _run() -> void:
 	var only: Array = []
 	if args.has("only"):
 		only = (args.only as String).split(",")
-	for sec in ["boot", "loop", "money", "mood", "queue", "autonomy", "clock", "gohere", "build", "travel"]:
+	for sec in ["boot", "loop", "money", "mood", "queue", "autonomy", "clock", "gohere", "build", "social", "townies", "travel"]:
 		if only.is_empty() or sec in only or sec == "boot":
 			await call("_s_" + sec)
 
@@ -282,23 +282,236 @@ func _s_queue() -> void:
 
 func _s_autonomy() -> void:
 	var maya = _agent("Maya")
+	# --- every object on the lot can be reached from both storeys
+	var nav: NavGrid = sim.nav
+	var probes: Array = [Vector3(-2.85, 3.0, -0.1), Vector3(0.0, 0.0, 0.0)]
+	var bad: Array = []
+	var n_ok := 0
+	for it in sim.interactables:
+		if not is_instance_valid(it) or sim.townie_of(it) != "" or it.get_parent() is SimActor:
+			continue
+		var r: Dictionary = sim.approach(maya, {"action": {"id": "x", "pose": "idle"}, "target": it})
+		if r.is_empty():
+			continue
+		var ok_all := true
+		for pr in probes:
+			nav.find_path(pr, r.spot, true)
+			if not nav.last_ok:
+				ok_all = false
+		if ok_all:
+			n_ok += 1
+		else:
+			bad.append(it.title)
+	_step("nav_reach_all", bad.is_empty(), "%d objects reachable from both floors, unreachable=%s" % [n_ok, str(bad)])
+
+	# --- hungry upstairs -> walks downstairs to the kitchen and eats
 	maya.cancel_all()
 	for k in maya.member.needs:
 		maya.member.needs[k] = 0.95
 	maya.member.needs.hunger = 0.05
 	maya.idle_minutes = 0.0
+	maya.actor.global_position = Vector3(-2.85, 3.0, -0.1)
 	Game.speed = 3
 	var y0: float = maya.actor.global_position.y
-	var picked := await _until(func(): return maya.phase != "idle" and maya.order.get("action", {}).get("needs", {}).get("hunger", 0.0) > 0.0, 25.0)
+	var picked := await _until_game(func(): return maya.phase != "idle" and maya.order.get("action", {}).get("needs", {}).get("hunger", 0.0) > 0.0, 30.0)
 	var act_name: String = maya.current_label()
 	var tgt = maya.order.get("target")
-	_step("autonomy_lowest_need", picked, "Maya hunger=0.05 -> chose '%s' on %s" % [act_name, str(tgt.title) if tgt else "-"])
-	await _until(func(): return maya.phase == "act", 50.0)
+	_step("autonomy_lowest_need", picked, "Maya hunger=0.05 -> chose '%s' on %s, route %.1f m" % [act_name, str(tgt.title) if tgt else "-", maya.path_len])
+	var m0 := Game.total_minutes()
+	await _until_game(func(): return maya.phase == "act" or maya.phase == "idle", 240.0)
 	var y1: float = maya.actor.global_position.y
 	await _focus(maya.actor.global_position)
 	await _shot("autonomy")
-	_step("autonomy_arrives", maya.phase == "act", "Maya phase=%s y %.2f -> %.2f (stairs %s)" % [maya.phase, y0, y1, "used" if absf(y1 - y0) > 1.5 else "not needed"])
+	_step("autonomy_arrives", maya.phase == "act" and float(maya.order.get("action", {}).get("needs", {}).get("hunger", 0.0)) > 0.0,
+		"Maya phase=%s '%s' after %.0f game min, y %.2f -> %.2f (stairs %s), repaths=%d route_fails=%d" % [maya.phase, maya.current_label(), Game.total_minutes() - m0, y0, y1, "used" if absf(y1 - y0) > 1.5 else "not needed", maya.repaths, maya.route_fails])
+	var h0: float = maya.member.needs.hunger
+	await _until_game(func(): return maya.phase != "act", 120.0)
+	_step("autonomy_eats", maya.member.needs.hunger > h0 + 0.2, "hunger %.2f -> %.2f" % [h0, maya.member.needs.hunger])
 
+	# --- the stairs are blocked -> no walking into walls: route fail, then
+	# free will picks something it can reach; unblocked -> goes to eat.
+	maya.cancel_all()
+	maya.actor.global_position = Vector3(-2.85, 3.0, -0.1)
+	var fails0: int = maya.route_fails
+	var unr0: int = int(sim.stats.get("unreachable", 0))
+	var top: Vector3 = nav.links[0].a
+	nav.add_obstacle(990001, AABB(Vector3(top.x - 1.5, top.y, top.z - 1.2), Vector3(3.0, 1.0, 1.8)))
+	nav.find_path(maya.actor.global_position, Vector3(0, 0, -4.0), true)
+	var blocked: bool = not nav.last_ok
+	maya.unreachable.clear()
+	maya.member.needs.hunger = 0.0
+	maya._force_cool = 0.0
+	maya.check_needs()   # starving: free will is forced to look for food
+	maya.idle_minutes = 99.0
+	await _until_game(func(): return false, 60.0)
+	var stayed_up: bool = maya.actor.global_position.y > 2.0 and (maya.phase != "walk" or maya.spot.y > 2.0)
+	var noticed: bool = maya.route_fails > fails0 or int(sim.stats.get("unreachable", 0)) > unr0
+	_step("route_fail_fallback", blocked and stayed_up and noticed,
+		"stairs blocked=%s -> Maya stays upstairs=%s, %s '%s', route fails +%d, skipped targets +%d" % [str(blocked), str(stayed_up), maya.phase, maya.current_label(), maya.route_fails - fails0, int(sim.stats.get("unreachable", 0)) - unr0])
+	nav.remove_obstacle(990001)
+	sim._on_furniture_changed()
+	maya.cancel_all()
+	maya.member.needs.hunger = 0.05
+	maya.idle_minutes = 99.0
+	await _until_game(func(): return maya.phase == "act" and float(maya.order.get("action", {}).get("needs", {}).get("hunger", 0.0)) > 0.0, 240.0)
+	_step("route_recovers", maya.phase == "act" and maya.actor.global_position.y < 1.0, "unblocked -> Maya %s '%s' at y %.2f" % [maya.phase, maya.current_label(), maya.actor.global_position.y])
+	maya.cancel_all()
+	maya.member.needs.hunger = 0.8
+	maya.check_needs()
+
+	# --- free will soak: everyone lives for a few game hours with no orders
+	for m in Game.household:
+		for k in m.needs:
+			m.needs[k] = randf_range(0.25, 0.7)
+	var stuck_max := 0.0
+	var done0: int = sim.stats.done
+	var walk_since := {}
+	var t0 := Game.total_minutes()
+	while Game.total_minutes() - t0 < 360.0:
+		await get_tree().process_frame
+		for a in sim.agents:
+			if a == null:
+				continue
+			if a.phase == "walk":
+				if not walk_since.has(a):
+					walk_since[a] = Game.total_minutes()
+				stuck_max = maxf(stuck_max, Game.total_minutes() - walk_since[a])
+			else:
+				walk_since.erase(a)
+		if Time.get_ticks_msec() - _t0 > 520000:
+			break
+	var fb := 0
+	for a in sim.agents:
+		if a:
+			fb += a.fallbacks
+	_step("autonomy_soak", sim.stats.done - done0 >= 4 and stuck_max < 90.0,
+		"%.0f game min: %d actions done, longest walk %.0f game min, give-ups %d, low needs %s" % [Game.total_minutes() - t0, sim.stats.done - done0, stuck_max, fb, _low_needs()])
+	await _shot("autonomy_soak")
+
+
+func _low_needs() -> String:
+	var out: Array = []
+	for m in Game.household:
+		var lo := 1.0
+		var ln := ""
+		for k in m.needs:
+			if m.needs[k] < lo:
+				lo = m.needs[k]
+				ln = k
+		out.append("%s %s %.2f" % [m.name, ln, lo])
+	return ", ".join(out)
+
+
+func _s_social() -> void:
+	var jack = _agent("Jack")
+	var lily = _agent("Lily")
+	for a in [jack, lily]:
+		a.cancel_all()
+		a.autonomy = false
+		for k in a.member.needs:
+			a.member.needs[k] = maxf(a.member.needs[k], 0.6)
+	Game.selected = jack.index
+	Game.speed = 1
+	await _focus(lily.actor.global_position)
+	var r0 := Game.rel("Jack", "Lily")
+	_menus.clear()
+	var lp: Vector3 = (lily.actor.global_position + lily.actor.head_top()) * 0.5
+	sim.long_press(_cam().unproject_position(lp))
+	await _frames(3)
+	var got: bool = not _menus.is_empty() and "Lily" in str(_menus[-1][0])
+	var labels: Array = _menus[-1][1].map(func(a): return a.label) if got else []
+	_step("social_menu_tiers", got and "Hug" in labels and "Deep Conversation" in labels and not "Introduce Yourself" in labels,
+		"Jack->Lily (%s %.0f): %s" % [Game.rel_level(r0), r0, str(labels)])
+	await _shot("social_menu")
+	await _choose("Tell a Joke")
+	Game.speed = 3
+	await _until_game(func(): return jack.last_done == "s_joke" and jack.phase == "idle" or jack.phase == "idle" and jack.completed > 0 and jack.last_done == "s_joke", 90.0)
+	var r1 := Game.rel("Jack", "Lily")
+	_step("social_raises_rel", r1 > r0 or Game.has_moodlet(jack.index, "rejected"), "Jack-Lily %.1f -> %.1f (%s), Charisma %.2f" % [r0, r1, Game.rel_level(r1), Game.skill_level(jack.index, "Charisma")])
+	# Relationships tab
+	var ov = sim.overlay
+	await _frames(3)
+	for h in ov._hits:
+		if h[1] == "rels":
+			_touch((h[0] as Rect2).get_center())
+			break
+	await _frames(3)
+	var rl: Array = Game.rel_list(jack.index)
+	_step("relationships_panel", ov.panel.visible and ov.panel_tab == "rels" and rl.size() >= 3,
+		"tab=%s rels=%s" % [ov.panel_tab, str(rl.map(func(x): return "%s %s %.0f" % [x.name, x.level, x.value]))])
+	await _shot("relationships")
+	ov.panel.visible = false
+	# Level up: push close to the next level and do one more social.
+	var before := Game.rel_level(Game.rel("Lily", "Maya"))
+	Game.change_rel("Lily", "Maya", 69.5 - Game.rel("Lily", "Maya"))
+	var lvl_seen := []
+	var cb := func(a, b, l): lvl_seen.append(l)
+	Game.relationship_level_changed.connect(cb)
+	var maya = _agent("Maya")
+	maya.cancel_all()
+	maya.autonomy = false
+	lily.command({"action": SimActions_hug(lily, maya), "other": maya})
+	await _until_game(func(): return lily.phase == "idle", 90.0)
+	Game.relationship_level_changed.disconnect(cb)
+	_step("rel_level_up", "Best Friend" in lvl_seen and Game.has_moodlet(lily.index, "new_friend"), "Lily-Maya %s -> %s, events=%s" % [before, Game.rel_level(Game.rel("Lily", "Maya")), str(lvl_seen)])
+	for a in [jack, lily, maya]:
+		a.autonomy = true
+
+
+func SimActions_hug(ag, other) -> Dictionary:
+	for a in preload("res://scripts/sim/sim_actions.gd").socials_for(ag, other):
+		if a.id == "s_hug":
+			return a
+	return {}
+
+
+func _s_townies() -> void:
+	Game.speed = 1
+	_menus.clear()
+	Game.mode = "manage"
+	await _frames(3)
+	await _choose("Autumn Festival")
+	await _frames(6)
+	var jack = _agent("Jack")
+	Game.selected = jack.index
+	for m in Game.household:
+		for k in m.needs:
+			m.needs[k] = maxf(m.needs[k], 0.7)
+	jack.cancel_all()
+	# nearest townie Jack hasn't met
+	var best = null
+	var bd := INF
+	for it in sim.interactables:
+		var tn: String = sim.townie_of(it)
+		if tn == "" or Game.has_met("Jack", tn):
+			continue
+		var d := _flat(it.global_position, jack.actor.global_position)
+		if d < bd:
+			bd = d
+			best = it
+	var tname: String = sim.townie_of(best) if best else ""
+	_menus.clear()
+	if best:
+		await _tap_world(_it_center(best))
+		await _frames(3)
+	var labels: Array = _menus[-1][1].map(func(a): return a.label) if not _menus.is_empty() else []
+	_step("townie_stranger_menu", tname != "" and "Introduce Yourself" in labels and not "Chat" in labels and str(_menus[-1][0]).begins_with(tname),
+		"%s: %s" % [str(_menus[-1][0]) if not _menus.is_empty() else "-", str(labels)])
+	await _shot("townie_menu")
+	await _choose("Introduce Yourself")
+	Game.speed = 2
+	await _until_game(func(): return jack.phase == "idle" and jack.last_done == "s_introduce", 120.0)
+	var met: bool = Game.has_met("Jack", tname)
+	_menus.clear()
+	await _tap_world(_it_center(best))
+	await _frames(3)
+	labels = _menus[-1][1].map(func(a): return a.label) if not _menus.is_empty() else []
+	_step("townie_meet_unlocks", met and "Chat" in labels and "Tell a Joke" in labels,
+		"Jack-%s %.1f (%s), menu now %s, Meet 3 Neighbors done=%s (met here %d)" % [tname, Game.rel("Jack", tname), Game.rel_level(Game.rel("Jack", tname)), str(labels), str(_task_done("Meet 3 Neighbors")), sim.met_here.size()])
+	await _choose("Chat")
+	await _until_game(func(): return jack.phase == "idle" and jack.last_done == "s_chat", 120.0)
+	_step("townie_rel_persists", Game.rel("Jack", tname) > 14.0 and not _task_done("Meet 3 Neighbors"), "Jack-%s %.1f, Meet 3 Neighbors done=%s" % [tname, Game.rel("Jack", tname), str(_task_done("Meet 3 Neighbors"))])
+	await _shot("townie_chat")
 
 
 func _s_clock() -> void:
@@ -547,6 +760,19 @@ func _until(cond: Callable, timeout_s: float) -> bool:
 	var t := Time.get_ticks_msec()
 	while not cond.call():
 		if Time.get_ticks_msec() - t > timeout_s * 1000.0:
+			return false
+		await get_tree().process_frame
+	return true
+
+
+## Wait until cond is true or `game_min` in-game minutes have passed (the
+## software renderer is slow, so real-time timeouts are unreliable); a hard
+## real-time cap of 90 s keeps a broken run from hanging.
+func _until_game(cond: Callable, game_min: float) -> bool:
+	var m0 := Game.total_minutes()
+	var t := Time.get_ticks_msec()
+	while not cond.call():
+		if Game.total_minutes() - m0 > game_min or Time.get_ticks_msec() - t > 90000:
 			return false
 		await get_tree().process_frame
 	return true

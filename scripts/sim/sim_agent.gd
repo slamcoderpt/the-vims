@@ -18,6 +18,16 @@ const MAX_QUEUE := 5
 const AUTONOMY_URGENT_AFTER := 1.5
 ## How often (in-game minutes) needs are checked for moodlets / consequences.
 const NEED_CHECK_EVERY := 2.0
+## Walking robustness: within ARRIVE_TOL (m, same storey) of the spot counts as
+## there; progress is checked every STUCK_CHECK walk-seconds and a sim that
+## gained less than STUCK_MIN metres repaths (up to MAX_REPATHS), then gives up
+## on that target and free will picks the next best one.
+const ARRIVE_TOL := 0.3
+const STUCK_CHECK := 1.5
+const STUCK_MIN := 0.25
+const MAX_REPATHS := 2
+## In-game minutes an unreachable object is skipped by free will.
+const UNREACHABLE_FOR := 180.0
 
 ## Need -> [mild moodlet, strong moodlet]: [id, label, icon, mood delta, below].
 ## Strong ones last until the need recovers past RECOVER.
@@ -74,6 +84,17 @@ var _force_cool := 0.0
 var last_pay := 0
 var refused := 0
 var forced := 0
+## Walking diagnostics (playtest) and route-failure memory.
+var path_len := 0.0
+var repaths := 0
+var route_fails := 0
+var fallbacks := 0
+var unreachable := {}        # Interactable -> in-game minute until which it's skipped
+var _stuck_t := 0.0
+var _stuck_rem := INF
+var _stuck_n := 0
+var _other_at := Vector3.INF
+var _repath_cool := 0.0
 
 
 func setup(p_world, i: int, p_actor: Node3D) -> void:
@@ -240,6 +261,8 @@ func _start(o: Dictionary) -> bool:
 	if t != null and not is_instance_valid(t):
 		return false
 	var other = o.get("other")
+	if other != null and (other.actor == null or not is_instance_valid(other.actor)):
+		return false
 	order = o
 	var a: Dictionary = o.get("action", {})
 	var r: Dictionary = world.approach(self, o)
@@ -248,20 +271,77 @@ func _start(o: Dictionary) -> bool:
 		return false
 	spot = r.spot
 	face_point = r.get("face", Vector3.INF)
-	path = world.nav.find_path(actor.global_position, spot, true) if world.nav else PackedVector3Array([spot])
-	path_i = 0
-	seg_from = actor.global_position
+	if not _plan_path():
+		_route_fail(o)
+		order = {}
+		return false
 	walk_real = 0.0
 	wait_minutes = 0.0
 	elapsed = 0.0
 	_shown_prog = -1
 	_skill_t = 0.0
+	_stuck_n = 0
 	if other != null:
 		_social_partner = other
+		_other_at = other.actor.global_position
+	else:
+		_other_at = Vector3.INF
 	phase = "walk"
 	actor.set_pose("walk")
 	if a.get("id", "") != "go_here":
 		_bubble(0.0, true)
+	return true
+
+
+## Path from where the sim stands to `spot`. False when the grid says the spot
+## cannot be reached from here (a closed-off room, a blocked doorway).
+func _plan_path() -> bool:
+	var from: Vector3 = actor.global_position
+	if world.nav:
+		path = world.nav.find_path(from, spot, true)
+		if not world.nav.last_ok:
+			return false
+	else:
+		path = PackedVector3Array([spot])
+	path_i = 0
+	seg_from = from
+	path_len = NavGrid.path_length(from, path)
+	_stuck_t = 0.0
+	_stuck_rem = path_len
+	return true
+
+
+## The target can't be reached: remember it, show a route-fail thought and
+## (for free will) pick the next best thing straight away.
+func _route_fail(o: Dictionary) -> void:
+	route_fails += 1
+	var t = o.get("target")
+	var what := "there"
+	if t != null and is_instance_valid(t):
+		unreachable[t] = Game.total_minutes() + UNREACHABLE_FOR
+		what = "the %s" % str(t.title)
+	elif o.get("other") != null:
+		what = str(o.other.display_name())
+	if OS.has_environment("VIMS_PLAYTEST"):
+		print("  route fail: %s -> %s (%s) from %s" % [display_name(), what, o.get("action", {}).get("label", ""), str(actor.global_position)])
+	Game.show_bubble(actor, {"kind": "thought", "icon": "dots", "text": "?", "id": "thought", "ttl": 2.5})
+	if not o.get("auto", false):
+		Game.notify.emit("%s can't get to %s" % [display_name(), what], "dots")
+	elif o.get("forced", false) or autonomy:
+		# Free will: try the next best target now instead of idling.
+		idle_minutes = AUTONOMY_AFTER
+		_fallback_need = o.get("forced", false)
+
+
+var _fallback_need := false
+
+
+func is_unreachable(t) -> bool:
+	if not unreachable.has(t):
+		return false
+	if Game.total_minutes() > float(unreachable[t]):
+		unreachable.erase(t)
+		return false
 	return true
 
 
@@ -309,7 +389,15 @@ func _idle(delta: float, dm: float) -> void:
 		wait = AUTONOMY_URGENT_AFTER
 	if autonomy and idle_minutes >= wait and dm > 0.0:
 		idle_minutes = 0.0
-		var o: Dictionary = world.choose_autonomous(self)
+		var o: Dictionary
+		if _fallback_need:
+			# A forced need-fix couldn't reach its target: next best fix.
+			_fallback_need = false
+			o = world.choose_for_need(self, lowest_need())
+			if not o.is_empty():
+				o["forced"] = true
+		if o.is_empty():
+			o = world.choose_autonomous(self)
 		if not o.is_empty():
 			o["auto"] = true
 			command(o, false)
@@ -328,7 +416,8 @@ func lowest_need() -> String:
 func _speed_mult() -> float:
 	if Game.frozen or Game.speed == 0:
 		return 0.0
-	return [0.0, 1.0, 2.2, 3.5][Game.speed]
+	# Walking keeps up with the clock (Sims 3: fast-forward moves sims faster too).
+	return [0.0, 1.0, 3.0, 6.0][Game.speed]
 
 
 func _walk(delta: float) -> void:
@@ -338,6 +427,20 @@ func _walk(delta: float) -> void:
 	if mult <= 0.0:
 		return
 	walk_real += delta * mult
+	# A social partner who walked off: head for where they are now.
+	var other = order.get("other")
+	_repath_cool = maxf(0.0, _repath_cool - delta * mult)
+	if other != null and is_instance_valid(other.actor) and _other_at != Vector3.INF and _repath_cool <= 0.0:
+		if _flat(other.actor.global_position, _other_at) > 1.0 and _on_floor():
+			var r: Dictionary = world.approach(self, order)
+			if not r.is_empty():
+				spot = r.spot
+				face_point = r.get("face", Vector3.INF)
+				_other_at = other.actor.global_position
+				_repath_cool = 1.0
+				if not _plan_path():
+					_give_up()
+					return
 	var remaining := spd * delta
 	var pos := actor.global_position
 	while remaining > 0.0 and path_i < path.size():
@@ -360,12 +463,75 @@ func _walk(delta: float) -> void:
 			var want := atan2(dir.x, dir.y)
 			actor.rotation.y = lerp_angle(actor.rotation.y, want, 1.0 - exp(-delta * 12.0 * mult))
 	actor.global_position = pos
+	# Tolerant arrival: close enough on the same storey (and not mid-stairs).
+	var near := _flat(pos, spot) <= ARRIVE_TOL and absf(pos.y - spot.y) < 0.5
+	if path_i >= path.size() or (near and path_i >= path.size() - 2):
+		_arrive()
+		return
+	_check_stuck(delta * mult)
+
+
+## Progress watchdog: the remaining route length must keep shrinking.
+func _check_stuck(dt: float) -> void:
+	_stuck_t += dt
+	if _stuck_t < STUCK_CHECK:
+		return
+	_stuck_t = 0.0
+	var rem := _remaining_len()
+	if _stuck_rem - rem >= STUCK_MIN:
+		_stuck_rem = rem
+		return
+	_stuck_n += 1
+	if OS.has_environment("VIMS_PLAYTEST"):
+		print("  stuck: %s at %s (remaining %.2f m, try %d)" % [display_name(), str(actor.global_position), rem, _stuck_n])
+	if _stuck_n > MAX_REPATHS:
+		# Last resort: if the spot is close, just step onto it; else give up.
+		if _flat(actor.global_position, spot) < 1.2 and absf(actor.global_position.y - spot.y) < 0.6:
+			_arrive()
+		else:
+			_give_up()
+		return
+	repaths += 1
+	if _on_floor():
+		if not _plan_path():
+			_give_up()
+			return
+	else:
+		# Mid-stairs: skip ahead to the next waypoint instead of replanning.
+		if path_i < path.size():
+			actor.global_position = path[path_i]
+			seg_from = path[path_i]
+			path_i += 1
+	_stuck_rem = _remaining_len()
+
+
+func _remaining_len() -> float:
 	if path_i >= path.size():
-		_arrive()
-	elif walk_real > 90.0:
-		# Give up on a path that never ends (shouldn't happen): hop there.
-		actor.global_position = spot
-		_arrive()
+		return 0.0
+	var d := actor.global_position.distance_to(path[path_i])
+	for k in range(path_i, path.size() - 1):
+		d += path[k].distance_to(path[k + 1])
+	return d
+
+
+## Standing on a storey (not on a stair segment between levels).
+func _on_floor() -> bool:
+	if world.nav == null:
+		return true
+	var p: Vector3 = actor.global_position
+	return absf(p.y - world.nav.floor_y(p)) < 0.3
+
+
+## Abandon the current walk: route-fail it and (for free will) move on.
+func _give_up() -> void:
+	var o := order
+	fallbacks += 1
+	_route_fail(o)
+	_end(false)
+
+
+static func _flat(a: Vector3, b: Vector3) -> float:
+	return Vector2(a.x - b.x, a.z - b.z).length()
 
 
 func _arrive() -> void:
@@ -475,12 +641,17 @@ func _complete() -> void:
 			_say(("+$%d" if m > 0 else "-$%d") % absi(m), "money")
 		else:
 			_say("Can't afford it", "money")
+	# Relationships: socials change friendship (and may be rejected).
+	var rejected := false
+	if a.has("rel"):
+		rejected = _apply_social(a)
 	# (A dog playing on its own doesn't tick "Play with Dog".)
-	if a.has("task") and not (kind == "dog" and "Dog" in str(a.task)):
+	if a.has("task") and not rejected and not (kind == "dog" and "Dog" in str(a.task)) and _meet_task_ok(str(a.task)):
 		if Game.complete_task_title(a.task):
 			Game.add_moodlet(index, "accomplished", "Accomplished", "trophy", 10.0, 4.0, "Finished \"%s\"" % a.task)
 			Game.notify.emit("Task done: %s" % a.task, "trophy")
-	_positive_moodlets(a, m)
+	if not rejected:
+		_positive_moodlets(a, m)
 	# Effects on other household members (feed the dog, pet the dog...).
 	var fx: Dictionary = SimActions.EFFECT_ON_KIND.get(a.get("id", ""), {})
 	for k in fx:
@@ -489,7 +660,11 @@ func _complete() -> void:
 				for need in fx[k]:
 					Game.change_need(i, need, fx[k][need])
 	var other = order.get("other")
-	if other != null and a.has("social"):
+	if other != null and a.has("pet_skill") and not rejected:
+		var lv: int = Game.add_skill_xp(other.index, a.pet_skill, float(a.get("minutes", 20.0)) / 60.0)
+		if lv > 0:
+			Game.notify.emit("%s reached %s level %d" % [other.display_name(), a.pet_skill, lv], "star")
+	if other != null and a.has("social") and not rejected:
 		for need in a.social:
 			Game.change_need(other.index, need, a.social[need])
 		var olab := "Played Together" if (kind == "dog" or other.kind == "dog") else "Good Conversation"
@@ -501,6 +676,65 @@ func _complete() -> void:
 	last_done = a.get("id", "")
 	world.on_action_done(self, order)
 	_end(true)
+
+
+## Who this social is with: a household agent's name or a townie's name.
+func _social_partner_name() -> String:
+	var other = order.get("other")
+	if other != null:
+		return other.display_name()
+	var a: Dictionary = order.get("action", {})
+	if a.has("townie"):
+		return str(a.townie)
+	return world.townie_of(order.get("target"))
+
+
+## Apply a social's friendship change. Returns true when it was rejected.
+func _apply_social(a: Dictionary) -> bool:
+	var partner := _social_partner_name()
+	if partner == "":
+		return false
+	var me := display_name()
+	var delta := float(a.get("rel", 0.0))
+	var reject_p := 0.0
+	var other = order.get("other")
+	var info: Dictionary = world.townie_info(partner)
+	if delta > 0.0 and not a.get("stranger", false):
+		if other != null and Game.mood_band(other.index) == "bad":
+			reject_p = 0.3
+		elif info.get("trait", "") == "Grumpy":
+			reject_p = 0.2
+	if a.get("id", "") == "s_joke" and info.get("trait", "") == "Good Sense of Humor":
+		delta *= 1.5
+	if delta > 0.0:
+		# A good mood makes you better company (x0.75 .. x1.25).
+		delta *= clampf(0.75 + (Game.mood_mult(index) - 0.6) / 0.8 * 0.5, 0.75, 1.25)
+	if reject_p > 0.0 and randf() < reject_p:
+		Game.change_rel(me, partner, -absf(delta) * 0.5)
+		Game.add_moodlet(index, "rejected", "Rejected", "dots", -10.0, 2.0, "%s wasn't in the mood" % partner)
+		_say("Hmph!", "dots")
+		if OS.has_environment("VIMS_PLAYTEST"):
+			print("  social rejected: %s -> %s (%s)" % [me, partner, a.get("label", "")])
+		return true
+	var v := Game.change_rel(me, partner, delta)
+	if other == null:
+		world.met_here[partner] = true
+	Game.show_bubble(actor, {"kind": "emote", "icon": "heart" if delta > 0.0 else "dots", "id": "say", "ttl": 1.6})
+	if OS.has_environment("VIMS_PLAYTEST"):
+		print("  social: %s -> %s %s %+.1f = %.1f (%s)" % [me, partner, a.get("label", ""), delta, v, Game.rel_level(v)])
+	return false
+
+
+## "Meet 3 Neighbors" needs three different townies on this lot.
+func _meet_task_ok(task: String) -> bool:
+	if not task.begins_with("Meet "):
+		return true
+	var w := task.get_slice(" ", 1)
+	var need := 1 if w in ["a", "an"] else maxi(1, w.to_int())
+	var have: int = world.met_here.size()
+	if have < need and Game.has_open_task(task):
+		Game.notify.emit("%s: %d of %d" % [task, have, need], "people")
+	return have >= need
 
 
 func _end(_ok: bool) -> void:

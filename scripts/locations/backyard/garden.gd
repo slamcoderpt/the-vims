@@ -9,7 +9,10 @@ const M := 8    # cells per metre at 0.125
 const F := 16   # cells per metre at 0.0625
 const T := 4    # cells per metre at 0.25
 
-const GRASS := [Color("5f9e3a"), Color("6aab40"), Color("579436"), Color("74b347"), Color("4f8a33"), Color("66a63c")]
+const Party := preload("res://scripts/locations/backyard/party.gd")
+
+## Dusk lawn: deeper, slightly blue-green (the lantern pools add the warmth).
+const GRASS := [Color("467a3a"), Color("4f8540"), Color("3f7036"), Color("578d44"), Color("3a6834"), Color("4b7f3c")]
 const PURPLES := [Color("8a5cc8"), Color("a37de0"), Color("6e47aa"), Color("b896ee"), Color("7d52bd")]
 const PINKS := [Color("ee7fb4"), Color("f59cc6"), Color("d95c98"), Color("ffb6d4")]
 const WHITES := [Color("fbf7f0"), Color("f1ece6"), Color("fffdf8")]
@@ -30,6 +33,35 @@ const BEDS := [
 	[0.9, 4.25, 8.6, 5.6, 1.2],        # centre foreground (bottom of the bbq shot)
 	[-13.0, -3.0, -10.5, 3.7, 0.9],    # left edge
 ]
+
+## Rounded flower mounds out on the lawn: cx, cz, rx, rz, density.
+const MOUNDS := [
+	[-7.6, 2.9, 1.7, 0.85, 1.2],     # left, by the patio
+	[-5.6, 3.7, 1.3, 0.6, 1.1],
+	[-0.9, 3.75, 1.5, 0.55, 1.2],    # between the table and the front fence
+	[1.3, 3.55, 0.75, 0.45, 1.1],
+	[6.9, 3.45, 1.5, 0.7, 1.2],      # right of the fire pit
+	[8.6, 2.0, 0.9, 1.0, 1.1],
+	[-0.4, -1.45, 1.0, 0.45, 1.0],   # behind the table, by the deck steps
+	[-6.4, -2.6, 0.9, 0.6, 1.0],     # behind the grill
+	[11.0, 2.4, 1.6, 0.9, 1.0],
+]
+
+var lawn_mat: ShaderMaterial
+
+const LAWN_SHADER := """
+shader_type spatial;
+render_mode cull_back;
+uniform sampler2D albedo_tex : source_color, filter_nearest, repeat_enable;
+uniform sampler2D glow_tex : source_color, filter_nearest, repeat_enable;
+uniform float glow = 1.0;
+void fragment() {
+	ALBEDO = texture(albedo_tex, UV).rgb;
+	EMISSION = texture(glow_tex, UV).rgb * glow;
+	ROUGHNESS = 0.9;
+	SPECULAR = 0.2;
+}
+"""
 
 var root: Node3D
 var _rng := RandomNumberGenerator.new()
@@ -55,7 +87,54 @@ func _in_bed(x: float, z: float) -> bool:
 	for r in BEDS:
 		if _in_rect(x, z, r):
 			return true
+	return _mound_h(x, z) > 0.0
+
+
+## 0 outside every mound, rising to 1 at a mound centre.
+func _mound_h(x: float, z: float) -> float:
+	var best := 0.0
+	for m in MOUNDS:
+		var dx: float = (x - m[0]) / m[2]
+		var dz: float = (z - m[1]) / m[3]
+		var d := dx * dx + dz * dz
+		var wob := sin(x * 5.3 + z * 3.1) * 0.08 + sin(z * 7.7 - x * 2.3) * 0.06
+		if d < 1.0 + wob:
+			best = maxf(best, sqrt(maxf(0.0, 1.0 - d)))
+			if best == 0.0:
+				best = 0.05
+	return best
+
+
+## Lantern footprints (metres) stay clear of foliage.
+func _under_lantern(x: float, z: float) -> bool:
+	for lp in Party.LANTERNS:
+		if lp.y == 0 and x > lp.x / 16.0 - 0.1 and x < (lp.x + 7) / 16.0 + 0.1 and z > lp.z / 16.0 - 0.1 and z < (lp.z + 7) / 16.0 + 0.1:
+			return true
 	return false
+
+
+var _pools: Array = []
+
+
+## Warm light reaching the ground at (x, z): 0..~1.5.
+func pool(x: float, z: float) -> float:
+	if _pools.is_empty():
+		_pools = Party.light_pools()
+	var acc := 0.0
+	for pl in _pools:
+		var dx: float = x - pl[0]
+		var dz: float = z - pl[1]
+		var d: float = sqrt(dx * dx + dz * dz) / pl[2]
+		if d < 1.0:
+			var f: float = 1.0 - d
+			acc += pl[3] * f * f
+	return acc
+
+
+## Albedo warmed by nearby lamps (for vertex-coloured foliage and blooms).
+func warm(c: Color, x: float, z: float, k := 0.55) -> Color:
+	var p := minf(pool(x, z), 1.3) * k
+	return Color(minf(c.r * (1.0 + p * 0.95), 1.0), minf(c.g * (1.0 + p * 0.5), 1.0), minf(c.b * (1.0 + p * 0.05), 1.0))
 
 
 func _paver(x: float, z: float) -> int:
@@ -81,6 +160,7 @@ func _lawn() -> void:
 	var w := 29 * M
 	var h := 15 * M
 	var img := Image.create(w, h, false, Image.FORMAT_RGB8)
+	var eimg := Image.create(w, h, false, Image.FORMAT_RGB8)
 	for iz in h:
 		for ix in w:
 			var wx := x0 + (ix + 0.5) / M
@@ -103,18 +183,32 @@ func _lawn() -> void:
 				elif r < 0.01:
 					c = Color("e8d44d")
 			img.set_pixel(ix, iz, c)
-	_ground_quad(img, Vector3(x0, 0.0, z0), Vector2(29, 15), "Lawn")
+			var pl := pool(wx, wz)
+			var e := Color(c.r * 1.1 + 0.14, c.g * 0.7 + 0.07, c.b * 0.25 + 0.01) * minf(pl, 1.5) * 1.35
+			eimg.set_pixel(ix, iz, Color(minf(e.r, 1.0), minf(e.g, 1.0), minf(e.b, 1.0)))
+	var lawn := _ground_quad(img, Vector3(x0, 0.0, z0), Vector2(29, 15), "Lawn")
+	# Lawn shader: per-texel albedo + a baked warm glow map (lantern pools)
+	# whose strength follows the clock (set_lamp_glow).
+	var sh := Shader.new()
+	sh.code = LAWN_SHADER
+	lawn_mat = ShaderMaterial.new()
+	lawn_mat.shader = sh
+	lawn_mat.set_shader_parameter("albedo_tex", ImageTexture.create_from_image(img))
+	lawn_mat.set_shader_parameter("glow_tex", ImageTexture.create_from_image(eimg))
+	lawn_mat.set_shader_parameter("glow", 1.0)
+	lawn.material_override = lawn_mat
 	# Coarse ground beyond the yard (neighbour lawns), 0.5 m texels.
 	var fimg := Image.create(88, 80, false, Image.FORMAT_RGB8)
 	for iz in 80:
 		for ix in 88:
 			var q := Vector3i(ix, 1, iz)
-			fimg.set_pixel(ix, iz, V.shade(GRASS[int(V.h1(q, 2) * GRASS.size()) % GRASS.size()], 0.72 + V.h1(q, 3) * 0.12))
+			fimg.set_pixel(ix, iz, V.shade(GRASS[int(V.h1(q, 2) * GRASS.size()) % GRASS.size()], 0.62 + V.h1(q, 3) * 0.1))
 	# One mesh / one draw call for all the surrounding ground (texture repeats).
 	_ground_quad(fimg, Vector3(-30.0, -0.02, -40.0), Vector2(60, 60), "OuterGround", Vector2(60.0 / 44.0, 60.0 / 40.0))
 	# Bed edging: stone border (voxels, perimeter only).
-	var vb := VoxelBuilder.new()
-	vb.jitter = 0.05
+	var vb := FastBuilder.new()
+	vb.jitter = 0.0
+	vb.skip_down_below = 0
 	for r in BEDS:
 		var bx0 := int(floor(r[0] * M))
 		var bx1 := int(ceil(r[2] * M))
@@ -124,11 +218,12 @@ func _lawn() -> void:
 			for z in range(bz0, bz1):
 				if x == bx0 or x == bx1 - 1 or z == bz0 or z == bz1 - 1:
 					var q := Vector3i(x, 0, z)
-					vb.set_v(q, V.shade(Color("a69a8c"), 0.8 + V.h1(q, 11) * 0.35))
+					# One tone per 2-cell stone so faces merge.
+					vb.set_v(q, V.shade(Color("a69a8c"), 0.8 + V.h1(Vector3i(x >> 1, 0, z >> 1), 11) * 0.35))
 	V.inst(vb, root, V.SIZE_MID, Vector3.ZERO, 0.0, Vector3.ZERO, false, true, "BedEdging")
 
 
-func _ground_quad(img: Image, corner: Vector3, size: Vector2, nm: String, uv_scale := Vector2.ONE) -> void:
+func _ground_quad(img: Image, corner: Vector3, size: Vector2, nm: String, uv_scale := Vector2.ONE) -> MeshInstance3D:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var pts := [Vector3(0, 0, 0), Vector3(size.x, 0, 0), Vector3(size.x, 0, size.y), Vector3(0, 0, size.y)]
@@ -149,6 +244,13 @@ func _ground_quad(img: Image, corner: Vector3, size: Vector2, nm: String, uv_sca
 	mi.material_override = mat
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	root.add_child(mi)
+	return mi
+
+
+## 0 = day (no lamp glow on the lawn) .. 1 = lamps fully on.
+func set_lamp_glow(k: float) -> void:
+	if lawn_mat:
+		lawn_mat.set_shader_parameter("glow", k)
 
 
 # ------------------------------------------------------------------ flowers
@@ -167,60 +269,129 @@ func _species(wx: float, wz: float) -> int:
 	return 4              # pink pom-pom
 
 
-func _beds() -> void:
-	# Foliage: bumpy heightfield at 0.125 (cheap: neighbours hide sides).
-	var leaf := FastBuilder.new()
-	leaf.jitter = 0.0
-	leaf.skip_down_below = 0
+const BLOOM_COLS := [
+	[Color("7e52c0"), Color("9b72dc"), Color("6a44a6"), Color("ad8ae8")],   # lavender / salvia
+	[Color("e76fa8"), Color("f292bf"), Color("d45a94"), Color("f7a8cc")],   # pink
+	[Color("f6f1ea"), Color("ece6de"), Color("fffaf2"), Color("f3d9e6")],   # white
+	[Color("f2c63a"), Color("ffd95a"), Color("eaa92a"), Color("f7d36a")],   # yellow
+	[Color("ee7fb4"), Color("c7509a"), Color("f59cc6"), Color("b896ee")],   # mixed pink/violet
+]
+## Beds nearer the camera than this (z, metres) get the fine canopy.
+const FINE_Z := 2.9
+const LEAF_COLS := [Color("3a7034"), Color("44803c"), Color("31622e"), Color("4f8f44"), Color("3d7437")]
+
+
+func _cell_in_any(x: int, z: int) -> float:
+	# Height factor for the foliage heightfield at 0.125 cell (x, z): -1 = none.
+	var wx := (x + 0.5) / M
+	var wz := (z + 0.5) / M
+	if _under_lantern(wx, wz):
+		return -1.0
+	var mh := _mound_h(wx, wz)
+	if mh > 0.0:
+		return mh
 	for r in BEDS:
 		var bx0 := int(floor(r[0] * M)) + 1
 		var bx1 := int(ceil(r[2] * M)) - 1
 		var bz0 := int(floor(r[1] * M)) + 1
 		var bz1 := int(ceil(r[3] * M)) - 1
-		for x in range(bx0, bx1):
-			for z in range(bz0, bz1):
-				var n := sin(x * 0.7 + z * 0.3) * 0.5 + sin(z * 0.9 - x * 0.4) * 0.5
-				var hh := 1 + int(clampf((n + 1.0) * 0.5 + V.hs(x, 7, z) * 0.9, 0.0, 1.99) * 1.5)
-				for y in hh:
-					var q := Vector3i(x, y, z)
-					var tone := V.hs(x / 2, y, z / 2)
-					var c: Color = [Color("3f7d34"), Color("4c9140"), Color("356b2e"), Color("5aa548"), Color("467f37")][int(tone * 5.0) % 5]
-					leaf.set_v(q, V.shade(c, 0.85 + 0.12 * y))
-	V.inst(leaf, root, V.SIZE_MID, Vector3.ZERO, 0.0, Vector3.ZERO, true, true, "BedFoliage")
-	# Blooms at 0.0625 sitting on the foliage.
-	var vb := VoxelBuilder.new()
-	vb.jitter = 0.06
+		if x >= bx0 and x < bx1 and z >= bz0 and z < bz1:
+			return 0.55
+	return -1.0
+
+
+func _chunk(chunks: Dictionary, x: float, fine := false) -> VoxelBuilder:
+	var k := floori((x + 14.0) / 5.0)
+	if not chunks.has(k):
+		var vb: VoxelBuilder = VoxelBuilder.new() if fine else FastBuilder.new()
+		if fine:
+			vb.jitter = 0.06
+		else:
+			vb.jitter = 0.0
+			vb.skip_down_below = 0
+		chunks[k] = vb
+	return chunks[k]
+
+
+func _beds() -> void:
+	# Foliage + flower canopy: bumpy heightfield at 0.125 whose top cells are
+	# mostly blossom colours (dense, cheap mounds). Split in 5 m chunks so
+	# culling and the per-object lamp passes stay small.
+	var leaf_chunks := {}
+	var fine_chunks := {}
+	var heights := {}
+	for x in range(-14 * M, 15 * M):
+		for z in range(-7 * M, 7 * M):
+			var f := _cell_in_any(x, z)
+			if f < 0.0:
+				continue
+			var wx := (x + 0.5) / M
+			var wz := (z + 0.5) / M
+			var n := sin(x * 0.7 + z * 0.3) * 0.5 + sin(z * 0.9 - x * 0.4) * 0.5
+			var hh := 1 + int(clampf(f * 2.4 + (n + 1.0) * 0.35 + V.hs(x, 7, z) * 0.8, 0.0, 3.99))
+			heights[Vector2i(x, z)] = hh
+			var sp := _species(wx, wz)
+			var bloom_p := 0.62 if sp != 2 else 0.5
+			if wz > FINE_Z and wx > -5.5 and wx < 11.0:
+				# Near the camera: the canopy at 1/16 m so blossoms read small.
+				var fvb := _chunk(fine_chunks, wx + 100.0, true)
+				for i in 2:
+					for j in 2:
+						var fx := x * 2 + i
+						var fz := z * 2 + j
+						var fh := hh * 2 - 1 + int(V.hs(fx, 41, fz) * 2.0)
+						for y in fh:
+							var fq := Vector3i(fx, y, fz)
+							var fc: Color = V.shade(LEAF_COLS[int(V.hs(fx / 2, y / 2, fz / 2) * 5.0) % 5], 0.8 + 0.05 * y)
+							if y >= fh - 1 and V.hs(fx, 31, fz) < bloom_p:
+								var fp: Array = BLOOM_COLS[sp]
+								fc = fp[int(V.hs(fx, 32, fz) * fp.size()) % fp.size()]
+							elif y == fh - 2 and V.hs(fx, 34, fz) < 0.3:
+								fc = V.shade(BLOOM_COLS[sp][0], 0.85)
+							fvb.set_v(fq, warm(fc, wx, wz))
+				continue
+			var vb := _chunk(leaf_chunks, wx)
+			for y in hh:
+				var q := Vector3i(x, y, z)
+				var c: Color = LEAF_COLS[int(V.hs(x / 2, y, z / 2) * 5.0) % 5]
+				c = V.shade(c, 0.8 + 0.1 * y)
+				if y == hh - 1 and V.hs(x, 31, z) < bloom_p:
+					var pal: Array = BLOOM_COLS[sp]
+					c = pal[int(V.hs(x, 32, z) * pal.size()) % pal.size()]
+				elif y == hh - 2 and V.hs(x, 33, z) < 0.25:
+					var pal2: Array = BLOOM_COLS[sp]
+					c = V.shade(pal2[0], 0.85)
+				vb.set_v(q, warm(c, wx, wz))
+	for k in leaf_chunks:
+		V.inst(leaf_chunks[k], root, V.SIZE_MID, Vector3.ZERO, 0.0, Vector3.ZERO, false, true, "BedFoliage%d" % k)
+	for k in fine_chunks:
+		V.inst(fine_chunks[k], root, V.SIZE_FINE, Vector3.ZERO, 0.0, Vector3.ZERO, false, true, "BedFoliageFine%d" % k)
+	# Fine blossoms poking out of the canopy (lavender spikes, daisies, poms).
+	var fl_chunks := {}
+	var spots: Array = []
 	for r in BEDS:
+		spots.append([r[0], r[1], r[2], r[3], r[4]])
+	for m in MOUNDS:
+		spots.append([m[0] - m[2], m[1] - m[3], m[0] + m[2], m[1] + m[3], m[4]])
+	for r in spots:
 		var area: float = (r[2] - r[0]) * (r[3] - r[1])
-		var n := int(area * 10.0 * r[4])
+		var n := int(area * 5.5 * r[4])
 		for i in n:
-			var wx := _rng.randf_range(r[0] + 0.15, r[2] - 0.15)
-			var wz := _rng.randf_range(r[1] + 0.15, r[3] - 0.15)
+			var wx := _rng.randf_range(r[0] + 0.12, r[2] - 0.12)
+			var wz := _rng.randf_range(r[1] + 0.12, r[3] - 0.12)
 			var cx := int(floor(wx * M))
 			var cz := int(floor(wz * M))
-			var top := 0
-			while leaf.has(Vector3i(cx, top, cz)):
-				top += 1
-			_bloom(vb, int(wx * F), top * 2, int(wz * F), _species(wx, wz), _rng.randi())
-	# Loose grass tufts on the lawn.
-	for i in 450:
-		var wx := _rng.randf_range(-12.5, 14.0)
-		var wz := _rng.randf_range(-6.3, 6.0)
-		if _in_bed(wx, wz) or _paver(wx, wz) != 0:
-			continue
-		var x := int(wx * F)
-		var z := int(wz * F)
-		var g: Color = GRASS[_rng.randi() % GRASS.size()]
-		vb.set_v(Vector3i(x, 0, z), V.shade(g, 1.08))
-		if _rng.randf() < 0.5:
-			vb.set_v(Vector3i(x, 1, z), V.shade(g, 1.15))
-		if _rng.randf() < 0.08:
-			vb.set_v(Vector3i(x, 1, z), WHITES[0])
-	V.inst(vb, root, V.SIZE_FINE, Vector3.ZERO, 0.0, Vector3.ZERO, false, true, "Flowers")
+			var top: int = heights.get(Vector2i(cx, cz), 0)
+			if top == 0:
+				continue
+			_bloom(_chunk(fl_chunks, wx, true), int(wx * F), top * 2, int(wz * F), _species(wx, wz), _rng.randi(), wx, wz)
+	for k in fl_chunks:
+		V.inst(fl_chunks[k], root, V.SIZE_FINE, Vector3.ZERO, 0.0, Vector3.ZERO, false, true, "Flowers%d" % k)
 
 
 ## One bloom group on top of the foliage at fine grid (x, y, z).
-func _bloom(vb: VoxelBuilder, x: int, y: int, z: int, kind: int, seed: int) -> void:
+func _bloom(vb0: VoxelBuilder, x: int, y: int, z: int, kind: int, seed: int, wx := 0.0, wz := 0.0) -> void:
+	var vb := _Warm.new(vb0, self, wx, wz)
 	match kind:
 		0:
 			var spikes := 2 + (seed >> 9) % 3
@@ -234,7 +405,7 @@ func _bloom(vb: VoxelBuilder, x: int, y: int, z: int, kind: int, seed: int) -> v
 					vb.set_v(Vector3i(sx, y + 1 + k, sz), V.shade(c, 0.85 + 0.05 * k))
 		4:
 			var cc: Color = PINKS[(seed >> 4) % PINKS.size()]
-			V.b(vb, x - 1, y + 1, z - 1, 3, 2, 3, V.mix([cc, V.shade(cc, 1.15), V.shade(cc, 0.85)], seed % 13))
+			vb.box(Vector3i(x - 1, y + 1, z - 1), Vector3i(3, 2, 3), V.mix([cc, V.shade(cc, 1.15), V.shade(cc, 0.85)], seed % 13))
 			vb.set_v(Vector3i(x, y + 3, z), V.shade(cc, 1.1))
 			vb.set_v(Vector3i(x, y, z), Color("4c8a35"))
 		_:
@@ -326,9 +497,8 @@ func _trees() -> void:
 	var vb := VoxelBuilder.new()
 	vb.jitter = 0.08
 	_tree(vb, Vector3(-10.5, 0, -8.6), 3.4, 1.9, 4)
-	_tree(vb, Vector3(-17.0, 0, -9.0), 3.6, 2.2, 4)
 	_tree(vb, Vector3(-15.0, 0, -3.0), 4.0, 2.5, 1)
-	_tree(vb, Vector3(-5.5, 0, -10.0), 3.6, 1.9, 4)
+	_tree(vb, Vector3(-5.5, 0, -10.0), 3.6, 1.9, 3)
 	_tree(vb, Vector3(15.5, 0, -4.0), 4.2, 2.5, 0)
 	# Hedge along the back fence (outside).
 	var x := -13.0
@@ -369,7 +539,7 @@ func _neighbours() -> void:
 	vb.jitter = 0.0
 	vb.skip_down_below = 0
 	vb.skip_normals = [Vector3i(0, 0, -1)]
-	var walls := [Color("4c4664"), Color("57496a"), Color("454a68"), Color("5c4c66"), Color("4a4260")]
+	var walls := [Color("6a6288"), Color("74648a"), Color("5e6486"), Color("7a6886"), Color("665c80")]
 	var roofs := [Color("2a2438"), Color("32263a"), Color("262636"), Color("2e2434")]
 	# x, z, width, depth, wall height (m), style
 	var houses := [
@@ -446,10 +616,10 @@ func _house(vb: VoxelBuilder, hd: Array, wall: Color, roof: Color) -> void:
 	var floors := 2 if h >= 18 else 1
 	for f in floors:
 		var wy := 3 + f * 9
-		var n := w / 7
+		var n := w / 6
 		for i in n:
-			var wx := x0 + 2 + i * 7
-			var lit := V.hs(wx, wy, z0) < 0.75
+			var wx := x0 + 2 + i * 6
+			var lit := V.hs(wx, wy, z0) < 0.85
 			var gc := Color("ffc76e") if lit else Color("3a3850")
 			V.b(vb, wx, wy, z0 + d, 3, 4, 1, gc, lit)
 			V.b(vb, wx - 1, wy - 1, z0 + d, 5, 1, 1, V.shade(wall, 1.35))
@@ -458,3 +628,24 @@ func _house(vb: VoxelBuilder, hd: Array, wall: Color, roof: Color) -> void:
 	# Front door with a porch light.
 	V.b(vb, x0 + w - 6, 0, z0 + d, 3, 6, 1, Color("2c2430"))
 	V.b(vb, x0 + w - 7, 6, z0 + d, 1, 1, 1, Color("ffd38a"), true)
+
+
+## Thin wrapper that warms every colour set through it by the lamp pools.
+class _Warm:
+	var vb: VoxelBuilder
+	var g
+	var wx: float
+	var wz: float
+
+	func _init(b: VoxelBuilder, garden, x: float, z: float) -> void:
+		vb = b; g = garden; wx = x; wz = z
+
+	func set_v(q: Vector3i, c: Color, e := false) -> void:
+		vb.set_v(q, g.warm(c, wx, wz), e)
+
+	func box(from: Vector3i, size: Vector3i, c, e := false) -> void:
+		for xx in size.x:
+			for yy in size.y:
+				for zz in size.z:
+					var q := from + Vector3i(xx, yy, zz)
+					set_v(q, c.call(q) if c is Callable else c, e)

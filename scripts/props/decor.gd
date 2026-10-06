@@ -8,7 +8,8 @@ const V := preload("res://scripts/props/vox_util.gd")
 const WOOD := Color("b07a46")
 const WOOD_D := Color("7d4f2b")
 const POTS := [Color("c8643c"), Color("ede7db"), Color("d98a5a"), Color("7393b3"), Color("f0c6b0"), Color("5d6b74")]
-const LAMP := Color("ffd98a")
+const LAMP := Color("ffc463")
+const LAMP_HI := Color("ffe2a0")
 
 
 # ------------------------------------------------------------------ plants
@@ -104,15 +105,17 @@ static func m_lamp_table(vb: VoxelBuilder, v: int) -> void:
 	var base: Color = [Color("e6dccb"), Color("f2b8c8"), Color("8fa8d8"), Color("c9a05a")][v % 4]
 	V.b(vb, 1, 0, 1, 4, 1, 4, V.shade(base, 0.9))
 	V.b(vb, 2, 1, 2, 2, 4, 2, base)
-	V.b(vb, 0, 5, 0, 6, 4, 6, LAMP, true)
-	V.b(vb, 1, 9, 1, 4, 1, 4, LAMP, true)
+	V.b(vb, 0, 5, 0, 6, 3, 6, LAMP, true)
+	V.b(vb, 0, 5, 0, 6, 1, 6, LAMP_HI, true)
+	V.b(vb, 1, 8, 1, 4, 2, 4, LAMP, true)
 
 
 static func m_lamp_floor(vb: VoxelBuilder, _v: int) -> void:
 	V.b(vb, 1, 0, 1, 4, 1, 4, Color("3a3a3f"))
 	V.b(vb, 3, 1, 3, 1, 22, 1, Color("3a3a3f"))
-	V.b(vb, 0, 23, 0, 7, 5, 7, LAMP, true)
-	V.b(vb, 1, 28, 1, 5, 1, 5, LAMP, true)
+	V.b(vb, 0, 23, 0, 7, 4, 7, LAMP, true)
+	V.b(vb, 0, 23, 0, 7, 1, 7, LAMP_HI, true)
+	V.b(vb, 1, 27, 1, 5, 2, 5, LAMP, true)
 
 
 ## Wall sconce / lantern, back on the wall at z=0.
@@ -448,3 +451,153 @@ static func m_rocket_lamp(vb: VoxelBuilder, _v: int) -> void:
 	V.b(vb, 2, 4, 2, 1, 2, 1, Color("e2463a"))
 	V.p(vb, 2, 2, 4, Color("6ab0e8"), true)
 	V.b(vb, 0, 0, 2, 1, 2, 1, Color("e2463a")); V.b(vb, 4, 0, 2, 1, 2, 1, Color("e2463a"))
+
+
+# ------------------------------------------------------------------ round 3 additions
+
+## Wall mirror, back at z=0. v0 tall wood frame (vanity), v1 round, v2 wide.
+static func m_mirror(vb: VoxelBuilder, v: int) -> void:
+	var glass := Color("cfe4ee")
+	match v % 3:
+		1:
+			for x in 11:
+				for y in 11:
+					var d := Vector2(x - 5.0, y - 5.0).length()
+					if d <= 5.4:
+						V.p(vb, x, y, 0, Color("d8b26a") if d > 4.3 else glass.lerp(Color("eef8fc"), 0.4 if x + y < 8 else 0.0))
+		2:
+			V.b(vb, 0, 0, 0, 18, 10, 1, WOOD)
+			V.b(vb, 1, 1, 0, 16, 8, 1, glass)
+			V.b(vb, 2, 5, 1, 3, 3, 1, Color("eaf6fb"))
+			V.b(vb, 1, 1, 1, 16, 1, 1, V.shade(WOOD, 1.1))
+		_:
+			V.b(vb, 0, 0, 0, 10, 15, 1, WOOD)
+			V.b(vb, 1, 1, 0, 8, 13, 1, glass)
+			V.b(vb, 2, 9, 1, 2, 4, 1, Color("eaf6fb"))
+			V.b(vb, 0, 15, 0, 10, 1, 2, V.shade(WOOD, 1.1))
+
+
+## Woven laundry / storage basket with a towel or blanket spilling out.
+static func m_basket(vb: VoxelBuilder, v: int) -> void:
+	var weave := V.checker(Color("c99a5c"), Color("b4824a"), 1)
+	V.b(vb, 0, 0, 0, 8, 7, 7, weave)
+	vb.clear_box(Vector3i(1, 2, 1), Vector3i(6, 5, 5))
+	var cloth: Color = [Color("f4f1ea"), Color("f2b5c6"), Color("8fb4d8"), Color("e9d6a8")][v % 4]
+	V.b(vb, 1, 2, 1, 6, 5, 5, V.noisy(cloth, 0.05))
+	V.b(vb, 2, 7, 2, 5, 1, 3, V.noisy(cloth, 0.05))
+	V.b(vb, 5, 4, 7, 2, 3, 1, V.noisy(cloth, 0.05))
+	V.b(vb, 0, 7, 0, 8, 1, 1, Color("8a5a36")); V.b(vb, 0, 7, 6, 8, 1, 1, Color("8a5a36"))
+
+
+## Gold trophy cup.
+static func m_trophy(vb: VoxelBuilder, _v: int) -> void:
+	var g := Color("e8b83a")
+	V.b(vb, 0, 0, 0, 4, 1, 3, WOOD_D)
+	V.b(vb, 1, 1, 1, 2, 2, 1, V.shade(g, 0.85))
+	V.b(vb, 0, 3, 0, 4, 3, 3, g)
+	V.p(vb, -1, 4, 1, g); V.p(vb, 4, 4, 1, g)
+	V.p(vb, 1, 5, 3, Color("fff2b0"))
+
+
+## Round wall clock, back at z=0.
+static func m_wall_clock(vb: VoxelBuilder, v: int) -> void:
+	var rim: Color = [Color("2c2c2f"), Color("b07a46"), Color("f2b8c8")][v % 3]
+	for x in 7:
+		for y in 7:
+			var d := Vector2(x - 3.0, y - 3.0).length()
+			if d <= 3.5:
+				V.p(vb, x, y, 0, rim if d > 2.6 else Color("fbf8f1"))
+	V.p(vb, 3, 3, 1, Color("222")); V.p(vb, 3, 4, 1, Color("222")); V.p(vb, 4, 3, 1, Color("e2463a"))
+
+
+## Kid's bean bag. v0 pink, v1 blue, v2 mustard.
+static func m_beanbag(vb: VoxelBuilder, v: int) -> void:
+	var c: Color = [Color("f2a3bd"), Color("7f97d6"), Color("e3b04a")][v % 3]
+	V.blob(vb, Vector3(5.5, 3.0, 5.5), Vector3(5.6, 3.2, 5.6), V.noisy(c, 0.06), 0.0, 0.15, v)
+	V.blob(vb, Vector3(5.5, 5.5, 2.8), Vector3(4.6, 3.4, 2.6), V.noisy(V.shade(c, 0.95), 0.06), 0.0, 0.15, v + 3)
+
+
+## Floor cushion / pouf.
+static func m_pouf(vb: VoxelBuilder, v: int) -> void:
+	var c: Color = [Color("e8d6b8"), Color("c9a0c8"), Color("9fc3a8")][v % 3]
+	V.cyl(vb, 4, 0, 4, 4.2, 4, V.noisy(c, 0.05))
+	V.cyl(vb, 4, 4, 4, 3.4, 1, V.shade(c, 1.08))
+
+
+## Stacked wall shelves with lots of stuff (2 tiers), back at z=0.
+## v0 books+plush (pink room), v1 books+rocket+globe (blue room),
+## v2 bathroom (bottles, rolled towels, plant), v3 office (binders, plant, photos).
+static func m_shelf_unit(vb: VoxelBuilder, v: int) -> void:
+	var wood := V.wood(WOOD if v != 0 else Color("f2ece2"), 0, 2)
+	for tier in 2:
+		var y := tier * 9
+		V.b(vb, 0, y, 0, 18, 1, 5, wood)
+		V.p(vb, 1, y - 1, 0, WOOD_D); V.p(vb, 16, y - 1, 0, WOOD_D)
+		match v % 4:
+			0:
+				if tier == 0:
+					V.books(vb, 1, y + 1, 0, 9, 6, 4, 61)
+					_bunny(vb, 12, y + 1, 1, Color("fbf3f5"))
+				else:
+					_bunny(vb, 2, y + 1, 1, Color("f7c6d4"))
+					V.b(vb, 8, y + 1, 1, 4, 4, 3, Color("f6e7a8")); V.b(vb, 9, y + 5, 2, 2, 1, 1, Color("f2c53a"))
+					V.b(vb, 13, y + 1, 1, 4, 3, 3, Color("ede7db"))
+					V.blob(vb, Vector3(15, y + 5, 2.5), Vector3(2.4, 1.8, 2.2), V.leaves(5, 2), 0.0, 0.3, 5)
+			1:
+				if tier == 0:
+					V.books(vb, 1, y + 1, 0, 10, 6, 4, 77)
+					V.b(vb, 13, y + 1, 1, 3, 1, 3, WOOD_D)
+					V.blob(vb, Vector3(14.5, y + 4.2, 2.5), Vector3(2.2, 2.2, 2.2), V.mix([Color("3d7fc4"), Color("5b9b48"), Color("4a8cd0")], 3), 0.0, 0.0)
+				else:
+					V.b(vb, 2, y + 1, 1, 3, 7, 3, Color("eeeef2")); V.b(vb, 3, y + 8, 2, 1, 1, 1, Color("e2463a"))
+					V.b(vb, 1, y + 1, 2, 1, 2, 1, Color("e2463a")); V.b(vb, 5, y + 1, 2, 1, 2, 1, Color("e2463a"))
+					V.p(vb, 3, y + 5, 4, Color("6ab0e8"))
+					V.books(vb, 8, y + 1, 0, 8, 5, 4, 91)
+			2:
+				if tier == 0:
+					for k in 3:
+						var tc: Color = [Color("f4f1ea"), Color("8fb4d8"), Color("f2b5c6")][k]
+						V.b(vb, 1 + k * 5, y + 1, 0, 4, 3, 4, V.noisy(tc, 0.04))
+						V.b(vb, 1 + k * 5, y + 2, 4, 4, 1, 1, V.shade(tc, 0.85))
+				else:
+					var bc := [Color("f3f0e8"), Color("9fd0e8"), Color("f2c4a0"), Color("c8e6c0")]
+					for k in 4:
+						V.b(vb, 1 + k * 3, y + 1, 1, 2, 3 + k % 2 * 2, 2, bc[k])
+						V.p(vb, 1 + k * 3, y + 4 + k % 2 * 2, 1, Color("d8d8d8"))
+					V.b(vb, 13, y + 1, 1, 4, 3, 3, Color("ede7db"))
+					V.blob(vb, Vector3(15, y + 5, 2.5), Vector3(2.6, 2.0, 2.4), V.leaves(8, 0), 0.0, 0.3, 8)
+			_:
+				if tier == 0:
+					for k in 5:
+						V.b(vb, 1 + k * 2, y + 1, 0, 2, 6, 4, [Color("3f6fb0"), Color("e0b44c"), Color("b8403a"), Color("3f7f4f"), Color("f0e2c0")][k])
+					V.b(vb, 13, y + 1, 1, 4, 3, 3, Color("c8643c"))
+					V.blob(vb, Vector3(15, y + 5, 2.5), Vector3(2.4, 2.0, 2.2), V.leaves(2, 0), 0.0, 0.3, 2)
+				else:
+					V.b(vb, 2, y + 1, 1, 4, 5, 1, Color("2c2c2f")); V.b(vb, 3, y + 2, 2, 2, 3, 1, Color("8fc0e0"))
+					V.b(vb, 8, y + 1, 1, 3, 4, 1, Color("f1e9dc")); V.b(vb, 9, y + 2, 2, 1, 2, 1, Color("e9a23b"))
+					V.books(vb, 12, y + 1, 0, 5, 4, 4, 13)
+
+
+static func _bunny(vb: VoxelBuilder, x: int, y: int, z: int, f: Color) -> void:
+	V.b(vb, x, y, z, 4, 3, 3, f); V.b(vb, x, y + 3, z, 4, 3, 3, f)
+	V.b(vb, x, y + 6, z + 1, 1, 3, 1, f); V.b(vb, x + 3, y + 6, z + 1, 1, 3, 1, f)
+	V.p(vb, x, y + 7, z + 2, Color("f7a9c0")); V.p(vb, x + 3, y + 7, z + 2, Color("f7a9c0"))
+	V.p(vb, x + 1, y + 4, z + 3, Color("2a2030")); V.p(vb, x + 2, y + 4, z + 3, Color("2a2030"))
+
+
+## Small potted plant on a hanging wall bracket (adds green at eye level), back at z=0.
+static func m_wall_planter(vb: VoxelBuilder, v: int) -> void:
+	V.b(vb, 1, 0, 0, 1, 4, 1, Color("3a3530")); V.b(vb, 1, 3, 0, 1, 1, 3, Color("3a3530"))
+	_pot(vb, 0, 0, 1, 5, 4, POTS[v % POTS.size()])
+	V.blob(vb, Vector3(2.5, 5.0, 3.5), Vector3(3.0, 1.8, 3.0), V.leaves(v + 2, v % 3), 0.0, 0.4, v)
+	for k in 3:
+		var ln := 3 + int(V.hs(k, v, 5) * 4)
+		for y in ln:
+			V.p(vb, [0, 4, 2][k], 3 - y, [2, 3, 5][k], V.leaves(k, 0).call(Vector3i(k, y, v)))
+
+
+## Bath step stool (white with a pink top) for kids at the sink.
+static func m_step_stool(vb: VoxelBuilder, _v: int) -> void:
+	V.b(vb, 0, 0, 0, 9, 5, 6, V.noisy(Color("f4f2ee"), 0.03))
+	vb.clear_box(Vector3i(2, 0, 0), Vector3i(5, 3, 6))
+	V.b(vb, 0, 5, 0, 9, 1, 6, Color("f2b5c6"))

@@ -12,13 +12,18 @@ extends RefCounted
 ##     var vb := VoxelBuilder.new()
 ##     PropLib.place(vb, "desk", Vector3i(10, 0, 4), 0)      # rot: 0 +Z, 1 +X, 2 -Z, 3 -X
 ##     PropLib.place(vb, "plant", Vector3i(40, 0, 2), 0, 1)  # variant 1
-##     add_child(vb.build_instance(PropLib.U))
+##     add_child(vb.build_instance(PropLib.FU))   # furniture display cell (1.25 x U)
 ## Or a single cached mesh instance (shared ArrayMesh, centred on its footprint):
 ##     var mi := PropLib.instance("tree", 3)
 ## Names: see PropLib.names().
 ## Procedural helpers: rug(), railing(), window_frame(), string_lights(), add_light().
 
 const U := 0.0625
+## Display cell size for furniture + decor: models are authored in 1/16 m cells
+## but shown 1.25x bigger (chibi proportions: the household's big-headed sims
+## need chunkier furniture, like the reference shots). Outdoor models keep
+## their own SCALE.
+const FU := 0.078125
 const Furn := preload("res://scripts/props/furniture.gd")
 const Decor := preload("res://scripts/props/decor.gd")
 const Outdoor := preload("res://scripts/props/outdoor.gd")
@@ -56,7 +61,7 @@ static func has_model(name: String) -> bool:
 
 ## Cell size (metres) a model is authored in.
 static func scale_of(name: String) -> float:
-	return Outdoor.SCALE.get(name, U)
+	return Outdoor.SCALE.get(name, FU)
 
 
 ## The cached, normalised model builder (do not modify it).
@@ -190,7 +195,7 @@ void fragment() {
 static func night_exterior_material() -> StandardMaterial3D:
 	if _night_ext_mat == null:
 		_night_ext_mat = VoxelBuilder.solid_material().duplicate()
-		_night_ext_mat.albedo_color = Color(0.44, 0.56, 0.76)
+		_night_ext_mat.albedo_color = Color(0.56, 0.66, 0.9)
 	return _night_ext_mat
 
 

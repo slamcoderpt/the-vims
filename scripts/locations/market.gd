@@ -41,7 +41,7 @@ func build() -> void:
 
 
 func camera_home() -> Dictionary:
-	return {"target": Vector3(0.3, 0.9, -0.6), "yaw": 0.0, "pitch": 24.0, "distance": 8.6, "fov": 46.0}
+	return {"target": Vector3(0.3, 1.12, 0.78), "yaw": 0.0, "pitch": 13.0, "distance": 7.0, "fov": 50.0}
 
 
 func lighting_profile() -> Dictionary:
@@ -113,9 +113,9 @@ func _place(key: String, pos: Vector3, face_to: Vector3, pose: String) -> SimAct
 func _stage() -> void:
 	if actors.is_empty():
 		return
-	var cam := Vector3(0.3, 0, 7.3)
+	var cam := Vector3(0.3, 0, 7.6)
 	# Jack pushes the cart towards the camera, angled a touch to screen right.
-	var jack := _place("dad", Vector3(-0.35, 0, 0.2), cam + Vector3(2.4, 0, 0), "idle")
+	var jack := _place("dad", Vector3(-0.3, 0, 1.75), cam + Vector3(2.0, 0, 0), "idle")
 	var cart_yaw := jack.rotation.y
 	var fwd := Vector3(sin(cart_yaw), 0, cos(cart_yaw))
 	_cart.position = jack.position + fwd * 0.42
@@ -124,18 +124,19 @@ func _stage() -> void:
 	dog.rotation.y = cart_yaw + 0.35
 	# The "type" pose turns the head ~0.9 rad to the sim's left, so the
 	# girls' bodies are turned the other way to keep their faces on camera.
-	var lily := _place("bunny_girl", Vector3(-1.35, 0, 0.55), cam, "stand_type")
+	var lily := _place("bunny_girl", Vector3(-1.4, 0, 2.05), cam, "stand_type")
 	lily.rotation.y -= 0.75
-	var maya := _place("cat_girl", Vector3(1.0, 0, 1.0), cam, "stand_type")
+	var maya := _place("cat_girl", Vector3(0.9, 0, 2.55), cam, "stand_type")
 	maya.rotation.y -= 0.8
 	_hold(lily, "carrots")
 	_hold(maya, "cereal")
-	_place("cashier", Vector3(2.95, 0, 0.75), Vector3(0.6, 0, 3.0), "idle")
-	_place("npc_2", Vector3(-0.85, 0, -2.4), Vector3(-2.6, 0, -3.4), "idle")
-	_place("npc_5", Vector3(0.7, 0, -5.5), Vector3(1.0, 0, -9.0), "idle")
-	_place("npc_4", Vector3(-0.4, 0, -3.9), Vector3(-0.4, 0, -9.0), "idle")
-	_place("npc_0", Vector3(1.55, 0, -3.25), Vector3(3.0, 0, -4.4), "stand_read")
-	_place("npc_6", Vector3(-3.4, 0, -6.4), Vector3(-6.0, 0, -6.2), "idle")
+	_place("cashier", Vector3(3.0, 0, 2.75), Vector3(0.4, 0, 4.8), "idle")
+	# Background shoppers spread down the main aisle, in the gaps between the family.
+	_place("npc_2", Vector3(-1.05, 0, -0.9), Vector3(-2.8, 0, -1.6), "idle")
+	_place("npc_5", Vector3(0.55, 0, -4.4), Vector3(0.9, 0, -9.0), "idle")
+	_place("npc_4", Vector3(-0.15, 0, -2.3), Vector3(-0.4, 0, -9.0), "idle")
+	_place("npc_0", Vector3(1.6, 0, -1.6), Vector3(3.2, 0, -3.0), "stand_read")
+	_place("npc_6", Vector3(-2.9, 0, -4.4), Vector3(-6.0, 0, -4.2), "idle")
 	_hold(actors["npc_4"], "basket")
 	_hold(actors["npc_2"], "basket")
 	_hold(actors["npc_6"], "basket")

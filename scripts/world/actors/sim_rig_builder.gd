@@ -485,8 +485,9 @@ static func _human_head(L: Dictionary, D: Dictionary) -> Dictionary:
 
 static func _human_hair(vb: VoxelBuilder, style: String, hc: Callable, W: int, H: int, Dd: int, B: int, T: int, F: int, has_hat: bool, child := false) -> void:
 	if style == "bald":
-		_fill(vb, -1, -1, B + 3, T - 3, 1, F - 4, hc)
-		_fill(vb, W, W, B + 3, T - 3, 1, F - 4, hc)
+		# Short fringe of hair behind the ears (not a block over them).
+		_fill(vb, -1, -1, B + 4, T - 3, 0, F - 6, hc)
+		_fill(vb, W, W, B + 4, T - 3, 0, F - 6, hc)
 		_fill(vb, 0, W - 1, B + 2, T - 3, -1, -1, hc)
 		return
 	if style == "shaggy":

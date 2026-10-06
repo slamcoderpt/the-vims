@@ -70,7 +70,7 @@ func _print_stats() -> void:
 				var arr = mi.mesh.surface_get_arrays(si)
 				var n := (arr[Mesh.ARRAY_VERTEX] as PackedVector3Array).size() / 3
 				tris += n
-				if n > 8000:
+				if n > 4000:
 					print("  mesh ", mi.name, " surf ", si, " tris ", n)
 	var vp := get_viewport()
 	print("BACKYARD_DRAWS visible=%d shadow=%d canvas=%d" % [
@@ -97,13 +97,19 @@ func _sync_env() -> void:
 	if sunset:
 		sunset.sync(_shared_env)
 		sunset.update(Game.hour())
+	if garden:
+		var hh := Game.hour()
+		var on := smoothstep(17.5, 19.5, hh) if hh > 12.0 else 1.0 - smoothstep(5.5, 7.0, hh)
+		garden.set_lamp_glow(on)
+		if party:
+			party.halos.set_strength(on)
 	if fill:
 		var h := Game.hour()
 		# Golden around sunset, a faint cool moon-fill at night, off by day.
 		var gold := smoothstep(16.5, 18.5, h) * (1.0 - smoothstep(20.0, 21.5, h))
 		var nite := smoothstep(20.5, 22.0, h) if h > 12.0 else 1.0 - smoothstep(4.5, 6.0, h)
 		fill.light_color = Color(1.0, 0.74, 0.5).lerp(Color(0.6, 0.66, 1.0), nite)
-		fill.light_energy = gold * 0.45 + nite * 0.12
+		fill.light_energy = gold * 0.2 + nite * 0.1
 		fill.visible = fill.light_energy > 0.01
 
 
@@ -164,11 +170,14 @@ func lighting_profile() -> Dictionary:
 	# Sun, ambient, exposure and screen post come from the shared lighting rig;
 	# the gradient sky + depth fog are applied locally by sunset_env.gd
 	# (camera environment override, synced from the shared environment).
+	# Dusk: a low, weak orange sun and a cool violet ambient so the lanterns,
+	# string lights, fire pit and the lit house make the warm pools.
 	return {
-		"sun_heading": 262.0, "sun_elev": 14.0, "sun_energy": 3.2,
-		"ambient_day": Color(1.0, 0.8, 0.66), "ambient_night": Color(0.52, 0.42, 0.70),
-		"ambient_energy": 0.8, "ambient_night_energy": 0.62,
-		"exposure": 1.08, "shadow_distance": 34.0,
-		"post": {"focus_y": 0.58, "band": 0.2, "falloff": 0.36, "blur_px": 6.0, "top_boost": 0.8,
-			"saturation": 1.14, "contrast": 1.05, "tint": Vector3(1.05, 0.98, 0.95), "vignette": 0.24},
+		"sun_heading": 262.0, "sun_elev": 11.0, "sun_energy": 1.25,
+		"ambient_day": Color(0.78, 0.62, 0.74), "ambient_night": Color(0.40, 0.38, 0.66),
+		"ambient_energy": 0.62, "ambient_night_energy": 0.5,
+		"exposure": 1.0, "shadow_distance": 30.0,
+		"lamp_night_mult": 1.35, "glow_boost_night": 1.9,
+		"post": {"focus_y": 0.6, "band": 0.25, "falloff": 0.42, "blur_px": 4.5, "top_boost": 1.25,
+			"saturation": 1.12, "contrast": 1.06, "tint": Vector3(1.04, 0.97, 0.98), "vignette": 0.26},
 	}

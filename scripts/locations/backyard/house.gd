@@ -47,7 +47,7 @@ func build(parent: Node3D) -> void:
 	_deck_decor(fine)
 	V.inst(fine, root, V.SIZE_FINE, Vector3.ZERO, 0.0, Vector3.ZERO, true, true, "HouseDecor")
 	# Warm interior light spilling out + porch fill.
-	V.omni(root, Vector3(6.5, 2.0, -8.2), Color(1.0, 0.72, 0.42), 3.0, 7.0)
+	V.omni(root, Vector3(6.5, 2.0, -8.2), Color(1.0, 0.72, 0.42), 4.2, 7.0)
 	V.omni(root, Vector3(5.8, 2.5, -3.2), Color(1.0, 0.76, 0.5), 3.0, 6.0)
 
 
@@ -69,8 +69,15 @@ func _shell(vb: VoxelBuilder) -> void:
 	V.b(vb, X0, 3, zb, 2, 25, WALL_Z - zb, _siding)
 	V.b(vb, UX0, 28, zb, 2, 20, WALL_Z - zb, _siding)
 	V.b(vb, X1 - 2, 3, zb, 2, 45, WALL_Z - zb, _siding)
-	V.b(vb, X0, 3, zb, UX0 - X0, 25, 2, Color("e8d2b0"))
-	V.b(vb, UX0, 3, zb, X1 - UX0, 45, 2, Color("e8d2b0"))
+	# Interior back wall: warm lamp-lit plaster (soft emissive so the room
+	# reads as glowing through the open sliding doors at dusk).
+	var lit_wall := func(q: Vector3i) -> Color:
+		var hot := 1.0 - clampf(absf(float(q.y) - 14.0) / 16.0, 0.0, 1.0) * 0.35
+		var lamp := maxf(0.0, 1.0 - absf(float(q.x) - 47.0) / 22.0) * 0.18 + maxf(0.0, 1.0 - absf(float(q.x) - 70.0) / 18.0) * 0.12
+		return V.shade(Color("c99a66"), (0.78 + lamp) * hot + V.h1(q, 3) * 0.04)
+	V.b(vb, X0, 3, zb, UX0 - X0, 25, 2, lit_wall, true)
+	V.b(vb, UX0, 3, zb, X1 - UX0, 24, 2, lit_wall, true)
+	V.b(vb, UX0, 27, zb, X1 - UX0, 21, 2, Color("e8d2b0"))
 	# Corner trim boards.
 	V.b(vb, X0 - 1, 3, WALL_Z - 2, 1, 25, 3, TRIM)
 	V.b(vb, UX0 - 1, 28, WALL_Z - 2, 1, 20, 3, TRIM)
