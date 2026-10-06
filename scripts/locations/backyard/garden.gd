@@ -125,7 +125,7 @@ func _lawn() -> void:
 				continue
 			var q := Vector3i(x, -1, z)
 			far.set_v(q, V.shade(GRASS[int(V.h1(q, 2) * GRASS.size())], 0.8))
-	V.inst(far, root, 0.5, Vector3(0, -0.375, 0), 0.0, Vector3.ZERO, false, true, "FarGround")
+	V.inst(far, root, 0.5, Vector3(0, -0.02, 0), 0.0, Vector3.ZERO, false, true, "FarGround")
 
 
 # ------------------------------------------------------------------ flowers
