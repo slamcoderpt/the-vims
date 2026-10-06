@@ -262,20 +262,31 @@ func _is_selected_actor(a: Node3D) -> bool:
 	return a != null and a == _selected_actor()
 
 
+## Screen gap (px) between the head-top anchor and the bubble's tail tip.
+const HEAD_GAP := 3.0
+## Where a skill chip sits relative to the head (its top-left corner):
+## right of the main bubble's tail, just under the bubble body.
+const CHIP_OFS := Vector2(26, -10)
+
+
 func _position_bubble(b) -> void:
 	var tip := Vector2.INF
 	b.tail_frac = b.base_tail_frac
+	b.tail_lean = 0.0
 	var a: Node3D = b.anchor
 	if a != null and is_instance_valid(a) and a.is_inside_tree():
-		tip = _project(_anchor_point(a))
-		if tip != Vector2.INF:
-			tip += Vector2(0, -10)
+		var head := _project(_anchor_point(a))
+		if head != Vector2.INF:
 			if b.kind == "skill":
-				tip += Vector2(62, 51)
+				tip = head + CHIP_OFS + Vector2(b.size.x * b.tail_frac - 7.0, b.size.y + 8.0)
 			elif _is_selected_actor(a) or b.selected_side:
-				# leave room for the plumbob on the right
-				b.tail_frac = 0.8
-				tip += Vector2(-52, 0)
+				# bubble sits up-left so the plumbob can float beside it over
+				# the head; the tail leans right and touches just above the head
+				b.tail_frac = 0.78
+				b.tail_lean = 7.0
+				tip = head + Vector2(-2, -HEAD_GAP)
+			else:
+				tip = head + Vector2(0, -HEAD_GAP)
 			tip += b.offset
 	else:
 		var at = b.fallback_at
@@ -289,6 +300,7 @@ func _position_bubble(b) -> void:
 		b.tip = tip
 		b.place()
 		_keep_off_hud(b)
+		b.queue_redraw()
 
 
 ## Slide a bubble right so it never sits on top of the portrait/needs column;
@@ -412,8 +424,18 @@ func _process(delta: float) -> void:
 			continue
 		_position_bubble(b)
 	_update_plumbob()
+	if _dbg_frames >= 0:
+		_dbg_frames += 1
+		if _dbg_frames == 15:
+			for m in Game.household:
+				var a := find_actor(m.name)
+				if a:
+					print("HUDDBG ", m.name, " head ", _project(_anchor_point(a)), " feet ", _project(a.global_position))
+				else:
+					print("HUDDBG ", m.name, " no actor")
 
 
+var _dbg_frames := 0 if OS.get_environment("HUD_DEBUG") != "" else -1
 var plumbob_fallback := Vector2.INF
 
 
@@ -421,13 +443,25 @@ func _update_plumbob() -> void:
 	var a := _selected_actor()
 	var tip := Vector2.INF
 	if a:
-		tip = _project(_anchor_point(a))
-		if tip != Vector2.INF:
-			tip += Vector2(0, -26)
+		var head := _project(_anchor_point(a))
+		if head != Vector2.INF:
+			tip = head + Vector2(0, -8)
+			# beside the sim's own action bubble, level with its body
+			var b = _main_bubble_for(a)
+			if b != null:
+				var cy: float = b.position.y + b.size.y * 0.5
+				tip = Vector2(maxf(head.x, b.position.x + b.size.x + 15.0), cy + 34.0 * plumbob.gem_scale)
 	else:
 		tip = plumbob_fallback
 	plumbob.active = tip != Vector2.INF
 	plumbob.tip = tip if plumbob.active else Vector2.ZERO
+
+
+func _main_bubble_for(a: Node3D):
+	var b = _bubbles.get(str(a.get_instance_id()) + "|main")
+	if b != null and is_instance_valid(b) and b.visible:
+		return b
+	return null
 
 
 # --------------------------------------------------------------- presets

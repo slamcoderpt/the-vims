@@ -65,15 +65,15 @@ var _fill: DirectionalLight3D
 
 ## Framing (fractions of the head height neck->top-of-hat), tuned so the face
 ## fills the card like the refs.
-const ADULT_TOP := 0.2
-const ADULT_BELOW := 0.42
-const KID_TOP := -0.2
-const KID_BELOW := 0.2
-const PERSON_YAW := -6.0
+const ADULT_TOP := 0.26
+const ADULT_BELOW := 0.56
+const KID_TOP := -0.05
+const KID_BELOW := 0.16
+const PERSON_YAW := -14.0
 const PERSON_PITCH := -2.0
-const DOG_YAW := -32.0
+const DOG_YAW := -40.0
 const DOG_PITCH := -8.0
-const DOG_ZOOM := 1.06
+const DOG_ZOOM := 1.2
 
 
 func _ready() -> void:

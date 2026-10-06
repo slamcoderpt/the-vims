@@ -19,10 +19,44 @@ const BODY := {
 	"big": {"lw": 5, "shin": 6, "thigh": 6, "tw": 12, "td": 7, "th": 9, "aw": 3, "ua": 6, "fa": 6, "hw": 10, "hh": 10, "hd": 10},
 	"slim": {"lw": 4, "shin": 6, "thigh": 6, "tw": 10, "td": 6, "th": 9, "aw": 3, "ua": 6, "fa": 6, "hw": 10, "hh": 10, "hd": 10},
 	# Chibi child: head (with hat) ~40% of total height, about 1:1.5 head:body.
-	"child": {"lw": 3, "shin": 4, "thigh": 4, "tw": 8, "td": 5, "th": 6, "aw": 2, "ua": 4, "fa": 3, "hw": 10, "hh": 9, "hd": 9},
+	"child": {"lw": 4, "shin": 4, "thigh": 5, "tw": 10, "td": 6, "th": 7, "aw": 3, "ua": 5, "fa": 4, "hw": 10, "hh": 9, "hd": 9},
 }
 
 static var _cache := {}
+static var _char_mat: ShaderMaterial
+
+const CHAR_SHADER := """
+shader_type spatial;
+// Character skin: vertex colours (sRGB) + a soft warm fresnel rim and a small
+// self-lift so the sims pop against busy furniture (ref: warm rim light).
+uniform vec3 rim_color : source_color = vec3(1.0, 0.80, 0.55);
+uniform float rim_strength = 0.45;
+uniform float lift = 0.07;
+void fragment() {
+	vec3 c = COLOR.rgb;
+	vec3 lin = c;
+	if (!OUTPUT_IS_SRGB) {
+		lin = mix(pow((c + vec3(0.055)) / 1.055, vec3(2.4)), c / 12.92, step(c, vec3(0.04045)));
+	}
+	ALBEDO = lin;
+	ROUGHNESS = 0.82;
+	SPECULAR = 0.3;
+	float ndv = clamp(dot(NORMAL, VIEW), 0.0, 1.0);
+	float f = pow(1.0 - ndv, 2.5);
+	EMISSION = rim_color * f * rim_strength + lin * lift;
+}
+"""
+
+
+## Shared material for every character body.
+static func character_material() -> ShaderMaterial:
+	if _char_mat == null:
+		var sh := Shader.new()
+		sh.code = CHAR_SHADER
+		_char_mat = ShaderMaterial.new()
+		_char_mat.shader = sh
+	return _char_mat
+
 static var _prop_cache := {}
 
 
@@ -36,6 +70,7 @@ static func get_rig(look: String) -> Dictionary:
 		r = _build_dog(L)
 	else:
 		r = _build_human(L)
+	(r.mesh as ArrayMesh).surface_set_material(0, character_material())
 	_cache[look] = r
 	return r
 
@@ -96,7 +131,6 @@ class Acc:
 		st.create_from_arrays(arrays)
 		st.index()
 		var mesh := st.commit()
-		mesh.surface_set_material(0, VoxelBuilder.solid_material())
 		var skin := Skin.new()
 		var rests := PackedVector3Array()
 		for i in names.size():
@@ -265,6 +299,7 @@ static func _build_human(L: Dictionary) -> Dictionary:
 		"head_h": (hh + 1 + top_extra) * VS,
 		"height": (neck + 1 + hh + 2) * VS,
 		"fore_len": fa * VS,
+		"shin_len": shin * VS,
 		"arm_x": ax * VS,
 		"elderly": L.get("elderly", false),
 	}
@@ -538,7 +573,7 @@ static func _human_hair(vb: VoxelBuilder, style: String, hc: Callable, W: int, H
 			if not has_hat:
 				_fill(vb, -1, W, T + 1, T + 1, -1, F, hc)
 				_fill(vb, 0, W - 1, T + 2, T + 2, 0, F - 1, hc)
-			var low := (-3 if child else -5) if style != "bun" and style != "ponytail" else B + 1
+			var low := (-1 if child else -5) if style != "bun" and style != "ponytail" else B + 1
 			if style == "long" or style == "curly_long":
 				# Curtains framing the face down past the chin, ragged ends.
 				for z in range(0, F):

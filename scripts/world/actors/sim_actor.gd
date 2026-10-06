@@ -35,6 +35,16 @@ var seat_height := 0.45
 var lie_height := 0.5
 ## Walking speed in m/s (set automatically from the body type).
 var walk_speed := 1.3
+## Display scale of the voxel body (<= 0: automatic per body type). Chibi
+## characters read better slightly larger than life next to furniture.
+var body_scale := -1.0:
+	set(v):
+		body_scale = v
+		_apply_scale()
+## When true, seated/activity poses "cheat" toward the active camera (Sims
+## style): the body swivels and the head turns so faces read in 3/4 even when
+## the sim works facing away from the player.
+var camera_cheat := true
 
 var skeleton: Skeleton3D
 var mesh_instance: MeshInstance3D
@@ -63,6 +73,8 @@ var _pose_after_walk := "idle"
 var _props := {}       # name -> MeshInstance3D
 var _attach := {}      # bone name -> BoneAttachment3D
 var _frames := 0
+var _s := 1.0          # resolved body scale
+var _cam_a := 0.0      # signed yaw (rad) from the actor's forward to the camera
 
 # Bone indices (humans).
 var b_root := -1
@@ -151,11 +163,25 @@ func _ready() -> void:
 		walk_speed = 1.5
 	elif _meta.kind == "child":
 		walk_speed = 1.1
+	_apply_scale()
 	_phase = VoxelBuilder.hash3(Vector3i(get_instance_id() % 9973, 3, 7)) * TAU
 	_t = _phase * 3.0
 	_blink_t = 1.0 + _phase
 	# Snaps straight into the pose on spawn (no blend from T-pose).
 	set_pose(pose)
+
+
+func _apply_scale() -> void:
+	if skeleton == null:
+		return
+	_s = body_scale
+	if _s <= 0.0:
+		_s = AUTO_SCALE.get(_meta.kind, 1.0)
+	skeleton.scale = Vector3.ONE * _s
+	walk_speed = (1.5 if _dog else (1.1 if _meta.kind == "child" else 1.3)) * sqrt(_s)
+
+
+const AUTO_SCALE := {"adult": 1.1, "child": 1.05, "dog": 1.4}
 
 
 func kind() -> String:
@@ -211,7 +237,7 @@ func face(world_pos: Vector3) -> void:
 
 
 func head_top() -> Vector3:
-	var h: float = _meta.get("height", 1.75) if not _meta.is_empty() else (0.75 if look == "beagle" else 1.8)
+	var h: float = (_meta.get("height", 1.75) if not _meta.is_empty() else (0.75 if look == "beagle" else 1.8)) * _s
 	if skeleton == null or b_head < 0 or not is_inside_tree():
 		return global_position + Vector3(0, h + 0.15, 0)
 	var g := skeleton.global_transform * skeleton.get_bone_global_pose(b_head)
@@ -236,7 +262,7 @@ func _process(delta: float) -> void:
 		_step_walk(delta)
 	elif pose == "walk":
 		# Walk in place (e.g. a staged screenshot).
-		var stride: float = (0.9 if _dog else 1.6) * maxf(0.3, _meta.get("hip_y", 0.25))
+		var stride: float = (0.9 if _dog else 1.6) * maxf(0.3, _meta.get("hip_y", 0.25)) * _s
 		_walk_phase += walk_speed * delta / stride * PI
 	# Blinking.
 	_blink_t -= delta
@@ -270,7 +296,7 @@ func _step_walk(delta: float) -> void:
 	global_position += dir * step
 	var want := atan2(dir.x, dir.z)
 	rotation.y = lerp_angle(rotation.y, want, 1.0 - exp(-delta * 10.0))
-	var stride: float = (0.9 if _dog else 1.6) * maxf(0.3, _meta.get("hip_y", 0.25))
+	var stride: float = (0.9 if _dog else 1.6) * maxf(0.3, _meta.get("hip_y", 0.25)) * _s
 	_walk_phase += step / stride * PI
 
 
@@ -315,12 +341,43 @@ func _compute_targets(_delta: float) -> void:
 	_tgt_root_rot = Vector3.ZERO
 	_tgt_root_pos = Vector3.ZERO
 	_eyes_closed = false
+	_cam_a = _camera_angle()
 	if _dog:
 		_dog_pose()
 	else:
 		_human_pose()
 	if has_meta("dbg_head_yaw"):
 		_tgt[b_head].y = get_meta("dbg_head_yaw")
+
+
+## Signed yaw from the actor's forward (+Z) to the active camera, radians.
+## Positive = camera on the actor's left (+X).
+func _camera_angle() -> float:
+	if not camera_cheat or not is_inside_tree():
+		return 0.0
+	var cam := get_viewport().get_camera_3d()
+	if cam == null:
+		return 0.0
+	var d := cam.global_position - global_position
+	var b := global_transform.basis.orthonormalized()
+	var lx := b.x.dot(d)
+	var lz := b.z.dot(d)
+	return atan2(lx, lz)
+
+
+## Sims-style presentation turn: swivel hips/torso/head toward the camera so
+## the face shows in roughly 3/4 view (`keep` radians off the camera axis),
+## capped at `max_turn`. Returns the yaw given to hips+torso (for arm
+## compensation).
+func _cheat(max_turn: float, wh := 0.3, wt := 0.25, keep := 0.75) -> float:
+	var a := _cam_a
+	if absf(a) <= keep:
+		return 0.0
+	var want := clampf(a - signf(a) * keep, -max_turn, max_turn)
+	_ab(b_hips, 0.0, want * wh, 0.0)
+	_ab(b_torso, 0.0, want * wt, 0.0)
+	_ab(b_head, 0.0, want * (1.0 - wh - wt), 0.0)
+	return want * (wh + wt)
 
 
 func _sb(i: int, x: float, y := 0.0, z := 0.0) -> void:
@@ -405,13 +462,15 @@ func _human_pose() -> void:
 			# monitor) so the face and beard read in 3/4 from a Sims camera.
 			var tap := sin(t * 13.0)
 			var tap2 := sin(t * 11.0 + 1.3)
-			_sb(b_arm_l, -0.62, -0.18, -0.05)
-			_sb(b_arm_r, -0.62, 0.18, 0.05)
+			var body_yaw := 0.0
+			if _seated():
+				body_yaw = _cheat(1.55, 0.32, 0.22, 0.8)
+			_sb(b_arm_l, -0.62, -0.18 - body_yaw, -0.05)
+			_sb(b_arm_r, -0.62, 0.18 - body_yaw, 0.05)
 			_sb(b_fore_l, -0.85 + 0.08 * maxf(0.0, tap), 0.0, 0.0)
 			_sb(b_fore_r, -0.85 + 0.08 * maxf(0.0, tap2), 0.0, 0.0)
-			_ab(b_torso, 0.1, 0.26, 0.0)
-			_ab(b_hips, 0.0, 0.08, 0.0)
-			_ab(b_head, 0.0 + 0.02 * sin(t * 0.8), 0.68 + 0.05 * sin(t * 0.4), 0.05)
+			_ab(b_torso, 0.1, 0.0, 0.0)
+			_ab(b_head, -0.06 + 0.02 * sin(t * 0.8), 0.05 * sin(t * 0.4), 0.05)
 		"read":
 			_sb(b_arm_l, -0.45, 0.0, -0.18)
 			_sb(b_arm_r, -0.45, 0.0, 0.18)
@@ -419,6 +478,7 @@ func _human_pose() -> void:
 			_sb(b_fore_r, -1.05, 0.0, 0.0)
 			_ab(b_torso, 0.06)
 			_ab(b_head, 0.2, 0.05 * sin(t * 0.6), 0.0)
+			_cheat(0.7, 0.25, 0.3, 0.9)
 		"paint":
 			# Brush arm raised to the canvas, palette held low in the other hand.
 			var dab := sin(t * 3.2)
@@ -427,8 +487,13 @@ func _human_pose() -> void:
 			_sb(b_fore_r, -0.45 - 0.2 * dab)
 			_sb(b_arm_l, -0.45, 0.0, 0.18)
 			_sb(b_fore_l, -1.15)
-			_ab(b_head, -0.05, -0.12 + 0.05 * dab2, 0.06 * sin(t * 0.7))
-			_ab(b_torso, 0.06, -0.12, 0.0)
+			_ab(b_head, -0.05, 0.05 * dab2, 0.06 * sin(t * 0.7))
+			_ab(b_torso, 0.06, 0.0, 0.0)
+			# Glance back toward the player now and then, otherwise a gentle
+			# 3/4 turn so the face isn't hidden behind the hair.
+			var py := _cheat(0.85, 0.15, 0.3, 1.0)
+			_ab(b_arm_r, 0.0, -py, 0.0)
+			_ab(b_arm_l, 0.0, -py, 0.0)
 		"talk":
 			var g := sin(t * 2.3 + _phase)
 			_sb(b_arm_r, -0.45 + 0.2 * g, 0.0, -0.15)
@@ -471,15 +536,23 @@ func _human_pose() -> void:
 
 
 func _sit_chair() -> void:
+	# Hips on the seat (in skeleton space, i.e. unscaled body units).
+	var hs: float = seat_height / _s + float(_meta.leg_half)
+	# Shins hang straight down; if the seat is too low for the (scaled) legs
+	# the knees open up so the feet stay on the floor instead of sinking in.
+	var shin_len: float = _meta.get("shin_len", 0.3)
+	var knee := PI * 0.5 - 0.06
+	if hs < shin_len:
+		knee = PI * 0.5 - acos(clampf(hs / shin_len, 0.0, 1.0))
 	_sb(b_thigh_l, -PI * 0.5, 0.06, 0.0)
 	_sb(b_thigh_r, -PI * 0.5, -0.06, 0.0)
-	_sb(b_shin_l, PI * 0.5 - 0.06)
-	_sb(b_shin_r, PI * 0.5 - 0.06)
+	_sb(b_shin_l, knee)
+	_sb(b_shin_r, knee - 0.12)
 	_sb(b_arm_l, -0.3, 0.0, 0.05)
 	_sb(b_arm_r, -0.3, 0.0, -0.05)
 	_sb(b_fore_l, -0.75)
 	_sb(b_fore_r, -0.75)
-	_tgt_pos.y += seat_height + float(_meta.leg_half) - float(_meta.hip_y)
+	_tgt_pos.y += hs - float(_meta.hip_y)
 
 
 func _sit_floor() -> void:
@@ -500,7 +573,7 @@ func _sit_floor() -> void:
 func _lie() -> void:
 	var h: float = _meta.height
 	_tgt_root_rot = Vector3(-PI * 0.5, 0.0, 0.0)
-	_tgt_root_pos = Vector3(0.0, lie_height + float(_meta.torso_half) + 0.02, h * 0.5)
+	_tgt_root_pos = Vector3(0.0, lie_height / _s + float(_meta.torso_half) + 0.02, h * 0.5)
 	_sb(b_arm_l, 0.0, 0.0, 0.12)
 	_sb(b_arm_r, 0.0, 0.0, -0.12)
 	_sb(b_fore_l, -0.25)
@@ -549,17 +622,17 @@ func _dog_pose() -> void:
 			_ab(b_head, 0.3)
 			_sb(b_tail, -1.3, 0.0, 0.25 * wag)
 		"lie", "sleep":
-			_dog_lie()
+			var ly := _dog_lie()
 			if bp == "sleep":
 				_eyes_closed = true
-				_sb(b_head, 0.35 + 0.02 * breath, 0.55, 0.15)
+				_sb(b_head, 0.35 + 0.02 * breath, 0.55 + ly * 0.5, 0.15)
 				_sb(b_tail, -1.4, 0.9, 0.0)
 				_sb(b_body, 0.0, 0.0, 0.0)
 		"play", "chew":
 			# Lying on the rug gnawing a chew toy held across the mouth.
-			_dog_lie()
+			var ly := _dog_lie()
 			var chew := sin(t * 7.0)
-			_sb(b_head, 0.02 + 0.05 * maxf(0.0, chew), 0.18 * sin(t * 0.9 + _phase), 0.1 * sin(t * 1.7))
+			_sb(b_head, 0.02 + 0.05 * maxf(0.0, chew), ly + 0.12 * sin(t * 0.9 + _phase), 0.1 * sin(t * 1.7))
 			_sb(b_tail, -0.9, 0.0, 0.55 * sin(t * 14.0))
 			_sb(b_ear_l, 0.05 * chew, 0.0, 0.12)
 			_sb(b_ear_r, 0.05 * chew, 0.0, -0.12)
@@ -581,17 +654,28 @@ func _dog_pose() -> void:
 			_sb(b_tail, -0.6, 0.0, 0.5 * sin(t * 15.0))
 
 
-func _dog_lie() -> void:
+func _dog_lie() -> float:
 	# Sphinx pose: belly on the floor, front legs stretched forward, hind legs
 	# folded out to the sides.
 	var vs: float = RigBuilder.VS
+	var look_yaw := 0.0
+	# Present the long side to the camera (a lying dog seen head-on is a
+	# shapeless blob): swivel so the camera sits ~65-95 degrees off the nose,
+	# then the head looks back toward the player.
+	if camera_cheat and is_inside_tree():
+		var a := _cam_a
+		var sg := 1.0 if a >= 0.0 else -1.0
+		var after := clampf(absf(a), 1.15, 1.65) * sg
+		_tgt_root_rot.y = a - after
+		look_yaw = 0.45 * sg
 	_tgt_pos.y = -float(_meta.leg) + 0.3 * vs
 	_sb(b_leg_fl, -1.5, 0.1, 0.0)
 	_sb(b_leg_fr, -1.5, -0.1, 0.0)
 	_sb(b_leg_bl, -1.45, 0.55, 0.0)
 	_sb(b_leg_br, -1.45, -0.55, 0.0)
 	_sb(b_tail, -1.25, 0.0, 0.15 * sin(_t * 11.0))
-	_ab(b_head, 0.1)
+	_ab(b_head, 0.1, look_yaw, 0.0)
+	return look_yaw
 
 
 # ---------------------------------------------------------------------------

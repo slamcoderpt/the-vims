@@ -4,7 +4,7 @@ extends Control
 
 const UI := preload("res://scripts/ui/ui_kit.gd")
 const PAD_Y := 9.0
-const ICON := 23.0
+const ICON := 25.0
 
 var member: Dictionary = {}
 var row_h := 25.5
@@ -64,5 +64,5 @@ func _draw() -> void:
 		var col: Color = UI.NEED_COLORS.get(k, Color.WHITE)
 		if v < 0.2:
 			col = col.lerp(Color("f04848"), 0.75)
-		UI.draw_bar(self, Rect2(bar_x, y + row_h * 0.5 - 6.5, bar_w, 12.0), v, col, UI.NEED_TRACK)
+		UI.draw_bar(self, Rect2(bar_x, y + row_h * 0.5 - 7.0, bar_w, 13.0), v, col, UI.NEED_TRACK)
 		y += row_h
