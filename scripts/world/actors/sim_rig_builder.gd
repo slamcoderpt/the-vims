@@ -354,7 +354,7 @@ static func _human_head(L: Dictionary, D: Dictionary) -> Dictionary:
 	var lid := _sh(skin, 0.88)
 	var lash := Color(0.18, 0.1, 0.08)
 	var E := B + 2 if child else B + 3
-	var eh := 3 if child else 2
+	var eh := 3
 	var exs := [2, 6]
 	for ex: int in exs:
 		for dx in 2:

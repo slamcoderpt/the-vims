@@ -634,8 +634,8 @@ func _dog_pose() -> void:
 			var chew := sin(t * 7.0)
 			_sb(b_head, 0.02 + 0.05 * maxf(0.0, chew), ly + 0.12 * sin(t * 0.9 + _phase), 0.1 * sin(t * 1.7))
 			_sb(b_tail, -0.9, 0.0, 0.55 * sin(t * 14.0))
-			_sb(b_ear_l, 0.05 * chew, 0.0, 0.12)
-			_sb(b_ear_r, 0.05 * chew, 0.0, -0.12)
+			_sb(b_ear_l, 0.05 * chew, 0.0, 0.4)
+			_sb(b_ear_r, 0.05 * chew, 0.0, -0.4)
 		"bow":
 			var hop := absf(sin(t * 5.0))
 			_sb(b_body, 0.32)
