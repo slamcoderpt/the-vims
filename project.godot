@@ -1,0 +1,39 @@
+; Engine configuration file.
+config_version=5
+
+[application]
+
+config/name="The Vims"
+config/description="A cozy voxel life sim for mobile."
+run/main_scene="res://scenes/main.tscn"
+config/features=PackedStringArray("4.4", "GL Compatibility")
+
+[autoload]
+
+Game="*res://scripts/core/game.gd"
+
+[display]
+
+window/size/viewport_width=1672
+window/size/viewport_height=941
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+window/handheld/orientation=4
+
+[gui]
+
+theme/custom_font="res://assets/fonts/Nunito.ttf"
+
+[input_devices]
+
+pointing/emulate_touch_from_mouse=true
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+textures/vram_compression/import_etc2_astc=true
+anti_aliasing/quality/msaa_3d=2
+lights_and_shadows/directional_shadow/size=4096
+lights_and_shadows/directional_shadow/soft_shadow_filter_quality=3
+environment/defaults/default_clear_color=Color(0.55, 0.75, 0.95, 1)
