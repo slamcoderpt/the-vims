@@ -73,7 +73,12 @@ static func _walls(root: Node3D) -> void:
 					vb.set_v(p, Color("3c3f45"))
 				else:
 					var t := float(y) / wh
-					win.set_v(p + Vector3i(0, 0, -1), Color(0.78, 0.9, 1.0).lerp(Color(0.98, 0.97, 0.9), 1.0 - t), true)
+					var sky := Color(0.55, 0.76, 0.95).lerp(Color(0.9, 0.95, 0.98), 1.0 - t)
+					# tree canopy outside along the bottom of the window
+					var tree_h := 4.0 + 3.0 * sin(float(a + x) * 0.7) + 2.0 * sin(float(a + x) * 1.9)
+					if float(y) < tree_h:
+						sky = Color(0.42, 0.66, 0.36) if (x + y) % 3 != 0 else Color(0.52, 0.74, 0.4)
+					win.set_v(p + Vector3i(0, 0, -1), sky, true)
 				# sill
 			vb.set_v(Vector3i(a + x, y0 - 1, z0 + 1), Color("e9dfcf"))
 	Kit.add(root, vb, C, "Walls", false, null, Vector3.ZERO, Vector3.ZERO, true)

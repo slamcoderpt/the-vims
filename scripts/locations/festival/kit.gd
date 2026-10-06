@@ -364,7 +364,7 @@ static func glow_material() -> StandardMaterial3D:
 		_glow_mat.vertex_color_use_as_albedo = true
 		_glow_mat.vertex_color_is_srgb = true
 		_glow_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		_glow_mat.albedo_color = Color(1.35, 1.25, 1.1)
+		_glow_mat.albedo_color = Color(1.9, 1.7, 1.4)
 	return _glow_mat
 
 

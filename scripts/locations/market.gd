@@ -120,7 +120,7 @@ func _stage() -> void:
 	_cart.rotation.y = jack.rotation.y
 	var dog := _place("beagle", _cart.position + fwd * 0.45 + Vector3(0, 13 * P * 1.2, 0), cam + Vector3(-1.5, 0, 0), "sit")
 	dog.rotation.y = jack.rotation.y + 0.35
-	var lily := _place("bunny_girl", Vector3(-1.0, 0, 0.35), Vector3(-0.4, 0, 5.0), "stand_type")
+	var lily := _place("bunny_girl", Vector3(-1.25, 0, 0.25), Vector3(-0.4, 0, 5.0), "stand_type")
 	var maya := _place("cat_girl", Vector3(1.0, 0, 0.8), Vector3(0.0, 0, 6.0), "stand_type")
 	_hold(lily, "carrots")
 	_hold(maya, "cereal")

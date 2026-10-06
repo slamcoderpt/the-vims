@@ -79,14 +79,14 @@ static func _kind_col(kind: String) -> Color:
 static func _tag(root: Node3D, pos: Vector3, text: String, rot_y := 0.0) -> void:
 	var vb := VoxelBuilder.new()
 	vb.jitter = 0.03
-	for x in 8:
-		for y in 4:
-			var edge := x == 0 or y == 0 or x == 7 or y == 3
-			vb.set_v(Vector3i(x, y, 0), Color("6b4a2c") if edge else Color("2c2420"))
-	var mi := Kit.add(root, vb, 0.04, "Tag", false, null, pos, Vector3(4, 2, 0.5))
+	for x in 10:
+		for y in 5:
+			var edge := x == 0 or y == 0 or x == 9 or y == 4
+			vb.set_v(Vector3i(x, y, 0), Color("8a5a31") if edge else Color("2c2420"))
+	var mi := Kit.add(root, vb, 0.04, "Tag", false, null, pos, Vector3(5, 2.5, 0.5))
 	mi.rotation.y = deg_to_rad(rot_y)
 	mi.rotation.x = deg_to_rad(-12)
-	var l := Kit.label(mi, text, Vector3(0, 0.0, 0.025), 0.0011, Color("fdf7e8"), 0.0, 128)
+	var l := Kit.label(mi, text, Vector3(0, 0.0, 0.03), 0.00052, Color("fdf7e8"), 0.0, 128)
 	l.scale = Vector3(1, 1.1, 1)
 
 

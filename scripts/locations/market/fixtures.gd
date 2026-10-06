@@ -160,63 +160,77 @@ static func fridge(width: int, seed: int) -> VoxelBuilder:
 	vb.jitter = 0.03
 	var H := 34
 	var D := 12
-	var frame := Color("dfe3e6")
+	var frame := Color("c9ced3")
 	vb.box(Vector3i(0, 0, 0), Vector3i(width, H, D), frame)
 	# kick plate
-	vb.box(Vector3i(0, 0, D - 1), Vector3i(width, 3, 1), Color("4a4f57"))
+	vb.box(Vector3i(0, 0, D - 1), Vector3i(width, 3, 1), Color("3b4048"))
 	# cavity
 	vb.clear_box(Vector3i(1, 3, 2), Vector3i(width - 2, 26, D - 2))
 	# glowing back
-	vb.box(Vector3i(1, 3, 1), Vector3i(width - 2, 26, 1), Color("eef7ff"), true)
-	# top header light box
-	vb.box(Vector3i(0, 30, D - 1), Vector3i(width, 3, 1), Color("ffffff"), true)
+	vb.box(Vector3i(1, 3, 1), Vector3i(width - 2, 26, 1), Color("d8ecff"), true)
+	# top header light box + brand stripe
+	vb.box(Vector3i(0, 30, D - 1), Vector3i(width, 3, 1), Color("f4fbff"), true)
 	vb.box(Vector3i(0, 33, 0), Vector3i(width, 1, D), Color("2f6fb5"))
 	var shelves := [3, 10, 16, 22]
+	var milk_caps: Array[Color] = [Color("2e7de0"), Color("e0412e"), Color("37a64a"), Color("f2c12e")]
+	var juice: Array[Color] = [Color("f7a21c"), Color("f5d33a"), Color("e8502f"), Color("8bd36b"), Color("c84fd0")]
+	var drinks: Array[Color] = [Color("2f9be8"), Color("54c45a"), Color("f06a5a"), Color("f5b93a"), Color("9a5be0")]
 	for si in shelves.size():
 		var y: int = shelves[si]
-		vb.box(Vector3i(1, y, 2), Vector3i(width - 2, 1, D - 3), Color("c9d3da"))
+		var top: int = (shelves[si + 1] if si + 1 < shelves.size() else 29) - y - 1
+		vb.box(Vector3i(1, y, 2), Vector3i(width - 2, 1, D - 3), Color("aab5bf"))
 		var x := 2
 		while x < width - 3:
-			var r := Kit.h(Vector3i(x, y, seed), 3)
-			var kind := int(r * 5.0)
-			var col: Color
-			match kind:
-				0, 1: # milk jug
-					col = Color("fbfbf7")
-					for dx in 3:
-						for yy in 5:
+			var r := Kit.h(Vector3i(x / 6, y, seed), 3)
+			var kind := int(r * 4.0)
+			var run := 2 + int(Kit.h(Vector3i(x, y, seed), 5) * 3.0)
+			for k in run:
+				if x >= width - 3:
+					break
+				match kind:
+					0: # milk jug
+						var cap := milk_caps[int(r * 31.0) % 4]
+						var hh := mini(top, 5)
+						for dx in 2:
+							for yy in hh:
+								for zz in 3:
+									vb.set_v(Vector3i(x + dx, y + 1 + yy, D - 5 + zz), Color("f7f7f2"))
+						vb.set_v(Vector3i(x, y + hh, D - 4), cap)
+						vb.set_v(Vector3i(x, y + 2, D - 3), cap)
+						vb.set_v(Vector3i(x + 1, y + 2, D - 3), cap)
+						x += 2
+					1: # juice carton
+						var col := juice[int(r * 37.0) % juice.size()]
+						var hh := mini(top, 5)
+						for yy in hh:
 							for zz in 3:
-								vb.set_v(Vector3i(x + dx, y + 1 + yy, D - 5 + zz), col, true)
-					var cap: Color = [Color("2e7de0"), Color("e0412e"), Color("37a64a")][int(r * 31.0) % 3]
-					vb.set_v(Vector3i(x + 1, y + 6, D - 4), cap, true)
-					vb.set_v(Vector3i(x + 1, y + 3, D - 3), cap, true)
-					x += 4
-				2: # juice carton
-					col = [Color("f7a21c"), Color("f5d33a"), Color("e8502f")][int(r * 37.0) % 3]
-					for dx in 2:
-						for yy in 5:
-							for zz in 2:
-								vb.set_v(Vector3i(x + dx, y + 1 + yy, D - 4 + zz), col if yy != 3 else Color("ffffff"), true)
-					x += 3
-				3: # yogurt cups
-					for dx in 3:
-						for yy in 2:
-							vb.set_v(Vector3i(x + dx, y + 1 + yy, D - 3), [Color("f2a7c3"), Color("fbe9a8"), Color("b9d8f5")][(dx + seed) % 3], true)
-					x += 4
-				_: # bottles
-					col = [Color("4fb3e8"), Color("8bd36b"), Color("f06a5a")][int(r * 41.0) % 3]
-					for yy in 6:
-						vb.set_v(Vector3i(x, y + 1 + yy, D - 3), col if yy < 5 else Color("ffffff"), true)
-						if yy < 4:
-							vb.set_v(Vector3i(x + 1, y + 1 + yy, D - 3), col, true)
-					x += 3
-	# door mullions + handles
-	for x in range(0, width, 10):
-		vb.box(Vector3i(x, 3, D - 1), Vector3i(1, 27, 1), Color("aeb6bd"))
-		if x + 8 < width:
-			vb.box(Vector3i(x + 8, 12, D), Vector3i(1, 8, 1), Color("d7dde2"))
-	vb.box(Vector3i(width - 1, 3, D - 1), Vector3i(1, 27, 1), Color("aeb6bd"))
-	vb.box(Vector3i(0, 29, D - 1), Vector3i(width, 1, 1), Color("aeb6bd"))
+								vb.set_v(Vector3i(x, y + 1 + yy, D - 5 + zz), col if yy != hh - 2 else Color("ffffff"))
+								vb.set_v(Vector3i(x + 1, y + 1 + yy, D - 5 + zz), col)
+						x += 2
+					2: # yogurt cups, two stacked
+						for yy in mini(top, 4):
+							vb.set_v(Vector3i(x, y + 1 + yy, D - 3), [Color("f2a7c3"), Color("fbe9a8"), Color("b9d8f5"), Color("ffffff")][(yy + x) % 4])
+							vb.set_v(Vector3i(x, y + 1 + yy, D - 4), Color("f4f0e8"))
+						x += 1
+					_: # bottles
+						var col := drinks[int(r * 41.0) % drinks.size()]
+						var hh := mini(top, 6)
+						for yy in hh:
+							vb.set_v(Vector3i(x, y + 1 + yy, D - 3), col if yy < hh - 1 else Color("ffffff"))
+							if yy < hh - 2:
+								vb.set_v(Vector3i(x, y + 1 + yy, D - 4), Kit.shade(col, 0.8))
+							if yy == 2:
+								vb.set_v(Vector3i(x, y + 1 + yy, D - 3), Color("fdf6e0"))
+						x += 1
+			x += 0 if Kit.h(Vector3i(x, y, seed), 7) > 0.35 else 1
+	# door frames (dark) + handles
+	for x in range(0, width, 9):
+		vb.box(Vector3i(x, 3, D - 1), Vector3i(1, 27, 1), Color("5d646c"))
+		if x + 7 < width:
+			vb.box(Vector3i(x + 7, 11, D), Vector3i(1, 9, 1), Color("e3e7ea"))
+	vb.box(Vector3i(width - 1, 3, D - 1), Vector3i(1, 27, 1), Color("5d646c"))
+	vb.box(Vector3i(0, 29, D - 1), Vector3i(width, 1, 1), Color("5d646c"))
+	vb.box(Vector3i(0, 3, D - 1), Vector3i(width, 1, 1), Color("5d646c"))
 	return vb
 
 
