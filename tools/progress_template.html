@@ -1,0 +1,37 @@
+<title>The Vims Gauntlet</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;800;900&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: a stack of piece panels, each pairing our render beside its reference, with the critic's log under it. */
+:root{--bg:#f3efe7;--card:#fffdf9;--fg:#2b2620;--muted:#7a6f62;--line:#e4dccf;--accent:#2f86e0;--ok:#3aa65a;--no:#d0573f;
+--display:"Nunito",ui-rounded,system-ui,sans-serif;--mono:"JetBrains Mono",ui-monospace,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1b1916;--card:#25221e;--fg:#efe8dd;--muted:#a59a8b;--line:#3a352e;--accent:#5aa5f0;--ok:#5cc47a;--no:#ec7a62;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#1b1916;--card:#25221e;--fg:#efe8dd;--muted:#a59a8b;--line:#3a352e;--accent:#5aa5f0;--ok:#5cc47a;--no:#ec7a62;color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font-family:var(--display);font-weight:600;padding-inline:16px;padding-block:24px 48px}
+main{max-width:1180px;margin:0 auto;display:grid;gap:20px}
+.top{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:end;justify-content:space-between}
+h1{font-weight:900;font-size:clamp(28px,5vw,44px);margin:0;letter-spacing:-.01em;text-wrap:balance}
+.sub{color:var(--muted);margin:4px 0 0;max-width:62ch}
+.stats{display:flex;gap:16px;font-family:var(--mono);font-size:13px;color:var(--muted)}
+.stats b{display:block;font-family:var(--display);font-size:26px;color:var(--fg);font-variant-numeric:tabular-nums}
+.piece{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;display:grid;gap:12px;min-width:0}
+.piece header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+h2{margin:0;font-size:20px;font-weight:800}
+.chip{font-size:12px;font-weight:800;padding:4px 10px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+.chip.lost{color:var(--no);border-color:currentColor}.chip.won{color:var(--ok);border-color:currentColor}.chip.building{color:var(--accent);border-color:currentColor}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:640px){.pair{grid-template-columns:1fr}}
+figure{margin:0;min-width:0}figcaption{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:4px}
+figure img{display:block;width:100%;border-radius:8px;aspect-ratio:1672/941;object-fit:cover;background:var(--line)}
+.empty{aspect-ratio:1672/941;border-radius:8px;border:1px dashed var(--line);display:grid;place-items:center;color:var(--muted)}
+summary{cursor:pointer;color:var(--muted);font-size:14px}summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.log{list-style:none;padding:0;margin:8px 0 0;display:grid;gap:8px}
+.log li{display:grid;grid-template-columns:auto auto 1fr;gap:10px;align-items:start;font-size:14px;font-weight:600;line-height:1.45}
+.log .r{font-family:var(--mono);font-size:12px;color:var(--muted);padding-top:2px}
+.log .w{font-size:11px;font-weight:800;padding:2px 8px;border-radius:6px;color:var(--card)}.w.ok{background:var(--ok)}.w.no{background:var(--no)}
+.log .g{min-width:0;overflow-wrap:anywhere}.log .none{display:block;color:var(--muted)}
+</style>
+<main>
+<div class="top"><div><h1>The Vims gauntlet</h1><p class="sub">Each piece of the voxel life sim is rebuilt round after round until a blind critic picks our render over the reference. Last updated {{STAMP}}.</p></div>
+<div class="stats"><div><b>{{WON}}/{{TOTAL}}</b>pieces won</div><div><b>{{ROUNDS}}</b>verdicts</div></div></div>
+{{CARDS}}
+</main>
