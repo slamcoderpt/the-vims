@@ -59,6 +59,8 @@ static func product(vb: VoxelBuilder, o: Vector3i, kind: String, col: Color, col
 								cc = Color("f6d7a8") if y == 3 else (Color("fbf3e4") if y == 1 else col2)
 							elif y == 0:
 								cc = Kit.shade(col, 0.82)
+							if x == 0:
+								cc = Kit.shade(cc, 0.72)
 						elif x == 0 or x == 3:
 							cc = Kit.shade(col, 0.85)
 						vb.set_v(p, cc)
@@ -147,8 +149,9 @@ static func gondola(length: int, seed: int, kinds: Array, double_sided := false)
 		vb.box(Vector3i(1, y, z0 + 1), Vector3i(length - 2, 1, D - z0 - 1), Kit.wood(WOOD_L, 1, 1))
 		# price strip
 		vb.box(Vector3i(1, y, D - 1), Vector3i(length - 2, 1, 1), Color("fbf3dc"))
-		for tx in range(3, length - 2, 6):
-			vb.set_v(Vector3i(tx, y, D), Color("f5d03b"))
+		for tx in range(4, length - 2, 12):
+			vb.set_v(Vector3i(tx, y, D - 1), Color("f5d03b"))
+			vb.set_v(Vector3i(tx + 1, y, D - 1), Color("f5d03b"))
 		stock(vb, 1, length - 2, y + 1, D - 1, 7, seed * 7 + li, kinds)
 		if double_sided:
 			var back := VoxelBuilder.new()

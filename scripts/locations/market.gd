@@ -116,11 +116,12 @@ func _stage() -> void:
 	var cam := Vector3(0.3, 0, 7.3)
 	# Jack pushes the cart towards the camera, angled a touch to screen right.
 	var jack := _place("dad", Vector3(-0.35, 0, 0.2), cam + Vector3(2.4, 0, 0), "idle")
-	var fwd := Vector3(sin(jack.rotation.y), 0, cos(jack.rotation.y))
+	var cart_yaw := jack.rotation.y
+	var fwd := Vector3(sin(cart_yaw), 0, cos(cart_yaw))
 	_cart.position = jack.position + fwd * 0.42
-	_cart.rotation.y = jack.rotation.y
+	_cart.rotation.y = cart_yaw
 	var dog := _place("beagle", _cart.position + fwd * 0.45 + Vector3(0, 13 * P * 1.2, 0), cam + Vector3(-1.5, 0, 0), "sit")
-	dog.rotation.y = jack.rotation.y + 0.35
+	dog.rotation.y = cart_yaw + 0.35
 	# The "type" pose turns the head ~0.9 rad to the sim's left, so the
 	# girls' bodies are turned the other way to keep their faces on camera.
 	var lily := _place("bunny_girl", Vector3(-1.35, 0, 0.55), cam, "stand_type")
@@ -133,8 +134,11 @@ func _stage() -> void:
 	_place("npc_2", Vector3(-0.85, 0, -2.4), Vector3(-2.6, 0, -3.4), "idle")
 	_place("npc_5", Vector3(0.7, 0, -5.5), Vector3(1.0, 0, -9.0), "idle")
 	_place("npc_4", Vector3(-0.4, 0, -3.9), Vector3(-0.4, 0, -9.0), "idle")
-	_place("npc_0", Vector3(1.95, 0, -3.6), Vector3(3.0, 0, -3.8), "stand_read")
+	_place("npc_0", Vector3(1.55, 0, -3.25), Vector3(3.0, 0, -4.4), "stand_read")
 	_place("npc_6", Vector3(-3.4, 0, -6.4), Vector3(-6.0, 0, -6.2), "idle")
+	_hold(actors["npc_4"], "basket")
+	_hold(actors["npc_2"], "basket")
+	_hold(actors["npc_6"], "basket")
 
 
 ## Give an actor a hand-held voxel item (attached to the right forearm).
@@ -175,6 +179,26 @@ func _hold(a: SimActor, what: String) -> void:
 			mi.mesh = Kit.mesh(vb, 0.036, Vector3(4, 5.5, 0))
 			mi.position = Vector3(ax, hand - 0.07, 0.12)
 			mi.rotation = Vector3(PI * 0.5, 0.0, 0.0)
+		"basket":
+			# Red shopping basket hanging from the hand, a few groceries inside.
+			var red := Color("d8322c")
+			for x in 9:
+				for z in 6:
+					for y in 5:
+						var side := x == 0 or x == 8 or z == 0 or z == 5
+						if y == 0 or (side and (y == 4 or (x + z + y) % 2 == 0)):
+							vb.set_v(Vector3i(x, y, z), red if y != 4 else Color("ef4a3c"))
+			vb.box(Vector3i(1, 1, 1), Vector3i(3, 5, 2), Color("fbfbf8"))
+			vb.box(Vector3i(5, 1, 2), Vector3i(3, 4, 3), Color("f6c22c"))
+			vb.set_v(Vector3i(2, 6, 2), Color("2e7de0"))
+			vb.box(Vector3i(5, 5, 2), Vector3i(2, 1, 2), Color("4f9e34"))
+			for y in 4:
+				vb.set_v(Vector3i(4, 5 + y, 0), Color("2a2a2c"))
+				vb.set_v(Vector3i(4, 5 + y, 5), Color("2a2a2c"))
+			for z in 6:
+				vb.set_v(Vector3i(4, 9, z), Color("2a2a2c"))
+			mi.mesh = Kit.mesh(vb, P, Vector3(4.5, 9.5, 3))
+			mi.position = Vector3(ax, hand - 0.02, 0.0)
 	att.add_child(mi)
 
 

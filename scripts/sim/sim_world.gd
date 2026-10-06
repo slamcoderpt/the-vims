@@ -14,6 +14,7 @@ const SimActions := preload("res://scripts/sim/sim_actions.gd")
 const NavConfig := preload("res://scripts/sim/nav_config.gd")
 const BuildMode := preload("res://scripts/sim/build_mode.gd")
 const ShotPresets := preload("res://scripts/core/shot_presets.gd")
+const SimOverlay := preload("res://scripts/sim/ui/sim_overlay.gd")
 
 const TAP_SLOP := 14.0         # px a finger may move and still count as a tap
 const LONG_PRESS := 0.5        # s
@@ -30,6 +31,8 @@ var nav: NavGrid
 var agents: Array = []           # SimAgent, index-aligned with Game.household (null if absent)
 var interactables: Array = []    # Interactable nodes in the location
 var build: Node
+## Gameplay HUD additions (queue strip, mood + moodlets, skills panel).
+var overlay: CanvasLayer
 var _users := {}                 # Interactable -> Array[agent]
 var _menu_ctx: Dictionary = {}
 var _menu_open_at_press := false
@@ -57,6 +60,16 @@ func _ready() -> void:
 	Game.mode_changed.connect(_on_mode)
 	Game.selected_changed.connect(_on_selected)
 	Game.furniture_changed.connect(refresh_interactables)
+	Game.queue_cancel_requested.connect(_on_queue_cancel)
+	overlay = SimOverlay.new()
+	overlay.name = "SimOverlay"
+	overlay.hud = main.hud if main else null
+	add_child(overlay)
+
+
+func _on_queue_cancel(i: int, slot: int) -> void:
+	if i >= 0 and i < agents.size() and agents[i] != null:
+		agents[i].cancel_slot(slot)
 
 
 # =================================================================== binding
@@ -195,6 +208,10 @@ func _adopt_staged() -> void:
 		reserve(best, ag)
 		ag._reserved = best
 		ag._bubble(ag.elapsed / maxf(1.0, best_a.get("minutes", 30.0)), true)
+	for ag in agents:
+		if ag:
+			ag._sync_queue()
+			ag.check_needs()
 
 
 static func _flat(a: Vector3, b: Vector3) -> float:
@@ -268,6 +285,8 @@ func _unhandled_input(e: InputEvent) -> void:
 
 ## Is a (non click-through) HUD control under this point?
 func _over_hud(p: Vector2) -> bool:
+	if overlay and overlay.has_method("hit") and overlay.hit(p):
+		return true
 	if hud == null:
 		return false
 	var root = hud.get("root")
@@ -486,14 +505,14 @@ func _on_action_chosen(title: String, action: Dictionary) -> void:
 			var sel = selected_agent()
 			var it = ctx.get("target")
 			if sel != null and it != null and is_instance_valid(it):
-				sel.command({"action": action, "target": it})
-				stats.orders += 1
+				if sel.command({"action": action, "target": it}):
+					stats.orders += 1
 		"social":
 			var sel = selected_agent()
 			var other = ctx.get("other")
 			if sel != null and other != null:
-				sel.command({"action": action, "other": other})
-				stats.orders += 1
+				if sel.command({"action": action, "other": other}):
+					stats.orders += 1
 		"self":
 			var sel = selected_agent()
 			if sel == null:
@@ -789,6 +808,34 @@ func choose_autonomous(ag) -> Dictionary:
 			best = {"action": {"id": "go_here", "label": "Wander", "minutes": 0.0}, "point": target}
 	if not best.is_empty():
 		stats.autonomous += 1
+	return best
+
+
+## Best way to fix one need right now (used when a need hits zero). Money is
+## allowed when affordable; distance matters less than in normal free will.
+func choose_for_need(ag, need: String) -> Dictionary:
+	var best: Dictionary = {}
+	var bs := -INF
+	var p: Vector3 = ag.actor.global_position
+	for it in interactables:
+		if not is_instance_valid(it):
+			continue
+		var u = user_of(it)
+		if u != null and u != ag and not shareable(it):
+			continue
+		var wp: Vector3 = it.world_use_spot() if it.use_spot != Vector3.ZERO else it.global_position
+		var dist := _flat(wp, p) + absf(wp.y - p.y) * 3.0
+		for a in SimActions.actions_for(it, ag.member):
+			var gain := float(a.get("needs", {}).get(need, 0.0))
+			if gain <= 0.0:
+				continue
+			var cost := -int(a.get("money", 0))
+			if cost > 0 and not Game.can_afford(cost):
+				continue
+			var s := gain * 2.0 - dist * 0.02 - float(a.get("minutes", 30.0)) / 600.0
+			if s > bs:
+				bs = s
+				best = {"action": a, "target": it}
 	return best
 
 

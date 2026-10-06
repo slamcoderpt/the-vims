@@ -13,7 +13,31 @@ const SimActions := preload("res://scripts/sim/sim_actions.gd")
 ## Idle in-game minutes before free will kicks in.
 const AUTONOMY_AFTER := 8.0
 const SKILL_CHIP_EVERY := 15.0   # in-game minutes between "+ Skill" chips
-const MAX_QUEUE := 3
+const MAX_QUEUE := 5
+## Faster free will when a need is getting low.
+const AUTONOMY_URGENT_AFTER := 1.5
+## How often (in-game minutes) needs are checked for moodlets / consequences.
+const NEED_CHECK_EVERY := 2.0
+
+## Need -> [mild moodlet, strong moodlet]: [id, label, icon, mood delta, below].
+## Strong ones last until the need recovers past RECOVER.
+const NEED_MOODLETS := {
+	"hunger": [["hungry", "Hungry", "need_hunger", -12.0, 0.25], ["starving", "Starving", "need_hunger", -35.0, 0.08]],
+	"energy": [["tired", "Tired", "need_energy", -12.0, 0.25], ["exhausted", "Exhausted", "need_energy", -30.0, 0.08]],
+	"fun": [["bored", "Bored", "need_fun", -10.0, 0.25], ["very_bored", "Very Bored", "need_fun", -25.0, 0.08]],
+	"hygiene": [["smelly", "Smelly", "need_hygiene", -10.0, 0.25], ["disgusting", "Disgusting", "need_hygiene", -25.0, 0.08]],
+	"social": [["lonely", "Lonely", "need_social", -10.0, 0.25], ["very_lonely", "Very Lonely", "need_social", -25.0, 0.08]],
+	"bladder": [["gotta_go", "Gotta Go", "need_bladder", -12.0, 0.25], ["desperate", "Desperate", "need_bladder", -30.0, 0.08]],
+}
+const RECOVER := 0.3
+const WARN_BELOW := 0.15
+## Spoken when a player order is refused because of a critical need.
+const REFUSE_TEXT := {"hunger": "Too hungry...", "energy": "Too tired...", "fun": "So bored...",
+	"hygiene": "I need a wash!", "social": "So lonely...", "bladder": "Gotta go!"}
+const WARN_TEXT := {"hunger": "%s is hungry", "energy": "%s is exhausted", "fun": "%s is bored",
+	"hygiene": "%s needs a wash", "social": "%s is lonely", "bladder": "%s needs the toilet"}
+const PASS_OUT := {"id": "pass_out", "label": "Passed Out", "icon": "zzz", "minutes": 90.0, "pose": "sleep",
+	"needs": {"energy": 0.35}}
 
 var index := -1
 var member: Dictionary
@@ -43,6 +67,13 @@ var _skill_t := 0.0
 var _thought_t := 4.0
 var _reserved: Node = null
 var _social_partner = null
+var _need_acc := 0.0
+var _warned := {}
+var _force_cool := 0.0
+## Money from the last paid action (mood scales pay).
+var last_pay := 0
+var refused := 0
+var forced := 0
 
 
 func setup(p_world, i: int, p_actor: Node3D) -> void:
@@ -70,16 +101,39 @@ func is_busy() -> bool:
 
 ## Player (or autonomy) asks for something. Player orders replace autonomous
 ## ones and the current action; up to MAX_QUEUE player orders queue behind.
-func command(o: Dictionary, replace := true) -> void:
-	if replace:
-		queue.clear()
-		if phase != "idle":
-			cancel_current()
+## Sims 3 style: player orders queue up behind each other (up to MAX_QUEUE)
+## and push out anything free will had planned; with replace the queue is
+## cleared first. Returns false when the sim refuses (critical need, passed out).
+func command(o: Dictionary, replace := false) -> bool:
+	var a: Dictionary = o.get("action", {})
+	var auto: bool = o.get("auto", false)
+	if not auto:
+		var why := refuse_reason(a)
+		if why != "":
+			refused += 1
+			_say(why, "dots")
+			Game.show_bubble(actor, {"kind": "thought", "icon": SimActions.need_icon(_critical_need(), kind), "id": "thought", "ttl": 2.5})
+			Game.notify.emit("%s won't %s: %s" % [display_name(), str(a.get("label", "do that")).to_lower(), why.trim_suffix("...").trim_suffix("!").to_lower()], "dots")
+			return false
+		# Player orders replace autonomous plans.
+		for k in range(queue.size() - 1, -1, -1):
+			if queue[k].get("auto", false):
+				queue.remove_at(k)
+		if replace:
+			queue.clear()
+		if phase != "idle" and (replace or order.get("auto", false)) and not order.get("forced", false):
+			queue.append(o)
+			cancel_current()   # starts the next one
+			_sync_queue()
+			return true
 	if queue.size() >= MAX_QUEUE:
 		queue.pop_back()
 	queue.append(o)
 	if phase == "idle":
 		_next()
+	else:
+		_sync_queue()
+	return true
 
 
 func cancel_current() -> void:
@@ -91,6 +145,78 @@ func cancel_current() -> void:
 func cancel_all() -> void:
 	queue.clear()
 	cancel_current()
+	_sync_queue()
+
+
+## Cancel one slot of the queue strip (0 = the action in progress).
+func cancel_slot(slot: int) -> void:
+	var has_cur := not order.is_empty() and phase != "idle"
+	if has_cur and slot == 0:
+		if order.get("forced", false):
+			_say("Can't stop now!", "dots")
+			return
+		cancel_current()
+	else:
+		var qi := slot - (1 if has_cur else 0)
+		if qi >= 0 and qi < queue.size():
+			queue.remove_at(qi)
+	_sync_queue()
+
+
+## Why this sim would refuse a player order right now ("" = it won't).
+func refuse_reason(a: Dictionary) -> String:
+	if order.get("forced", false) and phase == "act" and order.get("action", {}).get("id", "") == "pass_out":
+		return "Zzz..."
+	if a.get("id", "") in ["go_here", "cancel"]:
+		return ""
+	var crit := _critical_need()
+	if crit == "":
+		return ""
+	var eff: Dictionary = a.get("needs", {})
+	# Anything that helps any critical need is fine.
+	for k in member.needs:
+		if member.needs[k] < 0.08 and float(eff.get(k, 0.0)) > 0.0:
+			return ""
+		if member.needs[k] < 0.08 and k == "social" and a.has("social"):
+			return ""
+	return REFUSE_TEXT.get(crit, "I can't...")
+
+
+func _critical_need() -> String:
+	var best := ""
+	var bv := 0.08
+	for k in member.needs:
+		if member.needs[k] < bv:
+			bv = member.needs[k]
+			best = k
+	return best
+
+
+## What the queue strip shows (slot 0 = current action).
+func _sync_queue() -> void:
+	var view: Array = []
+	if not order.is_empty() and phase != "idle":
+		var a: Dictionary = order.get("action", {})
+		view.append({"label": a.get("label", ""), "icon": _queue_icon(a), "progress": _progress(),
+			"auto": order.get("auto", false), "current": true, "forced": order.get("forced", false)})
+	for o in queue:
+		var a: Dictionary = o.get("action", {})
+		view.append({"label": a.get("label", ""), "icon": _queue_icon(a), "progress": 0.0,
+			"auto": o.get("auto", false), "current": false, "forced": false})
+	Game.set_queue_view(index, view)
+
+
+static func _queue_icon(a: Dictionary) -> String:
+	var ic: String = a.get("icon", "")
+	if ic == "":
+		return "home" if a.get("id", "") == "go_here" else "star"
+	return ic
+
+
+func _progress() -> float:
+	if phase != "act":
+		return 0.0
+	return clampf(elapsed / maxf(1.0, order.get("action", {}).get("minutes", 30.0)), 0.0, 1.0)
 
 
 func current_label() -> String:
@@ -103,8 +229,10 @@ func _next() -> void:
 	while not queue.is_empty():
 		var o: Dictionary = queue.pop_front()
 		if _start(o):
+			_sync_queue()
 			return
 	idle_minutes = 0.0
+	_sync_queue()
 
 
 func _start(o: Dictionary) -> bool:
@@ -142,6 +270,12 @@ func _start(o: Dictionary) -> bool:
 func tick(delta: float, dm: float) -> void:
 	if actor == null or not is_instance_valid(actor):
 		return
+	if dm > 0.0:
+		_need_acc += dm
+		_force_cool = maxf(0.0, _force_cool - dm)
+		if _need_acc >= NEED_CHECK_EVERY:
+			_need_acc = 0.0
+			check_needs()
 	match phase:
 		"idle":
 			_idle(delta, dm)
@@ -169,7 +303,11 @@ func _idle(delta: float, dm: float) -> void:
 		var low := lowest_need()
 		if low != "" and member.needs[low] < 0.25:
 			Game.show_bubble(actor, {"kind": "thought", "icon": SimActions.need_icon(low, kind), "id": "thought", "ttl": 3.0})
-	if autonomy and idle_minutes >= AUTONOMY_AFTER and dm > 0.0:
+	var wait := AUTONOMY_AFTER
+	var low_need := lowest_need()
+	if low_need != "" and member.needs[low_need] < 0.2:
+		wait = AUTONOMY_URGENT_AFTER
+	if autonomy and idle_minutes >= wait and dm > 0.0:
 		idle_minutes = 0.0
 		var o: Dictionary = world.choose_autonomous(self)
 		if not o.is_empty():
@@ -305,9 +443,15 @@ func _act(dm: float) -> void:
 	for k in eff:
 		Game.change_need(index, k, float(eff[k]) * step / mins)
 	if a.has("skill"):
-		Game.add_skill_xp(index, a.skill, step / 60.0)
+		# A good mood makes practice count for more (0.6x .. 1.4x).
+		var lvl: int = Game.add_skill_xp(index, a.skill, step / 60.0 * Game.mood_mult(index))
 		_skill_t += step
-		if _skill_t >= SKILL_CHIP_EVERY:
+		if lvl > 0:
+			_skill_t = 0.0
+			Game.show_bubble(actor, {"kind": "skill", "text": "%s Lv %d!" % [a.skill, lvl], "icon": "star", "id": "skill", "ttl": 3.5})
+			Game.add_moodlet(index, "learned", "Learned Something", "bulb", 12.0, 4.0, "Reached %s level %d" % [a.skill, lvl])
+			Game.notify.emit("%s reached %s level %d" % [display_name(), a.skill, lvl], skill_icon(a.skill))
+		elif _skill_t >= SKILL_CHIP_EVERY:
 			_skill_t -= SKILL_CHIP_EVERY
 			Game.show_bubble(actor, {"kind": "skill", "text": a.skill, "icon": skill_icon(a.skill), "id": "skill"})
 	if elapsed >= mins - 0.0001:
@@ -320,6 +464,10 @@ func _act(dm: float) -> void:
 func _complete() -> void:
 	var a: Dictionary = order.get("action", {})
 	var m := int(a.get("money", 0))
+	if m > 0:
+		# Mood scales pay: a happy sim works better.
+		m = roundi(m * Game.mood_mult(index))
+	last_pay = m
 	if m != 0:
 		if OS.has_environment("VIMS_PLAYTEST"):
 			print("  money: %s %s %+d (%s)" % [display_name(), a.get("id", ""), m, "auto" if order.get("auto", false) else "player"])
@@ -329,7 +477,10 @@ func _complete() -> void:
 			_say("Can't afford it", "money")
 	# (A dog playing on its own doesn't tick "Play with Dog".)
 	if a.has("task") and not (kind == "dog" and "Dog" in str(a.task)):
-		Game.complete_task_title(a.task)
+		if Game.complete_task_title(a.task):
+			Game.add_moodlet(index, "accomplished", "Accomplished", "trophy", 10.0, 4.0, "Finished \"%s\"" % a.task)
+			Game.notify.emit("Task done: %s" % a.task, "trophy")
+	_positive_moodlets(a, m)
 	# Effects on other household members (feed the dog, pet the dog...).
 	var fx: Dictionary = SimActions.EFFECT_ON_KIND.get(a.get("id", ""), {})
 	for k in fx:
@@ -341,6 +492,8 @@ func _complete() -> void:
 	if other != null and a.has("social"):
 		for need in a.social:
 			Game.change_need(other.index, need, a.social[need])
+		var olab := "Played Together" if (kind == "dog" or other.kind == "dog") else "Good Conversation"
+		Game.add_moodlet(other.index, "good_social", olab, "heart", 8.0, 3.0, "With %s" % display_name())
 		if other.phase == "idle":
 			other.actor.set_pose("idle")
 			other.idle_minutes = 0.0
@@ -386,6 +539,9 @@ func _bubble(p: float, force := false) -> void:
 	_shown_prog = q
 	Game.show_bubble(actor, {"kind": "action", "text": a.get("label", ""), "icon": a.get("icon", ""),
 		"progress": p, "id": "action", "ttl": -1.0})
+	var view: Array = Game.queue_view(index)
+	if not view.is_empty() and view[0].get("current", false):
+		view[0].progress = p
 
 
 func _say(text: String, icon := "") -> void:
@@ -399,3 +555,150 @@ static func skill_icon(skill: String) -> String:
 		"Logic": return "chart"
 		"Cooking": return "cook"
 	return "arrow_up"
+
+
+# =================================================================== mood / consequences
+
+## Positive moodlets for a finished action.
+func _positive_moodlets(a: Dictionary, money: int) -> void:
+	var id: String = a.get("id", "")
+	var eff: Dictionary = a.get("needs", {})
+	if id == "pass_out":
+		return
+	if id == "sleep" and float(member.needs.get("energy", 0.0)) >= 0.8:
+		Game.add_moodlet(index, "well_rested", "Well Rested", "need_energy", 15.0, 8.0, "A full night's sleep")
+	elif float(eff.get("energy", 0.0)) >= 0.25:
+		Game.add_moodlet(index, "refreshed", "Refreshed", "zzz", 6.0, 3.0, "A nice nap")
+	var hunger := float(eff.get("hunger", 0.0))
+	if hunger >= 0.5:
+		if kind == "dog":
+			Game.add_moodlet(index, "good_meal", "Tasty Kibble", "bone", 10.0, 4.0)
+		elif a.has("skill") and "Cook" in str(a.skill):
+			Game.add_moodlet(index, "good_meal", "Delicious Meal", "cook", 12.0, 4.0, "Home cooking")
+		else:
+			Game.add_moodlet(index, "good_meal", "Good Meal", "plate", 8.0, 4.0)
+	if float(eff.get("fun", 0.0)) >= 0.15:
+		Game.add_moodlet(index, "had_fun", "Had Fun", "need_fun", 10.0, 3.0, a.get("label", ""))
+	if float(eff.get("hygiene", 0.0)) >= 0.5:
+		Game.add_moodlet(index, "clean", "Squeaky Clean", "need_hygiene", 8.0, 4.0)
+	if a.has("social"):
+		var lab := "Played Together" if kind == "dog" else "Good Conversation"
+		Game.add_moodlet(index, "good_social", lab, "heart", 10.0, 3.0)
+	if money < 0 and id == "bills":
+		Game.add_moodlet(index, "bills_paid", "Bills Paid", "bill", 6.0, 6.0, "One less worry")
+	elif money > 0:
+		Game.add_moodlet(index, "productive", "Productive", "work", 6.0, 4.0, "Earned $%d" % money)
+	# Effects on the dog (fed / petted by family).
+	if id in ["feed_dog", "pet", "s_pet", "fetch", "s_fetch"]:
+		for i in Game.household.size():
+			if Game.household[i].get("kind", "") == "dog" and i != index:
+				if id == "feed_dog":
+					Game.add_moodlet(i, "good_meal", "Tasty Kibble", "bone", 10.0, 4.0)
+				else:
+					Game.add_moodlet(i, "belly_rubs", "Belly Rubs", "paw", 12.0, 3.0, "Loved by %s" % display_name())
+
+
+## Needs -> moodlets, warnings and (at zero) forced consequences.
+func check_needs() -> void:
+	var needs: Dictionary = member.needs
+	for k in needs:
+		var v: float = needs[k]
+		var spec: Array = NEED_MOODLETS.get(k, [])
+		if spec.size() == 2:
+			var mild: Array = spec[0]
+			var strong: Array = spec[1]
+			var mild_icon: String = SimActions.need_icon(k, kind)
+			if v < strong[4]:
+				Game.remove_moodlet(index, mild[0])
+				Game.add_moodlet(index, strong[0], strong[1], mild_icon, strong[3], 0.0)
+			elif v < mild[4]:
+				Game.remove_moodlet(index, strong[0])
+				Game.add_moodlet(index, mild[0], mild[1], mild_icon, mild[3], 0.0)
+			elif v > RECOVER:
+				Game.remove_moodlet(index, strong[0])
+				Game.remove_moodlet(index, mild[0])
+		# Warning toast once per dip.
+		if v < WARN_BELOW and not _warned.get(k, false):
+			_warned[k] = true
+			Game.notify.emit(WARN_TEXT.get(k, "%s needs attention") % display_name(), SimActions.need_icon(k, kind))
+			Game.show_bubble(actor, {"kind": "thought", "icon": SimActions.need_icon(k, kind), "id": "thought", "ttl": 3.0})
+		elif v > RECOVER:
+			_warned[k] = false
+	if _force_cool > 0.0:
+		return
+	# Consequences at zero.
+	if needs.has("energy") and needs.energy <= 0.0 and kind != "dog" and not _doing_need("energy"):
+		pass_out()
+	elif needs.has("bladder") and needs.bladder <= 0.0:
+		accident()
+	elif needs.has("hunger") and needs.hunger <= 0.02 and not _doing_need("hunger") and phase != "walk":
+		_force_need("hunger")
+	elif kind == "dog" and needs.has("energy") and needs.energy <= 0.0 and not _doing_need("energy"):
+		_force_need("energy")
+
+
+func _doing_need(need: String) -> bool:
+	return not order.is_empty() and float(order.get("action", {}).get("needs", {}).get(need, 0.0)) > 0.0
+
+
+## Energy hit zero: drop everything and fall asleep on the spot.
+func pass_out() -> void:
+	forced += 1
+	_force_cool = 60.0
+	queue.clear()
+	if phase != "idle":
+		var keep := queue
+		_end(false)
+		queue = keep
+	if _reserved != null:
+		world.release(_reserved, self)
+		_reserved = null
+	order = {"action": PASS_OUT, "auto": true, "forced": true}
+	spot = actor.global_position
+	phase = "act"
+	elapsed = 0.0
+	_shown_prog = -1
+	actor.set("lie_height", 0.06)
+	actor.set_pose("sleep")
+	Game.add_moodlet(index, "passed_out", "Passed Out", "zzz", -25.0, 6.0, "Collapsed from exhaustion")
+	Game.notify.emit("%s passed out from exhaustion!" % display_name(), "zzz")
+	_bubble(0.0, true)
+	_sync_queue()
+
+
+## Bladder hit zero: an accident (hygiene crash, embarrassment).
+func accident() -> void:
+	forced += 1
+	_force_cool = 30.0
+	cancel_all()
+	Game.change_need(index, "bladder", 1.0)
+	Game.remove_moodlet(index, "desperate")
+	Game.remove_moodlet(index, "gotta_go")
+	if member.needs.has("hygiene"):
+		member.needs.hygiene = 0.02
+	Game.add_moodlet(index, "embarrassed", "Embarrassed", "need_bladder", -30.0, 4.0, "Had an accident")
+	_say("Oh no!", "need_bladder")
+	Game.notify.emit("%s had an accident!" % display_name(), "need_bladder")
+	Game.needs_changed.emit(index)
+
+
+## Starving (or a dog out of energy): free will takes over whatever the
+## player queued and fixes the need first.
+func _force_need(need: String) -> void:
+	var o: Dictionary = world.choose_for_need(self, need)
+	if o.is_empty():
+		return
+	forced += 1
+	_force_cool = 45.0
+	o["auto"] = true
+	o["forced"] = true
+	var keep: Array = queue.filter(func(q): return not q.get("auto", false))
+	queue.clear()
+	if phase != "idle":
+		_end(false)
+	queue = keep
+	queue.push_front(o)
+	_say(REFUSE_TEXT.get(need, "..."), SimActions.need_icon(need, kind))
+	Game.notify.emit(WARN_TEXT.get(need, "%s needs attention") % display_name() + "!", SimActions.need_icon(need, kind))
+	if phase == "idle":
+		_next()

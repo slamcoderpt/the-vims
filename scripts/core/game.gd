@@ -28,6 +28,15 @@ signal needs_changed(index: int)
 signal notify(text: String, icon: String)
 ## A placed (bought) object was added / moved / sold in the current location.
 signal furniture_changed
+## Overall mood of member index changed (value -100..100, see mood_band()).
+signal mood_changed(index: int, mood: float)
+## A moodlet was added / removed / expired for member index.
+signal moodlets_changed(index: int)
+## The visible action queue of member index changed (see queue_view()).
+signal queue_changed(index: int)
+## UI asks gameplay to cancel slot `slot` of member index's action queue
+## (slot 0 = the action in progress).
+signal queue_cancel_requested(index: int, slot: int)
 
 const DAY_NAMES := ["Mon.", "Tue.", "Wed.", "Thu.", "Fri.", "Sat.", "Sun."]
 const SEASONS := ["Spring", "Summer", "Autumn", "Winter"]
@@ -69,8 +78,18 @@ var live := false
 ## Need decay per in-game hour (default for unknown needs: NEED_DECAY_DEFAULT).
 const NEED_DECAY := {"hunger": 0.055, "energy": 0.04, "fun": 0.05, "hygiene": 0.035, "social": 0.04, "bladder": 0.08}
 const NEED_DECAY_DEFAULT := 0.04
-## Skill XP needed per level (in-game hours of practice per level grows a bit).
-const SKILL_HOURS_PER_LEVEL := 1.0
+## Skill XP: in-game hours of practice for level 0->1; each level needs
+## SKILL_LEVEL_GROWTH more (level 9->10 takes ~5.5x as long as 0->1).
+const SKILL_HOURS_PER_LEVEL := 3.0
+const SKILL_LEVEL_GROWTH := 0.5
+## Skill names shown in the skills panel (order) and their icons.
+const SKILL_ICONS := {"Logic": "chart", "Creativity": "palette", "Music": "music", "Cooking": "cook",
+	"Writing": "pencil", "Fitness": "ball", "Charisma": "chat", "Fetch": "ball"}
+## Mood bands (value -100..100): >= MOOD_GOOD green, <= MOOD_BAD red, else yellow.
+const MOOD_GOOD := 12.0
+const MOOD_BAD := -12.0
+const MOOD_COLORS := {"good": Color("4fd34a"), "okay": Color("f2c230"), "bad": Color("ee4a3c")}
+const MOOD_WORDS := {"good": "Happy", "okay": "Fine", "bad": "Upset"}
 const LOCATIONS := ["home", "backyard", "festival", "market"]
 const LOCATION_NAMES := {"home": "Home", "backyard": "Backyard BBQ", "festival": "Autumn Festival", "market": "Grocery Market"}
 ## Per-location task lists (kept when you travel away and back).
@@ -78,6 +97,7 @@ var location_tasks := {}
 ## Bought furniture per location: Array of {uid, item, pos: Vector3, rot: int}.
 var placed := {}
 var _uid := 0
+var _mood_acc := 0.0
 
 
 func _ready() -> void:
@@ -88,18 +108,33 @@ func _default_household() -> void:
 	household = [
 		{"name": "Jack", "kind": "adult", "look": "dad",
 		 "needs": {"fun": 0.85, "hunger": 0.45, "hygiene": 0.6, "energy": 0.55, "social": 0.35},
-		 "skills": {}},
+		 "skills": {"Logic": 3.4, "Cooking": 2.15, "Writing": 1.3}},
 		{"name": "Lily", "kind": "child", "look": "bunny_girl",
 		 "needs": {"fun": 0.75, "hunger": 0.5, "hygiene": 0.55, "energy": 0.6},
-		 "skills": {}},
+		 "skills": {"Creativity": 2.6, "Logic": 0.45}},
 		{"name": "Maya", "kind": "child", "look": "cat_girl",
 		 "needs": {"fun": 0.7, "hunger": 0.75, "energy": 0.4},
-		 "skills": {}},
+		 "skills": {"Creativity": 0.7}},
 		{"name": "Biscuit", "kind": "dog", "look": "beagle",
 		 "needs": {"fun": 0.75, "hunger": 0.4},
-		 "skills": {}},
+		 "skills": {"Fetch": 1.2}},
 	]
+	for i in household.size():
+		_ensure_member(household[i])
+		_recompute_mood(i, false)
 	household_changed.emit()
+
+
+## Mood / queue fields every member dictionary carries.
+func _ensure_member(m: Dictionary) -> void:
+	if not m.has("moodlets"):
+		m["moodlets"] = []
+	if not m.has("mood"):
+		m["mood"] = 0.0
+	if not m.has("queue_view"):
+		m["queue_view"] = []
+	if not m.has("skills"):
+		m["skills"] = {}
 
 
 func set_tasks(list: Array) -> void:
@@ -173,18 +208,198 @@ func skill_level(i: int, skill: String) -> float:
 	return float(household[i].skills.get(skill, 0.0))
 
 
-## Practise a skill for `hours` in-game hours. Emits skill_changed on level up.
-func add_skill_xp(i: int, skill: String, hours: float) -> void:
+## Practise a skill for `hours` in-game hours (callers scale by mood_mult()).
+## Emits skill_changed and returns the new level on a level up, else 0.
+func add_skill_xp(i: int, skill: String, hours: float) -> int:
 	if i < 0 or i >= household.size() or skill == "":
-		return
+		return 0
 	var sk: Dictionary = household[i].skills
 	var before: float = sk.get(skill, 0.0)
 	var lvl := floorf(before)
-	var gain := hours / (SKILL_HOURS_PER_LEVEL * (1.0 + lvl * 0.35))
-	var after := minf(10.0, before + gain)
+	if lvl >= 10.0:
+		return 0
+	var gain := hours / skill_hours_for_level(int(lvl))
+	# Never jump more than one level in one call.
+	var after := minf(minf(10.0, lvl + 1.0), before + gain)
 	sk[skill] = after
 	if floorf(after) > lvl:
 		skill_changed.emit(i, skill, int(floorf(after)))
+		return int(floorf(after))
+	return 0
+
+
+## In-game hours of practice needed to go from `level` to level + 1.
+func skill_hours_for_level(level: int) -> float:
+	return SKILL_HOURS_PER_LEVEL * (1.0 + level * SKILL_LEVEL_GROWTH)
+
+
+## [{name, level (int), frac (0..1 toward next), icon}] sorted by level.
+func skills_list(i: int) -> Array:
+	var out: Array = []
+	if i < 0 or i >= household.size():
+		return out
+	var sk: Dictionary = household[i].skills
+	for k in sk:
+		var v: float = sk[k]
+		out.append({"name": k, "level": int(floorf(v)), "frac": v - floorf(v), "icon": SKILL_ICONS.get(k, "star")})
+	out.sort_custom(func(a, b): return a.level + a.frac > b.level + b.frac)
+	return out
+
+
+# =================================================================== mood
+
+## Absolute in-game minutes since Monday 00:00 of week 0 (for moodlet expiry).
+func total_minutes() -> float:
+	return day * 1440.0 + minutes
+
+
+## Add (or refresh) a moodlet. delta: mood points (+/-), hours: how long it lasts
+## (<= 0 = until removed). Returns true when it is new.
+func add_moodlet(i: int, id: String, label: String, icon: String, delta: float, hours: float, desc := "") -> bool:
+	if i < 0 or i >= household.size():
+		return false
+	_ensure_member(household[i])
+	var list: Array = household[i].moodlets
+	var until := total_minutes() + hours * 60.0 if hours > 0.0 else INF
+	for ml in list:
+		if ml.id == id:
+			ml.expires = maxf(ml.expires, until)
+			if absf(ml.delta - delta) > 0.01 or ml.label != label:
+				ml.delta = delta
+				ml.label = label
+				ml.icon = icon
+				_recompute_mood(i, true)
+				moodlets_changed.emit(i)
+			return false
+	list.append({"id": id, "icon": icon, "label": label, "delta": delta, "expires": until,
+		"desc": desc, "added": total_minutes()})
+	_recompute_mood(i, true)
+	moodlets_changed.emit(i)
+	return true
+
+
+func remove_moodlet(i: int, id: String) -> bool:
+	if i < 0 or i >= household.size():
+		return false
+	var list: Array = household[i].get("moodlets", [])
+	for k in list.size():
+		if list[k].id == id:
+			list.remove_at(k)
+			_recompute_mood(i, true)
+			moodlets_changed.emit(i)
+			return true
+	return false
+
+
+func has_moodlet(i: int, id: String) -> bool:
+	if i < 0 or i >= household.size():
+		return false
+	for ml in household[i].get("moodlets", []):
+		if ml.id == id:
+			return true
+	return false
+
+
+## Moodlets of member i, strongest first.
+func moodlets(i: int) -> Array:
+	if i < 0 or i >= household.size():
+		return []
+	var list: Array = household[i].get("moodlets", []).duplicate()
+	list.sort_custom(func(a, b): return absf(a.delta) > absf(b.delta))
+	return list
+
+
+## Overall mood -100..100: the needs (average around the middle) plus moodlets.
+func mood(i: int) -> float:
+	if i < 0 or i >= household.size():
+		return 0.0
+	return float(household[i].get("mood", 0.0))
+
+
+func mood_band(i: int) -> String:
+	var m := mood(i)
+	if m >= MOOD_GOOD:
+		return "good"
+	if m <= MOOD_BAD:
+		return "bad"
+	return "okay"
+
+
+func mood_color(i: int) -> Color:
+	return MOOD_COLORS[mood_band(i)]
+
+
+func mood_word(i: int) -> String:
+	var m := mood(i)
+	if m >= 45.0:
+		return "Very Happy"
+	if m <= -45.0:
+		return "Miserable"
+	return MOOD_WORDS[mood_band(i)]
+
+
+## Multiplier for skill gain and work pay: 0.6 (miserable) .. 1.4 (very happy).
+func mood_mult(i: int) -> float:
+	return clampf(1.0 + mood(i) / 125.0, 0.6, 1.4)
+
+
+func _recompute_mood(i: int, emit: bool) -> void:
+	var m: Dictionary = household[i]
+	var needs: Dictionary = m.get("needs", {})
+	var sum := 0.0
+	for k in needs:
+		sum += needs[k]
+	var v := 0.0
+	if not needs.is_empty():
+		v = (sum / needs.size() - 0.5) * 50.0
+	for ml in m.get("moodlets", []):
+		v += ml.delta
+	v = clampf(v, -100.0, 100.0)
+	var old: float = m.get("mood", 0.0)
+	m["mood"] = v
+	if emit and (absf(old - v) >= 0.5 or _band(old) != _band(v)):
+		mood_changed.emit(i, v)
+
+
+static func _band(v: float) -> String:
+	return "good" if v >= MOOD_GOOD else ("bad" if v <= MOOD_BAD else "okay")
+
+
+## Drop expired moodlets and refresh every member's mood.
+func update_moods() -> void:
+	var now := total_minutes()
+	for i in household.size():
+		var list: Array = household[i].get("moodlets", [])
+		var changed := false
+		for k in range(list.size() - 1, -1, -1):
+			if list[k].expires <= now:
+				list.remove_at(k)
+				changed = true
+		_recompute_mood(i, true)
+		if changed:
+			moodlets_changed.emit(i)
+
+
+# =================================================================== action queue view
+
+## What the selected sim's queue strip shows: [{label, icon, progress, auto,
+## current}] -- slot 0 is the action in progress (if any).
+func queue_view(i: int) -> Array:
+	if i < 0 or i >= household.size():
+		return []
+	return household[i].get("queue_view", [])
+
+
+func set_queue_view(i: int, view: Array) -> void:
+	if i < 0 or i >= household.size():
+		return
+	household[i]["queue_view"] = view
+	queue_changed.emit(i)
+
+
+## UI: the player tapped slot `slot` of member i's queue strip.
+func request_queue_cancel(i: int, slot: int) -> void:
+	queue_cancel_requested.emit(i, slot)
 
 
 ## Go to another lot. main.gd rebuilds the world on location_changed.
@@ -250,6 +465,10 @@ func _process(delta: float) -> void:
 	for s in household:
 		for k in s.needs:
 			s.needs[k] = clampf(s.needs[k] - hours * NEED_DECAY.get(k, NEED_DECAY_DEFAULT), 0.0, 1.0)
+	_mood_acc += dm
+	if _mood_acc >= 2.0:
+		_mood_acc = 0.0
+		update_moods()
 	time_changed.emit(day, minutes)
 
 

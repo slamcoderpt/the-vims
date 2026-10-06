@@ -3,7 +3,7 @@ extends RefCounted
 ## Voxel size 0.15 m: chunky like the reference, cheap enough for phones.
 
 const K := preload("res://scripts/locations/festival/kit.gd")
-const VS := [0.22, 0.22, 0.3]
+const VS := [0.28, 0.26, 0.34]
 
 ## [x, z, height_m, crown_radius_m, palette (0 orange, 1 red, 2 yellow, 3 mixed), group]
 const TREES := [
@@ -11,7 +11,6 @@ const TREES := [
 	[-8.4, -1.0, 4.4, 2.4, 0, 0],
 	[-7.4, -6.8, 5.0, 2.6, 1, 0],
 	[-12.5, -8.5, 5.4, 2.8, 2, 0],
-	[-10.6, 3.4, 4.2, 2.5, 1, 0],
 	# Right edge, behind stalls / stage.
 	[9.6, -2.6, 4.6, 2.5, 2, 1],
 	[10.6, -10.0, 5.2, 2.8, 0, 1],
@@ -20,7 +19,6 @@ const TREES := [
 	[-5.4, -22.0, 6.4, 3.4, 0, 2],
 	[10.5, -19.0, 6.2, 3.0, 1, 2],
 	[8.0, -18.0, 5.6, 2.8, 3, 2],
-	[3.6, -34.0, 6.5, 3.4, 2, 2],
 	[13.5, -14.0, 5.6, 3.0, 2, 2],
 ]
 
@@ -95,7 +93,7 @@ func _tree(vb: VoxelBuilder, occ: Dictionary, vs: float, x: float, z: float, h: 
 			# Sun-lit crown top / sun side, deeper colour underneath.
 			var k := clampf((q.y - lo) / maxf(hi - lo, 1.0), 0.0, 1.0)
 			var side := clampf((float(q.x - cx) * -0.4 + float(q.z - cz) * 0.6) / maxf(rc, 1.0), -1.0, 1.0)
-			c = K.shade(c, 0.74 + 0.34 * k + 0.08 * side + (VoxelBuilder.hash3(q) - 0.5) * 0.08)
+			c = K.shade(c, 0.86 + 0.26 * k + 0.08 * side + (VoxelBuilder.hash3(q) - 0.5) * 0.08)
 			if hh > 0.95:
 				c = Color("f7d46a")
 			return c, 0.4, seed * 13 + bi, occ)

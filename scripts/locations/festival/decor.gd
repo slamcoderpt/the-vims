@@ -113,42 +113,46 @@ func _fountain(parent: Node3D) -> void:
 		return c
 	var water := func(q: Vector3i) -> Color:
 		return Color("7fb8d8") if posmod(q.x + q.z * 3, 7) != 0 else Color("a8d4ea")
-	# Octagon-ish basin.
-	K.cyl(vb, 0, 0, 0, 24.0, 2, stone)
-	K.cyl(vb, 0, 2, 0, 23.0, 8, stone, false, 20.0)
-	K.cyl(vb, 0, 10, 0, 23.5, 1, Color("b4afa4"), false, 19.5)
-	K.cyl(vb, 0, 2, 0, 20.0, 5, water)
+	# Chunky tiered fountain: wide basin, thick pedestal, two bowls.
+	K.cyl(vb, 0, 0, 0, 26.0, 2, stone)
+	K.cyl(vb, 0, 2, 0, 25.0, 9, stone, false, 21.0)
+	K.cyl(vb, 0, 11, 0, 25.5, 2, Color("b4afa4"), false, 20.5)
+	K.cyl(vb, 0, 2, 0, 21.0, 7, water)
 	# Pedestal and middle bowl.
-	K.cyl(vb, 0, 7, 0, 4.5, 16, stone)
-	K.cyl(vb, 0, 23, 0, 8.0, 2, stone)
-	K.cyl(vb, 0, 25, 0, 11.0, 3, stone, false, 9.0)
-	K.cyl(vb, 0, 25, 0, 9.0, 2, water)
+	K.cyl(vb, 0, 9, 0, 6.0, 4, stone)
+	K.cyl(vb, 0, 13, 0, 4.5, 14, stone)
+	K.cyl(vb, 0, 27, 0, 7.0, 2, stone)
+	K.cyl(vb, 0, 29, 0, 12.5, 4, stone, false, 10.0)
+	K.cyl(vb, 0, 29, 0, 10.0, 3, water)
+	K.cyl(vb, 0, 33, 0, 12.8, 1, Color("b4afa4"), false, 10.5)
 	# Upper column + top bowl + finial.
-	K.cyl(vb, 0, 28, 0, 2.5, 10, stone)
-	K.cyl(vb, 0, 38, 0, 6.0, 2, stone, false, 4.0)
-	K.cyl(vb, 0, 38, 0, 4.0, 1, water)
-	K.cyl(vb, 0, 40, 0, 1.5, 5, stone)
-	K.cyl(vb, 0, 45, 0, 2.5, 2, Color("b4afa4"))
-	# Water streams falling from the bowls.
-	for a in 8:
-		var ang := TAU * a / 8.0
-		for r in [10.5, 5.5]:
+	K.cyl(vb, 0, 32, 0, 3.0, 10, stone)
+	K.cyl(vb, 0, 42, 0, 7.0, 3, stone, false, 5.0)
+	K.cyl(vb, 0, 42, 0, 5.0, 2, water)
+	K.cyl(vb, 0, 45, 0, 2.0, 5, stone)
+	K.cyl(vb, 0, 50, 0, 3.0, 2, Color("b4afa4"))
+	K.cyl(vb, 0, 52, 0, 1.5, 2, Color("b4afa4"))
+	# Water curtains falling from the bowl rims.
+	for a in 16:
+		var ang := TAU * a / 16.0
+		for r in [12.0, 6.5]:
 			var x := int(round(cos(ang) * r))
 			var z := int(round(sin(ang) * r))
-			var y0 := 27 if r > 6.0 else 39
-			for y in range(5 if r > 6.0 else 26, y0):
-				if K.hs(x, y, z) > 0.25:
-					vb.set_v(Vector3i(x, y, z), Color("bfe4f4"))
+			var y0 := 29 if r > 8.0 else 42
+			for y in range(8 if r > 8.0 else 33, y0):
+				if K.hs(x, y, z) > 0.2:
+					vb.set_v(Vector3i(x, y, z), Color("cfeaf6") if K.hs(z, y, x) > 0.5 else Color("a8d4ea"))
 	# Spray on top.
 	for y in 6:
-		vb.set_v(Vector3i(0, 47 + y, 0), Color("d8f0fa"))
-	vb.set_v(Vector3i(1, 51, 0), Color("d8f0fa"))
-	vb.set_v(Vector3i(-1, 50, 0), Color("d8f0fa"))
+		vb.set_v(Vector3i(0, 54 + y, 0), Color("e0f4fc"))
+	vb.set_v(Vector3i(1, 58, 0), Color("e0f4fc"))
+	vb.set_v(Vector3i(-1, 57, 0), Color("e0f4fc"))
+	vb.set_v(Vector3i(0, 58, 1), Color("e0f4fc"))
 	# Mums and pumpkins around the rim.
 	for a in 6:
 		var ang := TAU * a / 6.0 + 0.3
-		var x := cos(ang) * 28.0
-		var z := sin(ang) * 28.0
+		var x := cos(ang) * 31.0
+		var z := sin(ang) * 31.0
 		if z > 8.0 and absf(x) < 14.0:
 			continue
 		K.mums(vb, x, 0, z, 4.0, a % 3, a)
@@ -207,6 +211,8 @@ func _strings(parent: Node3D) -> void:
 		[L[2], Vector3(-8.4, 4.4, -1.4), 0.4, false],
 		[L[3], Vector3(10.0, 4.8, -6.0), 0.4, true],
 		[Vector3(7.6, 4.4, -4.6), Vector3(11.5, 3.6, 1.0), 0.4, true],
+		[Vector3(4.2, 3.3, -1.2), Vector3(9.6, 3.0, 1.8), 0.35, true],
+		[Vector3(4.2, 3.3, -1.2), Vector3(6.9, 3.4, -4.2), 0.3, true],
 	]
 	for r: Array in runs:
 		_catenary(vb, r[0], r[1], r[2], r[3])
@@ -226,16 +232,19 @@ func _barrel_planter(vb: VoxelBuilder, cx: int, cz: int, r: float, pal: int, see
 
 
 func _ground_lantern(vb: VoxelBuilder, x: int, z: int) -> void:
+	# Iron floor lantern with warm amber glass (reads lit in daylight).
 	var iron := Color("2a2622")
-	K.box(vb, x - 4, 0, z - 4, 8, 2, 8, iron)
-	for c in [Vector2i(-4, -4), Vector2i(3, -4), Vector2i(-4, 3), Vector2i(3, 3)]:
-		K.box(vb, x + c.x, 2, z + c.y, 1, 10, 1, iron)
-	K.box(vb, x - 3, 2, z - 3, 6, 10, 6, Color("ffd27a"), true)
-	K.box(vb, x - 2, 3, z - 2, 4, 6, 4, Color("ffb040"), true)
-	K.box(vb, x - 5, 12, z - 5, 10, 1, 10, iron)
-	K.box(vb, x - 3, 13, z - 3, 6, 2, 6, iron)
-	K.box(vb, x - 1, 15, z - 1, 2, 2, 2, iron)
-	glow_points.append([Vector3(x, 7, z) * U, 1.1, Color(1.0, 0.7, 0.35)])
+	K.box(vb, x - 3, 0, z - 3, 6, 1, 6, iron)
+	for c in [Vector2i(-3, -3), Vector2i(2, -3), Vector2i(-3, 2), Vector2i(2, 2)]:
+		K.box(vb, x + c.x, 1, z + c.y, 1, 9, 1, iron)
+	K.box(vb, x - 2, 1, z - 2, 4, 9, 4, Color("ffb850"), true)
+	K.box(vb, x - 3, 1, z - 2, 6, 9, 4, Color("ffc868"), true)
+	K.box(vb, x - 2, 1, z - 3, 4, 9, 6, Color("ffc060"), true)
+	K.box(vb, x - 3, 5, z - 3, 6, 1, 6, iron)
+	K.box(vb, x - 4, 10, z - 4, 8, 1, 8, iron)
+	K.box(vb, x - 3, 11, z - 3, 6, 1, 6, iron)
+	K.box(vb, x - 1, 12, z - 1, 2, 2, 2, iron)
+	glow_points.append([Vector3(x, 6, z) * U, 1.0, Color(1.0, 0.7, 0.35)])
 
 
 func _picnic_table(vb: VoxelBuilder, x: int, z: int) -> void:
@@ -263,13 +272,14 @@ func _props(parent: Node3D) -> void:
 	var barrels := [
 		[-5.0, 3.9, 0], [-4.1, 4.9, 1], [0.5, 5.7, 2], [-6.3, 1.4, 1],
 		[-2.6, -4.6, 2], [2.2, -10.4, 0], [-4.0, -8.6, 1], [4.8, -6.4, 3], [8.0, -1.0, 2],
+		[-3.0, 4.1, 0], [3.9, 4.5, 2], [-0.6, 4.9, 1],
 	]
 	var i := 0
 	for b: Array in barrels:
 		_barrel_planter(near, int(b[0] * C), int(b[1] * C), 5.0, b[2], i)
 		i += 1
 	# Ground lanterns.
-	for l in [[1.7, 4.4], [-6.0, 4.6], [6.6, 1.6], [1.0, -4.6]]:
+	for l in [[1.5, 3.3], [-6.0, 4.6], [6.6, 1.6], [1.0, -4.6], [3.9, 3.8], [-1.6, 3.9]]:
 		_ground_lantern(near, int(l[0] * C), int(l[1] * C))
 	# Picnic tables.
 	_picnic_table(near, int(2.4 * C), int(-3.2 * C))

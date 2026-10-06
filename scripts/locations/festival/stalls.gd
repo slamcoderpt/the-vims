@@ -20,8 +20,8 @@ var glow_points: Array = []   # [pos, size, color] for halos
 
 
 func build(parent: Node3D) -> void:
-	treats = _place(parent, "TreatsStall", _treats_stall(), Vector3(-3.0, 0, 0.1), 20.0)
-	_sign(treats, "FALL TREATS", Vector3(0.22, 2.66, 0.975), 0.0042, 0.0)
+	treats = _place(parent, "TreatsStall", _treats_stall(), Vector3(-2.75, 0, -0.1), 20.0)
+	_sign(treats, "FALL TREATS", Vector3(0.3, 2.66, 0.975), 0.0034, 0.0)
 	game = _place(parent, "GameStall", _game_stall(), Vector3(1.5, 0, -0.5), -8.0)
 	crafts = _place(parent, "CraftsStall", _crafts_table(), Vector3(5.6, 0, 2.2), -25.0)
 	_place(parent, "RedStall", _side_stall(RED, CREAM, 0), Vector3(6.9, 0, -2.6), -38.0)
@@ -60,7 +60,7 @@ func _extent(vb: VoxelBuilder) -> Vector3:
 
 
 func _sign(n: Node3D, text: String, pos: Vector3, px: float, rot: float) -> void:
-	K.label(n, text, pos, px, Color("fff1d6"), rot, Color("5a2a12"))
+	K.label(n, text, pos, px, Color("5e2410"), rot, Color(0, 0, 0, 0))
 
 
 # ------------------------------------------------------------------ pieces
@@ -167,8 +167,8 @@ func _treats_stall() -> VoxelBuilder:
 	_awning(vb, -1, W + 1, 0, D + 2, 42, 36, RED, CREAM, 4)
 	# Sign board on the awning front (text added as Label3D).
 	K.box(vb, 4, 37, D + 2, W - 8, 11, 1, Color("5a3218"))
-	K.box(vb, 5, 38, D + 3, W - 10, 9, 1, K.wood(Color("8a5530"), 2, 3))
-	K.maple(vb, 6, 39, D + 4, Color("d84a1e"))
+	K.box(vb, 5, 38, D + 3, W - 10, 9, 1, K.wood(Color("e2b47a"), 2, 3))
+	K.maple(vb, 6, 39, D + 4, Color("d0381a"))
 	# Goods on the counter.
 	var top := 16
 	_crate(vb, 2, top, D - 10, 9, 4, 6, [Color("c8281e"), Color("d8361e"), Color("a81e18"), Color("e05a2a")])

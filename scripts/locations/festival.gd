@@ -50,22 +50,25 @@ func build() -> void:
 
 
 func _lights() -> void:
+	# Halos are subtle (they suggest glow without washing the frame out);
+	# street lamps + floor lanterns get the strongest ones.
 	var pts: Array = []
-	pts.append_array(stalls.glow_points)
-	pts.append_array(stage.glow_points)
-	pts.append_array(decor.glow_points)
+	_add_halos(pts, stalls.glow_points, 0.45)
+	_add_halos(pts, stage.glow_points, 0.4)
+	_add_halos(pts, decor.glow_points, 0.65)
 	for w: Vector3 in town.window_glows:
-		pts.append([w, 1.2, Color(1.0, 0.7, 0.35, 0.6)])
-	# Halos are subtle: they suggest glow without washing the frame out.
-	for e: Array in pts:
-		var c: Color = e[2]
-		e[1] = e[1] * 0.8
-		e[2] = Color(c.r * 0.5, c.g * 0.45, c.b * 0.4, c.a)
+		pts.append([w, 1.0, Color(0.4, 0.26, 0.12, 0.6)])
 	halos = K.halos(pts)
 	add_child(halos)
 	# A handful of real lights (each costs an extra pass per lit mesh on GL Compatibility).
 	K.light(self, Vector3(-3.0, 1.9, 2.0), Color(1.0, 0.66, 0.36), 1.4, 4.0, 0.7)
 	K.light(self, stage.node.position + Vector3(0, 3.6, 1.0), Color(1.0, 0.68, 0.4), 1.4, 5.0, 0.6)
+
+
+func _add_halos(out: Array, src: Array, k: float) -> void:
+	for e: Array in src:
+		var c: Color = e[2]
+		out.append([e[0], e[1] * 0.85, Color(c.r * k, c.g * k * 0.92, c.b * k * 0.85, c.a)])
 
 
 func _interactables() -> void:
@@ -137,11 +140,11 @@ func camera_home() -> Dictionary:
 func lighting_profile() -> Dictionary:
 	return {
 		"sun_heading": -32.0, "sun_elev": 34.0, "sun_energy": 1.25,
-		"ambient_day": Color(0.78, 0.74, 0.8), "ambient_energy": 0.5,
+		"ambient_day": Color(0.82, 0.77, 0.8), "ambient_energy": 0.56,
 		"ambient_night": Color(0.42, 0.38, 0.62), "ambient_night_energy": 0.45,
 		"sky_day": Color(0.74, 0.8, 0.92), "sky_night": Color(0.1, 0.1, 0.22),
 		"fog_day": Color(0.86, 0.8, 0.78), "fog_night": Color(0.12, 0.12, 0.26),
-		"fog_density": 0.0012, "exposure": 0.92, "shadow_distance": 45.0,
+		"fog_density": 0.0012, "exposure": 1.0, "shadow_distance": 45.0,
 		"lamp_night_mult": 1.6,
 		"post": {"focus_y": 0.6, "band": 0.24, "falloff": 0.42, "blur_px": 2.6, "top_boost": 0.85,
 			"saturation": 1.14, "contrast": 1.12, "tint": Vector3(1.02, 0.99, 0.95),
@@ -186,3 +189,16 @@ func _print_stats() -> void:
 	print("FESTIVAL_STATS meshes=%d tris=%d draws=%d prims=%d" % [meshes, tris,
 		RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME),
 		RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_PRIMITIVES_IN_FRAME)])
+	# Same frame without the 2D layers (HUD + post), to isolate the 3D cost.
+	var hidden: Array = []
+	for c in get_tree().root.find_children("*", "CanvasLayer", true, false):
+		if c.visible:
+			c.visible = false
+			hidden.append(c)
+	for i in 3:
+		await get_tree().process_frame
+	print("FESTIVAL_STATS_3D draws=%d objects=%d" % [
+		RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME),
+		RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_OBJECTS_IN_FRAME)])
+	for c in hidden:
+		c.visible = true

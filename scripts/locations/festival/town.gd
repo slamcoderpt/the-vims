@@ -43,10 +43,8 @@ func build(parent: Node3D) -> void:
 	_wall_meshes(parent)
 	K.inst(parent, det, VS, Vector3.ZERO, 0.0, true, Vector3.ZERO, "TownDetail")
 	K.inst(parent, roof, 1.0 / R, Vector3.ZERO, 0.0, true, Vector3.ZERO, "TownRoofs")
-	var far := VoxelBuilder.new()
-	far.jitter = 0.0
-	_skyline(far)
-	K.inst(parent, far, 0.5, Vector3.ZERO, 0.0, false, Vector3.ZERO, "Skyline")
+	# (The far skyline row is fully hidden behind the hall + trees from the
+	# festival cameras; skipped to save ~10k triangles on phones.)
 
 
 # ------------------------------------------------------------------ walls

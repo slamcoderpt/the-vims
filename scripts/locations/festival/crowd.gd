@@ -41,7 +41,7 @@ func build(parent: Node3D, stalls, stage) -> void:
 	var cr: Node3D = stalls.crafts
 	spawn(parent, "crafter", "npc_6", cr.transform * Vector3(0.1, 0, -0.85), cr.transform * Vector3(0, 0, 3.0), "talk")
 	# --- Guitarist on stage.
-	var gt := spawn(parent, "guitarist", "npc_1", stage.performer_spot, stage.performer_spot + Vector3(-0.3, 0, 3.0), "stand_type")
+	var gt := spawn(parent, "guitarist", "npc_1", stage.performer_spot, Vector3(0.5, 0, 8.0), "stand_type")
 	_hold(gt, "guitar", "torso")
 	# --- Townsfolk.
 	var folk := [
@@ -52,11 +52,7 @@ func build(parent: Node3D, stalls, stage) -> void:
 		["npc_3", Vector3(-1.2, 0, -2.4), Vector3(-0.2, 0, -2.0), "talk"],
 		["npc_6", Vector3(-0.3, 0, -2.0), Vector3(-1.2, 0, -2.4), "idle"],
 		["npc_4", Vector3(2.6, 0, -5.4), Vector3(2.0, 0, 6.0), "walk"],
-		["npc_2", Vector3(-2.6, 0, -7.2), Vector3(-1.9, 0, -6.4), "talk"],
-		["npc_6", Vector3(-1.9, 0, -6.3), Vector3(-2.6, 0, -7.2), "idle"],
-		["npc_1", Vector3(-3.6, 0, -6.4), Vector3(-1.0, 0, -8.0), "idle"],
 		["npc_3", Vector3(-4.6, 0, -3.8), Vector3(-5.8, 0, -5.4), "idle"],
-		["npc_4", Vector3(1.6, 0, -6.6), Vector3(0.0, 0, -8.4), "idle"],
 	]
 	_far_folk(parent)
 	var i := 1
@@ -91,7 +87,8 @@ func _far_folk(parent: Node3D) -> void:
 	for p in [[-2.2, -9.4, 60], [1.9, -9.0, 300], [-1.4, -11.2, 0], [1.0, -12.0, 90], [-3.2, -12.6, 30],
 			[2.6, -13.4, 0], [-0.2, -14.6, 270], [-4.6, -11.6, 90], [-6.4, -8.0, 0], [-7.2, -11.0, 45],
 			[-5.6, -14.6, 0], [3.8, -15.0, 180], [-2.4, -16.0, 0], [1.6, -16.8, 90], [9.6, -11.6, 270],
-			[-8.4, -6.2, 30], [5.0, -6.8, 330]]:
+			[-8.4, -6.2, 30], [5.0, -6.8, 330],
+			[-2.6, -7.2, 45], [-1.9, -6.3, 225], [-3.6, -6.4, 120], [1.6, -6.6, 200]]:
 		F.add(p[0], p[1], p[2], seed % 5 == 0, seed)
 		seed += 1
 	F.build(parent)

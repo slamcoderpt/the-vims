@@ -8,6 +8,7 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 TEST="${1:-playtest}"; shift || true
 mkdir -p "$ROOT/shots"
+[ "$TEST" = "playtest" ] && rm -f "$ROOT/shots"/playtest_*.png
 LOG="$(mktemp)"
 VIMS_PLAYTEST=1 timeout 600 xvfb-run -a -s "-screen 0 1672x941x24" godot --path "$ROOT" --rendering-driver opengl3 \
   --resolution 1672x941 --audio-driver Dummy -- --playtest="$TEST" --shots="$ROOT/shots" "$@" 2>&1 \

@@ -35,12 +35,12 @@ func _ready() -> void:
 	get_tree().quit(0 if fails == 0 else 1)
 
 
-## Sections can be picked with --only=boot,loop,money,autonomy,clock,gohere,build,travel
+## Sections can be picked with --only=boot,loop,money,mood,queue,autonomy,clock,gohere,build,travel
 func _run() -> void:
 	var only: Array = []
 	if args.has("only"):
 		only = (args.only as String).split(",")
-	for sec in ["boot", "loop", "money", "autonomy", "clock", "gohere", "build", "travel"]:
+	for sec in ["boot", "loop", "money", "mood", "queue", "autonomy", "clock", "gohere", "build", "travel"]:
 		if only.is_empty() or sec in only or sec == "boot":
 			await call("_s_" + sec)
 
@@ -104,6 +104,9 @@ func _s_loop() -> void:
 	var chips := _bubbles.filter(func(d): return d.get("kind", "") == "skill" and "Music" in str(d.get("text", "")))
 	_step("skill_rises", music1 > music0 and chips.size() > 0, "Music %.3f -> %.3f, chips=%d" % [music0, music1, chips.size()])
 	_step("task_completes", _task_done("Build Skill"), "Build Skill done=%s" % str(_task_done("Build Skill")))
+	_step("positive_moodlets", Game.has_moodlet(lily.index, "had_fun") and Game.has_moodlet(lily.index, "accomplished"),
+		"Lily moodlets=%s mood=%.1f (%s)" % [str(Game.moodlets(lily.index).map(func(m): return m.label)), Game.mood(lily.index), Game.mood_band(lily.index)])
+	_step("skill_pace", music1 - music0 < 0.5 and music1 - music0 > 0.05, "45 min of practice = %.2f of a level (x%.2f mood)" % [music1 - music0, Game.mood_mult(lily.index)])
 
 
 
@@ -128,8 +131,153 @@ func _s_money() -> void:
 	await _frames(3)
 	await _choose("Work")
 	await _until(func(): return jack.last_done == "work", 150.0)
-	_step("money_earned", Game.money == money1 + 180, "money %d -> %d, Logic=%.2f" % [money1, Game.money, Game.skill_level(jack.index, "Logic")])
+	_step("money_earned", Game.money == money1 + jack.last_pay and jack.last_pay >= 108 and jack.last_pay <= 252,
+		"money %d -> %d (base pay 180, mood-scaled = %d, mood now %s), Logic=%.2f" % [money1, Game.money, jack.last_pay, Game.mood_word(jack.index), Game.skill_level(jack.index, "Logic")])
 
+
+
+
+func _s_mood() -> void:
+	var maya = _agent("Maya")
+	var jack = _agent("Jack")
+	Game.speed = 1
+	# --- low need -> negative moodlet + mood drops
+	var mood0 := Game.mood(maya.index)
+	maya.member.needs.hunger = 0.2
+	maya.check_needs()
+	Game.update_moods()
+	_step("need_moodlet", Game.has_moodlet(maya.index, "hungry") and Game.mood(maya.index) < mood0,
+		"Maya hunger=0.20 -> %s, mood %.1f -> %.1f" % [str(Game.moodlets(maya.index).map(func(m): return m.label)), mood0, Game.mood(maya.index)])
+	maya.member.needs.hunger = 0.9
+	maya.check_needs()
+	_step("moodlet_clears", not Game.has_moodlet(maya.index, "hungry"), "fed -> hungry moodlet gone")
+
+	# --- mood scales skill gain / pay
+	var good := 0.0
+	var bad := 0.0
+	Game.add_moodlet(jack.index, "t_good", "Test Joy", "star", 60.0, 1.0)
+	good = Game.mood_mult(jack.index)
+	Game.remove_moodlet(jack.index, "t_good")
+	Game.add_moodlet(jack.index, "t_bad", "Test Gloom", "star", -60.0, 1.0)
+	bad = Game.mood_mult(jack.index)
+	var band_bad := Game.mood_band(jack.index)
+	Game.remove_moodlet(jack.index, "t_bad")
+	_step("mood_scales_gain", good > 1.2 and bad < 0.8 and band_bad == "bad", "skill/pay x%.2f happy vs x%.2f upset" % [good, bad])
+
+	# --- critical need -> refuses player orders that don't help
+	jack.cancel_all()
+	Game.selected = jack.index
+	var comp = _find_it("Computer")
+	var e0: float = jack.member.needs.energy
+	jack.member.needs.energy = 0.05
+	var ref0: int = jack.refused
+	_menus.clear()
+	await _tap_world(_it_center(comp))
+	await _frames(3)
+	await _choose("Work")
+	await _frames(2)
+	_step("refuses_when_exhausted", jack.refused == ref0 + 1 and jack.current_label() != "Work", "Jack energy=0.05 -> refused=%d, action='%s'" % [jack.refused - ref0, jack.current_label()])
+
+	# --- energy 0 -> passes out on the spot with a strong negative moodlet
+	# (free will would already have sent him to bed: switch it off for this check)
+	jack.autonomy = false
+	jack.cancel_all()
+	jack._force_cool = 0.0
+	jack.member.needs.energy = 0.0
+	jack.check_needs()
+	await _frames(3)
+	var po: bool = jack.order.get("action", {}).get("id", "") == "pass_out" and jack.actor.pose == "sleep"
+	await _focus(jack.actor.global_position)
+	await _wait(0.4)
+	await _shot("passed_out")
+	_step("pass_out_at_zero", po and Game.has_moodlet(jack.index, "passed_out"),
+		"order=%s pose=%s mood=%.1f (%s)" % [jack.order.get("action", {}).get("id", "-"), jack.actor.pose, Game.mood(jack.index), Game.mood_band(jack.index)])
+	var pb_hue = hud.plumbob.material.get_shader_parameter("hue_shift") if hud and hud.plumbob.material else null
+	_step("plumbob_mood_colour", pb_hue != null, "plumbob hue shift=%s for band %s" % [str(pb_hue), Game.mood_band(jack.index)])
+	jack.cancel_all()
+	jack.autonomy = true
+	jack.member.needs.energy = e0
+	Game.remove_moodlet(jack.index, "passed_out")
+	Game.remove_moodlet(jack.index, "exhausted")
+
+	# --- bladder 0 -> accident
+	jack.member.needs["bladder"] = 0.0
+	jack._force_cool = 0.0
+	jack.check_needs()
+	var acc: bool = Game.has_moodlet(jack.index, "embarrassed") and jack.member.needs.bladder > 0.9
+	jack.member.needs.erase("bladder")
+	Game.remove_moodlet(jack.index, "embarrassed")
+	jack.member.needs.hygiene = 0.6
+	_step("accident_at_zero", acc, "embarrassed moodlet=%s" % str(acc))
+
+	# --- starving -> free will overrides the queue and goes to eat
+	maya.cancel_all()
+	maya.member.needs.hunger = 0.0
+	maya._force_cool = 0.0
+	maya.check_needs()
+	await _frames(2)
+	var eats: bool = maya.order.get("forced", false) and float(maya.order.get("action", {}).get("needs", {}).get("hunger", 0.0)) > 0.0
+	_step("starving_forces_eat", eats and Game.has_moodlet(maya.index, "starving"), "Maya -> '%s' forced=%s" % [maya.current_label(), str(maya.order.get("forced", false))])
+	maya.cancel_all()
+	maya.member.needs.hunger = 0.8
+	maya.check_needs()
+
+
+func _s_queue() -> void:
+	var jack = _agent("Jack")
+	var ov = sim.overlay
+	jack.cancel_all()
+	for k in jack.member.needs:
+		jack.member.needs[k] = maxf(jack.member.needs[k], 0.6)
+	Game.selected = jack.index
+	Game.speed = 1
+	await _frames(2)
+	# Queue three orders through the real menu.
+	var comp = _find_it("Computer")
+	for lab in ["Answer Emails", "Play Games", "Work"]:
+		_menus.clear()
+		await _tap_world(_it_center(comp))
+		await _frames(3)
+		await _choose(lab)
+		await _frames(2)
+	await _wait(0.5)
+	var v: Array = Game.queue_view(jack.index)
+	_step("queue_strip", v.size() == 3 and v[0].current, "queue=%s" % str(v.map(func(q): return q.label)))
+	await _shot("queue")
+	# Tap the 3rd tile (Work) to cancel it.
+	var hit_rect := Rect2()
+	for h in ov._hits:
+		if h[1] == "queue" and int(h[2]) == 2:
+			hit_rect = h[0]
+	if hit_rect.size != Vector2.ZERO:
+		_touch(hit_rect.get_center())
+	await _frames(3)
+	v = Game.queue_view(jack.index)
+	_step("queue_tap_cancel", v.size() == 2 and not v.any(func(q): return q.label == "Work"), "after tap: %s" % str(v.map(func(q): return q.label)))
+	# Tap the current tile: it stops and the next one starts.
+	for h in ov._hits:
+		if h[1] == "queue" and int(h[2]) == 0:
+			_touch((h[0] as Rect2).get_center())
+	await _frames(3)
+	v = Game.queue_view(jack.index)
+	_step("queue_cancel_current", v.size() == 1 and v[0].label == "Play Games", "after tap: %s" % str(v.map(func(q): return q.label)))
+	# Skills tab.
+	for h in ov._hits:
+		if h[1] == "skills":
+			_touch((h[0] as Rect2).get_center())
+	await _frames(3)
+	_step("skills_panel", ov.panel.visible and ov.panel_tab == "skills" and Game.skills_list(jack.index).size() >= 2,
+		"panel=%s tab=%s skills=%s" % [str(ov.panel.visible), ov.panel_tab, str(Game.skills_list(jack.index).map(func(s): return "%s %d" % [s.name, s.level]))])
+	await _shot("skills")
+	for h in ov._hits:
+		if h[1] == "mood":
+			_touch((h[0] as Rect2).get_center())
+			break
+	await _frames(3)
+	_step("mood_panel", ov.panel.visible and ov.panel_tab == "mood", "moodlets=%s" % str(Game.moodlets(jack.index).map(func(m): return "%s %+d" % [m.label, m.delta])))
+	await _shot("mood")
+	ov.panel.visible = false
+	jack.cancel_all()
 
 
 func _s_autonomy() -> void:
@@ -139,6 +287,7 @@ func _s_autonomy() -> void:
 		maya.member.needs[k] = 0.95
 	maya.member.needs.hunger = 0.05
 	maya.idle_minutes = 0.0
+	Game.speed = 3
 	var y0: float = maya.actor.global_position.y
 	var picked := await _until(func(): return maya.phase != "idle" and maya.order.get("action", {}).get("needs", {}).get("hunger", 0.0) > 0.0, 25.0)
 	var act_name: String = maya.current_label()

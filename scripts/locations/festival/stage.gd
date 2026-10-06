@@ -35,6 +35,20 @@ func build(parent: Node3D, pos: Vector3, rot: float) -> void:
 		if p.y > 70 and posmod(p.x, 2) == 0:
 			glow_points.append([xf * ((Vector3(p) + Vector3(0.5, 0.5, 0.5) - origin) * U), 0.45, Color(1.0, 0.75, 0.4)])
 	performer_spot = xf * Vector3(-0.2, DECK * U, 0.35)
+	_notes(node)
+
+
+## Little floating music notes beside the guitarist.
+func _notes(n: Node3D) -> void:
+	var vb := VoxelBuilder.new()
+	vb.jitter = 0.0
+	var note := ["..##", "..#.", "..#.", "###.", "###."]
+	var dbl := ["#####", "#...#", "#...#", "#..##", "##.##", "##..."]
+	K.pattern(vb, note, 0, 0, 0, {"#": Color("fff8ea")})
+	K.pattern(vb, dbl, 7, 6, 0, {"#": Color("fff8ea")})
+	K.pattern(vb, note, 14, 2, 0, {"#": Color("fff8ea")})
+	var mi := K.inst(n, vb, 0.05, Vector3(-1.6, DECK * U + 1.5, 0.9), 0.0, false)
+	mi.name = "MusicNotes"
 
 
 func _deck(vb: VoxelBuilder) -> void:
