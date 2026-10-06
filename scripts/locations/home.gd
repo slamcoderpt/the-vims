@@ -32,8 +32,8 @@ const TRIM := Color("fbf8f1")
 const CAP := Color("2e3450")
 const FOUND := Color("8c8378")
 const W_OFFICE := Color("f0e3cc")
-const W_PINK := Color("f7cbd5")
-const W_BLUE := Color("8fa3d6")
+const W_PINK := Color("f2b9c7")
+const W_BLUE := Color("6f84c4")
 const W_HALL := Color("efe1c6")
 const W_LIVING := Color("e9dcc2")
 const W_KITCHEN := Color("dfe8d6")
@@ -45,8 +45,8 @@ var wall_view := "office"
 var _sb := {}                    # structure groups "zone|sig|part" -> VoxelBuilder
 var _fb := {}                    # furniture builders room -> VoxelBuilder
 var _wall_nodes := {}            # sig -> {part -> Array[MeshInstance3D]}
-var _hood_day: Node3D
-var _hood_night: Node3D
+var _hood_day: MeshInstance3D
+var _hood_night: MeshInstance3D
 var _glass_day: MeshInstance3D
 var _glass_night: MeshInstance3D
 var _moon: MeshInstance3D
@@ -56,6 +56,7 @@ var _auto_view := true
 var _halo_pts := []
 var _halos: MultiMeshInstance3D
 var _blanket: MeshInstance3D
+var _night_tint: Array[MeshInstance3D] = []   # exterior meshes darkened at night
 
 
 # =================================================================== API
@@ -93,13 +94,13 @@ func lighting_profile() -> Dictionary:
 	return {
 		"sun_heading": 205.0, "sun_elev": 36.0, "sun_energy": 1.55,
 		"ambient_day": Color(0.9, 0.88, 0.86), "ambient_energy": 0.72,
-		"ambient_night": Color(0.42, 0.4, 0.62), "ambient_night_energy": 0.34, "lamp_night_mult": 3.2,
+		"ambient_night": Color(0.36, 0.42, 0.64), "ambient_night_energy": 0.34, "lamp_night_mult": 3.2,
 		"sky_day": Color(0.64, 0.8, 0.94), "sky_night": Color(0.07, 0.09, 0.22),
 		"fog_day": Color(0.9, 0.9, 0.88), "fog_night": Color(0.1, 0.12, 0.28), "fog_density": 0.004,
 		"moon_heading": 150.0, "moon_energy": 0.3,
 		"shadow_distance": 40.0,
 		"post_day": {"focus_y": 0.52, "band": 0.24, "falloff": 0.22, "blur_px": 5.0, "top_boost": 1.2},
-		"post_night": {"focus_y": 0.56, "band": 0.24, "falloff": 0.2, "blur_px": 5.0, "top_boost": 1.3},
+		"post_night": {"focus_y": 0.46, "band": 0.21, "falloff": 0.22, "blur_px": 7.0, "top_boost": 1.35},
 	}
 
 
@@ -138,13 +139,13 @@ static func fc(m: float) -> int:
 	return roundi(m * 16.0)
 
 
-func _zone(x_cell: int) -> int:
-	# Coarse x cell -> light zone (keeps per-mesh light counts low).
-	if x_cell < -8:
-		return 0
-	if x_cell < 28:
-		return 1
-	return 2
+func _zone(q: Vector3i) -> int:
+	# Coarse cell -> light zone (x band, z half, floor). Keeps the number of
+	# omni lights touching each merged mesh low (GL Compatibility: <= 8 / mesh).
+	var xb := 0 if q.x < -8 else (1 if q.x < 28 else 2)
+	var zb := 0 if q.z < 0 else 1
+	var fl := 0 if q.y < 22 else 1
+	return (xb + 3 * zb) * 2 + fl
 
 
 func _sgroup(zone: int, sig: String, part: String) -> VoxelBuilder:
@@ -184,10 +185,10 @@ func _use(bb: AABB, title: String, acts: Array, spot := Vector3.INF) -> Interact
 	return it
 
 
-func _lamp(pos: Vector3, energy := 1.0, rng := 3.5, day_factor := 0.25, col := Color(1.0, 0.72, 0.42), halo := 0.9) -> void:
+func _lamp(pos: Vector3, energy := 1.0, rng := 3.5, day_factor := 0.25, col := Color(1.0, 0.66, 0.36), halo := 0.9) -> void:
 	PropLib.add_light(self, pos, col, energy, rng, day_factor)
 	if halo > 0.0:
-		_halo_pts.append({"pos": pos, "size": halo, "color": Color(1.0, 0.7, 0.36, 1.0)})
+		_halo_pts.append({"pos": pos, "size": halo * 1.4, "color": Color(1.25, 0.8, 0.4, 1.0)})
 
 
 static func _act(id: String, label: String, icon: String, minutes: float, needs := {}, extra := {}) -> Dictionary:
@@ -248,7 +249,11 @@ func _wall_col(room: String) -> Variant:
 			return func(q: Vector3i) -> Color:
 				return Color("f3e7b0") if VoxelBuilder.hash3(q) > 0.985 else W_BLUE
 		"hall": return W_HALL
-		"bath": return _tiles(Color("f4f7f8"), Color("dbe8ef"))
+		"bath":
+			return func(q: Vector3i) -> Color:
+				if posmod(q.y, 24) < 9:
+					return Color("dfe9ec") if posmod(q.x + q.z + q.y, 2) == 0 else Color("cbdde3")
+				return Color("f2e8d6") if posmod(q.y, 24) != 9 else Color("c9b48f")
 		"living": return W_LIVING
 		"kitchen": return W_KITCHEN
 		"ext":
@@ -327,14 +332,14 @@ func _wall(axis: int, at: float, from: float, to: float, floor_i: int, neg: Stri
 					if ry == 5:
 						# Duplicate the row: cap for low mode, wall for tall mode.
 						if not hole:
-							_sgroup(_zone(q.x), sig, "cap").set_v(q, CAP)
+							_sgroup(_zone(q), sig, "cap").set_v(q, CAP)
 						part = "upper"
 					elif ry > 5:
 						part = "upper"
 				if hole:
 					continue
 				var g := "static" if (sig == "T" or sig == "L") else sig
-				_sgroup(_zone(q.x), g, part if g != "static" else "s").set_v(q, col)
+				_sgroup(_zone(q), g, part if g != "static" else "s").set_v(q, col)
 
 
 func _build_structure() -> void:
@@ -343,13 +348,13 @@ func _build_structure() -> void:
 		for z in range(cc(-5), cc(5)):
 			var xm := (x + 0.5) / 8.0
 			var room := "living" if xm < -1.0 else "kitchen"
-			_sgroup(_zone(x), "static", "s").set_v(Vector3i(x, -1, z), _floor_col(room).call(Vector3i(x, -1, z)))
+			_sgroup(_zone(Vector3i(x, -1, z)), "static", "s").set_v(Vector3i(x, -1, z), _floor_col(room).call(Vector3i(x, -1, z)))
 	for x in range(cc(-9) - 1, cc(9) + 1):
 		for z in [cc(-5) - 1, cc(5)]:
-			_sgroup(_zone(x), "static", "s").set_v(Vector3i(x, -1, z), FOUND)
+			_sgroup(_zone(Vector3i(x, -1, z)), "static", "s").set_v(Vector3i(x, -1, z), FOUND)
 	for z in range(cc(-5) - 1, cc(5) + 1):
 		for x in [cc(-9) - 1, cc(9)]:
-			_sgroup(_zone(x), "static", "s").set_v(Vector3i(x, -1, z), FOUND)
+			_sgroup(_zone(Vector3i(x, -1, z)), "static", "s").set_v(Vector3i(x, -1, z), FOUND)
 	# ---- Upstairs slab (cells 22, 23) with the balcony void and the stair well.
 	for x in range(cc(-9), cc(9)):
 		for z in range(cc(-5), cc(5)):
@@ -361,14 +366,14 @@ func _build_structure() -> void:
 				continue
 			var room := _upper_room(xm, zm)
 			var edge := x == cc(-9) or x == cc(9) - 1 or z == cc(-5) or z == cc(5) - 1
-			var g := _sgroup(_zone(x), "static", "s")
+			var g := _sgroup(_zone(Vector3i(x, 22, z)), "static", "s")
 			g.set_v(Vector3i(x, 22, z), TRIM if edge else Color("efe9df"))
 			g.set_v(Vector3i(x, 23, z), TRIM if edge else _floor_col(room).call(Vector3i(x, 23, z)))
 	# Void rim trim (wood fascia).
 	for x in range(cc(-8.75), cc(-4.5)):
-		_sgroup(0, "static", "s").set_v(Vector3i(x, 22, cc(1.5) - 1), Color("8a5a36"))
+		_sgroup(_zone(Vector3i(x, 22, 1)), "static", "s").set_v(Vector3i(x, 22, cc(1.5) - 1), Color("8a5a36"))
 	for z in range(cc(1.5), cc(4.75)):
-		_sgroup(0, "static", "s").set_v(Vector3i(cc(-4.5), 22, z), Color("8a5a36"))
+		_sgroup(_zone(Vector3i(cc(-4.5), 22, 1)), "static", "s").set_v(Vector3i(cc(-4.5), 22, z), Color("8a5a36"))
 
 	var both_tall := {"office": "tall", "bed": "tall"}
 	var both_low := {"office": "low", "bed": "low"}
@@ -378,21 +383,28 @@ func _build_structure() -> void:
 	_wall(0, -5.0, -1, 9, 0, "ext", "kitchen", both_tall, [[1.0, 3.0, 1.1, 2.1], [5.0, 7.0, 1.1, 2.1]])
 	_wall(2, -9.0, -5, 5, 0, "ext", "living", both_tall, [[-3.0, -1.0, 1.0, 2.2]])
 	_wall(2, 8.75, -5, 5, 0, "kitchen", "ext", both_tall, [[-3.5, -1.5, 1.0, 2.2], [1.0, 3.0, 1.0, 2.2]])
-	_wall(0, 4.75, -9, -1, 0, "living", "ext", {"office": "low", "bed": "tall"}, [[-7.0, -5.5, 1.0, 2.2], [-3.5, -2.0, 1.0, 2.2]])
-	_wall(0, 4.75, -1, 8.75, 0, "kitchen", "ext", both_tall, [[0.5, 1.6, 0.0, 2.1], [2.5, 4.0, 1.0, 2.2], [6.0, 7.5, 1.0, 2.2]])
+	# Front ground-floor walls are always cut (dollhouse view into the ground
+	# floor under the upstairs slab, like the lower level in ref1/ref3).
+	_wall(0, 4.75, -9, -1, 0, "living", "ext", both_low)
+	_wall(0, 4.75, -1, 8.75, 0, "kitchen", "ext", both_low, [[0.5, 1.6, 0.0, 2.1]])
 	_wall(2, -1.0, -5, 5, 0, "living", "kitchen", both_tall, [[-1.0, 1.5, 0.0, 2.2]])
 	# ---- Upstairs walls.
 	# Back exterior wall: big office windows, bedroom windows.
-	_wall(0, -5.0, -9, 9, 1, "ext", "office", both_tall, [[-6.25, -4.25, 0.45, 2.45], [-3.95, -1.95, 0.45, 2.45], [0.9, 2.4, 0.9, 2.2], [6.4, 7.8, 0.9, 2.2]])
+	var back_holes := [[-6.25, -4.25, 0.45, 2.45], [-3.95, -1.95, 0.45, 2.45], [0.9, 2.4, 0.9, 2.2], [6.4, 7.8, 0.9, 2.2]]
+	_wall(0, -5.0, -9, -1, 1, "ext", "office", both_tall, back_holes)
+	_wall(0, -5.0, -1, 3.5, 1, "ext", "pink", both_tall, back_holes)
+	_wall(0, -5.0, 3.5, 9, 1, "ext", "blue", both_tall, back_holes)
 	# Left exterior (office L wall).
 	_wall(2, -9.0, -4.75, 5, 1, "ext", "office", both_tall, [[2.0, 3.6, 0.9, 2.3]])
 	# Front exterior: always cut.
 	_wall(0, 4.75, -9, -4.5, 1, "office", "ext", {"office": "none", "bed": "low"})
 	_wall(0, 4.75, -4.5, 9, 1, "office", "ext", both_low)
 	# Right exterior.
-	_wall(2, 8.75, -4.75, 4.75, 1, "blue", "ext", both_low)
+	_wall(2, 8.75, -4.75, 0.0, 1, "blue", "ext", both_low)
+	_wall(2, 8.75, 0.0, 4.75, 1, "bath", "ext", both_low)
 	# Office | pink+hall divider (low from the office, tall for the bedrooms).
-	_wall(2, -1.0, -4.75, 4.75, 1, "office", "pink", {"office": "low", "bed": "tall"}, [[1.4, 2.6, 0.0, 2.15]])
+	_wall(2, -1.0, -4.75, 0.0, 1, "office", "pink", {"office": "low", "bed": "tall"}, [[1.4, 2.6, 0.0, 2.15]])
+	_wall(2, -1.0, 0.0, 4.75, 1, "office", "hall", {"office": "low", "bed": "tall"}, [[1.4, 2.6, 0.0, 2.15]])
 	# Bedroom fronts onto the hall.
 	_wall(0, 0.0, -0.75, 5.5, 1, "pink", "hall", both_low, [[2.3, 3.2, 0.0, 2.1], [4.2, 5.2, 0.0, 2.1]])
 	_wall(0, 0.0, 5.5, 8.75, 1, "blue", "bath", {"office": "low", "bed": "tall"})
@@ -529,23 +541,38 @@ func _build_office() -> void:
 func _build_living() -> void:
 	var R := "living"
 	var fx := -8.75
-	_put(R, "sofa", Vector3(fx + 0.05, 0, 1.7), 1, 0)
-	PropLib.rug(_f(R), Vector3i(fc(-7.6), 0, fc(1.6)), fc(2.6), fc(2.8), "red_kilim")
-	_put(R, "coffee_table", Vector3(-7.15, U, 2.2), 1)
-	_put(R, "lamp_floor", Vector3(fx + 0.1, 0, 4.15))
-	_lamp(Vector3(fx + 0.35, 1.75, 4.3), 1.1, 4.0, 0.45)
-	_put(R, "armchair", Vector3(-6.2, 0, 3.6), 2, 0)
-	_put(R, "bookshelf", Vector3(-5.6, 0, 4.0), 2, 1)
-	_put(R, "lamp_table", Vector3(-5.2, 12 * U, 4.2), 0, 0)
-	_lamp(Vector3(-5.0, 1.0, 4.2), 0.8, 3.0, 0.4)
+	# Library wall: the part of the living room you look down on through the
+	# balcony void upstairs (ref1's lower floor: shelves, glowing lamps, sofa).
+	_put(R, "bookshelf", Vector3(fx, 0, 0.95), 1, 0)
+	_put(R, "plant", Vector3(fx + 0.05, 30 * U, 1.05), 0, 2)
+	_put(R, "nightstand", Vector3(fx + 0.02, 0, 2.05), 1, 0)
+	_put(R, "lamp_table", Vector3(fx + 0.1, 10 * U, 2.15), 0, 0)
+	_lamp(Vector3(fx + 0.45, 0.95, 2.3), 1.0, 3.2, 0.7)
+	_put(R, "frame", Vector3(fx, 1.25, 2.0), 1, 7)
+	_put(R, "frame", Vector3(fx, 1.55, 2.4), 1, 2)
+	_put(R, "bookshelf", Vector3(fx, 0, 2.7), 1, 2)
+	_put(R, "globe", Vector3(fx + 0.1, 30 * U, 2.85))
+	_put(R, "lamp_floor", Vector3(fx + 0.1, 0, 3.85))
+	_lamp(Vector3(fx + 0.35, 1.75, 4.05), 1.1, 3.6, 0.6)
+	_put(R, "plant", Vector3(fx + 0.6, 0, 4.2), 0, 4)
+	_put(R, "sconce", Vector3(fx, 1.6, 0.55), 1, 0)
+	_put(R, "plant", Vector3(fx + 0.05, 0, 0.3), 0, 5)
+	PropLib.rug(_f(R), Vector3i(fc(-7.7), 0, fc(1.4)), fc(2.6), fc(2.9), "red_kilim")
+	_put(R, "coffee_table", Vector3(-7.25, U, 2.2), 1)
+	_put(R, "book_stack", Vector3(-7.0, U + 8 * U, 2.45), 0, 1)
+	_put(R, "sofa", Vector3(-6.05, 0, 1.6), 3, 0)
+	_put(R, "armchair", Vector3(-7.6, 0, 4.0), 2, 0)
 	_put(R, "plant", Vector3(-4.95, 0, 1.75), 0, 1)
-	_put(R, "plant", Vector3(fx + 0.1, 0, 0.9), 0, 5)
-	_put(R, "frame", Vector3(fx, 1.3, 2.3), 1, 7)
-	_put(R, "frame", Vector3(fx, 1.45, 3.5), 1, 2)
+	_put(R, "bookshelf", Vector3(-5.6, 0, 4.25), 2, 1)
+	_put(R, "lamp_table", Vector3(-5.2, 30 * U, 4.4), 0, 0)
+	_lamp(Vector3(-5.0, 2.1, 4.3), 0.8, 3.0, 0.5)
+	_put(R, "bookshelf", Vector3(fx, 0, -2.25), 1, 0)
+	_put(R, "nightstand", Vector3(fx + 0.02, 0, -0.9), 1, 0)
+	_put(R, "lamp_table", Vector3(fx + 0.1, 10 * U, -0.8), 0, 0)
 	_put(R, "tv", Vector3(-3.2, 0, -4.7), 0)
 	_put(R, "sofa", Vector3(-4.6, 0, -1.6), 2, 2)
 	_put(R, "dining_table", Vector3(-7.9, 0, -3.8), 0)
-	var sofa := AABB(Vector3(fx, 0, 1.7), Vector3(0.9, 0.8, 2.1))
+	var sofa := AABB(Vector3(-6.05, 0, 1.6), Vector3(0.9, 0.8, 2.1))
 	_use(sofa, "Sofa", [
 		_act("relax", "Relax", "sofa", 30, {"energy": 0.1, "fun": 0.05}, {"pose": "sit"}),
 		_act("nap_sofa", "Nap", "zzz", 60, {"energy": 0.3}, {"pose": "sleep"}),
@@ -586,9 +613,9 @@ func _build_pink() -> void:
 	_put(R, "plant", Vector3(fx + 0.05, y, -0.6), 0, 1)
 	_put(R, "plant", Vector3(2.55, y, -3.9), 0, 4)
 	_put(R, "toy_box", Vector3(fx + 0.05, y, -1.75), 1)
-	var chair := _putc(R, "chair", 0.55, y, -2.35, 2, 2)
+	var chair := _putc(R, "chair", 0.75, y, -4.4, 0, 2)
 	_put(R, "plush", Vector3(1.9, y + U, -1.3), 3, 2)
-	_put(R, "toy_blocks", Vector3(1.6, y + U, -2.2), 0, 3)
+	_put(R, "toy_blocks", Vector3(0.6, y + U, -2.2), 0, 3)
 	_put(R, "sconce", Vector3(fx, y + 1.6, -1.15), 1, 1)
 	_lamp(Vector3(fx + 0.4, y + 1.8, -1.0), 0.8, 2.8, 0.2)
 	_lamp(Vector3(1.4, y + 2.25, -2.2), 0.8, 4.5, 0.0, Color(1.0, 0.76, 0.52), 0.0)
@@ -608,7 +635,7 @@ func _build_blue() -> void:
 	_put(R, "nightstand", Vector3(5.5, y, bz + 0.05), 0, 3)
 	_put(R, "rocket_lamp", Vector3(5.6, y + 10 * U, bz + 0.15), 0)
 	_put(R, "lamp_table", Vector3(5.85, y + 10 * U, bz + 0.12), 0, 2)
-	_lamp(Vector3(5.95, y + 1.05, bz + 0.45), 1.2, 3.2, 0.2)
+	_lamp(Vector3(5.95, y + 1.05, bz + 0.45), 1.2, 3.2, 0.2, Color(1.0, 0.8, 0.6))
 	_put(R, "frame", Vector3(4.6, y + 1.55, bz), 0, 4)
 	_put(R, "frame", Vector3(3.75, y + 1.35, -3.2), 1, 8)
 	PropLib.string_lights(_f(R), Vector3i(fc(4.0), fc(y + 2.45), fc(bz) + 1), Vector3i(fc(8.6), fc(y + 2.45), fc(bz) + 1), 7, 4.0, true)
@@ -620,10 +647,16 @@ func _build_blue() -> void:
 	_put(R, "bookshelf", Vector3(3.75, y, -1.95), 1, 2)
 	_put(R, "plant", Vector3(3.8, y + 30 * U, -1.85), 0, 2)
 	_put(R, "plush", Vector3(5.0, y + U, -1.5), 0, 1)
+	PropLib.rug(_f(R), Vector3i(fc(5.6), fc(y), fc(-2.9)), fc(1.8), fc(1.8), "star")
+	_put(R, "toy_blocks", Vector3(6.1, y + U, -2.2), 0, 1)
+	_put(R, "wall_shelf", Vector3(3.75, y + 1.7, -3.9), 1, 2)
+	_put(R, "globe", Vector3(3.8, y + 1.7 + U, -3.6))
+	_put(R, "frame", Vector3(7.95, y + 1.5, bz), 0, 3)
+	_put(R, "toy_box", Vector3(6.9, y, -0.75), 2)
 	_put(R, "plant", Vector3(8.15, y, -0.6), 0, 4)
 	_put(R, "plant", Vector3(6.55, y + 0.85, bz + 0.25), 0, 3)
-	_lamp(Vector3(6.3, y + 2.2, bz + 0.6), 0.6, 3.0, 0.1, Color(1.0, 0.8, 0.45), 0.0)
-	_lamp(Vector3(5.6, y + 2.0, -2.2), 0.6, 3.5, 0.0, Color(1.0, 0.78, 0.5), 0.0)
+	_lamp(Vector3(6.3, y + 2.2, bz + 0.6), 0.6, 3.0, 0.1, Color(1.0, 0.88, 0.74), 0.0)
+	_lamp(Vector3(5.6, y + 2.0, -2.2), 0.6, 3.5, 0.0, Color(1.0, 0.88, 0.74), 0.0)
 	_use(bed, "Star Bed", [
 		_act("sleep", "Sleep", "bed", 480, {"energy": 1.0}, {"pose": "sleep", "task": "Go to Sleep"}),
 		_act("story", "Read Story", "book_open", 20, {"social": 0.2}, {"pose": "sit_read", "who": ["adult"]}),
@@ -681,13 +714,19 @@ func _build_bath() -> void:
 	_put(R, "sconce", Vector3(8.4, y + 1.65, bz), 0, 1)
 	_lamp(Vector3(8.5, y + 1.85, bz + 0.45), 1.1, 3.0, 0.2)
 	_put(R, "towel_rack", Vector3(6.85, y + 0.2, bz), 0, 2)
-	_lamp(Vector3(7.2, y + 2.3, 2.4), 1.0, 4.0, 0.0, Color(1.0, 0.86, 0.68), 0.0)
+	_lamp(Vector3(7.2, y + 2.3, 2.4), 0.8, 4.0, 0.0, Color(1.0, 0.74, 0.5), 0.0)
 	_put(R, "plant", Vector3(8.35, y, 0.35), 0, 4)
 	var tub := _put(R, "bathtub", Vector3(6.85, y, 3.85), 2)
 	var toilet := _put(R, "toilet", Vector3(5.8, y, 3.35), 1)
 	_put(R, "bath_mat", Vector3(7.3, y, 3.1), 0, 1)
 	_put(R, "plant", Vector3(8.35, y, 2.2), 0, 0)
 	_putc(R, "stool", 7.85, y, 1.25, 0, 2)
+	PropLib.rug(_f(R), Vector3i(fc(7.25), fc(y), fc(1.0)), fc(1.2), fc(0.8), "round_blue")
+	_put(R, "wall_shelf", Vector3(5.5 + 2 * U, y + 1.45, 2.0), 1, 2)
+	_put(R, "plant", Vector3(5.5 + 3 * U, y + 1.45 + U, 2.15), 0, 3)
+	_put(R, "frame", Vector3(5.5 + 2 * U, y + 1.3, 2.95), 1, 4)
+	_put(R, "plant", Vector3(8.25, y, 4.15), 0, 2)
+	_put(R, "plant", Vector3(8.0, y + 14 * U, 0.3), 0, 3)
 	var glass := PropLib.instance("shower_glass", 0, false)
 	var gs := PropLib.size_of("shower_glass")
 	glass.position = Vector3(5.75 + U * 1 + gs.x * U * 0.5, y + U, bz + U + gs.z * U * 0.5)
@@ -709,13 +748,39 @@ func _build_kitchen() -> void:
 	var sink := _put(R, "counter", Vector3(1.85, 0, bz + 0.02), 0, 1)
 	var stove := _put(R, "stove", Vector3(2.85, 0, bz + 0.02), 0)
 	_put(R, "counter", Vector3(3.85, 0, bz + 0.02), 0, 0)
-	_put(R, "dining_table", Vector3(2.0, 0, -1.5), 0)
-	for k in 2:
-		_put(R, "chair", Vector3(2.3 + k * 0.8, 0, -2.05), 0, 0)
-		_put(R, "chair", Vector3(2.3 + k * 0.8, 0, -0.55), 2, 0)
 	var bowl := _put(R, "dog_bowl", Vector3(0.3, 0, -0.8))
 	_put(R, "plant", Vector3(4.9, 0, bz + 0.1), 0, 1)
-	_lamp(Vector3(2.8, 2.3, -1.0), 1.2, 4.5, 0.2, Color(1.0, 0.72, 0.42), 0.0)
+	_lamp(Vector3(2.0, 2.3, -2.5), 0.9, 4.0, 0.2, Color(1.0, 0.72, 0.42), 0.0)
+	# --- Front strip (seen under the upstairs slab in the cutaway).
+	# Dining nook right of the stairs.
+	PropLib.rug(_f(R), Vector3i(fc(5.7), 0, fc(1.2)), fc(2.8), fc(2.6), "red_kilim")
+	var dtable := _put(R, "dining_table", Vector3(6.2, U, 1.75), 0)
+	for k in 2:
+		_put(R, "chair", Vector3(6.35 + k * 0.8, U, 1.2), 0, 0)
+		_put(R, "chair", Vector3(6.35 + k * 0.8, U, 2.95), 2, 0)
+	_put(R, "plant", Vector3(8.2, 0, 0.3), 0, 5)
+	_put(R, "plant", Vector3(5.5, 0, 4.2), 0, 2)
+	_put(R, "lamp_floor", Vector3(8.25, 0, 4.0))
+	_lamp(Vector3(8.45, 1.75, 4.15), 1.0, 3.5, 0.3)
+	_lamp(Vector3(7.0, 2.4, 2.2), 0.9, 3.6, 0.0, Color(1.0, 0.7, 0.4), 1.1)
+	# Hallway wall left of the stairs: shelves, console with lamp, frames.
+	var wx := -0.75
+	_put(R, "bookshelf", Vector3(wx, 0, 0.35), 1, 2)
+	_put(R, "plant", Vector3(wx + 0.05, 30 * U, 0.45), 0, 0)
+	_put(R, "dresser", Vector3(wx + 0.02, 0, 1.75), 1, 1)
+	_put(R, "lamp_table", Vector3(wx + 0.1, 14 * U, 1.85), 0, 0)
+	_put(R, "plant", Vector3(wx + 0.1, 14 * U, 2.4), 0, 6)
+	_lamp(Vector3(wx + 0.45, 1.25, 2.1), 1.0, 3.4, 0.3)
+	_put(R, "frame", Vector3(wx, 1.45, 1.8), 1, 7)
+	_put(R, "frame", Vector3(wx, 1.6, 2.55), 1, 3)
+	_put(R, "sconce", Vector3(wx, 1.55, 3.6), 1, 0)
+	_lamp(Vector3(wx + 0.4, 1.75, 3.7), 0.8, 3.0, 0.3)
+	_put(R, "plant", Vector3(wx + 0.05, 0, 4.15), 0, 4)
+	PropLib.rug(_f(R), Vector3i(fc(0.2), 0, fc(1.4)), fc(2.2), fc(2.6), "round_cream")
+	_put(R, "armchair", Vector3(1.0, 0, 0.3), 0, 1)
+	_put(R, "side_table", Vector3(2.15, 0, 0.5), 0, 0)
+	_put(R, "plant", Vector3(2.3, 10 * U, 0.6), 0, 3)
+	_use(dtable, "Dining Table", [_act("eat", "Eat", "plate", 30, {"hunger": 0.3, "social": 0.1}, {"pose": "sit"})])
 	_use(fridge, "Fridge", [
 		_act("snack", "Grab a Snack", "apple", 5, {"hunger": 0.2}, {"pose": "idle"}),
 		_act("cook_fridge", "Cook", "cook", 45, {"hunger": 0.6}, {"skill": "Cooking", "pose": "grill"}),
@@ -746,9 +811,9 @@ func _build_exterior() -> void:
 			elif xm > 0.3 and xm < 1.9 and zm > 5.0:
 				c = Color("d8c8a8") if posmod(z, 2) == 0 else Color("cbb994")
 			else:
-				c = [Color("6fae4a"), Color("78b850"), Color("64a243"), Color("82c058")][int(hh * 4.0)]
+				c = [Color("5f9c40"), Color("68a646"), Color("57903a"), Color("72ae4c")][int(hh * 4.0)]
 			g.set_v(Vector3i(x, -1, z), c)
-	_add_mesh(Mesher.build(g, 0.5), "Ground", false)
+	_night_tint.append(_add_mesh(Mesher.build(g, 0.5), "Ground", false))
 	# Trees, bushes, street lamps.
 	var t := VoxelBuilder.new()
 	var o := VoxelBuilder.new()
@@ -756,21 +821,22 @@ func _build_exterior() -> void:
 		Vector3(-8.5, 0, -8.0), Vector3(-3.5, 0, -7.6), Vector3(1.5, 0, -8.2), Vector3(6.5, 0, -7.7),
 		Vector3(-13.5, 0, -2.0), Vector3(-13.0, 0, 5.5), Vector3(12.5, 0, -1.0), Vector3(13.0, 0, 6.5),
 		Vector3(-18.5, 0, -17.0), Vector3(-6.5, 0, -16.8), Vector3(5.5, 0, -17.2), Vector3(17.0, 0, -16.6),
-		Vector3(-20.0, 0, -27.0), Vector3(-8.0, 0, -27.5), Vector3(4.0, 0, -27.0), Vector3(16.0, 0, -27.5),
 		Vector3(-24.0, 0, -6.0), Vector3(22.0, 0, -8.0), Vector3(-20, 0, 10.0), Vector3(19, 0, 12.0),
+		Vector3(-12.0, 0, 9.5), Vector3(12.0, 0, 9.0), Vector3(-6.0, 0, 11.5), Vector3(7.5, 0, 12.0),
+		Vector3(11.5, 0, 3.0), Vector3(-12.5, 0, -6.5), Vector3(14.0, 0, -12.0), Vector3(-15.0, 0, -12.5),
 	]
 	for i in trees.size():
 		var p: Vector3 = trees[i]
 		var nm := "pine" if i % 5 == 4 else "tree"
 		var rs := PropLib.size_of(nm, i % 3)
 		PropLib.place(t, nm, Vector3i(roundi(p.x * 4) - rs.x / 2, 0, roundi(p.z * 4) - rs.z / 2), i % 4, i % 3)
-	_add_mesh(Mesher.build(t, 0.25), "Trees", true)
+	_night_tint.append(_add_mesh(Mesher.build(t, 0.25), "Trees", true))
 	for i in 9:
 		var lx := -24.0 + i * 6.5
 		PropLib.place(o, "street_lamp", Vector3i(cc(lx), 0, cc(-9.6)), 0)
 		PropLib.place(o, "street_lamp", Vector3i(cc(lx + 3.2), 0, cc(-14.6)), 0)
 		if lx > -14.0 and lx < 12.0:
-			_lamp(Vector3(lx + 0.3, 3.3, -9.3), 1.6, 6.0, 0.0, Color(1.0, 0.78, 0.45))
+			_lamp(Vector3(lx + 0.3, 3.3, -9.3), 1.6, 3.4, 0.0, Color(1.0, 0.78, 0.45))
 	var bushes := [Vector3(-9.8, 0, -3.0), Vector3(-9.8, 0, 1.0), Vector3(9.4, 0, -3.5), Vector3(9.4, 0, 0.5),
 		Vector3(-6.0, 0, 5.6), Vector3(-2.5, 0, 5.6), Vector3(3.5, 0, 5.6), Vector3(6.5, 0, 5.6), Vector3(-9.8, 0, 4.2), Vector3(9.4, 0, 3.6)]
 	for i in bushes.size():
@@ -779,7 +845,7 @@ func _build_exterior() -> void:
 	for k in 6:
 		PropLib.place(o, "hedge", Vector3i(cc(-9.0 + k * 3.0), 0, cc(-6.1)), 0, k)
 	PropLib.place(o, "mailbox", Vector3i(cc(2.4), 0, cc(7.5)), 0)
-	_add_mesh(Mesher.build(o, 0.125), "Garden", true)
+	_night_tint.append(_add_mesh(Mesher.build(o, 0.125), "Garden", true))
 	# Picket fence (fine grid) along the front garden.
 	var fz := fc(8.2)
 	for k in 30:
@@ -792,7 +858,7 @@ func _build_exterior() -> void:
 	var gn := VoxelBuilder.new()
 	gd.jitter = 0.0
 	gn.jitter = 0.0
-	for wdef in [[0, 4.75, 2.5, 4.0], [0, 4.75, 6.0, 7.5], [2, 8.75, -3.5, -1.5], [2, 8.75, 1.0, 3.0], [0, 4.75, -7.0, -5.5], [0, 4.75, -3.5, -2.0]]:
+	for wdef in [[2, 8.75, -3.5, -1.5], [2, 8.75, 1.0, 3.0]]:
 		var axis: int = wdef[0]
 		var at: float = wdef[1]
 		for a in range(fc(wdef[2]), fc(wdef[3])):
@@ -808,72 +874,126 @@ func _build_exterior() -> void:
 	_glass_night = _add_mesh(Mesher.build(gn, U, Vector3.ZERO, true, true), "GlassNight", false)
 	_glass_day.visible = not _is_night
 	_glass_night.visible = _is_night
+	_glass_night.material_override = PropLib.lit_window_material()
 	# Wall lanterns on the outside of the ground floor.
-	for lp in [Vector3(-4.5, 1.9, 5.0), Vector3(4.8, 1.9, 5.0), Vector3(9.0, 1.9, -0.4)]:
+	for lp in [Vector3(9.0, 1.9, -0.4), Vector3(9.0, 1.9, 4.2)]:
 		var rot := 0 if lp.z > 4.0 else 1
 		_put("ext", "sconce", lp - Vector3(0.15, 0, 0) if rot == 0 else lp, rot, 0)
-		_lamp(lp + (Vector3(0, 0.3, 0.35) if rot == 0 else Vector3(0.35, 0.3, 0)), 1.0, 3.5, 0.0)
-	# Porch light by the front door.
-	_put("ext", "sconce", Vector3(1.7, 2.0, 4.75 + 0.25), 0, 1)
-	_lamp(Vector3(1.85, 2.3, 5.4), 1.0, 4.0, 0.0)
+		_lamp(lp + (Vector3(0, 0.3, 0.35) if rot == 0 else Vector3(0.35, 0.3, 0)), 0.4, 2.2, 0.0)
 
 
 func _ensure_neighbourhood(lit: bool) -> void:
 	var cur := _hood_night if lit else _hood_day
 	if cur == null:
-		cur = Node3D.new()
-		cur.name = "HoodNight" if lit else "HoodDay"
-		var spots := [Vector3(-26, 0, -23.5), Vector3(-14, 0, -23.0), Vector3(-2, 0, -23.5), Vector3(10, 0, -23.0), Vector3(22, 0, -23.5),
+		# All neighbour houses merged into ONE mesh (one draw call).
+		var vb := VoxelBuilder.new()
+		vb.jitter = 0.0
+		var spots := [Vector3(-26, 0, -24.5), Vector3(-14, 0, -24.0), Vector3(-2, 0, -24.5), Vector3(10, 0, -24.0), Vector3(22, 0, -24.5),
 			Vector3(-26, 0, -5.0), Vector3(21, 0, -4.0)]
 		var styles := [1, 4, 2, 1, 4, 2, 5]
+		var hs: float = PropLib.scale_of("house")
 		for i in spots.size():
-			var p: Vector3 = spots[i]
-			var mi := PropLib.instance("house", styles[i] + (8 if lit else 0))
-			mi.position = p + Vector3(4.0, 0, 3.25)
-			mi.rotation_degrees.y = 0.0 if i < 5 else (90.0 if i == 5 else -90.0)
-			cur.add_child(mi)
+			var c: Vector3 = spots[i] + Vector3(4.0, 0, 3.25)
+			var rot := 0 if (i < 5 or i > 6) else (1 if i == 5 else 3)
+			var rs := PropLib.rotated_size("house", rot, styles[i] + (8 if lit else 0))
+			PropLib.place(vb, "house", Vector3i(roundi(c.x / hs) - rs.x / 2, 0, roundi(c.z / hs) - rs.z / 2), rot, styles[i] + (8 if lit else 0))
+		var mi := MeshInstance3D.new()
+		mi.name = "HoodNight" if lit else "HoodDay"
+		mi.mesh = Mesher.build(vb, hs, Vector3.ZERO, true, true)
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		cur = mi
 		add_child(cur)
 		if lit:
 			_hood_night = cur
+			_night_tint.append(mi)
 		else:
 			_hood_day = cur
 	if _hood_day:
 		_hood_day.visible = not lit
 	if _hood_night:
 		_hood_night.visible = lit
+	_apply_night_tint(lit)
 
 
+## Exterior meshes get a cool, darker material at night so the warm interior
+## pops (moonlit lawn instead of a bright green field).
+func _apply_night_tint(lit: bool) -> void:
+	for mi in _night_tint:
+		if is_instance_valid(mi):
+			# Surface 0 is the solid surface (Mesher writes it first); glow stays.
+			if mi.mesh and mi.mesh.get_surface_count() > 0 and mi.mesh.surface_get_material(0) == VoxelBuilder.solid_material():
+				mi.set_surface_override_material(0, PropLib.night_exterior_material() if lit else null)
+
+
+## Night sky backdrop: one big unshaded card (gradient, stars, moon) standing
+## far behind the neighbourhood, turned to face the camera heading. It hides
+## the edge of the ground and gives the top of the frame a sky like ref3.
 func _make_moon() -> void:
 	_moon = MeshInstance3D.new()
-	_moon.name = "Moon"
-	var sm := SphereMesh.new()
-	sm.radius = 2.6
-	sm.height = 5.2
-	sm.radial_segments = 16
-	sm.rings = 8
-	var m := StandardMaterial3D.new()
-	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	m.albedo_color = Color(1.0, 0.97, 0.85)
-	m.disable_fog = true
-	sm.material = m
-	_moon.mesh = sm
+	_moon.name = "SkyCard"
+	var q := QuadMesh.new()
+	q.size = Vector2(SKY_W, SKY_H)
+	var sh := Shader.new()
+	sh.code = SKY_SHADER
+	var m := ShaderMaterial.new()
+	m.shader = sh
+	m.set_shader_parameter("aspect", SKY_W / SKY_H)
+	q.material = m
+	_moon.mesh = q
 	_moon.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(_moon)
 	_place_moon(ShotPresets.PRESETS["home_night"].camera)
 
 
+const SKY_W := 150.0
+const SKY_H := 46.0
+const SKY_DIST := 48.0
+const SKY_SHADER := """shader_type spatial;
+render_mode unshaded, cull_disabled, fog_disabled, shadows_disabled;
+uniform float aspect = 3.0;
+uniform vec3 top_col = vec3(0.035, 0.05, 0.16);
+uniform vec3 mid_col = vec3(0.09, 0.12, 0.3);
+uniform vec3 low_col = vec3(0.16, 0.2, 0.38);
+uniform vec2 moon_uv = vec2(0.6, 0.3);
+uniform float moon_r = 0.075;
+float h21(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+void fragment() {
+	vec2 uv = UV;
+	vec3 col = mix(top_col, mid_col, smoothstep(0.0, 0.6, uv.y));
+	col = mix(col, low_col, smoothstep(0.55, 1.0, uv.y));
+	vec2 g = uv * vec2(160.0 * aspect / 3.0, 60.0);
+	vec2 cell = floor(g);
+	float hs = h21(cell);
+	vec2 f = fract(g) - 0.5;
+	float star = step(0.955, hs) * (1.0 - smoothstep(0.08, 0.2, length(f))) * (1.0 - smoothstep(0.35, 0.7, uv.y));
+	col += vec3(0.85, 0.88, 1.0) * star * (0.6 + 0.4 * h21(cell + 7.0));
+	vec2 d = (uv - moon_uv) * vec2(aspect, 1.0);
+	float r = length(d);
+	float disc = 1.0 - smoothstep(moon_r - 0.004, moon_r, r);
+	float crater = h21(floor((d + 1.0) * 60.0));
+	vec3 moon = vec3(1.0, 0.96, 0.82) * (0.92 + 0.08 * crater);
+	col += vec3(0.5, 0.55, 0.8) * 0.45 * exp(-max(r - moon_r, 0.0) * 9.0) * (1.0 - disc);
+	col = mix(col, moon * 1.15, disc);
+	ALBEDO = col;
+}
+"""
+
+
 func _place_moon(cam: Dictionary) -> void:
-	# Hang the moon in the patch of sky above the far houses, near the top of
-	# the preset view (screen ~ 72% across, 6% down), far beyond the ground edge.
+	# Stand the card SKY_DIST m behind the orbit target, facing the camera heading.
 	var yaw := deg_to_rad(cam.get("yaw", 30.0))
-	var pitch := deg_to_rad(cam.get("pitch", 40.0))
-	var r := Basis.from_euler(Vector3(-pitch, yaw, 0))
-	var cam_pos: Vector3 = cam.get("target", Vector3.ZERO) + r * Vector3(0, 0, cam.get("distance", 15.0))
-	var vt := tan(deg_to_rad(cam.get("fov", 30.0)) * 0.5)
-	var ht := vt * 1672.0 / 941.0
-	var dir := (r * Vector3(0, 0, -1) + r * Vector3(1, 0, 0) * ht * 0.44 + r * Vector3(0, 1, 0) * vt * 0.88).normalized()
-	_moon.position = cam_pos + dir * 90.0
+	var tgt: Vector3 = cam.get("target", Vector3.ZERO)
+	var back := Vector3(-sin(yaw), 0.0, -cos(yaw))
+	_moon.position = Vector3(tgt.x, 0.0, tgt.z) + back * SKY_DIST + Vector3(0, SKY_H * 0.5 - 6.0, 0)
+	_moon.rotation = Vector3(0.0, yaw, 0.0)
 	_moon.visible = _is_night
+
+
+func _place_moon_live(yaw_deg: float, tgt: Vector3) -> void:
+	var yaw := deg_to_rad(yaw_deg)
+	var back := Vector3(-sin(yaw), 0.0, -cos(yaw))
+	_moon.position = Vector3(tgt.x, 0.0, tgt.z) + back * SKY_DIST + Vector3(0, SKY_H * 0.5 - 6.0, 0)
+	_moon.rotation.y = yaw
 
 
 func _add_mesh(m: ArrayMesh, n: String, shadows: bool) -> MeshInstance3D:
@@ -934,10 +1054,10 @@ func _stage(preset: String) -> void:
 		return
 	var y := UF
 	if preset == "home_night":
-		var lily := _place("bunny_girl", Vector3(-0.73 + 17 * U + 0.08, y, -3.95 + 9 * U), Vector3(3.0, y, -3.95 + 9 * U), "lie")
+		var lily := _place("bunny_girl", Vector3(-0.73 + 17 * U - 0.3, y, -3.95 + 9 * U), Vector3(3.0, y, -3.95 + 9 * U), "lie")
 		lily.lie_height = 0.53
-		var jack := _place("dad", Vector3(0.55, y, -2.3), Vector3(0.55, y, -4.5), "sit_read", 0.44)
-		var maya := _place("cat_girl", Vector3(7.85, y + 6 * U, 1.25), Vector3(9.0, y, 2.2), "brush_teeth")
+		var jack := _place("dad", Vector3(0.75, y, -4.4), Vector3(0.4, y, -2.0), "sit_read", 0.44)
+		var maya := _place("cat_girl", Vector3(7.85, y + 6 * U, 1.3), Vector3(7.85, y, 0.0), "brush_teeth")
 		var dog := _place("beagle", Vector3(1.15, y + 0.12, 2.25), Vector3(2.5, y, 3.0), "sleep")
 		Game.show_bubble(jack, {"text": "Read Story", "icon": "book_open", "kind": "action", "id": "action", "progress": -1})
 		Game.show_bubble(maya, {"text": "Brush Teeth", "icon": "brush", "kind": "action", "id": "action", "progress": -1})
@@ -988,6 +1108,10 @@ func _process(delta: float) -> void:
 		print("HOME_STATS draw_calls=", RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME),
 			" prims=", RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_PRIMITIVES_IN_FRAME),
 			" objects=", RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_OBJECTS_IN_FRAME))
+		var vp := get_viewport()
+		for t in [[Viewport.RENDER_INFO_TYPE_VISIBLE, "visible"], [Viewport.RENDER_INFO_TYPE_SHADOW, "shadow"], [Viewport.RENDER_INFO_TYPE_CANVAS, "canvas"]]:
+			print("HOME_PASS ", t[1], " draws=", vp.get_render_info(t[0], Viewport.RENDER_INFO_DRAW_CALLS_IN_FRAME),
+				" prims=", vp.get_render_info(t[0], Viewport.RENDER_INFO_PRIMITIVES_IN_FRAME), " objs=", vp.get_render_info(t[0], Viewport.RENDER_INFO_OBJECTS_IN_FRAME))
 		var rows := []
 		for mi in find_children("*", "MeshInstance3D", true, false):
 			if mi.mesh == null or not mi.is_visible_in_tree():
@@ -1003,7 +1127,12 @@ func _process(delta: float) -> void:
 		var tot := 0
 		for r in rows:
 			tot += r[0]
-		print("HOME_TRIS total=", tot, " meshes=", rows.size(), " top=", rows.slice(0, 14))
+		print("HOME_TRIS total=", tot, " meshes=", rows.size(), " top=", rows.slice(0, 60), " lights=", get_tree().get_nodes_in_group("vims_lamps").size())
+	if _moon and _moon.visible:
+		var rig := get_viewport().get_camera_3d()
+		if rig and rig.get_parent() and "yaw" in rig.get_parent():
+			var p: Node = rig.get_parent()
+			_place_moon_live(p.yaw, p.target)
 	if not _auto_view:
 		return
 	_view_timer -= delta

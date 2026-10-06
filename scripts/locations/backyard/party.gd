@@ -53,7 +53,8 @@ func build(parent: Node3D) -> void:
 	_fire_pit(yard, int(PIT_POS.x * F), int(PIT_POS.z * F))
 	_sofa(yard, 100, 28)
 	_side_table(yard, 96, 8)
-	for lp in [Vector3i(-66, 0, 14), Vector3i(24, 0, -38), Vector3i(122, 0, -10), Vector3i(-88, 0, -58), Vector3i(150, 0, 50)]:
+	for lp in [Vector3i(-66, 0, 14), Vector3i(24, 0, -38), Vector3i(122, 0, -10), Vector3i(-88, 0, -58), Vector3i(150, 0, 50),
+			Vector3i(44, 6, -50), Vector3i(118, 6, -50), Vector3i(-22, 0, 30), Vector3i(66, 0, 40)]:
 		_lantern(yard, lp.x, lp.y, lp.z, 1.0)
 	_posts(yard)
 	# Planters around the lounge and the patio.
@@ -260,11 +261,12 @@ func _grill() -> void:
 		V.b(vb, -7 + i * 3, 17, 2, 2, 1, 1, Color("8a4426"))
 	V.b(vb, 6, 17, 0, 1, 1, 3, Color("f3d24a")); V.b(vb, 8, 17, 0, 1, 1, 3, Color("f3d24a"))
 	V.p(vb, 6, 17, 3, Color("6cb04a")); V.p(vb, 8, 17, 3, Color("6cb04a"))
-	# Open lid behind.
-	V.b(vb, -10, 16, -7, 20, 11, 1, V.noisy(IRON, 0.05))
-	V.b(vb, -9, 27, -7, 18, 1, 1, IRON)
-	V.b(vb, -6, 22, -8, 12, 1, 1, steel)
-	V.p(vb, 0, 25, -6, Color("e8e8ea"))
+	# Open lid, swung right back on its hinge (low, so the grate stays visible).
+	for k in 7:
+		V.b(vb, -10, 16 + k, -7 - k, 20, 1, 2, V.noisy(IRON, 0.05))
+	V.b(vb, -9, 23, -14, 18, 1, 1, IRON)
+	V.b(vb, -6, 21, -13, 12, 1, 1, steel)
+	V.p(vb, 0, 22, -12, Color("e8e8ea"))
 	# Side shelves.
 	V.b(vb, -17, 13, -5, 7, 1, 9, V.wood(WOOD, 0, 2))
 	V.b(vb, 10, 13, -5, 7, 1, 9, V.wood(WOOD, 0, 2))

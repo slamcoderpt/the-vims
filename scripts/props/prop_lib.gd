@@ -30,6 +30,8 @@ static var _models := {}    # "name#v" -> VoxelBuilder (normalised, min corner a
 static var _sizes := {}     # "name#v" -> Vector3i
 static var _meshes := {}    # "name#v" -> ArrayMesh
 static var _glass_mat: StandardMaterial3D
+static var _lit_window_mat: ShaderMaterial
+static var _night_ext_mat: StandardMaterial3D
 
 
 static func _ensure_index() -> void:
@@ -161,6 +163,35 @@ static func glass_material() -> StandardMaterial3D:
 		_glass_mat.roughness = 0.1
 		_glass_mat.metallic_specular = 0.9
 	return _glass_mat
+
+
+## Bright warm glass for lit windows at night (vertex colour * boost, unshaded,
+## so it blooms through the glow pass). Use as material_override.
+static func lit_window_material(boost := 1.6) -> ShaderMaterial:
+	if _lit_window_mat == null:
+		var sh := Shader.new()
+		sh.code = """shader_type spatial;
+render_mode unshaded, cull_back;
+uniform float boost = 1.6;
+void fragment() {
+	ALBEDO = COLOR.rgb * boost;
+}
+"""
+		_lit_window_mat = ShaderMaterial.new()
+		_lit_window_mat.shader = sh
+	_lit_window_mat.set_shader_parameter("boost", boost)
+	return _lit_window_mat
+
+
+## Darker, cooler variant of the voxel material for exterior scenery at night
+## (lawns, trees, neighbour houses). Emissive voxels (windows, lamps) keep a
+## glow surface of their own: set this on surface 0 only
+## (MeshInstance3D.set_surface_override_material) so the glow surface stays.
+static func night_exterior_material() -> StandardMaterial3D:
+	if _night_ext_mat == null:
+		_night_ext_mat = VoxelBuilder.solid_material().duplicate()
+		_night_ext_mat.albedo_color = Color(0.44, 0.56, 0.76)
+	return _night_ext_mat
 
 
 # ------------------------------------------------------------------ lights

@@ -33,7 +33,7 @@ const PRESETS := {
 	"home_night": {
 		"ref": "refs/ref3_home_night_cutaway.png",
 		"location": "home", "day": 0, "hour": 21, "minute": 18, "season": 1,
-		"camera": {"target": Vector3(2.6, 3.0, -0.3), "yaw": 34.0, "pitch": 40.0, "distance": 24.0, "fov": 30.0},
+		"camera": {"target": Vector3(3.0, 2.6, -0.9), "yaw": 30.0, "pitch": 32.0, "distance": 20.5, "fov": 33.0},
 		"tasks": [
 			{"title": "Take Bath", "icon": "bath"},
 			{"title": "Brush Teeth", "icon": "brush", "done": true},
@@ -46,7 +46,7 @@ const PRESETS := {
 	"bbq": {
 		"ref": "refs/ref4_backyard_bbq_sunset.png",
 		"location": "backyard", "day": 0, "hour": 19, "minute": 36, "season": 1,
-		"camera": {"target": Vector3(1.4, 0.3, -0.8), "yaw": -6.0, "pitch": 25.0, "distance": 10.0, "fov": 58.0},
+		"camera": {"target": Vector3(0.3, 1.0, -0.4), "yaw": -5.0, "pitch": 15.5, "distance": 9.6, "fov": 55.0},
 		"tasks": [
 			{"title": "Grill Dinner", "icon": "burger", "done": true},
 			{"title": "Talk to Neighbors", "icon": "people"},

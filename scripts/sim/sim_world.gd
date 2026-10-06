@@ -177,7 +177,7 @@ func _adopt_staged() -> void:
 		var bd := 1.6
 		for it in interactables:
 			for a in SimActions.actions_for(it, ag.member):
-				if a.get("pose", "") != pose:
+				if a.get("pose", "") != pose or int(a.get("money", 0)) < 0:
 					continue
 				var d: float = _flat(it.world_use_spot(), ag.actor.global_position)
 				if absf(it.world_use_spot().y - ag.actor.global_position.y) > 1.0:
@@ -385,17 +385,43 @@ func pick_interactable(screen: Vector2):
 	var q := PhysicsRayQueryParameters3D.create(from, from + dir * 300.0)
 	q.collide_with_areas = false
 	var exclude: Array[RID] = []
-	# Skip hidden objects (cut-away floors) and colliders of household members.
-	for _i in 8:
+	# Collect the first few objects along the ray (skipping hidden ones and
+	# colliders on household members). Overlapping boxes (an armchair beside a
+	# bed) are told apart by how close their centre is to the finger on screen.
+	var hits: Array = []
+	var first_d := INF
+	for _i in 6:
 		q.exclude = exclude
 		var hit := space.intersect_ray(q)
 		if hit.is_empty():
-			return null
-		var c = hit.collider
-		if c is Interactable and c.is_visible_in_tree() and not is_household_actor(c.get_parent()) and location.is_ancestor_of(c):
-			return c
+			break
 		exclude.append(hit.rid)
-	return null
+		var c = hit.collider
+		if not (c is Interactable and c.is_visible_in_tree() and not is_household_actor(c.get_parent()) and location.is_ancestor_of(c)):
+			continue
+		var d: float = from.distance_to(hit.position)
+		if hits.is_empty():
+			first_d = d
+		elif d - first_d > 1.5:
+			break
+		hits.append(c)
+	if hits.is_empty():
+		return null
+	if build.is_active():
+		for c in hits:
+			if c.has_meta("placed_uid"):
+				return c
+	var best = hits[0]
+	var bd := INF
+	for c in hits:
+		var cp: Vector3 = c.global_transform * c.look_at_spot
+		if cam.is_position_behind(cp):
+			continue
+		var sd := cam.unproject_position(cp).distance_to(screen)
+		if sd < bd:
+			bd = sd
+			best = c
+	return best
 
 
 ## Floor point under a screen position: {pos: Vector3, level: int} or {}.
@@ -611,9 +637,59 @@ func approach(ag, o: Dictionary) -> Dictionary:
 		if d.length() < 0.05:
 			d = Vector3(0, 0, 1)
 		spot = _open_spot(center + d.normalized() * (maxf(half.x, half.z) + 0.4))
+	var pose: String = a.get("pose", "")
+	var seated := (pose.begins_with("sit") and pose != "sit_floor") or pose in ["type", "read"]
+	if seated and ag.kind != "dog" and nav and nav.seat_height(spot) < 0.3:
+		# Sitting at something that isn't itself a seat (a dinner table, a
+		# fire pit): take the nearest free chair around it.
+		var chair := _free_seat_near(ag, center, maxf(_box_half(it).x, _box_half(it).z) + 1.2)
+		if chair != Vector3.INF:
+			return {"spot": chair, "face": center}
 	if _flat(face, spot) < 0.3:
 		face = _open_face(it, spot, a)
 	return {"spot": spot, "face": face}
+
+
+## Centre of the nearest chair-height seat cell within r of c that nobody is
+## sitting on, or Vector3.INF.
+func _free_seat_near(ag, c: Vector3, r: float) -> Vector3:
+	var li := nav.level_of(c)
+	var cc := nav.cell_of(c)
+	var rc := int(ceil(r / nav.cs))
+	var taken: Array[Vector3] = []
+	for n in location.find_children("*", "Node3D", true, false):
+		if n is SimActor and n != ag.actor:
+			taken.append(n.global_position)
+	for other in agents:
+		if other and other != ag and other.phase in ["walk", "act", "wait"]:
+			taken.append(other.spot)
+	var best := Vector3.INF
+	var bd := INF
+	for dz in range(-rc, rc + 1):
+		for dx in range(-rc, rc + 1):
+			var q := cc + Vector2i(dx, dz)
+			if q.x < 0 or q.y < 0 or q.x >= nav.w or q.y >= nav.h:
+				continue
+			var i := q.y * nav.w + q.x
+			var st: float = nav.seats[li][i]
+			var fy: float = nav.floors[li][i]
+			if st == INF or fy == INF or st - fy < 0.3 or st - fy > 0.6:
+				continue
+			var p := nav.center_of(li, q)
+			if _flat(p, c) > r:
+				continue
+			var free := true
+			for t in taken:
+				if _flat(t, p) < 0.45:
+					free = false
+					break
+			if not free:
+				continue
+			var d := _flat(p, ag.actor.global_position) + _flat(p, c) * 0.5
+			if d < bd:
+				bd = d
+				best = p
+	return best
 
 
 func _box_half(it: Node) -> Vector3:
@@ -718,7 +794,7 @@ func choose_autonomous(ag) -> Dictionary:
 
 func _desperate_fix(ag, a: Dictionary) -> bool:
 	var low: String = ag.lowest_need()
-	return low != "" and ag.member.needs[low] < 0.2 and float(a.get("needs", {}).get(low, 0.0)) > 0.0
+	return low != "" and ag.member.needs[low] < 0.2 and float(a.get("needs", {}).get(low, 0.0)) >= 0.15
 
 
 func on_action_done(_ag, _o: Dictionary) -> void:

@@ -325,10 +325,10 @@ func _trees() -> void:
 	# Canopies at 0.25 m: chunky leaves, a fraction of the triangles.
 	var vb := VoxelBuilder.new()
 	vb.jitter = 0.08
-	_tree(vb, Vector3(-10.5, 0, -8.6), 3.0, 1.9, 0)
-	_tree(vb, Vector3(-17.0, 0, -9.0), 3.6, 2.2, 1)
+	_tree(vb, Vector3(-10.5, 0, -8.6), 3.4, 1.9, 3)
+	_tree(vb, Vector3(-17.0, 0, -9.0), 3.6, 2.2, 3)
 	_tree(vb, Vector3(-15.0, 0, -3.0), 4.0, 2.5, 1)
-	_tree(vb, Vector3(-5.0, 0, -9.0), 3.4, 2.0, 2)
+	_tree(vb, Vector3(-5.5, 0, -10.0), 3.6, 1.9, 3)
 	_tree(vb, Vector3(15.5, 0, -4.0), 4.2, 2.5, 0)
 	# Hedge along the back fence (outside).
 	var x := -13.0
@@ -363,30 +363,48 @@ func _tree(vb: VoxelBuilder, base: Vector3, height: float, crown: float, tone: i
 # ------------------------------------------------------------------ neighbours
 
 func _neighbours() -> void:
+	# A row of dusky neighbour houses along the horizon (silhouettes against
+	# the sunset with warm lit windows), with dark tree clumps between them.
 	var vb := FastBuilder.new()
 	vb.jitter = 0.0
 	vb.skip_down_below = 0
 	vb.skip_normals = [Vector3i(0, 0, -1)]
-	var walls := [Color("7e7096"), Color("8c7c8e"), Color("6f6c90"), Color("94848c"), Color("7a6a8a")]
-	var roofs := [Color("3e3550"), Color("4a3640"), Color("35334a"), Color("443848")]
+	var walls := [Color("4c4664"), Color("57496a"), Color("454a68"), Color("5c4c66"), Color("4a4260")]
+	var roofs := [Color("2a2438"), Color("32263a"), Color("262636"), Color("2e2434")]
+	# x, z, width, depth, wall height (m), style
 	var houses := [
-		[-19.0, -24.0, 8.0, 6.0, 4.5, 0],
-		[-8.5, -27.0, 7.0, 6.0, 4.0, 1],
-		[0.5, -30.0, 7.0, 6.0, 4.5, 2],
-		[-29.0, -27.0, 7.0, 6.0, 4.0, 3],
-		[10.0, -33.0, 8.0, 6.0, 5.0, 0],
+		[-46.0, -40.0, 9.0, 7.0, 5.0, 0],
+		[-34.0, -44.0, 8.0, 6.0, 3.5, 1],
+		[-24.0, -40.0, 9.0, 7.0, 5.0, 2],
+		[-13.0, -43.0, 7.0, 6.0, 3.5, 3],
+		[-4.0, -40.0, 8.0, 7.0, 5.0, 4],
+		[6.0, -45.0, 8.0, 6.0, 5.0, 1],
+		[18.0, -42.0, 9.0, 7.0, 5.0, 2],
 	]
 	for hd in houses:
 		_house(vb, hd, walls[hd[5] % walls.size()], roofs[hd[5] % roofs.size()])
 	V.inst(vb, root, V.SIZE_BIG, Vector3.ZERO, 0.0, Vector3.ZERO, false, false, "Neighbours")
-	# Distant tree line at 0.5 m.
+	# Dark tree clumps at 0.5 m: between and behind the houses.
 	var tl := VoxelBuilder.new()
-	tl.jitter = 0.08
-	for i in 14:
-		var tx := -34.0 + i * 5.0 + _rng.randf_range(-1.0, 1.0)
-		var tz := -44.0 + _rng.randf_range(-3.0, 3.0)
-		var r := _rng.randf_range(1.0, 1.6)
-		V.blob(tl, Vector3(tx * 2, r * 2 * 1.3, tz * 2), Vector3(r * 2, r * 2 * 1.2, r * 2), V.leaves(i, 3, 0), 0.3, i)
+	tl.jitter = 0.06
+	var dark := func(q: Vector3i) -> Color:
+		var c: Color = [Color("27402e"), Color("2f4a34"), Color("223a2a"), Color("35503a")][int(V.h1(q, 7) * 4.0) % 4]
+		return V.shade(c, 0.9 + clampf(float(q.y) * 0.015, 0.0, 0.25))
+	for i in 18:
+		var tx := -54.0 + i * 4.6 + _rng.randf_range(-1.2, 1.2)
+		var tz := -50.0 + _rng.randf_range(-3.0, 2.0)
+		var r := _rng.randf_range(1.6, 2.6)
+		var hgt := _rng.randf_range(4.0, 7.5)
+		# Trunk + layered crown (rounder tops read as deciduous silhouettes).
+		V.b(tl, int(tx * 2), 0, int(tz * 2), 1, int(hgt * 2 * 0.6), 1, Color("2a2224"))
+		V.blob(tl, Vector3(tx * 2, hgt * 2, tz * 2), Vector3(r * 2, r * 2 * 1.1, r * 2), dark, 0.32, i)
+		V.blob(tl, Vector3(tx * 2 + r, hgt * 2 - r * 0.8, tz * 2), Vector3(r * 1.3, r * 1.2, r * 1.3), dark, 0.32, i + 40, true)
+	# A couple of tall conifers for variety in the skyline.
+	for cx in [-29.0, -8.5, 12.0]:
+		var cz := -47.0
+		for k in 10:
+			var rr := maxf(0.5, 3.4 - k * 0.32)
+			V.blob(tl, Vector3(cx * 2, 2.0 + k * 1.6, cz * 2), Vector3(rr, 1.0, rr), dark, 0.25, k)
 	V.inst(tl, root, 0.5, Vector3.ZERO, 0.0, Vector3.ZERO, false, false, "TreeLine")
 
 
@@ -397,23 +415,38 @@ func _house(vb: VoxelBuilder, hd: Array, wall: Color, roof: Color) -> void:
 	var w := int(hd[2] * s)
 	var d := int(hd[3] * s)
 	var h := int(hd[4] * s)
-	V.b(vb, x0, 0, z0, w, h, d, V.wood(wall, 0, 1, 0.06))
-	# Gable roof along X.
-	var half := d / 2 + 1
-	for k in half + 1:
-		V.b(vb, x0 - 1, h + k, z0 - 1 + k, w + 2, 1, d + 2 - 2 * k, V.noisy(roof, 0.08, k))
-	# Chimney.
-	V.b(vb, x0 + w - 5, h + 2, z0 + d / 2, 2, half + 1, 2, Color("8a6a62"))
-	# Lit windows on the front (+z) face, two floors.
+	var style: int = hd[5]
+	# Flat-shaded walls (distant + blurred, so plain faces merge into few quads).
+	V.b(vb, x0, 0, z0, w, h, d, wall)
+	V.b(vb, x0, 0, z0 + d, w, 1, 1, V.shade(wall, 0.8))
+	# Gable roof: along X for even styles, a front-facing gable for odd ones.
+	if style % 2 == 0:
+		var half := d / 2 + 1
+		for k in half + 1:
+			V.b(vb, x0 - 1, h + k, z0 - 1 + k, w + 2, 1, d + 2 - 2 * k, V.shade(roof, 0.94 + 0.03 * (k % 3)))
+		V.b(vb, x0 + w - 6, h + 2, z0 + d / 2, 3, half + 2, 3, Color("4a3a40"))
+	else:
+		var half := w / 2 + 1
+		for k in half + 1:
+			V.b(vb, x0 - 1 + k, h + k, z0 - 1, w + 2 - 2 * k, 1, d + 2, V.shade(roof, 0.94 + 0.03 * (k % 3)))
+			# Gable wall triangle on the front.
+			if k > 0 and w - 2 * k + 2 > 0:
+				V.b(vb, x0 + k - 1, h + k - 1, z0 + d - 1, w - 2 * k + 2, 1, 1, wall)
+		# Attic window.
+		V.b(vb, x0 + w / 2 - 1, h + 1, z0 + d, 2, 2, 1, Color("ffc76e"), true)
+	# Lit windows on the front (+z) face.
 	var floors := 2 if h >= 18 else 1
 	for f in floors:
 		var wy := 3 + f * 9
 		var n := w / 7
 		for i in n:
 			var wx := x0 + 2 + i * 7
-			var lit := V.hs(wx, wy, z0) < 0.7
-			var gc := Color("ffcf7a") if lit else Color("6a6a8a")
+			var lit := V.hs(wx, wy, z0) < 0.75
+			var gc := Color("ffc76e") if lit else Color("3a3850")
 			V.b(vb, wx, wy, z0 + d, 3, 4, 1, gc, lit)
-			V.b(vb, wx - 1, wy - 1, z0 + d, 5, 1, 1, Color("efe8e0"))
+			V.b(vb, wx - 1, wy - 1, z0 + d, 5, 1, 1, V.shade(wall, 1.35))
 			if lit:
-				V.b(vb, wx + 1, wy, z0 + d, 1, 4, 1, V.shade(gc, 0.8), true)
+				V.b(vb, wx + 1, wy, z0 + d, 1, 4, 1, V.shade(gc, 0.75), true)
+	# Front door with a porch light.
+	V.b(vb, x0 + w - 6, 0, z0 + d, 3, 6, 1, Color("2c2430"))
+	V.b(vb, x0 + w - 7, 6, z0 + d, 1, 1, 1, Color("ffd38a"), true)

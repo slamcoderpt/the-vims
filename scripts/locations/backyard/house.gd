@@ -21,6 +21,7 @@ const DECK_Y := 0.375
 const X0 := 12      # 1.5 m
 const X1 := 104     # 13 m
 const WALL_Z := -48 # -6 m (outer face)
+const UX0 := 44     # 5.5 m: left edge of the two-storey block
 const DECK_Z1 := -21
 
 var root: Node3D
@@ -60,14 +61,25 @@ func _shell(vb: VoxelBuilder) -> void:
 	var zb := -82
 	# Foundation.
 	V.b(vb, X0, 0, WALL_Z - 2, X1 - X0, 3, 2, Color("8f8790"))
-	# Back wall (2 cells thick) + side walls.
-	V.b(vb, X0, 3, WALL_Z - 2, X1 - X0, 45, 2, _siding)
-	V.b(vb, X0, 3, zb, 2, 45, WALL_Z - zb, _siding)
+	# Back wall (2 cells thick) + side walls. The left wing (X0..UX0) is a
+	# single storey with a low lean-to roof so the sunset sky shows above it;
+	# the two-storey block sits to the right.
+	V.b(vb, X0, 3, WALL_Z - 2, X1 - X0, 25, 2, _siding)
+	V.b(vb, UX0, 28, WALL_Z - 2, X1 - UX0, 20, 2, _siding)
+	V.b(vb, X0, 3, zb, 2, 25, WALL_Z - zb, _siding)
+	V.b(vb, UX0, 28, zb, 2, 20, WALL_Z - zb, _siding)
 	V.b(vb, X1 - 2, 3, zb, 2, 45, WALL_Z - zb, _siding)
-	V.b(vb, X0, 3, zb, X1 - X0, 45, 2, Color("e8d2b0"))
+	V.b(vb, X0, 3, zb, UX0 - X0, 25, 2, Color("e8d2b0"))
+	V.b(vb, UX0, 3, zb, X1 - UX0, 45, 2, Color("e8d2b0"))
 	# Corner trim boards.
-	for x in [X0 - 1, X1]:
-		V.b(vb, x, 3, WALL_Z - 2, 1, 45, 3, TRIM)
+	V.b(vb, X0 - 1, 3, WALL_Z - 2, 1, 25, 3, TRIM)
+	V.b(vb, UX0 - 1, 28, WALL_Z - 2, 1, 20, 3, TRIM)
+	V.b(vb, X1, 3, WALL_Z - 2, 1, 45, 3, TRIM)
+	# Lean-to roof over the single-storey wing, rising towards the back.
+	for z in range(zb - 2, WALL_Z + 1):
+		var ry := 28 + int(float(WALL_Z - z) / 4.0)
+		V.b(vb, X0 - 2, ry, z, UX0 - X0 + 2, 1, 1, func(q: Vector3i) -> Color:
+			return V.shade(SHINGLE, 0.86 + V.h1(Vector3i(q.x / 3 + posmod(q.z, 2) * 7, 0, q.z), 5) * 0.28))
 	# Floor / ceiling between storeys.
 	V.b(vb, X0, 2, zb, X1 - X0, 1, WALL_Z - zb - 2, func(q: Vector3i) -> Color:
 		return V.shade(Color("c08a58"), 0.92 + V.hs((q.x + q.z * 5) / 7, q.z, 2) * 0.16))
@@ -88,17 +100,21 @@ func _shell(vb: VoxelBuilder) -> void:
 	_window(vb, 84, 9, 14, 12)
 	_window(vb, 15, 9, 9, 12)
 	# Upper floor windows.
-	_window(vb, 20, 32, 12, 10)
-	_window(vb, 46, 32, 12, 10)
+	_window(vb, 56, 32, 12, 10)
 	_window(vb, 80, 32, 14, 10)
 	# Roof: gable along X, ridge over the house.
 	var eave_y := 48
 	for k in 22:
 		var z := WALL_Z + 1 - k
-		V.b(vb, X0 - 2, eave_y + k, z - 1, X1 - X0 + 4, 1, 2, func(q: Vector3i) -> Color:
+		V.b(vb, UX0 - 2, eave_y + k, z - 1, X1 - UX0 + 4, 1, 2, func(q: Vector3i) -> Color:
 			return V.shade(SHINGLE, 0.86 + V.h1(Vector3i(q.x / 3 + (q.y % 2) * 7, q.y, 0), 5) * 0.28))
 	# Fascia board.
-	V.b(vb, X0 - 2, eave_y - 1, WALL_Z, X1 - X0 + 4, 1, 1, TRIM)
+	V.b(vb, UX0 - 2, eave_y - 1, WALL_Z, X1 - UX0 + 4, 1, 1, TRIM)
+	# Gable end of the upper block (left side) closes the roof triangle.
+	for k in 22:
+		var dz := WALL_Z - 1 - k - zb
+		if dz > 0:
+			V.b(vb, UX0, eave_y + k, zb, 2, 1, dz, _siding)
 
 
 func _window(vb: VoxelBuilder, x: int, y: int, w: int, h: int) -> void:

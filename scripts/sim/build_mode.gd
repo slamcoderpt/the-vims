@@ -245,6 +245,8 @@ func _move_ghost(p: Vector3, find_free := false) -> void:
 		return
 	var q := _snap(ghost_item, ghost_rot, p)
 	ghost_valid = world.nav != null and world.nav.can_place(_box(ghost_item, ghost_rot, q))
+	if find_free and ghost_valid and _covers_sim(_box(ghost_item, ghost_rot, q)):
+		ghost_valid = false
 	if not ghost_valid and find_free and world.nav:
 		# Spiral out to the nearest free spot.
 		var cs: float = world.nav.cs
@@ -252,7 +254,8 @@ func _move_ghost(p: Vector3, find_free := false) -> void:
 			for k in 16:
 				var a := TAU * k / 16.0
 				var t := _snap(ghost_item, ghost_rot, p + Vector3(cos(a), 0, sin(a)) * r * cs)
-				if world.nav.can_place(_box(ghost_item, ghost_rot, t)):
+				var tb := _box(ghost_item, ghost_rot, t)
+				if world.nav.can_place(tb) and not _covers_sim(tb):
 					q = t
 					ghost_valid = true
 					break
@@ -264,6 +267,29 @@ func _move_ghost(p: Vector3, find_free := false) -> void:
 	ghost_mesh.material_override = _mat_ok if ghost_valid else _mat_bad
 	if grid:
 		grid.global_position = Vector3(q.x, q.y + 0.015, q.z)
+
+
+func _covers_sim(box: AABB) -> bool:
+	var g := box.grow(0.25)
+	for ag in world.agents:
+		if ag and is_instance_valid(ag.actor):
+			var p: Vector3 = ag.actor.global_position
+			if p.x > g.position.x and p.x < g.end.x and p.z > g.position.z and p.z < g.end.z and absf(p.y - box.position.y) < 1.0:
+				return true
+	return false
+
+
+## Sims standing where something was just placed step out of the way.
+func _push_sims(box: AABB) -> void:
+	var g := box.grow(0.1)
+	for ag in world.agents:
+		if ag == null or not is_instance_valid(ag.actor):
+			continue
+		var p: Vector3 = ag.actor.global_position
+		if p.x > g.position.x and p.x < g.end.x and p.z > g.position.z and p.z < g.end.z and absf(p.y - box.position.y) < 1.0:
+			if ag.phase == "act":
+				ag.cancel_current()
+			ag.actor.global_position = world._open_spot(p)
 
 
 func place_ghost() -> bool:
@@ -293,6 +319,7 @@ func place_ghost() -> bool:
 	ghost = null
 	ghost_item = {}
 	_spawn(entry)
+	_push_sims(_box(Catalog.get_item(entry.item), entry.rot, entry.pos))
 	Game.furniture_changed.emit()
 	return true
 

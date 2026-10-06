@@ -15,6 +15,7 @@ extends Node3D
 ## gets energy = base_energy * lerp(day_factor, lamp_night_mult (profile, default 1), night).
 
 const PostFX := preload("res://scripts/world/post/post_fx.gd")
+const Mesher := preload("res://scripts/props/mesher.gd")
 
 var sun: DirectionalLight3D
 var moon: DirectionalLight3D
@@ -127,6 +128,8 @@ func _apply() -> void:
 	env.adjustment_saturation = 1.0
 	env.glow_intensity = lerpf(0.5, 0.9, night)
 	env.glow_hdr_threshold = lerpf(0.95, 0.7, night)
+	# --- Emissive voxels (lamp shades, lit windows) bloom more after dark.
+	Mesher.set_glow_boost(lerpf(1.0, profile.get("glow_boost_night", 1.7), night))
 	# --- Lamps
 	if is_inside_tree():
 		for l in get_tree().get_nodes_in_group("vims_lamps"):

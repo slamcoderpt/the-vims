@@ -6,15 +6,20 @@ extends RefCounted
 
 const SKY_SHADER := """
 shader_type sky;
+// Sunset gradient: warm gold at the horizon -> peach/orange -> pink ->
+// violet overhead, with streaky lit clouds and a soft sun glow.
 uniform vec3 top_color : source_color = vec3(0.30, 0.22, 0.48);
 uniform vec3 mid_color : source_color = vec3(0.78, 0.42, 0.55);
 uniform vec3 low_color : source_color = vec3(1.0, 0.62, 0.42);
 uniform vec3 horizon_color : source_color = vec3(1.0, 0.80, 0.52);
+uniform vec3 cloud_lit : source_color = vec3(1.0, 0.62, 0.55);
+uniform vec3 cloud_dark : source_color = vec3(0.52, 0.34, 0.58);
 uniform vec3 sun_dir = vec3(-0.85, 0.08, -0.5);
 uniform vec3 sun_color : source_color = vec3(1.0, 0.75, 0.45);
-uniform float horizon_y = -0.24;
-uniform float zenith_y = -0.02;
+uniform float horizon_y = -0.02;
+uniform float zenith_y = 0.34;
 uniform float brightness = 1.0;
+uniform float cloud_amount = 1.0;
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float noise(vec2 p) {
@@ -26,18 +31,24 @@ float noise(vec2 p) {
 void sky() {
 	vec3 d = normalize(EYEDIR);
 	float t = clamp((d.y - horizon_y) / (zenith_y - horizon_y), 0.0, 1.0);
-	vec3 c = mix(horizon_color, low_color, smoothstep(0.0, 0.18, t));
-	c = mix(c, mid_color, smoothstep(0.12, 0.45, t));
-	c = mix(c, top_color, smoothstep(0.4, 1.0, t));
-	// Streaky sunset clouds (pink lit undersides, violet bodies).
-	vec2 uv = vec2(atan(d.x, -d.z) * 3.0, t * 18.0);
-	float n = noise(uv * vec2(1.0, 1.0)) * 0.6 + noise(uv * vec2(2.3, 2.0)) * 0.4;
-	float band = smoothstep(0.15, 0.3, t) * (1.0 - smoothstep(0.55, 0.8, t));
-	float cl = smoothstep(0.55, 0.8, n) * band;
-	c = mix(c, mix(vec3(0.98, 0.55, 0.55), vec3(0.62, 0.38, 0.62), t), cl * 0.6);
-	// Sun glow.
+	vec3 c = mix(horizon_color, low_color, smoothstep(0.0, 0.22, t));
+	c = mix(c, mid_color, smoothstep(0.16, 0.5, t));
+	c = mix(c, top_color, smoothstep(0.45, 1.0, t));
+	// Streaky sunset clouds: long horizontal wisps, lit pink-orange from
+	// below near the horizon, cooler violet higher up.
+	float az = atan(d.x, -d.z);
+	vec2 uv = vec2(az * 5.0, t * 22.0);
+	float n = noise(uv * vec2(0.6, 1.0)) * 0.55 + noise(uv * vec2(1.7, 2.3) + 3.1) * 0.3 + noise(uv * vec2(4.0, 5.0)) * 0.15;
+	float band = smoothstep(0.12, 0.26, t) * (1.0 - smoothstep(0.7, 0.95, t));
+	float cl = smoothstep(0.52, 0.72, n) * band * cloud_amount;
+	vec3 ccol = mix(cloud_lit, cloud_dark, smoothstep(0.25, 0.75, t));
+	c = mix(c, ccol, cl * 0.75);
+	// Thin bright rims under the clouds.
+	float rim = smoothstep(0.55, 0.6, n) * (1.0 - smoothstep(0.6, 0.66, n)) * band * cloud_amount;
+	c += cloud_lit * rim * 0.12;
+	// Sun glow low on the horizon.
 	float s = max(dot(d, normalize(sun_dir)), 0.0);
-	c += sun_color * (pow(s, 6.0) * 0.35 + pow(s, 60.0) * 0.6);
+	c += sun_color * (pow(s, 4.0) * 0.32 + pow(s, 40.0) * 0.5);
 	COLOR = c * brightness;
 }
 """
@@ -74,9 +85,9 @@ func setup(viewport: Viewport, shared_env: Environment) -> void:
 	env.fog_mode = Environment.FOG_MODE_DEPTH
 	env.fog_light_color = Color(0.78, 0.52, 0.62)
 	env.fog_light_energy = 1.0
-	env.fog_density = 0.6
-	env.fog_depth_begin = 14.0
-	env.fog_depth_end = 55.0
+	env.fog_density = 0.32
+	env.fog_depth_begin = 22.0
+	env.fog_depth_end = 60.0
 	env.fog_depth_curve = 1.4
 	env.fog_sky_affect = 0.0
 	env.adjustment_enabled = true
@@ -111,15 +122,19 @@ func update(hour: float) -> void:
 	if sky_mat == null:
 		return
 	sky_mat.set_shader_parameter("brightness", lerpf(1.0, 0.3, n))
-	var top := Color(0.30, 0.22, 0.48).lerp(Color(0.05, 0.06, 0.16), n).lerp(Color(0.38, 0.58, 0.9), day)
-	var mid := Color(0.80, 0.42, 0.58).lerp(Color(0.16, 0.12, 0.3), n).lerp(Color(0.6, 0.76, 0.95), day)
-	var low := Color(1.0, 0.58, 0.40).lerp(Color(0.3, 0.16, 0.3), n).lerp(Color(0.8, 0.86, 0.95), day)
-	var hor := Color(1.0, 0.80, 0.52).lerp(Color(0.36, 0.2, 0.3), n).lerp(Color(0.92, 0.9, 0.86), day)
+	var top := Color(0.27, 0.20, 0.46).lerp(Color(0.05, 0.06, 0.16), n).lerp(Color(0.38, 0.58, 0.9), day)
+	var mid := Color(0.66, 0.36, 0.60).lerp(Color(0.16, 0.12, 0.3), n).lerp(Color(0.6, 0.76, 0.95), day)
+	var low := Color(1.0, 0.50, 0.46).lerp(Color(0.3, 0.16, 0.3), n).lerp(Color(0.8, 0.86, 0.95), day)
+	var hor := Color(1.0, 0.72, 0.42).lerp(Color(0.36, 0.2, 0.3), n).lerp(Color(0.92, 0.9, 0.86), day)
+	sky_mat.set_shader_parameter("sun_dir", Vector3(-0.45, 0.04, -1.0))
+	sky_mat.set_shader_parameter("horizon_y", 0.0)
+	sky_mat.set_shader_parameter("zenith_y", 0.42)
+	sky_mat.set_shader_parameter("cloud_amount", lerpf(1.0, 0.4, n))
 	sky_mat.set_shader_parameter("top_color", top)
 	sky_mat.set_shader_parameter("mid_color", mid)
 	sky_mat.set_shader_parameter("low_color", low)
 	sky_mat.set_shader_parameter("horizon_color", hor)
-	env.fog_light_color = Color(0.86, 0.55, 0.6).lerp(Color(0.2, 0.16, 0.3), n).lerp(Color(0.85, 0.85, 0.88), day)
+	env.fog_light_color = Color(0.62, 0.42, 0.62).lerp(Color(0.2, 0.16, 0.3), n).lerp(Color(0.85, 0.85, 0.88), day)
 
 
 func release() -> void:

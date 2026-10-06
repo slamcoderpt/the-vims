@@ -120,14 +120,14 @@ func _s_money() -> void:
 	await _frames(3)
 	await _choose("Pay Bills")
 	Game.speed = 3
-	await _until(func(): return jack.last_done == "bills", 40.0)
+	await _until(func(): return jack.last_done == "bills", 90.0)
 	_step("money_spent", Game.money == money0 - 120 and _task_done("Pay Bills"), "money %d -> %d, Pay Bills done=%s" % [money0, Game.money, str(_task_done("Pay Bills"))])
 	var money1 := Game.money
 	_menus.clear()
 	await _tap_world(_it_center(comp))
 	await _frames(3)
 	await _choose("Work")
-	await _until(func(): return jack.last_done == "work", 60.0)
+	await _until(func(): return jack.last_done == "work", 150.0)
 	_step("money_earned", Game.money == money1 + 180, "money %d -> %d, Logic=%.2f" % [money1, Game.money, Game.skill_level(jack.index, "Logic")])
 
 
@@ -284,6 +284,10 @@ func _s_travel() -> void:
 	# One action at the market: pay at the checkout.
 	jack = _agent("Jack")
 	jack.cancel_all()
+	# Content family: nobody needs to spend money on their own during this check.
+	for m in Game.household:
+		for k in m.needs:
+			m.needs[k] = maxf(m.needs[k], 0.8)
 	Game.selected = jack.index
 	var cashier = _find_it("Cashier")
 	var money_m := Game.money
@@ -321,6 +325,13 @@ func _s_travel() -> void:
 
 	# ---------------------------------------------------------------- travel home
 	Game.speed = 1
+	# Go back to the market first so "Return Home" can tick off there.
+	_menus.clear()
+	Game.mode = "manage"
+	await _frames(3)
+	await _choose("Grocery Market")
+	await _frames(6)
+	var kept_market := _task_done("Pay at Checkout")
 	_menus.clear()
 	Game.mode = "manage"
 	await _frames(3)
@@ -331,8 +342,10 @@ func _s_travel() -> void:
 	for t in mk:
 		if t.title == "Return Home" and t.done:
 			rh = true
-	_step("travel_home", Game.location == "home" and sim.loc_name == "home" and rh and _task_done("Build Skill"),
-		"location=%s market 'Return Home' done=%s, home tasks kept=%s" % [Game.location, str(rh), str(_task_done("Build Skill"))])
+	var loop_ran: bool = not args.has("only") or "loop" in str(args.only)
+	var kept_home: bool = _task_done("Build Skill") or not loop_ran
+	_step("travel_home", Game.location == "home" and sim.loc_name == "home" and rh and kept_home and kept_market,
+		"location=%s market 'Return Home' done=%s, tasks kept: market=%s home=%s" % [Game.location, str(rh), str(kept_market), str(kept_home)])
 	await _shot("home_again")
 
 

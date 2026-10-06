@@ -321,6 +321,8 @@ func _complete() -> void:
 	var a: Dictionary = order.get("action", {})
 	var m := int(a.get("money", 0))
 	if m != 0:
+		if OS.has_environment("VIMS_PLAYTEST"):
+			print("  money: %s %s %+d (%s)" % [display_name(), a.get("id", ""), m, "auto" if order.get("auto", false) else "player"])
 		if Game.add_money(m):
 			_say(("+$%d" if m > 0 else "-$%d") % absi(m), "money")
 		else:

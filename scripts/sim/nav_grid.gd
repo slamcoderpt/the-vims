@@ -504,12 +504,14 @@ func _los(li: int, a: Vector2i, b: Vector2i) -> bool:
 			err += dx
 		else:
 			# Exactly through a corner: both neighbours must be open.
+			if x + sx < 0 or x + sx >= w or z + sz < 0 or z + sz >= h:
+				return false
 			if bl[z * w + x + sx] != 0 or bl[(z + sz) * w + x] != 0:
 				return false
 			x += sx
 			z += sz
 			err += dx - dz
-		if bl[z * w + x] != 0:
+		if x < 0 or z < 0 or x >= w or z >= h or bl[z * w + x] != 0:
 			return false
 	return true
 

@@ -24,6 +24,29 @@ const AOV := [1.0, 0.82, 0.68, 0.55]
 const RUN := [2, 2, 0, 0, 0, 0]
 
 
+static var _glow_mat: ShaderMaterial
+
+## Glow surface material for meshes built here: unshaded vertex colour times
+## a global boost (lighting.gd raises it at night so lamps / lit windows bloom).
+static func glow_material() -> ShaderMaterial:
+	if _glow_mat == null:
+		var sh := Shader.new()
+		sh.code = """shader_type spatial;
+render_mode unshaded;
+uniform float boost = 1.0;
+void fragment() {
+	ALBEDO = COLOR.rgb * boost;
+}
+"""
+		_glow_mat = ShaderMaterial.new()
+		_glow_mat.shader = sh
+	return _glow_mat
+
+
+static func set_glow_boost(k: float) -> void:
+	glow_material().set_shader_parameter("boost", k)
+
+
 class Surf:
 	var v := PackedVector3Array()
 	var n := PackedVector3Array()
@@ -139,7 +162,7 @@ static func build(vb: VoxelBuilder, vs := 0.0625, origin := Vector3.ZERO, skip_d
 				solid.quad(q[0], q[1], q[2], q[3], Vector3(n), e[1], e[2], e[3], e[4])
 				k = m + 1
 	var mesh := ArrayMesh.new()
-	for pair in [[solid, VoxelBuilder.solid_material()], [lit, VoxelBuilder.glow_material()]]:
+	for pair in [[solid, VoxelBuilder.solid_material()], [lit, glow_material()]]:
 		var s: Surf = pair[0]
 		if s.v.is_empty():
 			continue

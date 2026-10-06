@@ -150,6 +150,6 @@ func lighting_profile() -> Dictionary:
 		"ambient_day": Color(0.98, 0.74, 0.66), "ambient_night": Color(0.52, 0.42, 0.70),
 		"ambient_energy": 0.8, "ambient_night_energy": 0.62,
 		"exposure": 1.08, "shadow_distance": 34.0,
-		"post": {"focus_y": 0.6, "band": 0.2, "falloff": 0.32, "blur_px": 7.0, "top_boost": 1.25,
+		"post": {"focus_y": 0.58, "band": 0.2, "falloff": 0.36, "blur_px": 6.0, "top_boost": 0.8,
 			"saturation": 1.14, "contrast": 1.05, "tint": Vector3(1.05, 0.98, 0.95), "vignette": 0.24},
 	}
