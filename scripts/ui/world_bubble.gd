@@ -7,7 +7,15 @@ extends Control
 ## The owner (hud.gd) sets `tip` (screen point the tail touches) every frame.
 
 const UI := preload("res://scripts/ui/ui_kit.gd")
-const TAIL_H := 11.0
+const TAIL_H := 13.0
+## Action bubble metrics (design px at 1672x941), sized to ref1's Work/Paint.
+const A_H := 60.0
+const A_H_PLAIN := 50.0
+const A_ICON := 36.0
+const A_TEXT_X := 60.0
+const A_FONT := 20
+const A_PAD_R := 18.0
+const A_MIN_W := 172.0
 
 var kind := "action"
 var text := ""
@@ -35,7 +43,7 @@ var _age := 0.0
 
 func _init() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_body = UI.card_style(12, UI.WHITE, 6)
+	_body = UI.card_style(14, UI.WHITE, 7)
 
 
 func configure(data: Dictionary) -> void:
@@ -52,7 +60,7 @@ func configure(data: Dictionary) -> void:
 	elif bc is String:
 		bar_color = UI.BLUE if bc == "blue" else (Color(bc) if bc.begins_with("#") else UI.GREEN)
 	ttl = data.get("ttl", 4.0 if kind == "skill" else -1.0)
-	_body.set_corner_radius_all(11 if kind == "skill" else 12)
+	_body.set_corner_radius_all(12 if kind == "skill" else 14)
 	_measure()
 	queue_redraw()
 
@@ -61,24 +69,24 @@ func _measure() -> void:
 	var f := UI.font(800)
 	match kind:
 		"action":
-			var tw := f.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x
+			var tw := f.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, A_FONT).x
 			if sub != "":
-				tw = maxf(tw, UI.font(700).get_string_size(sub, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x)
-			size = Vector2(maxf(146.0 if progress >= 0.0 else 100.0, tw + 72.0), 50.0 if (progress >= 0.0 or sub != "") else 42.0)
+				tw = maxf(tw, UI.font(700).get_string_size(sub, HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x)
+			size = Vector2(maxf(A_MIN_W if progress >= 0.0 else 120.0, tw + A_TEXT_X + A_PAD_R + (22.0 if progress >= 0.0 else 0.0)), A_H if (progress >= 0.0 or sub != "") else A_H_PLAIN)
 		"speech":
-			var tw2 := UI.font(700).get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x
-			size = Vector2(tw2 + (50.0 if icon_tex else 26.0), 40.0)
+			var tw2 := UI.font(700).get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 17).x
+			size = Vector2(tw2 + (58.0 if icon_tex else 30.0), 46.0)
 		"skill":
-			var tw3 := f.get_string_size("+ " + text, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x
-			size = Vector2(tw3 + (40.0 if icon_tex else 22.0), 30.0)
+			var tw3 := f.get_string_size("+ " + text, HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x
+			size = Vector2(tw3 + (48.0 if icon_tex else 26.0), 36.0)
 		_:
-			size = Vector2(44.0, 40.0)
+			size = Vector2(50.0, 46.0)
 	if kind == "skill":
 		tail_frac = 0.2
 	elif kind != "action":
 		tail_frac = 0.4
 	else:
-		tail_frac = 0.36
+		tail_frac = 0.5
 	base_tail_frac = tail_frac
 
 
@@ -116,32 +124,33 @@ func _draw() -> void:
 		# chip sits beside the head: short tail pointing down-left at it
 		tail = PackedVector2Array([Vector2(tx - 3, size.y - 1), Vector2(tx + 9, size.y - 1), Vector2(tx - 7, size.y + 8.0)])
 	else:
-		tail = PackedVector2Array([Vector2(tx - 8, size.y - 1), Vector2(tx + 8, size.y - 1), Vector2(tx + tail_lean, size.y + TAIL_H)])
+		tail = PackedVector2Array([Vector2(tx - 10, size.y - 1), Vector2(tx + 10, size.y - 1), Vector2(tx + tail_lean, size.y + TAIL_H)])
 	draw_colored_polygon(tail, UI.WHITE)
 	var f := UI.font(800)
 	match kind:
 		"action":
 			if icon_tex:
-				draw_texture_rect(icon_tex, Rect2(10, (size.y - 31.0) * 0.5, 31, 31), false)
-			var ty := 23.0 if (progress >= 0.0 or sub != "") else 27.0
-			draw_string(f, Vector2(50, ty), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, UI.INK)
+				draw_texture_rect(icon_tex, Rect2(13, (size.y - A_ICON) * 0.5, A_ICON, A_ICON), false)
+			var tall := progress >= 0.0 or sub != ""
+			var ty := 27.0 if tall else 32.0
+			draw_string(f, Vector2(A_TEXT_X, ty), text, HORIZONTAL_ALIGNMENT_LEFT, -1, A_FONT, UI.INK)
 			if sub != "" and progress < 0.0:
-				draw_string(UI.font(700), Vector2(50, 39), sub, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, UI.INK_SOFT)
+				draw_string(UI.font(700), Vector2(A_TEXT_X, 47), sub, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, UI.INK_SOFT)
 			if progress >= 0.0:
 				# full-width rounded track under the label (ref1 "Work"/"Paint")
-				UI.draw_bar(self, Rect2(50, 31, size.x - 50.0 - 12.0, 8.0), _shown_progress, bar_color, UI.TRACK)
+				UI.draw_bar(self, Rect2(A_TEXT_X, 37, size.x - A_TEXT_X - A_PAD_R, 9.0), _shown_progress, bar_color, UI.TRACK)
 		"speech":
 			var x := 14.0
 			if icon_tex:
-				draw_texture_rect(icon_tex, Rect2(10, 8, 24, 24), false)
-				x = 40.0
-			draw_string(UI.font(700), Vector2(x, 25), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, UI.INK)
+				draw_texture_rect(icon_tex, Rect2(11, 9, 28, 28), false)
+				x = 46.0
+			draw_string(UI.font(700), Vector2(x, 29), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 17, UI.INK)
 		"skill":
 			var x2 := 12.0
 			if icon_tex:
-				draw_texture_rect(icon_tex, Rect2(8, 6, 19, 19), false)
-				x2 = 31.0
-			draw_string(f, Vector2(x2, 20), "+ " + text, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, UI.INK)
+				draw_texture_rect(icon_tex, Rect2(9, 6, 24, 24), false)
+				x2 = 37.0
+			draw_string(f, Vector2(x2, 24), "+ " + text, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, UI.INK)
 		_:
 			if icon_tex:
-				draw_texture_rect(icon_tex, Rect2((size.x - 28.0) * 0.5, (size.y - 28.0) * 0.5, 28, 28), false)
+				draw_texture_rect(icon_tex, Rect2((size.x - 32.0) * 0.5, (size.y - 32.0) * 0.5, 32, 32), false)

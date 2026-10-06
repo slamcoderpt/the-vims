@@ -183,7 +183,7 @@ static func fridge(width: int, seed: int) -> VoxelBuilder:
 	var shelves := [3, 10, 16, 22]
 	var milk_caps: Array[Color] = [Color("2e7de0"), Color("e0412e"), Color("37a64a"), Color("f2c12e")]
 	var juice: Array[Color] = [Color("f7a21c"), Color("f5d33a"), Color("e8502f"), Color("8bd36b"), Color("c84fd0")]
-	var drinks: Array[Color] = [Color("2f9be8"), Color("54c45a"), Color("f06a5a"), Color("f5b93a"), Color("9a5be0")]
+	var drinks: Array[Color] = [Color("1f8fe8"), Color("3cc24a"), Color("ef4a3a"), Color("f5a82a"), Color("8a4be0"), Color("19c2c9"), Color("f25f9c")]
 	for si in shelves.size():
 		var y: int = shelves[si]
 		var top: int = (shelves[si + 1] if si + 1 < shelves.size() else 29) - y - 1
@@ -191,7 +191,7 @@ static func fridge(width: int, seed: int) -> VoxelBuilder:
 		var x := 2
 		while x < width - 3:
 			var r := Kit.h(Vector3i(x / 6, y, seed), 3)
-			var kind := int(r * 4.0)
+			var kind: int = [0, 1, 1, 2, 3, 3, 3, 1][int(r * 8.0) % 8]
 			var run := 2 + int(Kit.h(Vector3i(x, y, seed), 5) * 3.0)
 			for k in run:
 				if x >= width - 3:
@@ -221,16 +221,22 @@ static func fridge(width: int, seed: int) -> VoxelBuilder:
 							vb.set_v(Vector3i(x, y + 1 + yy, D - 3), [Color("f2a7c3"), Color("fbe9a8"), Color("b9d8f5"), Color("ffffff")][(yy + x) % 4])
 							vb.set_v(Vector3i(x, y + 1 + yy, D - 4), Color("f4f0e8"))
 						x += 1
-					_: # bottles
-						var col := drinks[int(r * 41.0) % drinks.size()]
+					_: # chunky soda / water bottles, 2 wide with a label band and cap
+						var col := drinks[(int(r * 41.0) + k) % drinks.size()]
 						var hh := mini(top, 6)
 						for yy in hh:
-							vb.set_v(Vector3i(x, y + 1 + yy, D - 3), col if yy < hh - 1 else Color("ffffff"))
-							if yy < hh - 2:
-								vb.set_v(Vector3i(x, y + 1 + yy, D - 4), Kit.shade(col, 0.8))
-							if yy == 2:
-								vb.set_v(Vector3i(x, y + 1 + yy, D - 3), Color("fdf6e0"))
-						x += 1
+							for dx in 2:
+								var cc := col
+								if yy == hh - 1:
+									cc = Color("ffffff") if dx == 0 else Kit.shade(col, 1.2)
+								elif yy == 2:
+									cc = Color("fdf6e0")
+								elif yy == 3:
+									cc = Kit.shade(col, 1.25)
+								vb.set_v(Vector3i(x + dx, y + 1 + yy, D - 3), cc)
+								if yy < hh - 1:
+									vb.set_v(Vector3i(x + dx, y + 1 + yy, D - 4), Kit.shade(col, 0.8))
+						x += 2
 			x += 0 if Kit.h(Vector3i(x, y, seed), 7) > 0.35 else 1
 	# door frames (dark) + handles
 	for x in range(0, width, 9):
@@ -260,24 +266,33 @@ static func crate(vb: VoxelBuilder, o: Vector3i, w: int, d: int, h: int, col := 
 				vb.set_v(p, Kit.shade(cc, 0.94 + 0.12 * Kit.h(Vector3i(o.x, y, o.z), 1)))
 
 
-## Pendant lamp (black dome, glowing underside). o = bottom centre cell.
+## Pendant lamp (black cone shade, glowing rim + bulb). o = bottom centre cell.
 static func pendant(vb: VoxelBuilder, o: Vector3i, cord: int) -> void:
 	var shade_c := Color("23201e")
-	for y in 3:
-		var r := 1 + y
-		r = 3 - y
+	var rim := Color("3a3532")
+	# cone: wide at the bottom, narrow at the top
+	for y in 4:
+		var r := 4 - y
 		for x in range(-r, r + 1):
 			for z in range(-r, r + 1):
-				if absi(x) + absi(z) > r + 1:
+				if x * x + z * z > r * r + r:
 					continue
-				vb.set_v(o + Vector3i(x, y + 1, z), shade_c)
-	for x in range(-2, 3):
-		for z in range(-2, 3):
-			if absi(x) + absi(z) <= 3:
-				vb.set_v(o + Vector3i(x, 0, z), Color("fff1cf"), true)
-	vb.set_v(o + Vector3i(0, -1, 0), Color("ffe7b0"), true)
+				var inner := x * x + z * z <= (r - 1) * (r - 1) + (r - 1)
+				if y == 0 and inner:
+					continue
+				vb.set_v(o + Vector3i(x, y + 1, z), rim if y == 0 else shade_c)
+	# glowing underside + hanging bulb
+	for x in range(-3, 4):
+		for z in range(-3, 4):
+			if x * x + z * z <= 10:
+				vb.set_v(o + Vector3i(x, 1, z), Color("fff3d6"), true)
+	for x in range(-1, 1):
+		for z in range(-1, 1):
+			vb.set_v(o + Vector3i(x, 0, z), Color("ffe9b8"), true)
+			vb.set_v(o + Vector3i(x, -1, z), Color("ffdf9a"), true)
+	vb.set_v(o + Vector3i(0, 5, 0), shade_c)
 	for y in cord:
-		vb.set_v(o + Vector3i(0, 4 + y, 0), Color("1c1a19"))
+		vb.set_v(o + Vector3i(0, 5 + y, 0), Color("1c1a19"))
 
 
 ## Shopping cart (P = 1/32 grid), local facing +z (handle at -z).

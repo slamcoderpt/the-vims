@@ -7,7 +7,7 @@ const PRESETS := {
 	"home_day": {
 		"ref": "refs/ref1_home_office_day.png",
 		"location": "home", "day": 1, "hour": 14, "minute": 16, "season": 1,
-		"camera": {"target": Vector3(-5.0, 3.3, -1.0), "yaw": 36.0, "pitch": 36.0, "distance": 15.0, "fov": 30.0},
+		"camera": {"target": Vector3(-4.9, 3.7, -1.3), "yaw": 32.0, "pitch": 31.0, "distance": 17.0, "fov": 32.0},
 		"tasks": [
 			{"title": "Answer Emails", "icon": "laptop", "done": true},
 			{"title": "Practice Creativity", "icon": "palette"},
@@ -20,7 +20,7 @@ const PRESETS := {
 	"festival": {
 		"ref": "refs/ref2_autumn_festival.png",
 		"location": "festival", "day": 5, "hour": 16, "minute": 42, "season": 2,
-		"camera": {"target": Vector3(0.5, 1.35, -0.9), "yaw": 0.0, "pitch": 15.0, "distance": 9.2, "fov": 50.0},
+		"camera": {"target": Vector3(0.5, 1.2, -3.2), "yaw": 0.0, "pitch": 15.0, "distance": 17.5, "fov": 40.0},
 		"tasks": [
 			{"title": "Buy Festival Snack", "icon": "apple", "done": true},
 			{"title": "Meet 3 Neighbors", "icon": "chat"},
@@ -33,7 +33,7 @@ const PRESETS := {
 	"home_night": {
 		"ref": "refs/ref3_home_night_cutaway.png",
 		"location": "home", "day": 0, "hour": 21, "minute": 18, "season": 1,
-		"camera": {"target": Vector3(3.3, 2.4, -1.9), "yaw": 10.0, "pitch": 36.0, "distance": 20.0, "fov": 33.0},
+		"camera": {"target": Vector3(4.1, 2.7, -1.0), "yaw": -10.0, "pitch": 36.0, "distance": 17.5, "fov": 33.0},
 		"tasks": [
 			{"title": "Take Bath", "icon": "bath"},
 			{"title": "Brush Teeth", "icon": "brush", "done": true},
@@ -46,7 +46,7 @@ const PRESETS := {
 	"bbq": {
 		"ref": "refs/ref4_backyard_bbq_sunset.png",
 		"location": "backyard", "day": 0, "hour": 19, "minute": 36, "season": 1,
-		"camera": {"target": Vector3(1.0, 1.15, -1.0), "yaw": -6.0, "pitch": 13.0, "distance": 9.2, "fov": 55.0},
+		"camera": {"target": Vector3(1.7, 1.2, -2.6), "yaw": -6.0, "pitch": 17.0, "distance": 12.0, "fov": 52.0},
 		"tasks": [
 			{"title": "Grill Dinner", "icon": "burger", "done": true},
 			{"title": "Talk to Neighbors", "icon": "people"},
@@ -59,7 +59,7 @@ const PRESETS := {
 	"market": {
 		"ref": "refs/ref5_grocery_market.png",
 		"location": "market", "day": 0, "hour": 8, "minute": 24, "season": 1,
-		"camera": {"target": Vector3(0.3, 1.12, 0.78), "yaw": 0.0, "pitch": 13.0, "distance": 7.0, "fov": 50.0},
+		"camera": {"target": Vector3(0.3, 1.19, 1.04), "yaw": 0.0, "pitch": 15.0, "distance": 7.0, "fov": 50.0},
 		"tasks": [
 			{"title": "Buy Groceries", "icon": "cart", "done": true},
 			{"title": "Meet a Neighbor", "icon": "people"},

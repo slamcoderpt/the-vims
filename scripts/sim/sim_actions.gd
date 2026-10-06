@@ -40,6 +40,30 @@ const EXTRAS := {
 	],
 }
 
+## Actions a skill level unlocks on an object (Sims 3: skills open new
+## interactions that earn money or fix needs better). req: [skill, level];
+## money_per_level adds pay per whole skill level; moodlet: on completion
+## [id, label, icon, delta, hours]. An empty pose copies the object's first one.
+const SKILL_UNLOCKS := {
+	"Piano": [{"id": "tips", "label": "Play for Tips", "icon": "money", "minutes": 30.0, "pose": "",
+		"needs": {"fun": 0.1, "social": 0.05}, "skill": "Music", "req": ["Music", 3], "money": 15, "money_per_level": 8, "who": ["adult", "child"]}],
+	"Guitar": [{"id": "busk", "label": "Busk for Tips", "icon": "money", "minutes": 30.0, "pose": "",
+		"needs": {"fun": 0.1}, "skill": "Music", "req": ["Music", 3], "money": 12, "money_per_level": 7, "who": ["adult", "child"]}],
+	"Easel": [{"id": "masterpiece", "label": "Paint Masterpiece", "icon": "palette", "minutes": 90.0, "pose": "",
+		"needs": {"fun": 0.25}, "skill": "Creativity", "req": ["Creativity", 3], "money": 40, "money_per_level": 25,
+		"moodlet": ["inspired", "Inspired", "bulb", 10.0, 4.0]}],
+	"Computer": [{"id": "freelance", "label": "Freelance Coding", "icon": "laptop", "minutes": 60.0, "pose": "",
+		"needs": {"fun": -0.05}, "skill": "Logic", "req": ["Logic", 4], "money": 50, "money_per_level": 20, "who": ["adult"]},
+		{"id": "write_blog", "label": "Write Blog Post", "icon": "pencil", "minutes": 45.0, "pose": "",
+		"needs": {"fun": 0.05}, "skill": "Writing", "req": ["Writing", 1], "money": 20, "money_per_level": 15, "who": ["adult"]}],
+	"Stove": [{"id": "gourmet", "label": "Cook Gourmet Meal", "icon": "cook", "minutes": 60.0, "pose": "",
+		"needs": {"hunger": 1.0}, "skill": "Cooking", "req": ["Cooking", 3], "who": ["adult"],
+		"moodlet": ["gourmet", "Gourmet Meal", "cook", 16.0, 5.0]}],
+	"Grill": [{"id": "gourmet_grill", "label": "Grill Gourmet Burgers", "icon": "burger", "minutes": 50.0, "pose": "",
+		"needs": {"hunger": 0.9, "fun": 0.1}, "skill": "Cooking", "req": ["Cooking", 3], "who": ["adult"],
+		"moodlet": ["gourmet", "Gourmet Meal", "cook", 16.0, 5.0]}],
+}
+
 ## Side effects on OTHER household members when an action completes.
 ## action id -> {kind: need delta}
 const EFFECT_ON_KIND := {
@@ -77,6 +101,20 @@ static func actions_for(it: Node, member: Dictionary) -> Array:
 	for a in EXTRAS.get(str(it.get("title")), []):
 		if allowed(a, kind):
 			out.append(a)
+	var skills: Dictionary = member.get("skills", {})
+	for u in SKILL_UNLOCKS.get(str(it.get("title")), []):
+		if not allowed(u, kind):
+			continue
+		var a: Dictionary = u.duplicate(true)
+		if a.pose == "":
+			a.pose = src[0].get("pose", "idle") if not src.is_empty() and src[0] is Dictionary else "idle"
+		var need_lv: int = int(a.req[1])
+		if floorf(float(skills.get(a.req[0], 0.0))) >= need_lv:
+			out.append(a)
+		elif float(skills.get(a.req[0], 0.0)) >= need_lv - 2:
+			# Close to it: a teaser row the player can't pick yet.
+			out.append({"id": "locked_" + str(a.id), "label": "%s (%s %d)" % [a.label, a.req[0], need_lv], "icon": "dots",
+				"locked": true, "lock_msg": "Reach %s level %d to unlock %s" % [a.req[0], need_lv, a.label]})
 	return out
 
 
@@ -88,7 +126,7 @@ static func actions_for(it: Node, member: Dictionary) -> Array:
 ##   kinds: actor kinds allowed; tkinds: target kinds; mean: lowers friendship.
 const SOCIALS := [
 	{"id": "s_introduce", "label": "Introduce Yourself", "icon": "wave", "minutes": 6.0, "pose": "wave",
-	 "stranger": true, "rel": 14.0, "needs": {"social": 0.15}, "social": {"social": 0.1}, "kinds": ["adult", "child"], "tkinds": ["adult", "child"]},
+	 "stranger": true, "rel": 10.0, "needs": {"social": 0.15}, "social": {"social": 0.1}, "kinds": ["adult", "child"], "tkinds": ["adult", "child"]},
 	{"id": "s_chat", "label": "Chat", "icon": "chat", "minutes": 15.0, "pose": "talk", "min": -2,
 	 "rel": 6.0, "needs": {"social": 0.3, "fun": 0.05}, "social": {"social": 0.25}, "kinds": ["adult", "child"], "tkinds": ["adult", "child"]},
 	{"id": "s_joke", "label": "Tell a Joke", "icon": "laugh", "minutes": 6.0, "pose": "talk", "min": -1,

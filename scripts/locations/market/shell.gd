@@ -13,7 +13,7 @@ const Z0 := -8.25
 const ZF := 8.0
 const H := 5.0
 
-const WALL := Color("f1e2c4")
+const WALL := Color("d6a46c")
 const WAINSCOT := Color("a8693a")
 const CEIL := Color("7b5232")
 const BEAM := Color("5e3c22")
@@ -51,7 +51,12 @@ static func _walls(root: Node3D) -> void:
 			return Kit.shade(Color("8a5a34"), 0.9 + 0.15 * Kit.h(Vector3i(p.y, 0, 0), 3))
 		if p.y == 21 or p.y == 22:
 			return Color("6f8f5a")
-		return WALL
+		# warm honey-wood vertical planks (2 cells wide) above the green rail
+		var k := (p.x + p.z) / 3
+		var f := 0.88 + 0.2 * Kit.h(Vector3i(k, p.y / 12, 3), 2)
+		if (p.x + p.z) % 3 == 0:
+			f *= 0.9
+		return Kit.shade(WALL, f)
 	# left / right / back
 	vb.box(Vector3i(x0, 0, z0), Vector3i(1, hh, zf - z0), wall_fn)
 	vb.box(Vector3i(x1, 0, z0), Vector3i(1, hh, zf - z0), wall_fn)
@@ -109,25 +114,31 @@ static func _ceiling(root: Node3D, halo_pts: Array) -> void:
 	for bx in [-2.25, 3.25]:
 		vb.box(Vector3i(cc(bx), hh - 2, z0), Vector3i(2, 2, zf - z0), Color("6b4528"))
 	Kit.add(root, vb, C, "Ceiling", false, null, Vector3.ZERO, Vector3.ZERO, true, false)
-	# Pendant lamps at U.
+	# Pendant lamps at U: rows across the store, hanging lower towards the
+	# back so they read in the eye-level camera, each with a warm omni light
+	# and a soft light pool on the glossy floor.
 	var lamps := VoxelBuilder.new()
 	lamps.jitter = 0.02
-	var pts := [
-		Vector3(-4.2, 4.15, 3.2), Vector3(-1.4, 4.2, 3.4), Vector3(1.7, 4.2, 3.3), Vector3(4.6, 4.15, 3.1),
-		Vector3(-4.4, 3.5, -2.0), Vector3(-1.8, 3.6, -1.6), Vector3(1.0, 3.7, -2.4), Vector3(4.4, 3.6, -1.9),
-		Vector3(-4.0, 3.6, -5.0), Vector3(-1.2, 3.6, -4.8), Vector3(1.6, 3.6, -5.2), Vector3(4.6, 3.55, -4.9),
-		Vector3(-2.6, 3.5, -7.0), Vector3(0.3, 3.45, -7.1), Vector3(3.2, 3.5, -7.0),
-	]
-	for p: Vector3 in pts:
-		var cord := int((H - 0.19 - p.y) / U) - 4
-		Fx.pendant(lamps, Vector3i(int(round(p.x / U)), int(round(p.y / U)), int(round(p.z / U))), cord)
-		halo_pts.append([p + Vector3(0.03, -0.08, 0.03), 1.4, Color(1.0, 0.68, 0.36, 1.0)])
+	var pools := []
+	var rows := [[1.2, 3.85, [-4.3, -1.5, 1.5, 4.5], true], [-1.8, 3.7, [-4.4, -1.6, 1.3, 4.3], true],
+		[-4.6, 3.6, [-4.1, -1.3, 1.6, 4.5], true], [-7.0, 3.55, [-2.8, 0.1, 3.0], false]]
+	for r: Array in rows:
+		for x: float in r[2]:
+			var p := Vector3(x, r[1], r[0])
+			var cord := int((H - 0.19 - p.y) / U) - 4
+			Fx.pendant(lamps, Vector3i(int(round(p.x / U)), int(round(p.y / U)), int(round(p.z / U))), cord)
+			halo_pts.append([p + Vector3(0.03, -0.1, 0.03), 1.7, Color(1.0, 0.7, 0.38, 1.0)])
+			halo_pts.append([p + Vector3(0.03, -0.12, 0.03), 0.45, Color(1.0, 0.92, 0.75, 1.0)])
+			if r[3]:
+				Kit.light(root, p + Vector3(0, -0.35, 0), Color(1.0, 0.8, 0.55), 1.15, 4.6)
+				pools.append([Vector3(x, 0.012, r[0]), Vector2(3.0, 3.0), Color(1.0, 0.7, 0.4, 0.6)])
 	Kit.add(root, lamps, U, "Pendants", false, Kit.glow_mat("warm"), Vector3.ZERO, Vector3.ZERO, false, false)
-	# A handful of real lights (Compatibility renderer: keep this small).
-	Kit.light(root, Vector3(-3.4, 3.0, 1.2), Color(1.0, 0.78, 0.52), 1.6, 6.0)
-	Kit.light(root, Vector3(0.6, 3.2, 0.6), Color(1.0, 0.8, 0.56), 1.3, 6.5)
-	Kit.light(root, Vector3(3.6, 3.0, 1.2), Color(1.0, 0.78, 0.52), 1.4, 6.0)
-	Kit.light(root, Vector3(0.4, 2.6, -6.4), Color(0.85, 0.92, 1.0), 1.2, 6.0)
+	# Cool spill from the fridge bank + its reflection streak on the tiles.
+	Kit.light(root, Vector3(0.6, 1.4, -6.9), Color(0.8, 0.9, 1.0), 1.4, 4.5)
+	Kit.light(root, Vector3(5.8, 1.4, -6.9), Color(0.8, 0.9, 1.0), 1.0, 3.5)
+	pools.append([Vector3(0.6, 0.014, -6.9), Vector2(7.2, 1.8), Color(0.62, 0.8, 1.0, 0.55)])
+	pools.append([Vector3(5.9, 0.014, -6.9), Vector2(3.6, 1.6), Color(0.62, 0.8, 1.0, 0.45)])
+	root.add_child(Kit.pools(pools))
 
 
 # ------------------------------------------------------------------ signs
@@ -187,11 +198,11 @@ static func _signs(root: Node3D) -> void:
 	Fx.leaf_icon(lv2, Vector3i(0, 0, 0), Color("6cbf45"), Color("2f7a2a"))
 	Kit.add(mk, lv2, U * 0.7, "Leaf", false, null, Vector3(1.03, 0.0, 0.11), Vector3(3.5, 4, 0))
 	# Aisle signs
-	var aisles := [["Dairy", Vector3(-0.05, 2.5, -5.0), 4.0, 0.85], ["Snacks", Vector3(1.16, 2.5, -5.0), 0.0, 0.92],
-		["Beverages", Vector3(2.5, 2.56, -5.0), -6.0, 1.22], ["Bakery", Vector3(4.6, 2.66, -4.0), -22.0, 1.0]]
+	var aisles := [["Dairy", Vector3(-0.35, 2.62, -5.4), 6.0, 1.0], ["Snacks", Vector3(1.0, 2.62, -5.4), 0.0, 1.1],
+		["Beverages", Vector3(2.55, 2.68, -5.4), -6.0, 1.45], ["Bakery", Vector3(4.75, 2.8, -4.2), -22.0, 1.2]]
 	for a in aisles:
-		var b := _board(root, "Sign" + a[0], a[1], a[2], a[3], 0.32, Color("3b2a1f"), Color("7a5130"))
-		_text(b, a[0], Vector3(0, 0.0, z), a[3] - 0.24, 0.19, Color("f6efe0"))
+		var b := _board(root, "Sign" + a[0], a[1], a[2], a[3], 0.4, Color("3b2a1f"), Color("7a5130"))
+		_text(b, a[0], Vector3(0, 0.0, z), a[3] - 0.26, 0.25, Color("f6efe0"))
 
 
 # ------------------------------------------------------------------ greenery

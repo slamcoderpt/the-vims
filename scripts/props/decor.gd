@@ -8,8 +8,8 @@ const V := preload("res://scripts/props/vox_util.gd")
 const WOOD := Color("b07a46")
 const WOOD_D := Color("7d4f2b")
 const POTS := [Color("c8643c"), Color("ede7db"), Color("d98a5a"), Color("7393b3"), Color("f0c6b0"), Color("5d6b74")]
-const LAMP := Color("ffc463")
-const LAMP_HI := Color("ffe2a0")
+const LAMP := Color("ffd27e")
+const LAMP_HI := Color("fff0c8")
 
 
 # ------------------------------------------------------------------ plants
@@ -226,7 +226,7 @@ static func m_corkboard(vb: VoxelBuilder, v: int) -> void:
 	var w := 22 if v == 0 else 28
 	var h := 14 if v == 0 else 17
 	V.b(vb, 0, 0, 0, w, h, 1, WOOD)
-	V.b(vb, 1, 1, 1, w - 2, h - 2, 1, V.mix([Color("c7955c"), Color("bd8a52"), Color("d2a068"), Color("b9844d")], 4))
+	V.b(vb, 1, 1, 1, w - 2, h - 2, 1, V.mix([Color("c99a60"), Color("c99a60"), Color("c99a60"), Color("bb8a52")], 4))
 	var notes := [Color("fff6b0"), Color("bfe3ff"), Color("ffc4d8"), Color("ffffff"), Color("c8f0b8"), Color("ffd8a8")]
 	var spots := [Vector4i(2, 8, 4, 4), Vector4i(7, 9, 3, 3), Vector4i(11, 7, 5, 5), Vector4i(17, 9, 3, 3),
 		Vector4i(2, 2, 3, 4), Vector4i(6, 3, 4, 4), Vector4i(12, 2, 3, 3), Vector4i(16, 2, 4, 5)]
@@ -271,15 +271,19 @@ static func m_monitor(vb: VoxelBuilder, v: int) -> void:
 	V.b(vb, w / 2 - 2, 0, 1, 4, 1, 3, blk)
 	V.b(vb, w / 2 - 1, 1, 1, 2, 3, 1, blk)
 	V.b(vb, 0, 3, 1, w, h, 1, blk)
+	# Bright blue desktop with a white app window (reads as "screen" at phone size).
 	for x in range(1, w - 1):
 		for y in range(1, h - 1):
-			var c := Color("dcebfb")
-			if y == h - 2:
-				c = Color("3b7de0")
-			elif x < 3 and v == 0:
-				c = Color("b8d2ef")
-			elif (y % 2 == 0) and x > 3 and x < w - 3 and V.hs(x, y, v) > 0.25:
-				c = Color("8fb0d8")
+			var c := Color("3f86e6")
+			var win := x >= 2 and x <= w - 3 and y >= 1 and y <= h - 3
+			if win:
+				c = Color("f4f8fd")
+				if y == h - 3:
+					c = Color("1f5fb8")
+				elif x == 2 and v == 0:
+					c = Color("c9dcf3")
+				elif y % 2 == 0 and x > 3 and x < w - 3 and V.hs(x, y, v) > 0.35:
+					c = Color("9db8dc")
 			V.p(vb, x, 3 + y, 2, c, true)
 
 
@@ -288,7 +292,8 @@ static func m_laptop(vb: VoxelBuilder, _v: int) -> void:
 	V.b(vb, 0, 0, 2, 8, 1, 5, c)
 	V.b(vb, 1, 1, 3, 6, 1, 3, Color("4a4e57"))
 	V.b(vb, 0, 1, 1, 8, 5, 1, c)
-	V.b(vb, 1, 2, 2, 6, 3, 1, Color("bcd8f2"), true)
+	V.b(vb, 1, 2, 2, 6, 3, 1, Color("5d9be8"), true)
+	V.b(vb, 2, 3, 2, 4, 1, 1, Color("f4f8fd"), true)
 
 
 static func m_keyboard(vb: VoxelBuilder, _v: int) -> void:

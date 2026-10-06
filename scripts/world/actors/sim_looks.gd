@@ -37,7 +37,7 @@ const LOOKS := {
 	"beagle": {
 		"species": "dog",
 		"tan": Color(0.74, 0.42, 0.19), "saddle": Color(0.36, 0.21, 0.11),
-		"white": Color(0.97, 0.95, 0.91), "ear": Color(0.45, 0.24, 0.11),
+		"white": Color(0.97, 0.95, 0.91), "ear": Color(0.36, 0.19, 0.09),
 		"collar": Color(0.86, 0.18, 0.18),
 	},
 	# --- Neighbours / townsfolk -------------------------------------------

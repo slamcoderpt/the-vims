@@ -195,7 +195,7 @@ void fragment() {
 static func night_exterior_material() -> StandardMaterial3D:
 	if _night_ext_mat == null:
 		_night_ext_mat = VoxelBuilder.solid_material().duplicate()
-		_night_ext_mat.albedo_color = Color(0.56, 0.66, 0.9)
+		_night_ext_mat.albedo_color = Color(0.66, 0.72, 0.95)
 	return _night_ext_mat
 
 
@@ -233,7 +233,7 @@ static func rug(vb: VoxelBuilder, at: Vector3i, w: int, d: int, style := "check_
 			var h := VoxelBuilder.hash3(Vector3i(x, 7, z) + at)
 			match style:
 				"patch_pink":
-					var pal := [Color("e98ba0"), Color("f2b5c0"), Color("d96f88"), Color("f6d0d0"), Color("c9a0c8"), Color("f0c08a")]
+					var pal := [Color("ef9fb2"), Color("f7d3d6"), Color("e48aa0"), Color("fbe6dc"), Color("f2b7c4"), Color("f3cf9e")]
 					c = pal[(int(x / 4) * 7 + int(z / 4) * 3) % pal.size()]
 					if posmod(x, 4) == 0 or posmod(z, 4) == 0:
 						c = Color("f7e6e0")

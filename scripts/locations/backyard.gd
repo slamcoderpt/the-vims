@@ -109,7 +109,7 @@ func _sync_env() -> void:
 		var gold := smoothstep(16.5, 18.5, h) * (1.0 - smoothstep(20.0, 21.5, h))
 		var nite := smoothstep(20.5, 22.0, h) if h > 12.0 else 1.0 - smoothstep(4.5, 6.0, h)
 		fill.light_color = Color(1.0, 0.74, 0.5).lerp(Color(0.6, 0.66, 1.0), nite)
-		fill.light_energy = gold * 0.2 + nite * 0.1
+		fill.light_energy = gold * 0.42 + nite * 0.12
 		fill.visible = fill.light_energy > 0.01
 
 

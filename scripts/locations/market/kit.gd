@@ -211,9 +211,12 @@ static func glow_mat(kind: String) -> StandardMaterial3D:
 	m.emission_enabled = true
 	match kind:
 		"warm":
+			m.albedo_color = Color(1.9, 1.6, 1.2)
 			m.emission = Color(1.0, 0.78, 0.45); m.emission_energy_multiplier = 2.2
 		"cool":
-			m.emission = Color(0.85, 0.95, 1.0); m.emission_energy_multiplier = 0.3
+			# HDR albedo so the fridge interiors cross the glow threshold.
+			m.albedo_color = Color(1.45, 1.55, 1.75)
+			m.emission = Color(0.82, 0.93, 1.0); m.emission_energy_multiplier = 0.6
 		"sky":
 			m.emission = Color(0.9, 0.95, 1.0); m.emission_energy_multiplier = 0.45
 		_:
@@ -331,40 +334,124 @@ static func light(parent: Node, pos: Vector3, color: Color, energy: float, rng: 
 
 # ------------------------------------------------------------------ floor
 
-## Glossy cream tile floor (one quad, procedural texture).
-static func tile_floor(parent: Node3D, size: Vector2, center: Vector3, tile := 0.6) -> MeshInstance3D:
+## Glossy cream tile floor, split into chunks so each chunk picks up its own
+## nearby pendant lights (the Compatibility renderer caps lights per object).
+## World-space UVs keep the tile grid continuous across chunks.
+static func tile_floor(parent: Node3D, size: Vector2, center: Vector3, tile := 0.6, chunk := 4.0) -> Node3D:
 	var px := 32
 	var n := 8
 	var img := Image.create(px * n, px * n, true, Image.FORMAT_RGB8)
 	for ty in n:
 		for tx in n:
-			var base := Color("eadfc9") if (tx + ty) % 2 == 0 else Color("ddcfb5")
+			var base := Color("efe5d2") if (tx + ty) % 2 == 0 else Color("d9c9ad")
 			var f := 0.97 + 0.06 * h(Vector3i(tx, ty, 5))
 			for y in px:
 				for x in px:
 					var c := shade(base, f * (0.985 + 0.03 * h(Vector3i(tx * px + x, ty * px + y, 1))))
 					if x < 1 or y < 1:
-						c = Color("a39177")
+						c = Color("9c8a70")
 					elif x < 2 or y < 2:
-						c = shade(base, 0.9)
+						c = shade(base, 0.92)
 					img.set_pixel(tx * px + x, ty * px + y, c)
 	img.generate_mipmaps()
 	var tex := ImageTexture.create_from_image(img)
 	var mat := StandardMaterial3D.new()
 	mat.albedo_texture = tex
-	mat.roughness = 0.35
-	mat.metallic_specular = 0.6
-	mat.uv1_scale = Vector3(size.x / (tile * n), size.y / (tile * n), 1)
+	mat.roughness = 0.22
+	mat.metallic_specular = 0.75
+	mat.uv1_triplanar = true
+	mat.uv1_world_triplanar = true
+	mat.uv1_scale = Vector3.ONE / (tile * n)
 	mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+	var root := Node3D.new()
+	root.name = "TileFloor"
+	parent.add_child(root)
+	var nx := maxi(1, int(ceil(size.x / chunk)))
+	var nz := maxi(1, int(ceil(size.y / chunk)))
+	var cw := size.x / nx
+	var cd := size.y / nz
 	var pm := PlaneMesh.new()
-	pm.size = size
-	pm.subdivide_width = 8
-	pm.subdivide_depth = 8
-	var mi := MeshInstance3D.new()
-	mi.name = "TileFloor"
-	mi.mesh = pm
-	mi.material_override = mat
-	mi.position = center
+	pm.size = Vector2(cw, cd)
+	pm.subdivide_width = 3
+	pm.subdivide_depth = 3
+	for iz in nz:
+		for ix in nx:
+			var mi := MeshInstance3D.new()
+			mi.mesh = pm
+			mi.material_override = mat
+			mi.position = center + Vector3(-size.x * 0.5 + cw * (ix + 0.5), 0, -size.y * 0.5 + cd * (iz + 0.5))
+			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			root.add_child(mi)
+	return root
+
+
+## Soft additive light pools lying flat (on the floor, under lamps, in front of
+## fridges). points: Array of [pos: Vector3, size: Vector2 (x, z), color]. One draw call.
+static func pools(points: Array) -> MultiMeshInstance3D:
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.use_colors = true
+	var q := QuadMesh.new()
+	q.size = Vector2(1, 1)
+	q.orientation = PlaneMesh.FACE_Y
+	mm.mesh = q
+	mm.instance_count = points.size()
+	for i in points.size():
+		var e: Array = points[i]
+		var sz: Vector2 = e[1]
+		mm.set_instance_transform(i, Transform3D(Basis().scaled(Vector3(sz.x, 1, sz.y)), e[0]))
+		mm.set_instance_color(i, e[2])
+	var mi := MultiMeshInstance3D.new()
+	mi.name = "LightPools"
+	mi.multimesh = mm
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var m := halo_mat().duplicate() as StandardMaterial3D
+	m.billboard_mode = BaseMaterial3D.BILLBOARD_DISABLED
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	mi.material_override = m
+	return mi
+
+
+static var _blob_mat: StandardMaterial3D
+static var _blob_mesh: QuadMesh
+
+## Soft contact shadow (dark radial blob) lying on the floor under `parent`.
+## Cheap stand-in for SSAO, which the Compatibility renderer lacks.
+static func blob(parent: Node3D, size: float, strength := 0.5, offset := Vector3.ZERO) -> MeshInstance3D:
+	if _blob_mat == null:
+		var g := Gradient.new()
+		g.set_color(0, Color(0, 0, 0, 1))
+		g.set_color(1, Color(0, 0, 0, 0))
+		g.add_point(0.35, Color(0, 0, 0, 0.75))
+		g.add_point(0.7, Color(0, 0, 0, 0.2))
+		var tex := GradientTexture2D.new()
+		tex.gradient = g
+		tex.fill = GradientTexture2D.FILL_RADIAL
+		tex.fill_from = Vector2(0.5, 0.5)
+		tex.fill_to = Vector2(1.0, 0.5)
+		tex.width = 64
+		tex.height = 64
+		_blob_mat = StandardMaterial3D.new()
+		_blob_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		_blob_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		_blob_mat.vertex_color_use_as_albedo = false
+		_blob_mat.albedo_texture = tex
+		_blob_mat.albedo_color = Color(0.18, 0.1, 0.05, 1.0)
+		_blob_mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+		_blob_mat.disable_fog = true
+		_blob_mesh = QuadMesh.new()
+		_blob_mesh.size = Vector2(1, 1)
+		_blob_mesh.orientation = PlaneMesh.FACE_Y
+	var mi := MeshInstance3D.new()
+	mi.name = "Blob"
+	mi.mesh = _blob_mesh
+	var m := _blob_mat
+	if strength != 0.5:
+		m = _blob_mat.duplicate()
+		m.albedo_color.a = strength * 2.0
+	mi.material_override = m
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mi.scale = Vector3(size, 1, size)
+	mi.position = Vector3(0, 0.02, 0) + offset
 	parent.add_child(mi)
 	return mi

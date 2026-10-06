@@ -34,14 +34,16 @@ func build(parent: Node3D, party) -> void:
 	root.name = "Cast"
 	parent.add_child(root)
 	# Jack at the grill.
-	var gf: Vector3 = party.grill_front()
-	_spawn("Jack", gf, 0.0, "grill").face(Party.GRILL_POS)
+	# Beside the grill (its right end, table side) so his whole body reads in
+	# 3/4 view instead of hiding behind the firebox.
+	var gf: Vector3 = Party.GRILL_POS + Vector3(0.8, 0.0, -0.5)
+	_spawn("Jack", gf, 0.0, "grill").face(Party.GRILL_POS + Vector3(0.0, 0.0, 0.45))
 	# Table.
 	_seat("Lily", party, "far_l", "sit_talk")
 	_seat("neighbor_3", party, "far_m", "sit_talk")
 	_seat("neighbor_4", party, "far_r", "sit")
 	_seat("Maya", party, "end_r", "sit_talk")
-	_seat("neighbor_6", party, "near_l", "sit")
+	_seat("neighbor_6", party, "end_l", "sit_talk")
 	_seat("neighbor_7", party, "near_m", "sit_talk")
 	# On the deck, chatting with plates and drinks.
 	var a := _spawn("neighbor_1", Vector3(4.3, 0.375, -3.4), 0.0, "talk")
@@ -52,7 +54,7 @@ func build(parent: Node3D, party) -> void:
 	_spawn_seated("neighbor_5", Vector3(6.55, 0, 1.05), -PI * 0.5 - 0.25, "sit_talk", 0.5)
 	_spawn_seated("neighbor_8", Vector3(6.55, 0, 2.5), -PI * 0.5 + 0.1, "sit", 0.5)
 	# Biscuit trotting across the lawn.
-	var d := _spawn("Biscuit", Vector3(2.5, 0, 3.25), PI * 0.5 - 0.45, "walk")
+	var d := _spawn("Biscuit", Vector3(2.55, 0, 3.05), -PI * 0.36, "idle")
 	d.position.y = 0.0
 	# Chat interactables on guests.
 	for k in GUEST_NAMES:
@@ -71,6 +73,7 @@ func _make(key: String) -> Node3D:
 	var a: Node3D = SimActor.create(look)
 	a.name = key
 	root.add_child(a)
+	_tune.call_deferred(a)
 	actors[key] = a
 	for alias in PEOPLE[key][1]:
 		actors[alias] = a
@@ -100,6 +103,26 @@ func _spawn_seated(key: String, pos: Vector3, yaw: float, pose: String, seat_h: 
 func _seat(key: String, party, seat: String, pose: String) -> Node3D:
 	var t: Transform3D = party.world_seat(seat)
 	return _spawn_seated(key, t.origin, t.basis.get_euler().y, pose, 0.4375)
+
+
+## Proportions for this wide party shot: chibi heads read as a "pile of heads"
+## around the table from this distance, so shrink them (bone scale at the
+## neck; SimActor never touches the head bone's scale) and slightly shrink the
+## bodies so torsos + arms show above the table.
+const HEAD_SCALE := {"adult": 0.66, "child": 0.76, "dog": 1.0}
+const BODY_SCALE := {"adult": 1.1, "child": 1.05, "dog": 1.15}
+
+
+func _tune(a: Node3D) -> void:
+	if not is_instance_valid(a) or not a.has_method("kind"):
+		return
+	var k: String = a.kind()
+	if "body_scale" in a:
+		a.body_scale = BODY_SCALE.get(k, 1.0)
+	var sk = a.get("skeleton")
+	var hb = a.get("b_head")
+	if sk is Skeleton3D and hb is int and hb >= 0 and k != "dog":
+		(sk as Skeleton3D).set_bone_pose_scale(hb, Vector3.ONE * float(HEAD_SCALE.get(k, 1.0)))
 
 
 func get_actor(key: String) -> Node3D:

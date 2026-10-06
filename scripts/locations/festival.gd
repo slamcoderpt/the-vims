@@ -14,7 +14,7 @@ const Stage := preload("res://scripts/locations/festival/stage.gd")
 const Decor := preload("res://scripts/locations/festival/decor.gd")
 const Crowd := preload("res://scripts/locations/festival/crowd.gd")
 
-const CAMERA := {"target": Vector3(0.5, 1.35, -0.9), "yaw": 0.0, "pitch": 15.0, "distance": 9.2, "fov": 50.0}
+const CAMERA := {"target": Vector3(0.5, 1.2, -3.2), "yaw": 0.0, "pitch": 15.0, "distance": 17.5, "fov": 40.0}
 
 var stalls
 var stage
@@ -35,7 +35,7 @@ func build() -> void:
 	stalls = Stalls.new()
 	stalls.build(self)
 	stage = Stage.new()
-	stage.build(self, Vector3(6.0, 0, -12.5), -12.0)
+	stage.build(self, Vector3(5.6, 0, -10.6), -14.0)
 	decor = Decor.new()
 	decor.build(self)
 	crowd = Crowd.new()
@@ -79,7 +79,7 @@ func _interactables() -> void:
 		 "money": -4, "needs": {"hunger": 0.15, "fun": 0.1}},
 		{"id": "chat_vendor", "label": "Chat", "icon": "chat", "minutes": 10.0, "pose": "talk",
 		 "needs": {"social": 0.2}, "task": "Meet 3 Neighbors", "who": ["adult", "child"]},
-	], Vector3(3.0, 2.8, 1.6), Vector3(0, 1.4, 0.2), Vector3(0.2, 0, 1.6))
+	], Vector3(3.2, 3.8, 1.6), Vector3(0, 1.9, 0.1), Vector3(0.2, 0, 1.6))
 	Interactable.attach(stalls.game, "Festival Game", [
 		{"id": "play_game", "label": "Play Game", "icon": "target", "minutes": 20.0, "pose": "play",
 		 "money": -2, "needs": {"fun": 0.35}, "task": "Play Festival Game", "who": ["adult", "child"]},
@@ -186,6 +186,19 @@ func _print_stats() -> void:
 				tris += n
 				if n > 4000:
 					print("  mesh ", mi.name, " surf ", si, " tris ", n)
+	var cam := get_viewport().get_camera_3d()
+	if cam:
+		for k: String in ["Jack", "Lily", "Maya", "Biscuit", "vendor", "guitarist", "game_host"]:
+			var a: Node3D = crowd.actors.get(k)
+			if a:
+				var f := cam.unproject_position(a.global_position)
+				var h := cam.unproject_position(a.head_top()) if a.has_method("head_top") else f
+				print("SCREEN %s feet=%s head=%s h=%d" % [k, f.round(), h.round(), int(f.y - h.y)])
+		for k: String in ["Fountain", "Stage", "TreatsStall", "GameStall", "CraftsStall"]:
+			var n := find_child(k, true, false) as Node3D
+			if n:
+				print("SCREEN %s %s" % [k, cam.unproject_position(n.global_position).round()])
+		print("SCREEN FountainSpot ", cam.unproject_position(Decor.FOUNTAIN).round())
 	print("FESTIVAL_STATS meshes=%d tris=%d draws=%d prims=%d" % [meshes, tris,
 		RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME),
 		RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_PRIMITIVES_IN_FRAME)])

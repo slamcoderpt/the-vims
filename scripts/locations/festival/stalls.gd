@@ -26,11 +26,11 @@ func _lp(cell: Vector3) -> Vector3:
 
 
 func build(parent: Node3D) -> void:
-	treats = _place(parent, "TreatsStall", _treats_stall(), Vector3(-3.1, 0, 0.2), 28.0)
+	treats = _place(parent, "TreatsStall", _treats_stall(), Vector3(-2.6, 0, 0.0), 40.0)
 	var sc := Vector3(TW * 0.5 + 4.5, (SIGN_Y0 + SIGN_Y1) * 0.5 - 0.3, TD + 1.06)
 	_sign(treats, "FALL TREATS", _lp(sc), 0.0031, 0.0)
-	vendor_spot = treats.transform * _lp(Vector3(13.0, 0.0, TD - 14.0))
-	game = _place(parent, "GameStall", _game_stall(), Vector3(1.5, 0, -0.5), -8.0)
+	vendor_spot = treats.transform * _lp(Vector3(16.0, 0.0, TD - 14.0))
+	game = _place(parent, "GameStall", _game_stall(), Vector3(2.3, 0, -1.3), -10.0)
 	crafts = _place(parent, "CraftsStall", _crafts_table(), Vector3(5.6, 0, 2.2), -25.0)
 	_place(parent, "RedStall", _side_stall(RED, CREAM, 0), Vector3(6.9, 0, -2.6), -38.0)
 	_place(parent, "BlueStall", _side_stall(BLUE, CREAM, 1), Vector3(9.2, 0, -7.4), -60.0)
@@ -39,7 +39,7 @@ func build(parent: Node3D) -> void:
 	K.label(menu, "Apple Cider\n· Pumpkin Pie\n· Pretzels\nCandy Apples", Vector3(-0.1, 0.86, 0.13), 0.00155, Color("f4f1e6"), 0.0, Color(0, 0, 0, 0), 64, HORIZONTAL_ALIGNMENT_LEFT)
 	var hm := _chalkboard(parent, Vector3(4.5, 0, 4.0), -25.0, 0.8)
 	K.label(hm, "HANDMADE", Vector3(0, 0.95, 0.13), 0.0021, Color("f4f1e6"))
-	var gm := _chalkboard(parent, Vector3(2.5, 0, 0.3), -20.0, 0.6)
+	var gm := _chalkboard(parent, Vector3(3.4, 0, -0.5), -20.0, 0.6)
 	K.label(gm, "3 TRIES", Vector3(-0.02, 0.62, 0.13), 0.0015, Color("f8e9a0"))
 
 
@@ -128,17 +128,16 @@ func _lantern(vb: VoxelBuilder, x: int, y: int, z: int) -> void:
 
 const TW := 50   # treats stall width (cells)
 const TD := 24   # treats stall depth (cells)
-const SIGN_Y0 := 29
-const SIGN_Y1 := 40
+const SIGN_Y0 := 36
+const SIGN_Y1 := 47
 
 
 func _candy_apple(vb: VoxelBuilder, x: int, y: int, z: int, c := Color("b8141c")) -> void:
 	# Glossy 3x3x3 candy apple with a highlight and a stick poking up.
 	K.box(vb, x, y, z, 3, 3, 3, K.noisy(c, 0.06, x * 3 + z))
 	vb.set_v(Vector3i(x + 2, y + 2, z + 2), K.shade(c, 1.45))
-	vb.set_v(Vector3i(x + 1, y + 3, z + 1), Color("e8d4a0"))
-	vb.set_v(Vector3i(x + 1, y + 4, z + 1), Color("e8d4a0"))
-	vb.set_v(Vector3i(x + 1, y + 5, z + 1), Color("f2e2b4"))
+	vb.set_v(Vector3i(x + 1, y + 3, z + 1), Color("c89a62"))
+	vb.set_v(Vector3i(x + 1, y + 4, z + 1), Color("b8885a"))
 
 
 func _pretzel(vb: VoxelBuilder, x: int, y: int, z: int) -> void:
@@ -227,10 +226,10 @@ func _treats_stall() -> VoxelBuilder:
 					x += 5
 	# Posts.
 	for px in [0, W - 2]:
-		_post(vb, px, 0, 54)
-		_post(vb, px, D - 4, 46)
+		_post(vb, px, 0, 61)
+		_post(vb, px, D - 4, 54)
 	# Striped awning high above the sign.
-	_awning(vb, -2, W + 2, -1, D + 3, 55, 47, RED, CREAM, 4)
+	_awning(vb, -2, W + 2, -1, D + 3, 62, 54, RED, CREAM, 4)
 	# Carved hanging sign below the awning, in front of the posts, on two
 	# short chains (text = Label3D added in build()).
 	var sz := D - 1
@@ -243,17 +242,17 @@ func _treats_stall() -> VoxelBuilder:
 	K.maple(vb, 5, SIGN_Y0 + 2, sz + 2, Color("c8301a"))
 	vb.set_v(Vector3i(8, SIGN_Y0 + 1, sz + 2), Color("7a3a1a"))
 	for cx in [8, W - 9]:
-		for y in range(SIGN_Y1, 47):
+		for y in range(SIGN_Y1, 54):
 			vb.set_v(Vector3i(cx, y, sz), Color("2c2622") if posmod(y, 2) == 0 else Color("4a423a"))
 	# --- Food on the counter: two tiers so everything reads from the plaza.
 	var top := 17
-	# Back riser (vendor side) on the right half.
-	K.box(vb, 24, top, cz - 1, W - 26, 4, 4, K.wood(WOOD_D, 0, 3))
+	# Back riser on the right half (the vendor stands behind the left half).
+	K.box(vb, 27, top, cz - 1, 20, 4, 4, K.wood(WOOD_D, 0, 3))
 	# Front tier: candy apple tray, pretzel tray, pies.
 	_tray(vb, 3, top, cz + 2, 12, 7, Color("e8e2d4"))
 	for i in 6:
-		var ax := 4 + (i % 3) * 3 + (i / 3)
-		var az := cz + 3 + (i / 3) * 3
+		var ax := 4 + (i % 3) * 4 - (i / 3) * 2 + 1
+		var az := cz + 2 + (i / 3) * 3
 		_candy_apple(vb, ax, top + 1, az, Color("b8141c") if i % 3 != 1 else Color("c8261c"))
 	_tray(vb, 16, top, cz + 1, 13, 8, Color("c9a06a"))
 	for i in 4:
@@ -262,21 +261,27 @@ func _treats_stall() -> VoxelBuilder:
 	_pie(vb, 41.5, top, cz + 5.5, 3.4, Color("9a2a3a"))
 	# Upper tier (on the riser): caramel apples + a crate of red apples.
 	var ut := top + 4
-	_tray(vb, 25, ut, cz - 1, 10, 4, Color("e8e2d4"))
+	_tray(vb, 27, ut, cz - 1, 10, 4, Color("e8e2d4"))
 	for i in 3:
-		_candy_apple(vb, 26 + i * 3, ut + 1, cz, Color("c88a2a"))
-	_crate(vb, 36, ut, cz - 1, 10, 4, 4, [Color("c8281e"), Color("d8361e"), Color("a81e18"), Color("e05a2a")])
+		_candy_apple(vb, 28 + i * 3, ut + 1, cz, Color("c88a2a"))
+	_crate(vb, 38, ut, cz - 1, 9, 4, 4, [Color("c8281e"), Color("d8361e"), Color("a81e18"), Color("e05a2a")])
 	# Cider jugs + paper cups at the left end.
 	for i in 2:
-		K.box(vb, 1 + i * 3, top, cz - 1, 2, 5, 2, Color("d08a2a"))
-		vb.set_v(Vector3i(1 + i * 3, top + 5, cz - 1), Color("6a4a2a"))
+		K.box(vb, W - 5 - i * 3, top, cz, 2, 5, 2, Color("d08a2a"))
+		vb.set_v(Vector3i(W - 5 - i * 3, top + 5, cz), Color("6a4a2a"))
+	# Festoon bulbs under the awning's front edge.
+	for x in range(3, W - 2, 6):
+		vb.set_v(Vector3i(x, 52, D - 3), Color("2c2622"))
+		vb.set_v(Vector3i(x, 51, D - 3), Color("ffd070"), true)
+	for x in range(0, W):
+		vb.set_v(Vector3i(x, 53, D - 3), Color("3a3530"))
 	# Hanging lanterns on the outside of the front posts.
-	_lantern(vb, -5, 22, D - 4)
-	_lantern(vb, W + 1, 22, D - 4)
+	_lantern(vb, -5, 26, D - 4)
+	_lantern(vb, W + 1, 26, D - 4)
 	for lx in [-4, W + 2]:
-		for y in range(29, 33):
+		for y in range(33, 37):
 			vb.set_v(Vector3i(lx, y, D - 3), Color("2c2622"))
-		K.box(vb, mini(lx, 0) if lx < 0 else W, 32, D - 3, 3 if lx < 0 else 2, 1, 1, Color("2c2622"))
+		K.box(vb, mini(lx, 0) if lx < 0 else W, 36, D - 3, 3 if lx < 0 else 2, 1, 1, Color("2c2622"))
 	# Barrel of apples (left front) and hay with pumpkins (right).
 	K.cyl(vb, -5.0, 0, D + 1.0, 4.6, 12, func(q: Vector3i) -> Color:
 		if q.y == 2 or q.y == 9:
@@ -316,13 +321,13 @@ func _game_stall() -> VoxelBuilder:
 	for x in range(-2, W + 2):
 		for z in range(0, 10):
 			vb.set_v(Vector3i(x, 30 + mini(z, 9 - z) / 3, z), RED if posmod(x / 3, 2) == 0 else CREAM)
-	var tc := Vector2(W / 2.0, 38.0)
-	for x in range(-6, 7):
-		for y in range(-6, 7):
+	var tc := Vector2(W / 2.0, 35.0)
+	for x in range(-4, 5):
+		for y in range(-4, 5):
 			var d := Vector2(x + 0.5, y + 0.5).length()
-			if d > 6.2:
+			if d > 4.3:
 				continue
-			var ring := int(d / 1.6)
+			var ring := int(d / 1.3)
 			var c := RED if ring % 2 == 0 else CREAM
 			vb.set_v(Vector3i(int(tc.x) + x, int(tc.y) + y, 7), c)
 	K.box(vb, W / 2 - 1, 32, 6, 2, 2, 1, Color("5a3218"))

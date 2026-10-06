@@ -41,21 +41,23 @@ func build() -> void:
 
 
 func camera_home() -> Dictionary:
-	return {"target": Vector3(0.3, 1.12, 0.78), "yaw": 0.0, "pitch": 13.0, "distance": 7.0, "fov": 50.0}
+	return {"target": Vector3(0.3, 1.19, 1.04), "yaw": 0.0, "pitch": 15.0, "distance": 7.0, "fov": 50.0}
 
 
 func lighting_profile() -> Dictionary:
+	# Indoors: a weak, high "skylight" sun for soft shadow direction; the
+	# store is lit mostly by warm pendant omnis + bright neutral ambient.
 	return {
-		"sun_heading": 200.0, "sun_elev": 52.0, "sun_energy": 1.45,
-		"ambient_day": Color(1.0, 0.86, 0.72), "ambient_energy": 0.5,
-		"ambient_night": Color(0.75, 0.62, 0.5), "ambient_night_energy": 0.7,
+		"sun_heading": 200.0, "sun_elev": 62.0, "sun_energy": 0.55,
+		"ambient_day": Color(1.0, 0.95, 0.88), "ambient_energy": 0.62,
+		"ambient_night": Color(0.8, 0.7, 0.6), "ambient_night_energy": 0.6,
 		"lamp_night_mult": 1.2,
 		"sky_day": Color(0.36, 0.27, 0.2), "sky_night": Color(0.2, 0.14, 0.1),
-		"fog_day": Color(0.98, 0.9, 0.78), "fog_night": Color(0.4, 0.3, 0.22), "fog_density": 0.0015,
-		"exposure": 1.02,
-		"shadow_distance": 24.0,
-		"post": {"focus_y": 0.55, "band": 0.3, "falloff": 0.35, "blur_px": 3.0, "top_boost": 0.4,
-			"saturation": 1.2, "contrast": 1.12, "tint": Vector3(1.02, 1.0, 0.96), "vignette": 0.18},
+		"fog_day": Color(0.98, 0.94, 0.88), "fog_night": Color(0.4, 0.3, 0.22), "fog_density": 0.0022,
+		"exposure": 1.05,
+		"shadow_distance": 18.0,
+		"post": {"focus_y": 0.5, "band": 0.2, "falloff": 0.3, "blur_px": 4.5, "top_boost": 0.55,
+			"saturation": 1.16, "contrast": 1.1, "tint": Vector3(1.0, 1.0, 0.98), "vignette": 0.16},
 	}
 
 
@@ -89,8 +91,12 @@ func _spawn_people() -> void:
 		add_child(s)
 		actors["shopper_%d" % i] = s
 		actors[shoppers[i]] = s
+	# Soft contact shadows under everyone standing on the tiles.
+	for k: String in ["dad", "bunny_girl", "cat_girl", "cashier", "shopper_0", "shopper_1", "shopper_2", "shopper_3", "shopper_4"]:
+		Kit.blob(actors[k], 0.95 if k != "bunny_girl" and k != "cat_girl" else 0.8)
 	# Cart (with Biscuit riding in it).
 	_cart = Kit.add(self, Fx.cart(), P * 1.2, "Cart", true, null, Vector3.ZERO, Vector3(8.5, 0, -3))
+	Kit.blob(_cart, 1.05, 0.4, Vector3(0, 0, 0.5))
 	Interactable.attach(_cart, "Shopping Cart", [
 		_act("push", "Push Cart", "cart", 2.0),
 		_act("pet", "Pet Biscuit", "paw", 3.0, {"fun": 0.1}),
@@ -113,7 +119,7 @@ func _place(key: String, pos: Vector3, face_to: Vector3, pose: String) -> SimAct
 func _stage() -> void:
 	if actors.is_empty():
 		return
-	var cam := Vector3(0.3, 0, 7.6)
+	var cam := Vector3(0.3, 0, 7.8)
 	# Jack pushes the cart towards the camera, angled a touch to screen right.
 	var jack := _place("dad", Vector3(-0.3, 0, 1.75), cam + Vector3(2.0, 0, 0), "idle")
 	var cart_yaw := jack.rotation.y
@@ -130,10 +136,10 @@ func _stage() -> void:
 	maya.rotation.y -= 0.8
 	_hold(lily, "carrots")
 	_hold(maya, "cereal")
-	_place("cashier", Vector3(3.0, 0, 2.75), Vector3(0.4, 0, 4.8), "idle")
+	_place("cashier", Vector3(3.15, 0, 2.2), Vector3(0.6, 0, 5.2), "idle")
 	# Background shoppers spread down the main aisle, in the gaps between the family.
 	_place("npc_2", Vector3(-1.05, 0, -0.9), Vector3(-2.8, 0, -1.6), "idle")
-	_place("npc_5", Vector3(0.55, 0, -4.4), Vector3(0.9, 0, -9.0), "idle")
+	_place("npc_5", Vector3(1.05, 0, -6.1), Vector3(1.2, 0, -9.0), "idle")
 	_place("npc_4", Vector3(-0.15, 0, -2.3), Vector3(-0.4, 0, -9.0), "idle")
 	_place("npc_0", Vector3(1.6, 0, -1.6), Vector3(3.2, 0, -3.0), "stand_read")
 	_place("npc_6", Vector3(-2.9, 0, -4.4), Vector3(-6.0, 0, -4.2), "idle")

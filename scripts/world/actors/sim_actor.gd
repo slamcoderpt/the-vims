@@ -181,7 +181,7 @@ func _apply_scale() -> void:
 	walk_speed = (1.5 if _dog else (1.1 if _meta.kind == "child" else 1.3)) * sqrt(_s)
 
 
-const AUTO_SCALE := {"adult": 1.1, "child": 1.05, "dog": 1.28}
+const AUTO_SCALE := {"adult": 1.2, "child": 1.15, "dog": 1.4}
 
 
 func kind() -> String:
@@ -380,6 +380,21 @@ func _cheat(max_turn: float, wh := 0.3, wt := 0.25, keep := 0.75) -> float:
 	return want * (wh + wt)
 
 
+## Partial presentation turn for activities done facing away from the player:
+## the head (and a little of the torso) turns toward the camera by at most
+## `max_turn` radians, so the face reads in profile / back three-quarter while
+## the body stays square to the work. Returns the hips+torso yaw.
+func _glance(max_turn: float, wh := 0.1, wt := 0.2) -> float:
+	var a := _cam_a
+	if absf(a) < 0.15:
+		return 0.0
+	var want := clampf(a, -max_turn, max_turn)
+	_ab(b_hips, 0.0, want * wh, 0.0)
+	_ab(b_torso, 0.0, want * wt, 0.0)
+	_ab(b_head, 0.0, want * (1.0 - wh - wt), 0.0)
+	return want * (wh + wt)
+
+
 func _sb(i: int, x: float, y := 0.0, z := 0.0) -> void:
 	if i >= 0:
 		_tgt[i] = Vector3(x, y, z)
@@ -457,20 +472,23 @@ func _human_pose() -> void:
 				_sb(b_torso, 0.025 * slow)
 				_sb(b_head, -0.02 * slow, 0.35, 0.0)
 		"type":
-			# Hands on the keyboard, shoulders hunched in; the head is turned a
-			# little to the sim's left (glancing at the laptop beside the
-			# monitor) so the face and beard read in 3/4 from a Sims camera.
+			# Seated at the desk, back three-quarter to a Sims camera: the body
+			# stays square to the keyboard (forearms forward on the desk), and
+			# only the head turns part way so the beard + nose read in profile.
 			var tap := sin(t * 13.0)
 			var tap2 := sin(t * 11.0 + 1.3)
 			var body_yaw := 0.0
 			if _seated():
-				body_yaw = _cheat(1.55, 0.36, 0.28, 0.8)
-			_sb(b_arm_l, -0.62, -0.18 - body_yaw, -0.05)
-			_sb(b_arm_r, -0.62, 0.18 - body_yaw, 0.05)
-			_sb(b_fore_l, -0.85 + 0.08 * maxf(0.0, tap), 0.0, 0.0)
-			_sb(b_fore_r, -0.85 + 0.08 * maxf(0.0, tap2), 0.0, 0.0)
-			_ab(b_torso, 0.1, 0.0, 0.0)
-			_ab(b_head, -0.06 + 0.02 * sin(t * 0.8), 0.05 * sin(t * 0.4), 0.05)
+				body_yaw = _glance(1.3, 0.08, 0.17)
+				# Scoot to the front of the seat, lean in toward the screen.
+				_tgt_pos.z += 0.1 / _s
+				_ab(b_torso, 0.2, 0.0, 0.0)
+				_ab(b_head, -0.14, 0.0, 0.0)
+			_sb(b_arm_l, -1.0, -0.12 - body_yaw, -0.06)
+			_sb(b_arm_r, -1.0, 0.12 - body_yaw, 0.06)
+			_sb(b_fore_l, -0.62 + 0.08 * maxf(0.0, tap), 0.0, 0.0)
+			_sb(b_fore_r, -0.62 + 0.08 * maxf(0.0, tap2), 0.0, 0.0)
+			_ab(b_head, -0.04 + 0.02 * sin(t * 0.8), 0.05 * sin(t * 0.4), 0.04)
 		"read":
 			_sb(b_arm_l, -0.45, 0.0, -0.18)
 			_sb(b_arm_r, -0.45, 0.0, 0.18)
@@ -480,18 +498,17 @@ func _human_pose() -> void:
 			_ab(b_head, 0.2, 0.05 * sin(t * 0.6), 0.0)
 			_cheat(0.7, 0.25, 0.3, 0.9)
 		"paint":
-			# Brush arm raised to the canvas, palette held low in the other hand.
+			# Facing the easel, brush arm raised up to the canvas, palette held
+			# low in the other hand; the head turns part way to the player.
 			var dab := sin(t * 3.2)
 			var dab2 := sin(t * 1.3 + _phase)
-			_sb(b_arm_r, -1.5 + 0.12 * dab, 0.12 * dab2, 0.12)
-			_sb(b_fore_r, -0.2 - 0.2 * dab)
-			_sb(b_arm_l, -0.35, 0.0, 0.42)
-			_sb(b_fore_l, -1.1)
-			_ab(b_head, -0.05, 0.05 * dab2, 0.06 * sin(t * 0.7))
-			_ab(b_torso, 0.06, 0.0, 0.0)
-			# Glance back toward the player now and then, otherwise a gentle
-			# 3/4 turn so the face isn't hidden behind the hair.
-			var py := _cheat(0.85, 0.15, 0.3, 1.0)
+			_sb(b_arm_r, -1.6 + 0.1 * dab, 0.1 * dab2, 0.1)
+			_sb(b_fore_r, -0.45 - 0.2 * dab)
+			_sb(b_arm_l, -0.55, 0.0, 0.32)
+			_sb(b_fore_l, -1.0)
+			_ab(b_head, 0.02, 0.05 * dab2, 0.06 * sin(t * 0.7))
+			_ab(b_torso, 0.08, 0.0, 0.0)
+			var py := _glance(0.55, 0.05, 0.15)
 			_ab(b_arm_r, 0.0, -py, 0.0)
 			_ab(b_arm_l, 0.0, -py, 0.0)
 		"talk":

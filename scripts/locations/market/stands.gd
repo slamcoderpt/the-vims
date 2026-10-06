@@ -26,7 +26,7 @@ static func build(root: Node3D, halo_pts: Array) -> void:
 	Kit.add(root, fix, U, "ProduceFixtures", true, null, Vector3.ZERO, Vector3.ZERO, true)
 	Kit.add(root, prod, P, "Produce", false)
 	_chalkboard(root)
-	_fridges(root)
+	_fridges(root, halo_pts)
 	_aisles(root)
 	_checkout(root, halo_pts)
 	_foreground(root)
@@ -118,7 +118,7 @@ static func _produce_wall(root: Node3D, fix: VoxelBuilder, prod: VoxelBuilder) -
 			var top: float = tr[1]
 			# support / riser
 			fix.box(Vector3i(u(bx), 0, u(z)), Vector3i(u(tr[2]), u(top - 0.2), u(lenz)), Kit.wood(Fx.WOOD_D, 3))
-			_crate(fix, prod, Vector3(bx, top - 0.22, z + 0.03), Vector3(0.5, 0.22, lenz - 0.06), ks[2 - t], sec * 3 + t, 2, Fx.WOOD, false)
+			_crate(fix, prod, Vector3(bx, top - 0.22, z + 0.03), Vector3(0.5, 0.22, lenz - 0.06), ks[2 - t], sec * 3 + t, 2, Fx.WOOD, t == 0 and sec >= 2)
 		# back board + top shelf with baskets
 		fix.box(Vector3i(u(xw), 0, u(z)), Vector3i(u(0.55), u(2.1), u(lenz)), Kit.wood(Color("9a6438"), 2))
 		fix.box(Vector3i(u(xw + 0.55), u(2.0), u(z)), Vector3i(u(0.35), 1, u(lenz)), Kit.wood(Fx.WOOD_L, 1, 1))
@@ -195,7 +195,7 @@ static func _chalkboard(root: Node3D) -> void:
 	Fx.leaf_icon(lv, Vector3i(6, 7, 1), Color("6cbf45"), Color("2f7a2a"))
 	for p: Vector3i in lv.vox:
 		vb.set_v(p, lv.vox[p])
-	var mi := Kit.add(root, vb, U, "Chalkboard", true, null, Vector3(-3.0, 0.0, -2.5), Vector3(W * 0.5, 0, 0))
+	var mi := Kit.add(root, vb, U, "Chalkboard", true, null, Vector3(-3.55, 0.0, -1.75), Vector3(W * 0.5, 0, 0))
 	mi.rotation.y = deg_to_rad(32)
 	mi.rotation.x = deg_to_rad(-8)
 	var l := Kit.label(mi, "Local\nFresh\nToday!", Vector3(-0.04, 1.27, 0.075), 0.0024, Color("f4f1e6"), 0.0, 96)
@@ -205,7 +205,7 @@ static func _chalkboard(root: Node3D) -> void:
 
 # ------------------------------------------------------------------ fridges
 
-static func _fridges(root: Node3D) -> void:
+static func _fridges(root: Node3D, halo_pts: Array) -> void:
 	var vb := VoxelBuilder.new()
 	vb.jitter = 0.0
 	var bank := Fx.fridge(u(6.4), 3)
@@ -214,6 +214,12 @@ static func _fridges(root: Node3D) -> void:
 	var bank2 := Fx.fridge(u(3.2), 9)
 	Fx.put(vb, bank2, Vector3i(u(4.3), 0, u(-8.15)))
 	Kit.add(root, vb, U, "Fridges", false, Kit.glow_mat("cool"), Vector3.ZERO, Vector3.ZERO, true)
+	# Soft cool bloom along the lit header strips and inside the cases.
+	for i in 9:
+		halo_pts.append([Vector3(-2.25 + i * 0.72, 1.95, -7.35), 1.1, Color(0.55, 0.75, 1.0, 1.0)])
+		halo_pts.append([Vector3(-2.25 + i * 0.72, 1.0, -7.55), 1.3, Color(0.45, 0.62, 0.9, 1.0)])
+	for i in 4:
+		halo_pts.append([Vector3(4.7 + i * 0.8, 1.95, -7.35), 1.1, Color(0.55, 0.75, 1.0, 1.0)])
 	Interactable.attach(root, "Dairy Fridge", [
 		_act("buy", "Buy Milk", "milk", 2.0, {"money": -2, "item": "Milk"}),
 		_act("compare", "Compare", "scale", 3.0),
@@ -231,8 +237,8 @@ static func _aisles(root: Node3D) -> void:
 	# Row 1: angled towards the camera (front faces down-left), running from
 	# the dairy fridges out towards the checkout, like the reference.
 	var g1 := Fx.gondola(u(4.4), 1, kinds_a)
-	var g1m := Kit.add(root, g1, U, "AisleCereal", false, null, Vector3(1.75, 0, -5.9))
-	g1m.rotation.y = deg_to_rad(-53.0)
+	var g1m := Kit.add(root, g1, U, "AisleCereal", false, null, Vector3(2.75, 0, -5.6))
+	g1m.rotation.y = deg_to_rad(-62.0)
 	# Row 2 (further right, partly visible above row 1).
 	var g2 := Fx.gondola(u(4.4), 2, kinds_b)
 	Fx.put(vb, g2, Vector3i(u(6.3), 0, u(-6.4)), 3)
@@ -395,7 +401,7 @@ static func _checkout(root: Node3D, _halo_pts: Array) -> void:
 		Produce.tomato(pv, Vector3i((x0 + 3) * 2 + t * 4, py, (b0 + 29) * 2 + (t % 2)))
 	Produce.apple(pv, Vector3i((x0 + 3) * 2, py, (b0 + 34) * 2))
 	Produce.apple(pv, Vector3i((x0 + 3) * 2 + 4, py, (b0 + 34) * 2 + 2))
-	Kit.add(root, pv, P, "CheckoutProduce", true)
+	Kit.add(root, pv, P, "CheckoutProduce", false)
 	Interactable.attach(root, "Checkout", [
 		_act("pay", "Pay", "register", 3.0, {"task": "Pay at Checkout"}),
 		_act("bag", "Bag Groceries", "bag", 2.0),
@@ -454,7 +460,7 @@ static func _foreground(root: Node3D) -> void:
 		Produce.apple(pv, ap, i % 4 == 0)
 	for p: Vector3i in pv.vox:
 		vb.set_v(p, pv.vox[p])
-	Kit.add(root, vb, P, "Foreground", true, null, Vector3.ZERO, Vector3.ZERO, false)
+	Kit.add(root, vb, P, "Foreground", false, null, Vector3.ZERO, Vector3.ZERO, false)
 
 
 static func _basket(vb: VoxelBuilder, o: Vector3i, col: Color, handles: bool) -> void:

@@ -16,12 +16,12 @@ const BULB := Color("ffd889")
 ## World placement of the main pieces.
 const TABLE_POS := Vector3(0.9, 0.0, 0.5)
 const TABLE_ROT := 0.30
-const GRILL_POS := Vector3(-2.9, 0.0, 0.0)
+const GRILL_POS := Vector3(-3.6, 0.0, -1.15)
 const GRILL_ROT := PI + 0.55
 const PIT_POS := Vector3(4.1, 0.0, 2.4)
 ## Lanterns (fine cells: x, y, z of the base corner; 7x7 footprint).
 const LANTERNS := [Vector3i(-66, 0, 14), Vector3i(24, 0, -38), Vector3i(122, 0, -10), Vector3i(-88, 0, -58), Vector3i(150, 0, 50),
-		Vector3i(44, 6, -50), Vector3i(118, 6, -50), Vector3i(-22, 0, 30), Vector3i(66, 0, 40),
+		Vector3i(44, 6, -50), Vector3i(118, 6, -50), Vector3i(-22, 0, 30), Vector3i(70, 0, 68),
 		Vector3i(-118, 0, 42), Vector3i(100, 0, 62), Vector3i(-140, 0, -20)]
 ## Lanterns that also get a real OmniLight (the rest only bake a pool on the lawn).
 const LIT_LANTERNS := [0, 2, 7, 8, 10]
@@ -95,7 +95,7 @@ func build(parent: Node3D) -> void:
 	# Light sources.
 	pit_light = V.omni(root, PIT_POS + Vector3(0, 0.75, 0), Color(1.0, 0.55, 0.22), 2.6, 5.5)
 	# Glow sprites: fire pit, grill coals, table candles, house lamps + doors.
-	halos.add(PIT_POS + Vector3(0, 0.55, 0), 2.8, Color(1.0, 0.45, 0.12, 1.0))
+	halos.add(PIT_POS + Vector3(0, 0.6, 0), 1.9, Color(1.0, 0.45, 0.12, 0.85))
 	var tb := Transform3D(Basis(Vector3.UP, TABLE_ROT), TABLE_POS)
 	for cx in [-14, 11, 23]:
 		halos.add(tb * Vector3((cx + 1) / 16.0, 0.95, 0.0), 0.6, Color(1.0, 0.65, 0.3, 0.9))
@@ -107,7 +107,7 @@ func build(parent: Node3D) -> void:
 	for i in LIT_LANTERNS:
 		var lp: Vector3i = LANTERNS[i]
 		V.omni(root, Vector3((lp.x + 3.5) / F, (lp.y + 6.0) / F, (lp.z + 3.5) / F), Color(1.0, 0.66, 0.32), 1.1, 2.2)
-	V.omni(root, Vector3(-3.9, 0.7, 1.1), Color(1.0, 0.7, 0.4), 1.2, 3.5)
+	V.omni(root, GRILL_POS + Vector3(-0.9, 0.7, 1.1), Color(1.0, 0.7, 0.4), 1.2, 3.5)
 	V.omni(root, Vector3(-1.0, 2.6, -1.0), Color(1.0, 0.78, 0.5), 1.1, 6.5)
 	V.omni(root, Vector3(3.6, 2.6, 0.2), Color(1.0, 0.78, 0.5), 0.9, 6.0)
 
@@ -195,6 +195,18 @@ func _table() -> void:
 	# Ketchup + mustard.
 	V.b(vb, -3, y, 1, 1, 4, 1, Color("d02a24")); V.p(vb, -3, y + 4, 1, Color("f2f2f2"))
 	V.b(vb, -2, y, 1, 1, 4, 1, Color("f2c22a")); V.p(vb, -2, y + 4, 1, Color("f2f2f2"))
+	# Lemonade pitcher with a lemon slice.
+	V.b(vb, -8, y, -4, 3, 6, 3, Color("f6dc6a"))
+	V.b(vb, -8, y + 6, -4, 3, 1, 3, Color("e9f3f6"))
+	V.b(vb, -9, y + 2, -3, 1, 3, 1, Color("e9f3f6"))
+	V.p(vb, -7, y + 7, -3, Color("ffe14a"))
+	# Bread basket + corn on the right half.
+	V.b(vb, 20, y, -5, 5, 2, 3, V.wood(Color("c9944e"), 0, 1))
+	V.b(vb, 20, y + 2, -5, 5, 1, 3, V.mix([Color("e8b56a"), Color("d9a050"), Color("f3cf8a")], 4))
+	V.b(vb, 13, y, -6, 5, 1, 3, Color("f6f3ee"))
+	V.b(vb, 13, y + 1, -5, 4, 1, 1, Color("f3d24a")); V.b(vb, 14, y + 1, -6, 4, 1, 1, Color("e8c23a"))
+	# Extra salad bowl, left half.
+	_bowl(vb, -23, y, -5, Color("6cb04a"), [Color("e2513f"), Color("8fd05a"), Color("fbf3ec")])
 	# Candle jars (glow).
 	for cx in [-14, 11, 23]:
 		V.b(vb, cx, y, -1, 2, 2, 2, Color("ffcf6e"), true)
@@ -425,8 +437,8 @@ func _fire_pit(vb: VoxelBuilder, cx: int, cz: int) -> void:
 					c = V.shade(c, 0.8)
 					vb.set_v(q, c, true)
 	# Sparks.
-	for i in 6:
-		vb.set_v(Vector3i(cx - 3 + i, 18 + (i * 7) % 5, cz + (i * 5) % 7 - 3), Color("ffcf5a"), true)
+	for i in 3:
+		vb.set_v(Vector3i(cx - 2 + i * 2, 15 + (i * 7) % 4, cz + (i * 5) % 5 - 2), Color("ffb04a"), true)
 
 
 func _sofa(vb: VoxelBuilder, x: int, z: int) -> void:

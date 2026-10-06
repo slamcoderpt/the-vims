@@ -23,6 +23,7 @@ const NEED_CHECK_EVERY := 2.0
 ## gained less than STUCK_MIN metres repaths (up to MAX_REPATHS), then gives up
 ## on that target and free will picks the next best one.
 const ARRIVE_TOL := 0.3
+const WALK_BOOST := 1.4
 const STUCK_CHECK := 1.5
 const STUCK_MIN := 0.25
 const MAX_REPATHS := 2
@@ -108,6 +109,8 @@ func setup(p_world, i: int, p_actor: Node3D) -> void:
 	base_speed = actor.get("walk_speed") if actor.get("walk_speed") != null else 1.3
 	if base_speed <= 0.0:
 		base_speed = 1.3
+	# A brisk Sims walk: crossing the house shouldn't eat an hour of the day.
+	base_speed *= WALK_BOOST
 
 
 func display_name() -> String:
@@ -324,6 +327,8 @@ func _route_fail(o: Dictionary) -> void:
 		what = str(o.other.display_name())
 	if OS.has_environment("VIMS_PLAYTEST"):
 		print("  route fail: %s -> %s (%s) from %s" % [display_name(), what, o.get("action", {}).get("label", ""), str(actor.global_position)])
+	if o.get("auto", false) and o.get("action", {}).get("id", "") == "go_here":
+		return   # an aimless wander that can't be walked: just pick another
 	Game.show_bubble(actor, {"kind": "thought", "icon": "dots", "text": "?", "id": "thought", "ttl": 2.5})
 	if not o.get("auto", false):
 		Game.notify.emit("%s can't get to %s" % [display_name(), what], "dots")
@@ -630,6 +635,8 @@ func _act(dm: float) -> void:
 func _complete() -> void:
 	var a: Dictionary = order.get("action", {})
 	var m := int(a.get("money", 0))
+	if a.has("money_per_level") and a.has("skill"):
+		m += int(floorf(Game.skill_level(index, a.skill))) * int(a.money_per_level)
 	if m > 0:
 		# Mood scales pay: a happy sim works better.
 		m = roundi(m * Game.mood_mult(index))
@@ -652,6 +659,9 @@ func _complete() -> void:
 			Game.notify.emit("Task done: %s" % a.task, "trophy")
 	if not rejected:
 		_positive_moodlets(a, m)
+		if a.has("moodlet"):
+			var ml: Array = a.moodlet
+			Game.add_moodlet(index, ml[0], ml[1], ml[2], ml[3], ml[4], a.get("label", ""))
 	# Effects on other household members (feed the dog, pet the dog...).
 	var fx: Dictionary = SimActions.EFFECT_ON_KIND.get(a.get("id", ""), {})
 	for k in fx:

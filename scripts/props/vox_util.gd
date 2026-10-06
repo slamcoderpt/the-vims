@@ -89,7 +89,7 @@ static func blob(vb: VoxelBuilder, center: Vector3, rad: Vector3, c, shell := 0.
 			for z in range(floori(center.z - rad.z - 1), ceili(center.z + rad.z + 1)):
 				var d := Vector3((x + 0.5 - center.x) / rad.x, (y + 0.5 - center.y) / rad.y, (z + 0.5 - center.z) / rad.z)
 				var l := d.length()
-				var lim := 1.0 + (VoxelBuilder.hash3(Vector3i(x, y, z) + Vector3i(seed, 0, seed)) - 0.5) * rough
+				var lim := 1.0 + (VoxelBuilder.hash3(Vector3i(x, y, z) + Vector3i(seed, 0, seed)) - 0.5) * rough * 0.55
 				if l > lim:
 					continue
 				if shell > 0.0 and l < lim - shell / maxf(rad.x, 1.0):
@@ -123,16 +123,21 @@ static func books(vb: VoxelBuilder, x: int, y: int, z: int, w: int, h: int, d: i
 		i += 1
 
 
-## Leafy foliage colour callable (greens with highlights).
+## Leafy foliage colour callable. Kept deliberately calm (one dominant tone,
+## a lighter top and a few darker cells) so plants read as clean shapes at
+## phone size instead of high-frequency noise.
 static func leaves(seed := 0, tone := 0) -> Callable:
 	var sets := [
-		[Color("4f9a3c"), Color("5fae45"), Color("3d8030"), Color("72bf52"), Color("458c35")],
-		[Color("3e7d3a"), Color("4c9446"), Color("2f6630"), Color("5aa64f"), Color("6bb85a")],
-		[Color("6aa83f"), Color("7fbd4a"), Color("8ccc55"), Color("5b9636"), Color("a1d26a")],
+		[Color("5aa443"), Color("74bd52"), Color("44883a")],
+		[Color("3f8a3d"), Color("57a44c"), Color("2f6e33")],
+		[Color("78b445"), Color("93c95a"), Color("5f9a39")],
 	]
 	var cols: Array = sets[tone % sets.size()]
 	return func(q: Vector3i) -> Color:
 		var hh := VoxelBuilder.hash3(q + Vector3i(seed, seed, 3))
-		var c: Color = cols[int(hh * cols.size()) % cols.size()]
-		# Lighter on top.
-		return shade(c, 0.9 + clampf(float(q.y) * 0.006, 0.0, 0.2))
+		var c: Color = cols[0]
+		if hh > 0.86:
+			c = cols[2]
+		elif hh > 0.62 or posmod(q.y, 4) == 3:
+			c = cols[1]
+		return c

@@ -193,7 +193,7 @@ static func m_nightstand(vb: VoxelBuilder, v: int) -> void:
 ## v0 pink gingham (bunny girl), v1 navy star quilt (cat girl), v2 parents' double.
 static func m_bed(vb: VoxelBuilder, v: int) -> void:
 	var w := 18 if v != 2 else 28
-	var l := 34
+	var l := 28 if v != 2 else 34
 	v = v % 3
 	var frame: Color = [Color("f3a9c0"), WOOD, WOOD_R][v]
 	var fr := V.noisy(frame, 0.04) if v == 0 else V.wood(frame, 2, 2)
@@ -241,7 +241,7 @@ static func m_bed(vb: VoxelBuilder, v: int) -> void:
 				return V.shade(navy, 0.95 + VoxelBuilder.hash3(q) * 0.1) if posmod(q.x + q.z, 6) != 0 else Color("4c5fb0")
 		_:
 			quilt = V.plaid(Color("e8e0cf"), Color("c96a55"), Color("a24c3d"), 4)
-	var qz := 12
+	var qz := 10 if l < 30 else 12
 	V.b(vb, 0, 8, qz, w, 1, l - 2 - qz, quilt)
 	V.b(vb, 0, 4, qz, 1, 4, l - 2 - qz, quilt)
 	V.b(vb, w - 1, 4, qz, 1, 4, l - 2 - qz, quilt)

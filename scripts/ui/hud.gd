@@ -282,7 +282,7 @@ func _position_bubble(b) -> void:
 			elif _is_selected_actor(a) or b.selected_side:
 				# bubble sits up-left so the plumbob can float beside it over
 				# the head; the tail leans right and touches just above the head
-				b.tail_frac = 0.78
+				b.tail_frac = 0.7
 				b.tail_lean = 7.0
 				tip = head + Vector2(-2, -HEAD_GAP)
 			else:
@@ -423,6 +423,7 @@ func _process(delta: float) -> void:
 			_bubbles.erase(key)
 			continue
 		_position_bubble(b)
+	_resolve_overlaps()
 	_update_plumbob()
 	if _dbg_frames >= 0:
 		_dbg_frames += 1
@@ -455,6 +456,43 @@ func _update_plumbob() -> void:
 		tip = plumbob_fallback
 	plumbob.active = tip != Vector2.INF
 	plumbob.tip = tip if plumbob.active else Vector2.ZERO
+
+
+## Space kept free right of the selected sim's bubble for the plumbob.
+const PLUMBOB_RESERVE := 44.0
+var _sort_buf: Array = []
+
+
+## Push overlapping main bubbles apart horizontally (tails keep pointing at
+## their sims); a sim's skill chip moves with its bubble.
+func _resolve_overlaps() -> void:
+	_sort_buf.clear()
+	for key in _bubbles:
+		var b = _bubbles[key]
+		if is_instance_valid(b) and b.visible and b.kind != "skill":
+			_sort_buf.append(b)
+	if _sort_buf.size() < 2:
+		return
+	_sort_buf.sort_custom(func(x, y): return x.position.x < y.position.x)
+	var sel := _selected_actor()
+	for i in range(1, _sort_buf.size()):
+		var b = _sort_buf[i]
+		for j in i:
+			var o = _sort_buf[j]
+			var ow: float = o.size.x + (PLUMBOB_RESERVE if (sel != null and o.anchor == sel) else 0.0)
+			var orect := Rect2(o.position, Vector2(ow, o.size.y + WorldBubble.TAIL_H)).grow(8.0)
+			var br := Rect2(b.position, b.size + Vector2(0, WorldBubble.TAIL_H))
+			if not orect.intersects(br):
+				continue
+			var dx: float = orect.end.x - b.position.x
+			b.position.x += dx
+			b.tail_frac = clampf(b.tail_frac - dx / b.size.x, 0.14, 0.86)
+			b.tail_lean = 0.0
+			b.queue_redraw()
+			if b.anchor != null:
+				var chip = _bubbles.get(str(b.anchor.get_instance_id()) + "|skill")
+				if chip != null and is_instance_valid(chip):
+					chip.position.x += dx
 
 
 func _main_bubble_for(a: Node3D):

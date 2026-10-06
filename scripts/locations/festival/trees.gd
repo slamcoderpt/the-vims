@@ -3,22 +3,20 @@ extends RefCounted
 ## Voxel size 0.15 m: chunky like the reference, cheap enough for phones.
 
 const K := preload("res://scripts/locations/festival/kit.gd")
-const VS := [0.28, 0.26, 0.34]
+const VS := [0.24, 0.24, 0.34]
 
 ## [x, z, height_m, crown_radius_m, palette (0 orange, 1 red, 2 yellow, 3 mixed), group]
 const TREES := [
 	# Left edge, behind the treats stall.
-	[-8.4, -1.0, 4.4, 2.4, 0, 0],
-	[-7.4, -6.8, 5.0, 2.6, 1, 0],
+	[-8.9, -2.0, 4.8, 2.1, 0, 0],
+	[-8.6, -8.0, 5.0, 2.2, 1, 0],
 	[-12.5, -8.5, 5.4, 2.8, 2, 0],
 	# Right edge, behind stalls / stage.
-	[9.6, -2.6, 4.6, 2.5, 2, 1],
-	[10.6, -10.0, 5.2, 2.8, 0, 1],
+	[10.2, -3.6, 4.9, 2.2, 2, 1],
+	[11.2, -11.0, 5.0, 2.3, 0, 1],
 	# Back, framing the town hall.
-	[-16.5, -13.0, 5.6, 2.8, 0, 2],
 	[-5.4, -22.0, 6.4, 3.4, 0, 2],
 	[10.5, -19.0, 6.2, 3.0, 1, 2],
-	[8.0, -18.0, 5.6, 2.8, 3, 2],
 	[13.5, -14.0, 5.6, 3.0, 2, 2],
 ]
 

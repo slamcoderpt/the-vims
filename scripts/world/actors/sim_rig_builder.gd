@@ -257,7 +257,7 @@ static func _build_human(L: Dictionary) -> Dictionary:
 
 	var head := _human_head(L, D)
 	var hat: String = L.get("hat", "")
-	var ear_y := float(neck) + hh + 2.0
+	var ear_y := float(neck) + hh + 2.5
 	var ear_x := hw * 0.5 - 2.0
 	if hat == "cat":
 		ear_x = hw * 0.5 - 2.5
@@ -574,7 +574,7 @@ static func _human_hair(vb: VoxelBuilder, style: String, hc: Callable, W: int, H
 			if not has_hat:
 				_fill(vb, -1, W, T + 1, T + 1, -1, F, hc)
 				_fill(vb, 0, W - 1, T + 2, T + 2, 0, F - 1, hc)
-			var low := (-1 if child else -5) if style != "bun" and style != "ponytail" else B + 1
+			var low := (-4 if child else -5) if style != "bun" and style != "ponytail" else B + 1
 			if style == "long" or style == "curly_long":
 				# Curtains framing the face down past the chin, ragged ends.
 				for z in range(0, F):
@@ -613,7 +613,7 @@ static func _human_hair(vb: VoxelBuilder, style: String, hc: Callable, W: int, H
 				_fill(vb, W, W, B + 2, T, 0, F - 1, hc)
 			# Bangs.
 			var bang_top := T - 2 if has_hat else T
-			var bang_lo := T - 2 if has_hat else T - 3
+			var bang_lo := T - 3 if has_hat else T - 3
 			for x in range(0, W):
 				for y in range(bang_lo, bang_top + 1):
 					if y == bang_lo and not has_hat and _h(Vector3i(x, 0, 0), 16) < 0.5:
@@ -660,47 +660,64 @@ static func _human_hat(vb: VoxelBuilder, L: Dictionary, W: int, H: int, Dd: int,
 		var f := 0.95 if posmod(u, 2) == 0 else 1.04
 		return _sh(hc, f * (1.0 + (_h(p, 21) - 0.5) * 0.05))
 	if hat == "bunny" or hat == "cat":
-		# Snug beanie that sits ON the head: ribbed cuff just above the brows,
-		# shell hugging the skull one voxel out, rounded dome on top. The face
-		# stays fully exposed below the cuff.
-		var cuff_c: Color = L.get("cuff_color", _sh(hc, 1.06))
-		for y in range(T - 1, T + 1):
-			for x in range(-1, W + 1):
-				for z in range(-1, F + 2):
-					var shell := x == -1 or x == W or z == -1 or z == F + 1
-					if not shell:
-						continue
-					if (x == -1 or x == W) and (z == -1 or z == F + 1):
-						continue
-					var p := Vector3i(x, y, z)
-					if y <= T - 1:
-						var u := z if (x == -1 or x == W) else x
-						vb.set_v(p, _sh(cuff_c, 0.93 if posmod(u, 2) == 0 else 1.02))
-					else:
-						vb.set_v(p, knit.call(p))
-		# Top layer (inset by the shell) + dome.
-		_fill(vb, 0, W - 1, T + 1, T + 1, 0, F, knit)
-		for x in [0, W - 1]:
-			for z in [0, F]:
-				vb.erase(Vector3i(x, T + 1, z))
-		_fill(vb, 1, W - 2, T + 2, T + 2, 1, F - 1, knit)
-		for x in [1, W - 2]:
-			for z in [1, F - 1]:
-				vb.erase(Vector3i(x, T + 2, z))
+		# Rounded knit beanie that sits ON the head: ribbed cuff just above the
+		# brows, shell hugging the skull one voxel out, then a soft dome with
+		# cut corners on every row (no stacked "cake" tiers). The face stays
+		# fully exposed below the cuff.
+		var cuff_c: Color = L.get("cuff_color", _sh(hc, 1.05))
+		var c0 := T - 1
+		var dome := [[T + 2, 0, 1]]   # [row, inset, corner cut]
+		var in_hat := func(x: int, y: int, z: int) -> bool:
+			if y >= c0 and y <= T + 1:
+				if x < -1 or x > W or z < -1 or z > F + 1:
+					return false
+				return not ((x == -1 or x == W) and (z == -1 or z == F + 1))
+			for d: Array in dome:
+				if y == d[0]:
+					var i: int = d[1]
+					var k: int = d[2]
+					if x < i or x > W - 1 - i or z < i - 1 or z > F + 1 - i:
+						return false
+					var ex := mini(x - i, W - 1 - i - x)
+					var ez := mini(z - (i - 1), F + 1 - i - z)
+					return ex + ez >= k
+			return false
 		# Hair can't poke through the hat: clear anything above the cuff
-		# outside the hat volume.
-		for y in range(T - 1, T + 6):
+		# outside the hat volume (hair below the cuff stays: bangs, sides).
+		for y in range(c0, T + 7):
 			for x in range(-3, W + 3):
 				for z in range(-4, F + 3):
-					var inside := x >= -1 and x <= W and z >= -1 and z <= F + 1 and y <= T
-					if y == T + 1:
-						inside = x >= 0 and x < W and z >= 0 and z <= F
-					elif y == T + 2:
-						inside = x >= 1 and x < W - 1 and z >= 1 and z < F
-					elif y > T + 2:
-						inside = false
-					if not inside:
+					if not in_hat.call(x, y, z):
 						vb.erase(Vector3i(x, y, z))
+		for y in range(c0, T + 4):
+			for x in range(-1, W + 1):
+				for z in range(-1, F + 2):
+					if not in_hat.call(x, y, z):
+						continue
+					var p := Vector3i(x, y, z)
+					if y < T:
+						var u := z if (x == -1 or x == W) else x
+						vb.set_v(p, _sh(cuff_c, 0.9 if posmod(u, 2) == 0 else 1.02))
+					else:
+						vb.set_v(p, knit.call(p))
+		# Flared brim: the cuff row sticks out one more voxel all round
+		# (rounded corners), like the ref's knit hats.
+		for x in range(-2, W + 2):
+			for z in range(-2, F + 3):
+				var edge := x == -2 or x == W + 1 or z == -2 or z == F + 2
+				if not edge:
+					continue
+				var cx2 := x == -2 or x == W + 1
+				var cz2 := z == -2 or z == F + 2
+				if cx2 and cz2:
+					continue
+				if (cx2 and (z == -1 or z == F + 1)) or (cz2 and (x == -1 or x == W)):
+					continue
+				var u2 := z if cx2 else x
+				vb.set_v(Vector3i(x, c0, z), _sh(cuff_c, 0.92 if posmod(u2, 2) == 0 else 1.0))
+		# A slightly darker fold line above the cuff.
+		for x in range(0, W):
+			vb.set_v(Vector3i(x, T, F + 1), _sh(knit.call(Vector3i(x, T, F + 1)), 0.9))
 		if hat == "cat":
 			# Stitched cat face on the front of the hat: two eyes + nose.
 			# Stitched seam dots near the front corners (like the ref hat).
@@ -1083,19 +1100,22 @@ static func _build_dog(L: Dictionary) -> Dictionary:
 	var head_fn := func(p: Vector3i) -> Color:
 		var c := tan
 		var dx := absi(p.x - mid)
-		# Blaze: thin stripe up the forehead, widening down the face.
-		if dx == 0 and p.y >= 2:
+		# Blaze: thin stripe up the forehead (front face + front of the crown
+		# only), widening into white cheeks and muzzle at the bottom.
+		if dx == 0 and p.y >= 2 and p.z >= HD - 2:
 			c = white
-		elif dx == 1 and p.y <= 3 and p.z >= HD - 3:
+		elif dx == 0 and p.y >= HH - 1 and p.z >= HD - 4:
+			c = white
+		elif dx == 1 and p.y <= 3 and p.z >= HD - 2:
 			c = white
 		elif p.y <= 1 and p.z >= HD - 3 and dx <= 3:
 			c = white
-		elif p.y <= 0:
+		elif p.y <= 0 and p.z >= 2:
 			c = white
-		elif p.y >= HH - 1 and dx <= 1:
-			c = white
-		if c == tan and p.y >= HH - 2 and dx >= 2:
-			c = _sh(tan, 0.92)
+		if c == tan and p.y >= HH - 2:
+			c = _sh(tan, 0.9)
+		elif c == tan and p.z <= 1:
+			c = _sh(tan, 0.94)
 		return _sh(c, 1.0 + (_h(p, 33) - 0.5) * 0.1)
 	_fill(head, 0, HW - 1, 0, HH - 1, 0, HD - 1, head_fn)
 	# Round the skull.
@@ -1165,10 +1185,12 @@ static func _build_dog(L: Dictionary) -> Dictionary:
 				if x == 1 and y <= -5:
 					continue
 				var c := earc
-				if y >= -1:
-					c = tan
+				if y >= 0:
+					c = _sh(earc, 1.12)
 				elif y <= -6:
-					c = _sh(earc, 0.82)
+					c = _sh(earc, 0.8)
+				elif x == 0 and (z == 0 or z == 4):
+					c = _sh(earc, 0.9)
 				ear.set_v(Vector3i(x, y, z), _sh(c, 1.0 + (_h(Vector3i(x, y, z), 36) - 0.5) * 0.12))
 	acc.part("ear_l", ear, Vector3(0.5, 0.5, 2.5))
 	var ear_r := VoxelBuilder.new()

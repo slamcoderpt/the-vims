@@ -18,7 +18,7 @@ const SimOverlay := preload("res://scripts/sim/ui/sim_overlay.gd")
 
 const TAP_SLOP := 14.0         # px a finger may move and still count as a tap
 const LONG_PRESS := 0.5        # s
-const SHAREABLE := ["Stage", "Fountain", "Dinner Table", "Fire Pit", "Fall Treats", "Festival Game",
+const SHAREABLE := ["Stage", "Fountain", "Dinner Table", "Dining Table", "Fire Pit", "Fall Treats", "Festival Game",
 	"Handmade Crafts", "Shopping Cart", "Sofa", "TV", "Toy Box", "Ball", "Art Supplies", "Neighbor", "Cashier"]
 const TRAVEL_ICONS := {"home": "home", "backyard": "burger", "festival": "pumpkin", "market": "cart"}
 
@@ -361,9 +361,10 @@ func _unhandled_input(e: InputEvent) -> void:
 				_touch_down = false
 				build.release()
 				if not _touch_moved and not _touch_long_done:
-					if _menu_open_at_press:
+					if _menu_open_at_press and not build.is_active():
 						_menu_open_at_press = false
 					elif not _over_hud(e.position):
+						_menu_open_at_press = false
 						tap(e.position)
 	elif e is InputEventScreenDrag:
 		if e.index == _touch_index and _touch_down:
@@ -583,7 +584,8 @@ func open_object_menu(it: Interactable, screen: Vector2) -> void:
 	var tn := townie_of(it)
 	if tn != "":
 		var lvl := Game.rel_level(Game.rel(sel.display_name(), tn)) if Game.has_met(sel.display_name(), tn) else "Stranger"
-		open_menu("%s · %s" % [tn, lvl], townie_rows(sel, it), {"type": "object", "target": it}, screen)
+		# First name only: the menu card is narrow.
+		open_menu("%s · %s" % [tn.get_slice(" ", 0), lvl], townie_rows(sel, it), {"type": "object", "target": it}, screen)
 		return
 	var acts := SimActions.actions_for(it, sel.member)
 	if acts.is_empty():
@@ -599,7 +601,9 @@ func _on_action_chosen(title: String, action: Dictionary) -> void:
 	var t: String = ctx.get("type", "")
 	if action.get("locked", false):
 		var who: String = str(ctx.get("title", "them")).get_slice(" · ", 0)
-		Game.notify.emit("Become %s with %s to unlock %s" % [action.get("need_tier", "closer"), who, action.get("unlock_label", "that")], "heart")
+		var msg: String = action.get("lock_msg", "Become %s with %s to unlock %s" % [action.get("need_tier", "closer"), who, action.get("unlock_label", "that")])
+		Game.notify.emit(msg, "star" if action.has("lock_msg") else "heart")
+		say_selected("Not yet!", "dots")
 		return
 	if t == "" and title == "Travel":
 		t = "travel"
@@ -884,9 +888,12 @@ func choose_autonomous(ag) -> Dictionary:
 	for it in interactables:
 		if not is_instance_valid(it) or ag.is_unreachable(it):
 			continue
+		# Something in use is still an option when a need is urgent (the sim
+		# waits its turn, as in the Sims); otherwise free will looks elsewhere.
 		var u = user_of(it)
+		var busy_pen := 0.0
 		if u != null and u != ag and not shareable(it):
-			continue
+			busy_pen = 0.4
 		var wp: Vector3 = it.world_use_spot() if it.use_spot != Vector3.ZERO else it.global_position
 		var dist := _flat(wp, p) + absf(wp.y - p.y) * 3.0
 		var best_s := 0.1
@@ -900,7 +907,7 @@ func choose_autonomous(ag) -> Dictionary:
 				# Free will never spends money unless a need is desperate and this fixes it.
 				if not Game.can_afford(cost) or not _desperate_fix(ag, a):
 					continue
-			var s := SimActions.score(a, ag.member, dist) + randf() * 0.05
+			var s := SimActions.score(a, ag.member, dist) + randf() * 0.05 - busy_pen
 			if s > best_s:
 				best_s = s
 				best_a = a
@@ -959,6 +966,7 @@ func _first_reachable(ag, cands: Array) -> Dictionary:
 
 ## Best way to fix one need right now (used when a need hits zero). Money is
 ## allowed when affordable; distance matters less than in normal free will.
+## Objects in use still count (the sim queues up and waits its turn).
 func choose_for_need(ag, need: String) -> Dictionary:
 	var cands: Array = []
 	var p: Vector3 = ag.actor.global_position
@@ -966,8 +974,7 @@ func choose_for_need(ag, need: String) -> Dictionary:
 		if not is_instance_valid(it) or ag.is_unreachable(it):
 			continue
 		var u = user_of(it)
-		if u != null and u != ag and not shareable(it):
-			continue
+		var busy_pen := 0.3 if (u != null and u != ag and not shareable(it)) else 0.0
 		var wp: Vector3 = it.world_use_spot() if it.use_spot != Vector3.ZERO else it.global_position
 		var dist := _flat(wp, p) + absf(wp.y - p.y) * 3.0
 		for a in SimActions.actions_for(it, ag.member):
@@ -977,7 +984,7 @@ func choose_for_need(ag, need: String) -> Dictionary:
 			var cost := -int(a.get("money", 0))
 			if cost > 0 and not Game.can_afford(cost):
 				continue
-			var s := gain * 2.0 - dist * 0.02 - float(a.get("minutes", 30.0)) / 600.0
+			var s := gain * 2.0 - dist * 0.02 - float(a.get("minutes", 30.0)) / 600.0 - busy_pen
 			cands.append([s, {"action": a, "target": it}])
 	return _first_reachable(ag, cands)
 

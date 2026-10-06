@@ -1,9 +1,12 @@
 extends Node
 ## Build / Buy / Decorate modes (touch first).
-##   Buy, Decorate: the catalogue opens in the action menu; pick an item and a
-##     ghost appears on the floor grid in the middle of the screen. Drag the
-##     ghost (or tap the floor) to move it; tap the ghost for Place / Rotate / Cancel.
-##   Build: tap a bought item for Move / Rotate / Sell.
+##   Buy, Decorate, Build: the catalogue opens in the action menu by category
+##     (Seating, Surfaces... / Plants, Lighting, Rugs / Walls, Floor Tiles,
+##     Garden); pick an item and a ghost appears on the floor grid in the
+##     middle of the screen. Drag the ghost (or tap the floor) to move it; tap
+##     the ghost for Place / Rotate / Cancel.
+##   Any mode: tap a bought item for Move / Rotate / Sell. Walls block paths;
+##     floor tiles and rugs are walked over.
 ## The clock pauses while a build mode is open (as in The Sims).
 ## Bought objects persist per location in Game.placed and are Interactables
 ## with their catalogue actions, registered as NavGrid obstacles.
@@ -28,6 +31,7 @@ var grid: MeshInstance3D
 var _saved_speed := 1
 var _mat_ok: StandardMaterial3D
 var _mat_bad: StandardMaterial3D
+var _last_menu_pos := Vector2(170, 260)
 
 
 func _ready() -> void:
@@ -58,10 +62,9 @@ func enter(m: String) -> void:
 		Game.speed = 0
 	mode = m
 	_show_grid(true)
-	if m == "buy" or m == "decorate":
-		open_catalog()
-	else:
-		Game.notify.emit("Tap a bought item to move, rotate or sell it", "hammer")
+	open_catalog()
+	if m == "build":
+		Game.notify.emit("Walls, floors and garden · tap a bought item to move or sell it", "hammer")
 
 
 func exit() -> void:
@@ -75,11 +78,18 @@ func exit() -> void:
 	Game.speed = _saved_speed
 
 
-func open_catalog(at := Vector2.INF) -> void:
-	var cat := "decorate" if mode == "decorate" else "buy"
-	var title := "Decorate" if cat == "decorate" else "Buy"
+func open_catalog(at := Vector2.INF, sub := "") -> void:
+	var cat := mode if mode in ["buy", "decorate", "build"] else "buy"
+	var title: String = {"buy": "Buy", "decorate": "Decorate", "build": "Build"}[cat]
 	var pos := at if at != Vector2.INF else Vector2(170, 260)
-	world.open_menu(title, Catalog.menu_rows(cat), {"type": "catalog"}, pos)
+	_last_menu_pos = pos
+	if sub == "":
+		world.open_menu(title, Catalog.category_rows(cat), {"type": "catalog"}, pos)
+	else:
+		for c in Catalog.CATEGORIES.get(cat, []):
+			if c[0] == sub:
+				title = c[1]
+		world.open_menu(title, Catalog.menu_rows(cat, sub), {"type": "catalog"}, pos)
 
 
 # =================================================================== input (from SimWorld)
@@ -96,21 +106,17 @@ func tap(screen: Vector2) -> void:
 		return
 	var it = world.pick_interactable(screen)
 	if it != null and it.has_meta("placed_uid"):
-		var uid: int = it.get_meta("placed_uid")
-		var e := _entry(uid)
-		var item := Catalog.get_item(e.get("item", ""))
-		world.open_menu(item.get("label", "Item"), [
-			{"id": "move", "label": "Move", "icon": "hammer", "uid": uid},
-			{"id": "rotate", "label": "Rotate", "icon": "arrow_up", "uid": uid},
-			{"id": "sell", "label": "Sell  +$%d" % int(item.get("price", 0) * SELL_BACK), "icon": "money", "uid": uid},
-		], {"type": "placed"}, screen)
+		_open_placed_menu(it.get_meta("placed_uid"), screen)
 		return
 	if it != null:
 		Game.notify.emit("Built-in items can't be moved", "hammer")
 		world.say_selected("Only bought items can move", "hammer")
 		return
-	if mode == "buy" or mode == "decorate":
-		open_catalog(screen)
+	var fl := _floor_item_at(screen)
+	if fl >= 0:
+		_open_placed_menu(fl, screen)
+		return
+	open_catalog(screen)
 
 
 ## Returns true if the press starts a ghost drag (camera won't pan).
@@ -149,7 +155,14 @@ func _lock_camera(v: bool) -> void:
 func on_menu(ctx: Dictionary, action: Dictionary) -> void:
 	match ctx.get("type", ""):
 		"catalog":
-			start_ghost(action.get("item", ""))
+			# Deferred: the HUD hides its menu right after reporting the
+			# chosen row, which would hide the next level straight away.
+			if action.has("subcat"):
+				open_catalog.call_deferred(_last_menu_pos, action.subcat)
+			elif action.has("back"):
+				open_catalog.call_deferred(_last_menu_pos)
+			else:
+				start_ghost(action.get("item", ""))
 		"ghost":
 			match action.get("id", ""):
 				"place": place_ghost()
@@ -184,7 +197,7 @@ func start_ghost(item_id: String, at := Vector3.INF) -> bool:
 	ghost_rot = 0
 	ghost = Node3D.new()
 	ghost.name = "Ghost"
-	ghost_mesh = PropLib.instance(item.model, item.v, false)
+	ghost_mesh = Catalog.instance(item, false)
 	ghost_mesh.set_meta("nav_ignore", true)
 	ghost.add_child(ghost_mesh)
 	world.location.add_child(ghost)
@@ -218,9 +231,8 @@ func rotate_ghost() -> void:
 
 
 func _footprint(item: Dictionary, rot: int) -> Vector3:
-	var s: Vector3i = PropLib.rotated_size(item.model, rot, item.v)
-	var u: float = PropLib.scale_of(item.model)
-	return Vector3(s) * u
+	var s: Vector3i = Catalog.rotated_size(item, rot)
+	return Vector3(s) * Catalog.unit(item)
 
 
 ## World AABB of the footprint centred (x/z) on p, standing on p.y.
@@ -232,6 +244,7 @@ func _box(item: Dictionary, rot: int, p: Vector3) -> AABB:
 func _snap(item: Dictionary, rot: int, p: Vector3) -> Vector3:
 	var fs := _footprint(item, rot)
 	var cs: float = world.nav.cs if world.nav else 0.25
+	cs = maxf(cs, float(item.get("grid", 0.0)))
 	var mn := Vector2(p.x - fs.x * 0.5, p.z - fs.z * 0.5)
 	mn = Vector2(roundf(mn.x / cs) * cs, roundf(mn.y / cs) * cs)
 	var y := p.y
@@ -244,8 +257,8 @@ func _move_ghost(p: Vector3, find_free := false) -> void:
 	if ghost == null:
 		return
 	var q := _snap(ghost_item, ghost_rot, p)
-	ghost_valid = world.nav != null and world.nav.can_place(_box(ghost_item, ghost_rot, q))
-	if find_free and ghost_valid and _covers_sim(_box(ghost_item, ghost_rot, q)):
+	ghost_valid = _can_place(ghost_item, _box(ghost_item, ghost_rot, q))
+	if find_free and ghost_valid and not ghost_item.get("walk", false) and _covers_sim(_box(ghost_item, ghost_rot, q)):
 		ghost_valid = false
 	if not ghost_valid and find_free and world.nav:
 		# Spiral out to the nearest free spot.
@@ -255,14 +268,14 @@ func _move_ghost(p: Vector3, find_free := false) -> void:
 				var a := TAU * k / 16.0
 				var t := _snap(ghost_item, ghost_rot, p + Vector3(cos(a), 0, sin(a)) * r * cs)
 				var tb := _box(ghost_item, ghost_rot, t)
-				if world.nav.can_place(tb) and not _covers_sim(tb):
+				if _can_place(ghost_item, tb) and not _covers_sim(tb):
 					q = t
 					ghost_valid = true
 					break
 			if ghost_valid:
 				break
 	ghost_pos = q
-	ghost.global_position = q + Vector3(0, 0.02, 0)
+	ghost.global_position = q + Vector3(0, 0.02 + _lift(ghost_item), 0)
 	ghost.rotation.y = ghost_rot * PI * 0.5
 	ghost_mesh.material_override = _mat_ok if ghost_valid else _mat_bad
 	if grid:
@@ -319,9 +332,69 @@ func place_ghost() -> bool:
 	ghost = null
 	ghost_item = {}
 	_spawn(entry)
-	_push_sims(_box(Catalog.get_item(entry.item), entry.rot, entry.pos))
+	if not Catalog.get_item(entry.item).get("walk", false):
+		_push_sims(_box(Catalog.get_item(entry.item), entry.rot, entry.pos))
 	Game.furniture_changed.emit()
 	return true
+
+
+func _open_placed_menu(uid: int, screen: Vector2) -> void:
+	var e := _entry(uid)
+	var item := Catalog.get_item(e.get("item", ""))
+	world.open_menu(item.get("label", "Item"), [
+		{"id": "move", "label": "Move", "icon": "hammer", "uid": uid},
+		{"id": "rotate", "label": "Rotate", "icon": "arrow_up", "uid": uid},
+		{"id": "sell", "label": "Sell  +$%d" % int(item.get("price", 0) * SELL_BACK), "icon": "money", "uid": uid},
+	], {"type": "placed"}, screen)
+
+
+## Floor tiles / rugs sit just above the floor so they never z-fight it.
+static func _lift(item: Dictionary) -> float:
+	match item.get("proc", ""):
+		"floor": return 0.004
+		"rug": return 0.03
+	return 0.0
+
+
+## Placement rule: furniture and walls need free floor (NavGrid); floor tiles
+## need floor and no other tile in the same square; rugs go anywhere on floor.
+func _can_place(item: Dictionary, box: AABB) -> bool:
+	if world.nav == null:
+		return false
+	if not item.get("walk", false):
+		return world.nav.can_place(box, moving_uid)
+	var li: int = world.nav.level_of(box.position + Vector3(0, 0.05, 0))
+	for p: Vector3 in [box.get_center(), box.position + Vector3(0.05, 0, 0.05), box.end - Vector3(0.05, 0, 0.05)]:
+		if not world.nav.in_bounds(p) or not world.nav.has_floor(li, world.nav.cell_of(p)):
+			return false
+		if absf(world.nav.floor_y(p, li) - box.position.y) > 0.3:
+			return false
+	if item.get("proc", "") == "floor":
+		var c := box.get_center()
+		for e in _entries():
+			var other := Catalog.get_item(e.item)
+			if other.get("proc", "") == "floor" and e.uid != moving_uid and Vector2(e.pos.x - c.x, e.pos.z - c.z).length() < 0.5 and absf(e.pos.y - box.position.y) < 0.5:
+				return false
+	return true
+
+
+## A placed floor tile / rug under the screen point (uid) or -1.
+func _floor_item_at(screen: Vector2) -> int:
+	var g: Dictionary = world.ground_point(screen)
+	if g.is_empty():
+		return -1
+	var p: Vector3 = g.pos
+	var best := -1
+	for e in _entries():
+		var item := Catalog.get_item(e.item)
+		if not item.get("walk", false):
+			continue
+		var b := _box(item, e.rot, e.pos)
+		if p.x >= b.position.x and p.x <= b.end.x and p.z >= b.position.z and p.z <= b.end.z and absf(p.y - b.position.y) < 0.6:
+			best = e.uid
+			if item.get("proc", "") == "rug":
+				return best   # rugs lie on top of tiles
+	return best
 
 
 # =================================================================== placed items
@@ -352,13 +425,18 @@ func _spawn(e: Dictionary) -> void:
 	var n := Node3D.new()
 	n.name = "Placed_%d" % e.uid
 	world.location.add_child(n)
-	n.global_position = e.pos
+	n.global_position = e.pos + Vector3(0, _lift(item), 0)
 	n.rotation.y = e.rot * PI * 0.5
-	var mi := PropLib.instance(item.model, item.v)
+	var mi := Catalog.instance(item)
 	mi.set_meta("nav_ignore", true)
 	n.add_child(mi)
-	var raw: Vector3i = PropLib.size_of(item.model, item.v)
-	var sz := Vector3(raw) * PropLib.scale_of(item.model)
+	var raw: Vector3i = Catalog.size_of(item)
+	var sz := Vector3(raw) * Catalog.unit(item)
+	nodes[e.uid] = n
+	if item.get("walk", false):
+		# Floors / rugs: no collider in live mode (taps go to the floor);
+		# build modes find them by footprint (_floor_item_at).
+		return
 	var use := Vector3(0, 0, sz.z * 0.5 + 0.4) if item.get("use", "front") == "front" else Vector3.ZERO
 	var it := Interactable.attach(n, item.label, item.get("actions", []), Vector3(maxf(sz.x, 0.3), maxf(sz.y, 0.3), maxf(sz.z, 0.3)), Vector3(0, sz.y * 0.5, 0), use)
 	if item.get("use", "") == "seat":
@@ -367,7 +445,6 @@ func _spawn(e: Dictionary) -> void:
 	it.name = "Interactable"
 	if item.get("light", false):
 		PropLib.add_light(n, Vector3(0, sz.y - 0.1, 0), Color(1.0, 0.72, 0.42), 1.0, 3.5, 0.3)
-	nodes[e.uid] = n
 	if world.nav:
 		world.nav.add_obstacle(e.uid, _box(item, e.rot, e.pos))
 	world.refresh_interactables()
@@ -392,8 +469,9 @@ func rotate_placed(uid: int) -> bool:
 	var nr: int = (int(e.rot) + 1) % 4
 	var p := _snap(item, nr, e.pos)
 	world.nav.remove_obstacle(uid)
-	if not world.nav.can_place(_box(item, nr, p)):
-		world.nav.add_obstacle(uid, _box(item, e.rot, e.pos))
+	if not _can_place(item, _box(item, nr, p)):
+		if not item.get("walk", false):
+			world.nav.add_obstacle(uid, _box(item, e.rot, e.pos))
 		world.say_selected("No room to turn it", "dots")
 		return false
 	_despawn(uid)
@@ -416,7 +494,7 @@ func move_placed(uid: int) -> bool:
 	ghost_rot = e.rot
 	ghost = Node3D.new()
 	ghost.name = "Ghost"
-	ghost_mesh = PropLib.instance(item.model, item.v, false)
+	ghost_mesh = Catalog.instance(item, false)
 	ghost.add_child(ghost_mesh)
 	world.location.add_child(ghost)
 	_move_ghost(e.pos)

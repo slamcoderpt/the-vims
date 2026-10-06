@@ -26,7 +26,7 @@ func spawn(parent: Node3D, key: String, look: String, pos: Vector3, face_to: Vec
 func build(parent: Node3D, stalls, stage) -> void:
 	# --- Family (positions match the reference composition).
 	var vendor_pos: Vector3 = stalls.vendor_spot
-	var jack := spawn(parent, "Jack", "dad", Vector3(-1.5, 0, 2.2), Vector3(-3.4, 0, 5.4), "talk")
+	var jack := spawn(parent, "Jack", "dad", Vector3(-1.1, 0, 2.3), Vector3(-3.4, 0, 5.4), "talk")
 	var lily := spawn(parent, "Lily", "bunny_girl", Vector3(0.2, 0, 1.65), Vector3(-0.5, 0, 8.0), "talk")
 	_hold(lily, "candy_apple", "fore_r")
 	var dog := spawn(parent, "Biscuit", "beagle", Vector3(-0.5, 0, 2.7), Vector3(0.6, 0, 3.0), "idle")
@@ -44,12 +44,12 @@ func build(parent: Node3D, stalls, stage) -> void:
 	_hold(gt, "guitar", "torso")
 	# --- Townsfolk.
 	var folk := [
-		["npc_7", Vector3(0.9, 0, -2.4), Vector3(0.4, 0, 6.0), "walk"],
+		["npc_7", Vector3(-0.9, 0, -4.8), Vector3(-0.4, 0, 6.0), "walk"],
 		["npc_5", Vector3(-2.6, 0, -1.6), Vector3(-2.8, 0, 6.0), "walk"],
 		["npc_5", Vector3(5.6, 0, -1.4), Vector3(4.0, 0, 1.0), "talk"],
 		["npc_1", Vector3(7.8, 0, -5.8), Vector3(9.2, 0, -7.4), "talk"],
-		["npc_3", Vector3(-1.2, 0, -2.4), Vector3(-0.2, 0, -2.0), "talk"],
-		["npc_6", Vector3(-0.3, 0, -2.0), Vector3(-1.2, 0, -2.4), "idle"],
+		["npc_3", Vector3(-1.7, 0, -2.5), Vector3(-0.8, 0, -2.9), "talk"],
+		["npc_0", Vector3(-0.8, 0, -2.9), Vector3(-1.7, 0, -2.5), "idle"],
 		["npc_4", Vector3(2.6, 0, -5.4), Vector3(2.0, 0, 6.0), "walk"],
 		["npc_3", Vector3(-4.6, 0, -3.8), Vector3(-5.8, 0, -5.4), "idle"],
 	]
@@ -80,7 +80,7 @@ func _far_folk(parent: Node3D) -> void:
 	# Stage audience (backs to the camera, some turned).
 	for p in [[3.4, -9.6, 180], [4.3, -9.9, 160], [5.2, -9.5, 200], [6.1, -9.8, 180], [7.0, -9.4, 220],
 			[7.9, -9.9, 180], [4.8, -8.7, 150], [6.6, -8.6, 190], [8.6, -8.9, 240], [3.0, -8.4, 120]]:
-		F.add(p[0], p[1], p[2], seed % 4 == 0, seed)
+		F.add(p[0] - 0.3, p[1] + 1.9, p[2], seed % 4 == 0, seed)
 		seed += 1
 	# Around the fountain and across the back of the square.
 	for p in [[-2.2, -9.4, 60], [1.9, -9.0, 300], [-1.4, -11.2, 0], [1.0, -12.0, 90], [-3.2, -12.6, 30],

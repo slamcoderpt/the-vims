@@ -9,7 +9,7 @@ const U := 1.0 / 16.0
 ## [x, z, banner]
 const LAMPS := [
 	[-1.6, -4.0, true],
-	[2.6, -8.0, true],
+	[1.7, -7.0, true],
 	[-6.4, -5.6, false],
 	[6.6, -15.0, false],
 	[-4.2, -13.5, false],
@@ -107,7 +107,7 @@ func _fountain(parent: Node3D) -> void:
 	vb.jitter = 0.0
 	var stone := func(q: Vector3i) -> Color:
 		var row := q.y / 3
-		var c := K.pick([Color("9a968e"), Color("8a867e"), Color("a8a49a"), Color("7e7a72")], K.hs(q.x / 3, row, q.z / 3))
+		var c := K.pick([Color("8a867e"), Color("7a766e"), Color("96928a"), Color("6e6a64")], K.hs(q.x / 3, row, q.z / 3))
 		if posmod(q.y, 3) == 0:
 			c = K.shade(c, 0.88)
 		return c
@@ -140,7 +140,7 @@ func _fountain(parent: Node3D) -> void:
 			var z := int(round(sin(ang) * r))
 			var y0 := 29 if r > 8.0 else 42
 			for y in range(8 if r > 8.0 else 33, y0):
-				if K.hs(x, y, z) > 0.2:
+				if K.hs(x, y, z) > 0.55 and posmod(a, 2) == 0:
 					vb.set_v(Vector3i(x, y, z), Color("cfeaf6") if K.hs(z, y, x) > 0.5 else Color("a8d4ea"))
 	# Spray on top.
 	for y in 6:
@@ -270,22 +270,22 @@ func _props(parent: Node3D) -> void:
 	var C := 16
 	# Flower barrels (foreground left / right, around the square).
 	var barrels := [
-		[-5.0, 3.9, 0], [-4.1, 4.9, 1], [0.5, 5.7, 2], [-6.3, 1.4, 1],
+		[-5.0, 3.9, 0], [-4.1, 4.9, 1], [-6.3, 1.4, 1],
 		[-2.6, -4.6, 2], [2.2, -10.4, 0], [-4.0, -8.6, 1], [4.8, -6.4, 3], [8.0, -1.0, 2],
-		[-3.0, 4.1, 0], [3.9, 4.5, 2], [-0.6, 4.9, 1],
+		[-3.0, 4.1, 0], [3.9, 4.5, 0],
 	]
 	var i := 0
 	for b: Array in barrels:
 		_barrel_planter(near, int(b[0] * C), int(b[1] * C), 5.0, b[2], i)
 		i += 1
 	# Ground lanterns.
-	for l in [[1.5, 3.3], [-6.0, 4.6], [6.6, 1.6], [1.0, -4.6], [3.9, 3.8], [-1.6, 3.9]]:
+	for l in [[-6.0, 4.6], [6.6, 1.6], [1.0, -4.6], [4.7, 2.5], [-4.7, 2.3]]:
 		_ground_lantern(near, int(l[0] * C), int(l[1] * C))
 	# Picnic tables.
 	_picnic_table(near, int(2.4 * C), int(-3.2 * C))
 	_picnic_table(near, int(-4.8 * C), int(-9.6 * C))
 	# Pumpkin piles + hay.
-	var piles := [[-2.0, 3.9], [0.4, -5.2], [3.8, -5.6], [-7.4, -1.0], [8.6, 2.4], [-0.9, 4.9]]
+	var piles := [[-2.0, 3.9], [0.4, -5.2], [3.8, -5.6], [-7.4, -1.0], [8.6, 2.4]]
 	var j := 0
 	for p: Array in piles:
 		var px := int(p[0] * C)

@@ -515,6 +515,7 @@ func find_path(from: Vector3, to: Vector3, exact := true) -> PackedVector3Array:
 	var lb := level_of(to)
 	last_ok = true
 	var ok := true
+	var links_ok := true
 	if la == lb:
 		out = _level_path(la, from, to)
 		ok = _seg_ok
@@ -535,10 +536,12 @@ func find_path(from: Vector3, to: Vector3, exact := true) -> PackedVector3Array:
 				var v: Array = (l.via as Array).duplicate()
 				if dirn == 1:
 					v.reverse()
+				# Each leg must really reach its stair end (not stop behind
+				# furniture next to it) for the link to count.
 				var p1 := _level_path(la, from, pa)
-				var ok1 := _seg_ok
+				var ok1 := _seg_ok and _seg_end_gap < 1.0
 				var p2 := _level_path(lb, pb, to)
-				var ok2 := _seg_ok
+				var ok2 := _seg_ok and _seg_start_gap < 1.0
 				var cand := PackedVector3Array()
 				cand.append_array(p1)
 				cand.append(pa)
@@ -558,6 +561,7 @@ func find_path(from: Vector3, to: Vector3, exact := true) -> PackedVector3Array:
 		else:
 			out = best
 			ok = best_ok
+		links_ok = ok
 	last_ok = ok
 	var end_p: Vector3 = out[out.size() - 1] if not out.is_empty() else from
 	last_gap = Vector2(end_p.x - to.x, end_p.z - to.z).length() if level_of(end_p) == lb or out.is_empty() else INF
@@ -565,7 +569,7 @@ func find_path(from: Vector3, to: Vector3, exact := true) -> PackedVector3Array:
 		# The last open cell is next to `to` (use spots sit on chairs, in front
 		# of counters): finish the approach. Never walk a long straight line
 		# through walls to a place the grid could not reach.
-		if (ok and last_gap < 1.0) or last_gap < 0.5:
+		if links_ok and ((ok and last_gap < 1.0) or last_gap < 0.5):
 			if out.is_empty() or out[out.size() - 1].distance_to(to) > 0.04:
 				out.append(to)
 			last_ok = true
@@ -626,6 +630,8 @@ static func path_length(from: Vector3, p: PackedVector3Array) -> float:
 
 
 var _seg_ok := true
+var _seg_start_gap := 0.0   # last _level_path: start cell centre -> from (m, flat)
+var _seg_end_gap := 0.0     # goal cell centre -> to
 
 func _level_path(li: int, from: Vector3, to: Vector3) -> PackedVector3Array:
 	var out := PackedVector3Array()
@@ -657,6 +663,10 @@ func _level_path(li: int, from: Vector3, to: Vector3) -> PackedVector3Array:
 			b = _closest_in_region(li, region_of(li, a), to)
 			if b.x < 0:
 				return out
+	var ca := center_of(li, a)
+	var cb := center_of(li, b)
+	_seg_start_gap = Vector2(ca.x - from.x, ca.z - from.z).length()
+	_seg_end_gap = Vector2(cb.x - to.x, cb.z - to.z).length()
 	var ids: Array[Vector2i] = astars[li].get_id_path(a, b, true)
 	if ids.is_empty():
 		_seg_ok = false
@@ -745,7 +755,8 @@ func _closest_in_region(li: int, reg: int, p: Vector3) -> Vector2i:
 	return best
 
 
-## Grid line of sight (supercover walk, all cells must be open).
+## Grid line of sight (supercover walk): every cell walkable (open or the
+## clearance margin) so string-pulled paths stay smooth near furniture.
 func _los(li: int, a: Vector2i, b: Vector2i) -> bool:
 	var dx := absi(b.x - a.x)
 	var dz := absi(b.y - a.y)
@@ -769,12 +780,12 @@ func _los(li: int, a: Vector2i, b: Vector2i) -> bool:
 			# Exactly through a corner: both neighbours must be open.
 			if x + sx < 0 or x + sx >= w or z + sz < 0 or z + sz >= h:
 				return false
-			if bl[z * w + x + sx] != 0 or bl[(z + sz) * w + x] != 0:
+			if not _walk_v(bl[z * w + x + sx]) or not _walk_v(bl[(z + sz) * w + x]):
 				return false
 			x += sx
 			z += sz
 			err += dx - dz
-		if x < 0 or z < 0 or x >= w or z >= h or bl[z * w + x] != 0:
+		if x < 0 or z < 0 or x >= w or z >= h or not _walk_v(bl[z * w + x]):
 			return false
 	return true
 

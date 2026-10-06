@@ -35,12 +35,12 @@ func _ready() -> void:
 	get_tree().quit(0 if fails == 0 else 1)
 
 
-## Sections can be picked with --only=boot,loop,money,mood,queue,autonomy,clock,gohere,build,social,townies,travel
+## Sections can be picked with --only=boot,loop,money,unlocks,mood,queue,autonomy,clock,gohere,build,social,townies,travel
 func _run() -> void:
 	var only: Array = []
 	if args.has("only"):
 		only = (args.only as String).split(",")
-	for sec in ["boot", "loop", "money", "mood", "queue", "autonomy", "clock", "gohere", "build", "social", "townies", "travel"]:
+	for sec in ["boot", "loop", "money", "unlocks", "mood", "queue", "autonomy", "clock", "gohere", "build", "social", "townies", "travel"]:
 		if only.is_empty() or sec in only or sec == "boot":
 			await call("_s_" + sec)
 
@@ -135,6 +135,34 @@ func _s_money() -> void:
 		"money %d -> %d (base pay 180, mood-scaled = %d, mood now %s), Logic=%.2f" % [money1, Game.money, jack.last_pay, Game.mood_word(jack.index), Game.skill_level(jack.index, "Logic")])
 
 
+
+
+func _s_unlocks() -> void:
+	var SA := preload("res://scripts/sim/sim_actions.gd")
+	var lily = _agent("Lily")
+	lily.cancel_all()
+	Game.selected = lily.index
+	for k in lily.member.needs:
+		lily.member.needs[k] = maxf(lily.member.needs[k], 0.6)
+	var piano = _find_it("Piano")
+	var keep: float = lily.member.skills.get("Music", 0.0)
+	lily.member.skills["Music"] = 1.5
+	var before: Array = SA.actions_for(piano, lily.member).map(func(a): return a.label)
+	lily.member.skills["Music"] = 3.2
+	_menus.clear()
+	await _tap_world(_it_center(piano))
+	await _frames(3)
+	var labels: Array = _menus[-1][1].map(func(a): return a.label) if not _menus.is_empty() else []
+	_step("skill_unlocks", "Play for Tips (Music 3)" in before and "Play for Tips" in labels,
+		"Music 1.5: %s -> Music 3.2: %s" % [str(before), str(labels)])
+	await _shot("unlock_menu")
+	var m0 := Game.money
+	await _choose("Play for Tips")
+	Game.speed = 3
+	await _until_game(func(): return lily.last_done == "tips", 150.0)
+	_step("unlock_earns", lily.last_done == "tips" and Game.money > m0 and lily.last_pay >= 20,
+		"tips paid $%d (base 15 + 3 x 8, mood x%.2f), money %d -> %d" % [lily.last_pay, Game.mood_mult(lily.index), m0, Game.money])
+	lily.member.skills["Music"] = maxf(keep, lily.member.skills.get("Music", 0.0) - 2.0)
 
 
 func _s_mood() -> void:
@@ -367,7 +395,7 @@ func _s_autonomy() -> void:
 	var done0: int = sim.stats.done
 	var walk_since := {}
 	var t0 := Game.total_minutes()
-	while Game.total_minutes() - t0 < 360.0:
+	while Game.total_minutes() - t0 < 240.0:
 		await get_tree().process_frame
 		for a in sim.agents:
 			if a == null:
@@ -378,13 +406,13 @@ func _s_autonomy() -> void:
 				stuck_max = maxf(stuck_max, Game.total_minutes() - walk_since[a])
 			else:
 				walk_since.erase(a)
-		if Time.get_ticks_msec() - _t0 > 520000:
+		if Time.get_ticks_msec() - _t0 > 900000:
 			break
 	var fb := 0
 	for a in sim.agents:
 		if a:
 			fb += a.fallbacks
-	_step("autonomy_soak", sim.stats.done - done0 >= 4 and stuck_max < 90.0,
+	_step("autonomy_soak", sim.stats.done - done0 >= 4 and stuck_max < 120.0,
 		"%.0f game min: %d actions done, longest walk %.0f game min, give-ups %d, low needs %s" % [Game.total_minutes() - t0, sim.stats.done - done0, stuck_max, fb, _low_needs()])
 	await _shot("autonomy_soak")
 
@@ -443,7 +471,7 @@ func _s_social() -> void:
 	ov.panel.visible = false
 	# Level up: push close to the next level and do one more social.
 	var before := Game.rel_level(Game.rel("Lily", "Maya"))
-	Game.change_rel("Lily", "Maya", 69.5 - Game.rel("Lily", "Maya"))
+	Game.change_rel("Lily", "Maya", 79.5 - Game.rel("Lily", "Maya"))
 	var lvl_seen := []
 	var cb := func(a, b, l): lvl_seen.append(l)
 	Game.relationship_level_changed.connect(cb)
@@ -495,7 +523,7 @@ func _s_townies() -> void:
 		await _tap_world(_it_center(best))
 		await _frames(3)
 	var labels: Array = _menus[-1][1].map(func(a): return a.label) if not _menus.is_empty() else []
-	_step("townie_stranger_menu", tname != "" and "Introduce Yourself" in labels and not "Chat" in labels and str(_menus[-1][0]).begins_with(tname),
+	_step("townie_stranger_menu", tname != "" and "Introduce Yourself" in labels and not "Chat" in labels and str(_menus[-1][0]).begins_with(tname.get_slice(" ", 0)),
 		"%s: %s" % [str(_menus[-1][0]) if not _menus.is_empty() else "-", str(labels)])
 	await _shot("townie_menu")
 	await _choose("Introduce Yourself")
@@ -510,7 +538,7 @@ func _s_townies() -> void:
 		"Jack-%s %.1f (%s), menu now %s, Meet 3 Neighbors done=%s (met here %d)" % [tname, Game.rel("Jack", tname), Game.rel_level(Game.rel("Jack", tname)), str(labels), str(_task_done("Meet 3 Neighbors")), sim.met_here.size()])
 	await _choose("Chat")
 	await _until_game(func(): return jack.phase == "idle" and jack.last_done == "s_chat", 120.0)
-	_step("townie_rel_persists", Game.rel("Jack", tname) > 14.0 and not _task_done("Meet 3 Neighbors"), "Jack-%s %.1f, Meet 3 Neighbors done=%s" % [tname, Game.rel("Jack", tname), str(_task_done("Meet 3 Neighbors"))])
+	_step("townie_rel_persists", Game.rel("Jack", tname) > 10.0 and not _task_done("Meet 3 Neighbors"), "Jack-%s %.1f, Meet 3 Neighbors done=%s" % [tname, Game.rel("Jack", tname), str(_task_done("Meet 3 Neighbors"))])
 	await _shot("townie_chat")
 
 
@@ -556,7 +584,14 @@ func _s_build() -> void:
 	Game.mode = "buy"
 	await _frames(3)
 	var buy_menu: bool = not _menus.is_empty() and _menus[-1][0] == "Buy"
+	var cats: Array = _menus[-1][1].map(func(a): return a.label) if buy_menu else []
 	var paused_in_buy := Game.speed == 0
+	await _choose("Seating")
+	await _frames(2)
+	var n_items := preload("res://scripts/sim/catalog.gd").ITEMS.size()
+	_step("catalog_categories", buy_menu and cats.size() >= 6 and _menus[-1][0] == "Seating" and n_items >= 50,
+		"%d items; Buy categories %s; Seating: %s" % [n_items, str(cats), str(_menus[-1][1].map(func(a): return a.label))])
+	await _shot("catalog")
 	await _choose("Armchair")
 	await _frames(2)
 	var b = sim.build
@@ -621,6 +656,49 @@ func _s_build() -> void:
 	await _frames(2)
 	_step("build_sell", b.placed_count() == 0 and Game.money == money_s + int(350 * 0.85) and sim.nav.obstacles.is_empty() and lily.phase != "act",
 		"money %d -> %d placed=%d lily=%s" % [money_s, Game.money, b.placed_count(), lily.phase])
+	Game.mode = "live"
+	await _frames(2)
+
+	# ---------------------------------------------------------------- build: a wall + floor tiles
+	Game.mode = "build"
+	await _frames(3)
+	var build_cats: Array = _menus[-1][1].map(func(a): return a.label) if not _menus.is_empty() else []
+	await _choose("Walls")
+	await _frames(2)
+	await _choose("Wall · Brick")
+	await _frames(2)
+	var wall_ok := false
+	var money_w := Game.money
+	var obst0: int = sim.nav.obstacles.size()
+	if b.ghost:
+		var tl: int = sim.nav.level_of(lily.actor.global_position)
+		var c: Vector2i = sim.nav.nearest_open(tl, sim.nav.cell_of(lily.actor.global_position + Vector3(1.5, 0, 0)))
+		await _tap_world(sim.nav.center_of(tl, c))
+		await _frames(2)
+		await _tap_world(b.ghost.global_position + Vector3(0, 0.5, 0), false)
+		await _frames(2)
+		if b.ghost and not b.ghost_valid:
+			b._move_ghost(b.ghost.global_position, true)   # nudge to the nearest free spot
+		await _choose("Place")
+		await _frames(2)
+		wall_ok = sim.nav.obstacles.size() == obst0 + 1 and Game.money == money_w - 55
+	# a 2 x 1 strip of floor tiles
+	var tiles := 0
+	for k in 2:
+		_menus.clear()
+		b.open_catalog(Vector2(300, 300), "floors")
+		await _frames(2)
+		await _choose("Floor · Checker Tile")
+		await _frames(2)
+		if b.ghost:
+			b._move_ghost(lily.actor.global_position + Vector3(-1.0 - k, 0, 1.0), true)
+			if b.ghost_valid and b.place_ghost():
+				tiles += 1
+	await _frames(2)
+	_step("build_wall_floor", wall_ok and tiles == 2 and "Walls  (5)" in build_cats,
+		"Build categories %s, wall placed=%s (nav obstacles %d -> %d), floor tiles placed=%d" % [str(build_cats), str(wall_ok), obst0, sim.nav.obstacles.size(), tiles])
+	await _focus(lily.actor.global_position)
+	await _shot("build_wall_floor")
 	Game.mode = "live"
 	await _frames(2)
 

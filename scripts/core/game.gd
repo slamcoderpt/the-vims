@@ -117,8 +117,8 @@ const TOWNIES := {
 	"npc_7": {"name": "Kai Ortiz", "kind": "child", "trait": "Athletic"},
 }
 ## Relationship levels (friendship value -100..100), lowest first: [max, label].
-const REL_LEVELS := [[-60.0, "Enemy"], [-20.0, "Disliked"], [15.0, "Acquaintance"],
-	[40.0, "Friend"], [70.0, "Good Friend"], [101.0, "Best Friend"]]
+const REL_LEVELS := [[-60.0, "Enemy"], [-20.0, "Disliked"], [25.0, "Acquaintance"],
+	[55.0, "Friend"], [80.0, "Good Friend"], [101.0, "Best Friend"]]
 ## "a|b" (sorted names) -> {value: float, met: float (total_minutes), last: float}
 var relationships := {}
 
@@ -150,10 +150,10 @@ func _default_household() -> void:
 	_seed_rel("Jack", "Maya", 66.0)
 	_seed_rel("Lily", "Maya", 48.0)
 	_seed_rel("Jack", "Biscuit", 58.0)
-	_seed_rel("Lily", "Biscuit", 74.0)
+	_seed_rel("Lily", "Biscuit", 84.0)
 	_seed_rel("Maya", "Biscuit", 52.0)
 	# Jack already knows the grocer a little.
-	_seed_rel("Jack", "Omar Reed", 18.0)
+	_seed_rel("Jack", "Omar Reed", 28.0)
 	household_changed.emit()
 
 

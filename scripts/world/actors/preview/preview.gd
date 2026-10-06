@@ -190,6 +190,40 @@ func _ready() -> void:
 			rig.apply({"target": Vector3(0, 0.8, 0), "yaw": 35.0, "pitch": 38.0, "distance": 6.0, "fov": 30.0})
 			for i in 120:
 				await get_tree().process_frame
+		"quad":
+			# Home-day camera angle, the four household members, each facing
+			# the way the home staging has them (dad -X, painter +X-Z).
+			var specs := [
+				["dad", Vector3(-1.2, 0, -0.4), Vector3(-3.0, 0, -0.25), "type", 0.55],
+				["bunny_girl", Vector3(0.6, 0, -0.9), Vector3(1.7, 0, -1.8), "sit_paint", 0.47],
+				["cat_girl", Vector3(1.2, 0, 0.9), Vector3(2.0, 0, 2.6), "play", 0.0],
+				["beagle", Vector3(-0.6, 0, 1.0), Vector3(0.1, 0, 1.75), "play", 0.0],
+			]
+			var seat := VoxelBuilder.new()
+			for s2 in specs:
+				var a := SimActor.create(s2[0])
+				a.position = s2[1]
+				add_child(a)
+				a.face(s2[2])
+				if s2[4] > 0.0:
+					a.seat_height = s2[4]
+					var c := Vector3i(roundi(s2[1].x / 0.0625), 0, roundi(s2[1].z / 0.0625))
+					var h := roundi(s2[4] / 0.0625)
+					seat.box(c - Vector3i(3, 0, 3), Vector3i(7, h, 7), Color(0.35, 0.35, 0.38))
+				a.set_pose(s2[3])
+			add_child(seat.build_instance(0.0625))
+			rig.apply({"target": Vector3(0.0, 0.6, 0.1), "yaw": 36.0, "pitch": 36.0, "distance": 5.5, "fov": 30.0})
+		"dogcheck":
+			var x := -1.5
+			for p in ["play", "idle", "sleep"]:
+				var d := SimActor.create("beagle")
+				d.position = Vector3(x, 0, 0)
+				d.camera_cheat = false
+				d.rotation_degrees.y = 90.0
+				add_child(d)
+				d.set_pose(p)
+				x += 1.5
+			rig.apply({"target": Vector3(0, 0.3, 0), "yaw": 20.0, "pitch": 40.0, "distance": 4.5, "fov": 30.0})
 		"faces":
 			var x := -2.0
 			for l in ["npc_6", "bunny_girl", "cat_girl", "npc_3", "npc_2"]:
