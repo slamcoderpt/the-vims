@@ -4,6 +4,7 @@ extends RefCounted
 ## porch roof on posts, wall lanterns and potted plants.
 
 const V := preload("res://scripts/locations/backyard/vox.gd")
+const FastBuilder := preload("res://scripts/locations/backyard/fast_builder.gd")
 const M := 8
 const F := 16
 
@@ -29,14 +30,18 @@ func build(parent: Node3D) -> void:
 	root = Node3D.new()
 	root.name = "House"
 	parent.add_child(root)
-	var vb := VoxelBuilder.new()
-	vb.jitter = 0.035
+	var vb := FastBuilder.new()
+	vb.jitter = 0.0
+	vb.skip_normals = [Vector3i(0, 0, -1)]
+	vb.skip_down_below = 2
 	_shell(vb)
 	_deck(vb)
 	_porch(vb)
 	V.inst(vb, root, V.SIZE_MID, Vector3.ZERO, 0.0, Vector3.ZERO, true, false, "HouseShell")
-	var fine := VoxelBuilder.new()
-	fine.jitter = 0.05
+	var fine := FastBuilder.new()
+	fine.jitter = 0.0
+	fine.skip_normals = [Vector3i(0, 0, -1)]
+	fine.skip_down_below = 6
 	_interior(fine)
 	_deck_decor(fine)
 	V.inst(fine, root, V.SIZE_FINE, Vector3.ZERO, 0.0, Vector3.ZERO, true, true, "HouseDecor")
@@ -54,7 +59,7 @@ func _siding(q: Vector3i) -> Color:
 func _shell(vb: VoxelBuilder) -> void:
 	var zb := -82
 	# Foundation.
-	V.b(vb, X0, 0, zb, X1 - X0, 3, WALL_Z - zb, V.noisy(Color("8f8790"), 0.08))
+	V.b(vb, X0, 0, WALL_Z - 2, X1 - X0, 3, 2, Color("8f8790"))
 	# Back wall (2 cells thick) + side walls.
 	V.b(vb, X0, 3, WALL_Z - 2, X1 - X0, 45, 2, _siding)
 	V.b(vb, X0, 3, zb, 2, 45, WALL_Z - zb, _siding)
@@ -64,8 +69,9 @@ func _shell(vb: VoxelBuilder) -> void:
 	for x in [X0 - 1, X1]:
 		V.b(vb, x, 3, WALL_Z - 2, 1, 45, 3, TRIM)
 	# Floor / ceiling between storeys.
-	V.b(vb, X0, 2, zb, X1 - X0, 1, WALL_Z - zb - 2, V.wood(Color("c08a58"), 0, 1))
-	V.b(vb, X0, 27, zb, X1 - X0, 2, WALL_Z - zb - 2, Color("f0e4cc"))
+	V.b(vb, X0, 2, zb, X1 - X0, 1, WALL_Z - zb - 2, func(q: Vector3i) -> Color:
+		return V.shade(Color("c08a58"), 0.92 + V.hs((q.x + q.z * 5) / 7, q.z, 2) * 0.16))
+	V.b(vb, X0, 27, zb, X1 - X0, 1, WALL_Z - zb - 2, Color("f0e4cc"))
 	# Trim band between floors.
 	V.b(vb, X0, 27, WALL_Z - 2, X1 - X0, 1, 3, TRIM)
 	# Sliding doors: x 28..76, y 3..22.
@@ -91,8 +97,6 @@ func _shell(vb: VoxelBuilder) -> void:
 		var z := WALL_Z + 1 - k
 		V.b(vb, X0 - 2, eave_y + k, z - 1, X1 - X0 + 4, 1, 2, func(q: Vector3i) -> Color:
 			return V.shade(SHINGLE, 0.86 + V.h1(Vector3i(q.x / 3 + (q.y % 2) * 7, q.y, 0), 5) * 0.28))
-	# Fill behind the roof slope so it reads solid from any angle.
-	V.b(vb, X0, 48, zb, X1 - X0, 2, WALL_Z - zb - 2, Color("bdb4c4"))
 	# Fascia board.
 	V.b(vb, X0 - 2, eave_y - 1, WALL_Z, X1 - X0 + 4, 1, 1, TRIM)
 
@@ -116,7 +120,7 @@ func _window(vb: VoxelBuilder, x: int, y: int, w: int, h: int) -> void:
 
 
 func _deck(vb: VoxelBuilder) -> void:
-	V.b(vb, X0, 0, WALL_Z, X1 - X0, 2, DECK_Z1 - WALL_Z, V.noisy(DECK_D, 0.06))
+	V.b(vb, X0, 0, DECK_Z1 - 1, X1 - X0, 2, 1, DECK_D)
 	V.b(vb, X0, 2, WALL_Z, X1 - X0, 1, DECK_Z1 - WALL_Z, func(q: Vector3i) -> Color:
 		var board := q.z
 		var seg := (q.x + board * 7) / 13
@@ -223,6 +227,10 @@ func _deck_decor(vb: VoxelBuilder) -> void:
 	_pot_plant(vb, 182, fy, -90, 10, 3)
 	_pot_plant(vb, 196, fy, -48, 9, 0)
 	_pot_plant(vb, 30, fy, -50, 8, 2)
+	# Flower pots along the deck edge (steps at x 40..72).
+	for i in 7:
+		var px: int = [26, 84, 112, 138, 176, 196, 152][i]
+		V.flower_pot(vb, px, fy, -46 + (i % 2) * 2, 11 + i * 7, i % 3 == 0)
 	# Wall lanterns either side of the doors.
 	for lx in [48, 162]:
 		V.b(vb, lx, 34, -97, 5, 1, 4, Color("2a2a30"))

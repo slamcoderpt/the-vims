@@ -12,7 +12,7 @@ extends Node3D
 ##   post: Dictionary for post_fx.configure (focus_y, band, blur_px, ...)
 ##   post_day / post_night: overrides merged by time of day
 ## Lamps: any OmniLight3D/SpotLight3D in group "vims_lamps" (PropLib.add_light)
-## gets energy = base_energy * lerp(day_factor, 1, night).
+## gets energy = base_energy * lerp(day_factor, lamp_night_mult (profile, default 1), night).
 
 const PostFX := preload("res://scripts/world/post/post_fx.gd")
 
@@ -133,8 +133,8 @@ func _apply() -> void:
 			if l is Light3D:
 				var base: float = l.get_meta("base_energy", 1.0)
 				var df: float = l.get_meta("day_factor", 0.25)
-				l.light_energy = base * lerpf(df, 1.0, night)
-				l.visible = l.light_energy > 0.01
+				l.light_energy = base * lerpf(df, profile.get("lamp_night_mult", 1.0), night)
+				l.visible = l.light_energy > 0.01 and OS.get_environment("VIMS_NOLAMPS") == ""
 	# --- Post
 	var pp := {
 		"focus_y": 0.55, "band": 0.14, "falloff": 0.3, "blur_px": 7.0, "top_boost": 1.3,

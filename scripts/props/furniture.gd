@@ -244,6 +244,15 @@ static func m_bed(vb: VoxelBuilder, v: int) -> void:
 		V.b(vb, 3, 10, 4, w - 6, 1, 4, Color("fdfcf9"))
 
 
+## Turned-down quilt to lay over a sim in bed (16 x 3 x 15), v as m_bed.
+static func m_blanket(vb: VoxelBuilder, v: int) -> void:
+	var quilt: Callable = V.plaid(Color("f7b6c8"), Color("ef8fab"), Color("e36f92"), 2) if v == 0 else V.noisy(Color("34468f"), 0.06)
+	V.b(vb, 0, 0, 0, 16, 1, 15, quilt)
+	V.b(vb, 1, 1, 1, 14, 2, 13, quilt)
+	V.b(vb, 0, 1, 0, 16, 1, 2, Color("fbfbf8"))
+	V.b(vb, 2, 3, 4, 12, 1, 8, quilt)
+
+
 static func m_sofa(vb: VoxelBuilder, v: int) -> void:
 	var c: Color = [Color("8faa87"), Color("e2b456"), Color("8b9bbd"), Color("c97b5c")][v % 4]
 	var fab := V.noisy(c, 0.05)

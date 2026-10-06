@@ -37,22 +37,22 @@ func build(parent: Node3D, party) -> void:
 	var gf: Vector3 = party.grill_front()
 	_spawn("Jack", gf, 0.0, "grill").face(Party.GRILL_POS)
 	# Table.
-	_seat("Lily", party, "end_l", "sit_talk")
-	_seat("neighbor_3", party, "far_l", "sit_talk")
-	_seat("neighbor_4", party, "far_m", "sit")
-	_seat("Maya", party, "far_r", "sit_talk")
+	_seat("Lily", party, "far_l", "sit_talk")
+	_seat("neighbor_3", party, "far_m", "sit_talk")
+	_seat("neighbor_4", party, "far_r", "sit")
+	_seat("Maya", party, "end_r", "sit_talk")
 	_seat("neighbor_6", party, "near_l", "sit")
-	_seat("neighbor_8", party, "near_m", "sit_talk")
+	_seat("neighbor_7", party, "near_m", "sit_talk")
 	# On the deck, chatting with plates and drinks.
-	var a := _spawn("neighbor_1", Vector3(5.0, 0.375, -3.4), 0.0, "talk")
-	var b := _spawn("neighbor_2", Vector3(6.1, 0.375, -3.55), 0.0, "idle")
-	a.face(Vector3(6.4, 0, -1.5))
-	b.face(Vector3(4.6, 0, -2.0))
+	var a := _spawn("neighbor_1", Vector3(4.3, 0.375, -3.4), 0.0, "talk")
+	var b := _spawn("neighbor_2", Vector3(6.9, 0.375, -3.6), 0.0, "idle")
+	a.face(Vector3(6.0, 0, 1.5))
+	b.face(Vector3(3.6, 0, 0.5))
 	# Lounge by the fire pit.
-	_spawn_seated("neighbor_5", Vector3(7.05, 0, 1.1), -PI * 0.5 - 0.25, "sit_talk", 0.5)
-	_spawn_seated("neighbor_7", Vector3(7.05, 0, 2.6), -PI * 0.5 + 0.1, "sit", 0.5)
+	_spawn_seated("neighbor_5", Vector3(6.55, 0, 1.05), -PI * 0.5 - 0.25, "sit_talk", 0.5)
+	_spawn_seated("neighbor_8", Vector3(6.55, 0, 2.5), -PI * 0.5 + 0.1, "sit", 0.5)
 	# Biscuit trotting across the lawn.
-	var d := _spawn("Biscuit", Vector3(4.2, 0, 4.3), PI * 0.5 - 0.35, "walk")
+	var d := _spawn("Biscuit", Vector3(2.5, 0, 3.25), PI * 0.5 - 0.45, "walk")
 	d.position.y = 0.0
 	# Chat interactables on guests.
 	for k in GUEST_NAMES:

@@ -149,3 +149,26 @@ static func omni(parent: Node3D, pos: Vector3, col: Color, energy: float, rng: f
 	l.add_to_group("vims_lamps")
 	parent.add_child(l)
 	return l
+
+
+## Terracotta / glazed pot with a bushy flowering plant (fine grid, base at y).
+static func flower_pot(vb: VoxelBuilder, x: int, y: int, z: int, seed: int, big := false) -> void:
+	var pot: Color = [Color("c8643c"), Color("ede7db"), Color("7393b3"), Color("d98a5a"), Color("b85a4a")][seed % 5]
+	var r := 3.6 if big else 2.6
+	var ph := 6 if big else 4
+	cyl(vb, x, y, z, r, ph, noisy(pot, 0.05, seed))
+	cyl(vb, x, y + ph, z, r + 0.6, 1, shade(pot, 1.08))
+	var lr := r + 1.2
+	blob(vb, Vector3(x, y + ph + 2.5, z), Vector3(lr, 3.2 if big else 2.4, lr), leaves(seed, seed % 2, y + ph), 0.3, seed)
+	var fl: Array = [[Color("ee7fb4"), Color("f59cc6")], [Color("8a5cc8"), Color("a37de0")], [Color("fbf7f0"), Color("f2b630")], [Color("e2513f"), Color("f07a3a")]][(seed >> 2) % 4]
+	var n := 9 if big else 6
+	for i in n:
+		var a := float(i) / n * TAU + seed
+		var rr := lr * (0.45 + 0.4 * hs(i, seed, 1))
+		var fx := x + int(round(cos(a) * rr))
+		var fz := z + int(round(sin(a) * rr))
+		var top := y + ph + 5 + (1 if big else 0)
+		while vb.has(Vector3i(fx, top, fz)):
+			top += 1
+		vb.set_v(Vector3i(fx, top, fz), fl[i % 2])
+		vb.set_v(Vector3i(fx + 1, top, fz), fl[(i + 1) % 2])

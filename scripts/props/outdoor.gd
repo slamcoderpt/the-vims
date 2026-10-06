@@ -12,6 +12,9 @@ const SCALE := {
 	"fence": 0.0625, "lantern": 0.0625, "flower_bed": 0.0625,
 }
 
+## Models meshed without jitter and with face merging (big flat surfaces).
+const FLAT := {"house": true}
+
 const SIDING := [Color("efe6d2"), Color("b9cdb4"), Color("a9bad0"), Color("f2dfa6"), Color("e7c3b0"), Color("d8d8dc")]
 const ROOF := [Color("3b4566"), Color("6a4232"), Color("b8573a"), Color("4b5a47"), Color("5a3f5f"), Color("38506b")]
 
@@ -33,7 +36,6 @@ static func m_house(vb: VoxelBuilder, v: int) -> void:
 	var siding := func(q: Vector3i) -> Color:
 		return V.shade(sid, 0.92 if q.y % 2 == 0 else 1.0)
 	V.b(vb, 0, 1, 0, w, wh - 1, d, siding)
-	vb.clear_box(Vector3i(1, 1, 1), Vector3i(w - 2, wh - 2, d - 2))
 	# Corner trims.
 	for c in [Vector2i(0, 0), Vector2i(w - 1, 0), Vector2i(0, d - 1), Vector2i(w - 1, d - 1)]:
 		V.b(vb, c.x, 1, c.y, 1, wh - 1, 1, trim)
@@ -75,10 +77,9 @@ static func m_house(vb: VoxelBuilder, v: int) -> void:
 		V.b(vb, -1, wh + k, z1 - 1, w + 2, 1, 1, rc)
 		if k == rh or z1 - z0 <= 2:
 			V.b(vb, -1, wh + k, z0, w + 2, 1, z1 - z0, rc)
-		# Gable end walls.
+		# Gable end walls + solid attic (keeps hidden faces culled).
 		if z1 - z0 > 2:
-			V.b(vb, 0, wh + k, z0 + 1, 1, 1, z1 - z0 - 2, siding)
-			V.b(vb, w - 1, wh + k, z0 + 1, 1, 1, z1 - z0 - 2, siding)
+			V.b(vb, 0, wh + k, z0 + 1, w, 1, z1 - z0 - 2, siding)
 	# Attic window.
 	V.b(vb, -0, wh + 3, d / 2 - 1, 1, 3, 2, glass, lit)
 	V.b(vb, w - 1, wh + 3, d / 2 - 1, 1, 3, 2, glass, lit)

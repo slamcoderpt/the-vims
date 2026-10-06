@@ -219,14 +219,16 @@ static func _art(v: int, x: int, y: int, w: int, h: int) -> Color:
 			return Color("ffe27a") if V.hs(x, y, 8) > 0.82 else Color("2a3570")
 
 
-static func m_corkboard(vb: VoxelBuilder, _v: int) -> void:
-	var w := 22
-	var h := 14
+static func m_corkboard(vb: VoxelBuilder, v: int) -> void:
+	var w := 22 if v == 0 else 28
+	var h := 14 if v == 0 else 17
 	V.b(vb, 0, 0, 0, w, h, 1, WOOD)
 	V.b(vb, 1, 1, 1, w - 2, h - 2, 1, V.mix([Color("c7955c"), Color("bd8a52"), Color("d2a068"), Color("b9844d")], 4))
 	var notes := [Color("fff6b0"), Color("bfe3ff"), Color("ffc4d8"), Color("ffffff"), Color("c8f0b8"), Color("ffd8a8")]
 	var spots := [Vector4i(2, 8, 4, 4), Vector4i(7, 9, 3, 3), Vector4i(11, 7, 5, 5), Vector4i(17, 9, 3, 3),
 		Vector4i(2, 2, 3, 4), Vector4i(6, 3, 4, 4), Vector4i(12, 2, 3, 3), Vector4i(16, 2, 4, 5)]
+	if v == 1:
+		spots.append_array([Vector4i(22, 10, 4, 5), Vector4i(23, 3, 3, 4), Vector4i(7, 13, 4, 2), Vector4i(16, 14, 6, 2)])
 	for i in spots.size():
 		var s: Vector4i = spots[i]
 		var c: Color = notes[i % notes.size()]

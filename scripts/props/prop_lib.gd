@@ -23,6 +23,7 @@ const Furn := preload("res://scripts/props/furniture.gd")
 const Decor := preload("res://scripts/props/decor.gd")
 const Outdoor := preload("res://scripts/props/outdoor.gd")
 const VU := preload("res://scripts/props/vox_util.gd")
+const Mesher := preload("res://scripts/props/mesher.gd")
 
 static var _index := {}     # name -> script
 static var _models := {}    # "name#v" -> VoxelBuilder (normalised, min corner at 0)
@@ -130,7 +131,10 @@ static func mesh(name: String, v := 0) -> ArrayMesh:
 		return _meshes[key]
 	var m := model(name, v)
 	var s := size_of(name, v)
-	var am := m.build(scale_of(name), Vector3(s.x * 0.5, 0, s.z * 0.5))
+	var flat: bool = Outdoor.FLAT.has(name)
+	if flat:
+		m.jitter = 0.0
+	var am := Mesher.build(m, scale_of(name), Vector3(s.x * 0.5, 0, s.z * 0.5), true, flat)
 	_meshes[key] = am
 	return am
 
@@ -169,7 +173,7 @@ static func add_light(parent: Node, pos: Vector3, color := Color(1.0, 0.72, 0.42
 	l.light_color = color
 	l.light_energy = energy
 	l.omni_range = light_range
-	l.omni_attenuation = 1.4
+	l.omni_attenuation = 1.1
 	l.shadow_enabled = false
 	l.light_specular = 0.15
 	l.set_meta("base_energy", energy)
@@ -310,3 +314,68 @@ static func string_lights(vb: VoxelBuilder, a: Vector3i, b: Vector3i, bulbs := 8
 			vb.set_v(q + Vector3i(0, 1, 0), c, true); vb.set_v(q + Vector3i(0, -1, 0), c, true)
 		else:
 			vb.set_v(q + Vector3i(0, -1, 0), c, true)
+
+
+# ------------------------------------------------------------------ halos
+
+static var _halo_mat: StandardMaterial3D
+
+## Soft additive glow sprites for lamps / windows / string lights, all in ONE
+## MultiMesh (one draw call). points: [{pos: Vector3, size: float, color: Color}].
+## Fade the whole set with `mmi.set_instance_shader_parameter` is not needed:
+## call set_halo_strength(mmi, k) (0..1) instead.
+static func halos(points: Array) -> MultiMeshInstance3D:
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.use_colors = true
+	var q := QuadMesh.new()
+	q.size = Vector2(1, 1)
+	mm.mesh = q
+	mm.instance_count = points.size()
+	for i in points.size():
+		var d: Dictionary = points[i]
+		var s: float = d.get("size", 0.8)
+		mm.set_instance_transform(i, Transform3D(Basis().scaled(Vector3(s, s, s)), d.pos))
+		mm.set_instance_color(i, d.get("color", Color(1.0, 0.75, 0.4)))
+	var mi := MultiMeshInstance3D.new()
+	mi.name = "Halos"
+	mi.multimesh = mm
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mi.material_override = halo_material().duplicate()
+	return mi
+
+
+static func set_halo_strength(mi: MultiMeshInstance3D, k: float) -> void:
+	var m := mi.material_override as StandardMaterial3D
+	if m:
+		m.albedo_color = Color(k, k, k, 1.0)
+	mi.visible = k > 0.01
+
+
+static func halo_material() -> StandardMaterial3D:
+	if _halo_mat == null:
+		var g := Gradient.new()
+		g.set_color(0, Color(1, 1, 1, 1))
+		g.set_color(1, Color(1, 1, 1, 0))
+		g.add_point(0.12, Color(1, 1, 1, 0.85))
+		g.add_point(0.35, Color(1, 1, 1, 0.38))
+		g.add_point(0.65, Color(1, 1, 1, 0.1))
+		var tex := GradientTexture2D.new()
+		tex.gradient = g
+		tex.fill = GradientTexture2D.FILL_RADIAL
+		tex.fill_from = Vector2(0.5, 0.5)
+		tex.fill_to = Vector2(1.0, 0.5)
+		tex.width = 64
+		tex.height = 64
+		_halo_mat = StandardMaterial3D.new()
+		_halo_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		_halo_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		_halo_mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+		_halo_mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+		_halo_mat.billboard_keep_scale = true
+		_halo_mat.vertex_color_use_as_albedo = true
+		_halo_mat.albedo_texture = tex
+		_halo_mat.disable_fog = true
+		_halo_mat.no_depth_test = false
+		_halo_mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+	return _halo_mat

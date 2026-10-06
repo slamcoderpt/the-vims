@@ -15,18 +15,18 @@ const BULB := Color("ffd889")
 ## World placement of the main pieces.
 const TABLE_POS := Vector3(0.9, 0.0, 0.5)
 const TABLE_ROT := 0.30
-const GRILL_POS := Vector3(-3.3, 0.0, -0.6)
-const GRILL_ROT := 1.85
-const PIT_POS := Vector3(4.6, 0.0, 2.7)
+const GRILL_POS := Vector3(-2.9, 0.0, 0.0)
+const GRILL_ROT := 2.3
+const PIT_POS := Vector3(4.1, 0.0, 2.4)
 
-## Seats in table-local cells (x, z, facing yaw in table space).
+## Seats in table-local cells: Vector3(x, z, unused) — facing is derived in _facing().
 const SEATS := {
 	"far_l": Vector3(-17, -15, 0.0),
 	"far_m": Vector3(1, -15, 0.0),
 	"far_r": Vector3(19, -15, 0.0),
-	"near_l": Vector3(-17, 15, PI),
-	"near_m": Vector3(1, 15, PI),
-	"near_r": Vector3(19, 15, PI),
+	"near_l": Vector3(-8, 15, PI),
+	"near_m": Vector3(10, 15, PI),
+	"near_r": Vector3(25, 15, PI),
 	"end_l": Vector3(-36, 0, PI * 0.5),
 	"end_r": Vector3(36, 0, -PI * 0.5),
 }
@@ -51,11 +51,14 @@ func build(parent: Node3D) -> void:
 	yard.jitter = 0.05
 	_prep_table(yard, -28, -40)
 	_fire_pit(yard, int(PIT_POS.x * F), int(PIT_POS.z * F))
-	_sofa(yard, 108, 30)
-	_side_table(yard, 104, 10)
-	for lp in [Vector3i(-74, 0, 10), Vector3i(24, 0, -38), Vector3i(130, 0, -8), Vector3i(-88, 0, -58), Vector3i(150, 0, 70)]:
+	_sofa(yard, 100, 28)
+	_side_table(yard, 96, 8)
+	for lp in [Vector3i(-66, 0, 14), Vector3i(24, 0, -38), Vector3i(122, 0, -10), Vector3i(-88, 0, -58), Vector3i(150, 0, 50)]:
 		_lantern(yard, lp.x, lp.y, lp.z, 1.0)
 	_posts(yard)
+	# Planters around the lounge and the patio.
+	for pp in [Vector3i(94, 0, -10), Vector3i(92, 0, 66), Vector3i(-50, 0, -60), Vector3i(-96, 0, -20), Vector3i(60, 0, -30)]:
+		V.flower_pot(yard, pp.x, pp.y, pp.z, pp.x * 3 + pp.z, true)
 	V.inst(yard, root, V.SIZE_FINE, Vector3.ZERO, 0.0, Vector3.ZERO, true, true, "YardProps")
 	var lights := VoxelBuilder.new()
 	lights.jitter = 0.02
@@ -63,7 +66,7 @@ func build(parent: Node3D) -> void:
 	V.inst(lights, root, V.SIZE_FINE, Vector3.ZERO, 0.0, Vector3.ZERO, false, true, "StringLights")
 	# Light sources.
 	pit_light = V.omni(root, PIT_POS + Vector3(0, 0.75, 0), Color(1.0, 0.55, 0.22), 2.6, 5.5)
-	V.omni(root, Vector3(-4.4, 0.7, 0.85), Color(1.0, 0.7, 0.4), 1.2, 3.5)
+	V.omni(root, Vector3(-3.9, 0.7, 1.1), Color(1.0, 0.7, 0.4), 1.2, 3.5)
 	V.omni(root, Vector3(-1.0, 2.6, -1.0), Color(1.0, 0.78, 0.5), 1.1, 6.5)
 	V.omni(root, Vector3(3.6, 2.6, 0.2), Color(1.0, 0.78, 0.5), 0.9, 6.0)
 
@@ -71,7 +74,7 @@ func build(parent: Node3D) -> void:
 func world_seat(key: String) -> Transform3D:
 	var s: Vector3 = SEATS[key]
 	var tb := Transform3D(Basis(Vector3.UP, TABLE_ROT), TABLE_POS)
-	var p := tb * Vector3(s.x / F, 0.0, s.z / F)
+	var p := tb * Vector3(s.x / F, 0.0, s.y / F)
 	return Transform3D(Basis(Vector3.UP, TABLE_ROT + _facing(s)), p)
 
 
@@ -79,7 +82,7 @@ func _facing(s: Vector3) -> float:
 	# Face the table centre line.
 	if absf(s.x) > 30.0:
 		return PI * 0.5 if s.x < 0 else -PI * 0.5
-	return 0.0 if s.z < 0 else PI
+	return 0.0 if s.y < 0 else PI
 
 
 func grill_front() -> Vector3:
@@ -123,16 +126,16 @@ func _table() -> void:
 	for key in SEATS:
 		var s: Vector3 = SEATS[key]
 		var px := int(s.x)
-		var pz := int(s.z)
+		var pz := int(s.y)
 		if absf(s.x) > 30.0:
 			px = -24 if s.x < 0 else 23
 			pz = -2
 		else:
-			pz = -8 if s.z < 0 else 5
+			pz = -8 if s.y < 0 else 5
 		_plate(vb, px, y, pz, int(V.hs(px, pz, 1) * 4.0))
 		# Drink.
 		var gx := px + 3
-		var gz := pz + (2 if s.z < 0 else -1)
+		var gz := pz + (2 if s.y < 0 else -1)
 		V.b(vb, gx, y, gz, 2, 4, 2, Color("f0a43a"))
 		V.b(vb, gx, y + 4, gz, 2, 1, 2, Color("fff4dc"))
 	# Centre dishes.
@@ -161,7 +164,7 @@ func _table() -> void:
 	# Chairs.
 	for key in SEATS:
 		var s: Vector3 = SEATS[key]
-		_chair(vb, int(s.x), int(s.z), key)
+		_chair(vb, int(s.x), int(s.y), key)
 	table_node = V.inst(vb, root, V.SIZE_FINE, TABLE_POS, TABLE_ROT, Vector3.ZERO, true, false, "DinnerTable")
 
 
@@ -277,7 +280,7 @@ func _grill() -> void:
 	smoke = CPUParticles3D.new()
 	smoke.name = "Smoke"
 	smoke.position = Vector3(0, 1.15, -0.05)
-	smoke.amount = 26
+	smoke.amount = 30
 	smoke.lifetime = 3.2
 	smoke.preprocess = 3.2
 	smoke.local_coords = false
@@ -296,11 +299,11 @@ func _grill() -> void:
 	curve.add_point(Vector2(1, 1.6))
 	smoke.scale_amount_curve = curve
 	var grad := Gradient.new()
-	grad.set_color(0, Color(0.85, 0.82, 0.86, 0.5))
+	grad.set_color(0, Color(0.9, 0.86, 0.88, 0.6))
 	grad.set_color(1, Color(0.8, 0.75, 0.85, 0.0))
 	smoke.color_ramp = grad
 	var bm := BoxMesh.new()
-	bm.size = Vector3.ONE * 0.16
+	bm.size = Vector3.ONE * 0.2
 	var mat := StandardMaterial3D.new()
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -372,9 +375,10 @@ func _fire_pit(vb: VoxelBuilder, cx: int, cz: int) -> void:
 					var q := Vector3i(cx + x + int(tp.x), y, cz + z + int(tp.z))
 					if d > rad + (V.h1(q, 12) - 0.5) * 0.8:
 						continue
-					var c := Color("ffe27a").lerp(Color("ff8a1e"), clampf(d / maxf(rad, 0.3) * 0.8 + f * 0.6, 0.0, 1.0))
-					if f > 0.55:
-						c = c.lerp(Color("f2481a"), (f - 0.55) * 2.0)
+					var c := Color("ffc24a").lerp(Color("ff6a14"), clampf(d / maxf(rad, 0.3) * 0.9 + f * 0.7, 0.0, 1.0))
+					if f > 0.5:
+						c = c.lerp(Color("d8301a"), (f - 0.5) * 1.6)
+					c = V.shade(c, 0.8)
 					vb.set_v(q, c, true)
 	# Sparks.
 	for i in 6:
@@ -422,7 +426,7 @@ func _lantern(vb: VoxelBuilder, x: int, y: int, z: int, _s: float) -> void:
 	V.b(vb, x + 3, y + 13, z + 3, 1, 2, 1, IRON)
 
 
-const POSTS := [Vector3(-5.6, 3.1, -3.6), Vector3(-0.6, 3.2, -3.4), Vector3(8.4, 3.0, -0.6)]
+const POSTS := [Vector3(-5.6, 3.1, -3.6), Vector3(-0.6, 3.2, -3.4), Vector3(7.6, 3.0, -0.8)]
 const PORCH_POSTS := [Vector3(1.69, 3.15, -2.69), Vector3(6.81, 3.15, -2.69), Vector3(12.81, 3.15, -2.69)]
 
 

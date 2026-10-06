@@ -43,6 +43,32 @@ func build() -> void:
 	_sync_env.call_deferred()
 	if not Game.time_changed.is_connected(_on_time):
 		Game.time_changed.connect(_on_time)
+	if OS.has_environment("VIMS_STATS"):
+		_print_stats.call_deferred()
+
+
+func _print_stats() -> void:
+	for i in 8:
+		await get_tree().process_frame
+	var tris := 0
+	var meshes := 0
+	for mi in find_children("*", "MeshInstance3D", true, false):
+		if mi.mesh:
+			meshes += 1
+			for si in mi.mesh.get_surface_count():
+				var arr = mi.mesh.surface_get_arrays(si)
+				var n := (arr[Mesh.ARRAY_VERTEX] as PackedVector3Array).size() / 3
+				tris += n
+				if n > 8000:
+					print("  mesh ", mi.name, " surf ", si, " tris ", n)
+	var vp := get_viewport()
+	print("BACKYARD_DRAWS visible=%d shadow=%d canvas=%d" % [
+		vp.get_render_info(Viewport.RENDER_INFO_TYPE_VISIBLE, Viewport.RENDER_INFO_DRAW_CALLS_IN_FRAME),
+		vp.get_render_info(Viewport.RENDER_INFO_TYPE_SHADOW, Viewport.RENDER_INFO_DRAW_CALLS_IN_FRAME),
+		vp.get_render_info(Viewport.RENDER_INFO_TYPE_CANVAS, Viewport.RENDER_INFO_DRAW_CALLS_IN_FRAME)])
+	print("BACKYARD_STATS meshes=%d tris=%d draws=%d prims=%d" % [meshes, tris,
+		RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME),
+		RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_PRIMITIVES_IN_FRAME)])
 
 
 func _exit_tree() -> void:
@@ -116,10 +142,11 @@ func camera_home() -> Dictionary:
 
 
 func lighting_profile() -> Dictionary:
-	# Shared lighting supports sun_yaw; the sky/ambient/fog look is applied
-	# locally through sunset_env.gd (camera environment override).
+	# Sun, ambient, exposure and screen post come from the shared lighting rig;
+	# the gradient sky + depth fog are applied locally by sunset_env.gd
+	# (camera environment override, synced from the shared environment).
 	return {
-		"sun_heading": 262.0, "sun_elev": 13.0, "sun_energy": 2.4,
+		"sun_heading": 262.0, "sun_elev": 14.0, "sun_energy": 3.2,
 		"ambient_day": Color(0.98, 0.74, 0.66), "ambient_night": Color(0.52, 0.42, 0.70),
 		"ambient_energy": 0.8, "ambient_night_energy": 0.62,
 		"exposure": 1.08, "shadow_distance": 34.0,

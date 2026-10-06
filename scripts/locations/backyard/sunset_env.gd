@@ -13,7 +13,7 @@ uniform vec3 horizon_color : source_color = vec3(1.0, 0.80, 0.52);
 uniform vec3 sun_dir = vec3(-0.85, 0.08, -0.5);
 uniform vec3 sun_color : source_color = vec3(1.0, 0.75, 0.45);
 uniform float horizon_y = -0.24;
-uniform float zenith_y = 0.05;
+uniform float zenith_y = -0.02;
 uniform float brightness = 1.0;
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -74,9 +74,9 @@ func setup(viewport: Viewport, shared_env: Environment) -> void:
 	env.fog_mode = Environment.FOG_MODE_DEPTH
 	env.fog_light_color = Color(0.78, 0.52, 0.62)
 	env.fog_light_energy = 1.0
-	env.fog_density = 0.75
-	env.fog_depth_begin = 22.0
-	env.fog_depth_end = 60.0
+	env.fog_density = 0.6
+	env.fog_depth_begin = 14.0
+	env.fog_depth_end = 55.0
 	env.fog_depth_curve = 1.4
 	env.fog_sky_affect = 0.0
 	env.adjustment_enabled = true
