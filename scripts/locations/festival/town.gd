@@ -21,8 +21,8 @@ const TRIM := Color("f3eee4")
 const GLASS := Color("3a5068")
 const GLASS_LIT := Color("ffc56a")
 
-const HALL_Z := -20.0
-const HALL_H := 4.6
+const HALL_Z := -29.0
+const HALL_H := 6.6
 
 var clock_center := Vector3.ZERO
 var window_glows: Array = []  # world positions of lit windows (for halos)
@@ -256,17 +256,19 @@ func _town_hall() -> void:
 	_wall("brick", Vector3(-6.5, 0, z - 4.5), Vector3(13.0, h, 4.5))
 	# Stone plinth, floor band, cornice, quoins.
 	_band(-6.6, 6.6, 0.0, z - 0.1, 0.5, 0.375)
-	_band(-6.6, 6.6, 2.2, z - 0.1, 0.25, 0.375)
+	_band(-6.6, 6.6, 2.4, z - 0.1, 0.25, 0.375)
+	_band(-6.6, 6.6, 4.45, z - 0.1, 0.25, 0.375)
 	_band(-6.7, 6.7, h - 0.375, z - 0.1, 0.375, 0.5)
 	for y in range(0, int(h * 2)):
 		var w := 0.625 if y % 2 == 0 else 0.375
 		_band(-6.6, -6.6 + w, y * 0.5, z - 0.1, 0.25, 0.375)
 		_band(6.6 - w, 6.6, y * 0.5, z - 0.1, 0.25, 0.375)
 	# Windows (two floors) either side of the tower.
-	for fl in 2:
-		var wy := 0.75 + fl * 2.15
+	for fl in 3:
+		var wy := 0.75 + fl * 2.05
 		for wx in [-5.5, -3.9, 2.9, 4.5]:
-			_window(wx, wy, z, 8, 11, (fl == 0 and wx == -3.9) or (fl == 1 and wx == 4.5) or (fl == 0 and wx == 2.9), true)
+			var lit := K.hs(int(wx * 4.0), fl, 21) < 0.35
+			_window(wx, wy, z, 8, 11, lit, fl != 1)
 	# Roof.
 	_roof_x(-7.0, 7.0, z - 5.0, z + 0.5, h, SLATE)
 	# Dormers on the roof.
@@ -280,7 +282,7 @@ func _town_hall() -> void:
 				roof.set_v(Vector3i(rx + 6 - i, int((h + 1.5) * R) + i, zz), SLATE[1])
 	# --- Clock tower (front at z + 0.5).
 	var tz := z + 0.5
-	var th := 9.0
+	var th := 11.5
 	_wall("brick", Vector3(-1.75, 0, tz - 3.0), Vector3(3.5, th, 3.0))
 	for y in range(0, int(th * 2)):
 		var w := 0.5 if y % 2 == 0 else 0.375
@@ -302,14 +304,16 @@ func _town_hall() -> void:
 	K.box(det, -11, 2, int(tz * C), 22, 2, 3, K.mix(STONE, 10))
 	# Window above the door.
 	_window(-0.5, 3.35, tz, 8, 9, true, true)
+	_window(-0.5, 5.6, tz, 8, 10, false, true)
+	_band(-1.9, 1.9, 7.1, tz - 0.1, 0.25, 0.375)
 	# Clock face.
-	var cy := int(6.1 * C)
+	var cy := int(8.5 * C)
 	clock_center = Vector3(0.0, (cy + 0.5) * VS, tz + 0.15)
 	_clock(0, cy, int(tz * C))
 	# Belfry openings with a bell.
 	for bx in [-10, 3]:
-		K.box(det, bx, int(7.75 * C), int(tz * C), 7, 7, 1, Color("2a2420"))
-	K.box(det, -1, int(7.8 * C), int(tz * C) - 1, 3, 4, 1, Color("c9a040"))
+		K.box(det, bx, int(10.15 * C), int(tz * C), 7, 7, 1, Color("2a2420"))
+	K.box(det, -1, int(10.2 * C), int(tz * C) - 1, 3, 4, 1, Color("c9a040"))
 	# Spire (roof cells).
 	var sp := 0
 	var w := 16

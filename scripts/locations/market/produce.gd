@@ -47,18 +47,19 @@ static func _ball(vb: VoxelBuilder, o: Vector3i, col: Color, s: int, stem := Col
 
 static func tomato(vb: VoxelBuilder, o: Vector3i) -> void:
 	var col := RED if Kit.h(o, 11) > 0.25 else RED2
-	_ball(vb, o, col, 1, LEAF, LEAF2)
+	_ball(vb, o, col, 1, LEAF, LEAF2, 4)
 
 
 static func apple(vb: VoxelBuilder, o: Vector3i, green := false) -> void:
 	var col := Color("cf2a2a") if not green else Color("8cc63f")
-	_ball(vb, o, col, 2, STEM)
+	_ball(vb, o, col, 2, STEM, LEAF if not green else Color(0, 0, 0, 0), 4)
 	if not green:
-		vb.set_v(o + Vector3i(0, 1, 1), Color("f0a33a"))
+		vb.set_v(o + Vector3i(0, 2, 1), Color("f0a33a"))
+		vb.set_v(o + Vector3i(1, 3, 0), Color("f26a5a"))
 
 
 static func orange(vb: VoxelBuilder, o: Vector3i) -> void:
-	_ball(vb, o, ORANGE, 3, LEAF)
+	_ball(vb, o, ORANGE, 3, LEAF, Color(0, 0, 0, 0), 4)
 
 
 static func lemon(vb: VoxelBuilder, o: Vector3i) -> void:
@@ -171,13 +172,13 @@ static func item(vb: VoxelBuilder, kind: String, o: Vector3i, rnd: float) -> Vec
 	## Stamps one item, returns its footprint (x, y, z) in cells.
 	match kind:
 		"tomato":
-			tomato(vb, o); return Vector3i(3, 3, 3)
+			tomato(vb, o); return Vector3i(5, 4, 5)
 		"apple":
-			apple(vb, o, rnd < 0.12); return Vector3i(3, 3, 3)
+			apple(vb, o, rnd < 0.12); return Vector3i(5, 4, 5)
 		"green_apple":
-			apple(vb, o, true); return Vector3i(3, 3, 3)
+			apple(vb, o, true); return Vector3i(5, 4, 5)
 		"orange":
-			orange(vb, o); return Vector3i(3, 3, 3)
+			orange(vb, o); return Vector3i(5, 4, 5)
 		"lemon":
 			lemon(vb, o); return Vector3i(3, 3, 3)
 		"pepper_red":
@@ -188,7 +189,7 @@ static func item(vb: VoxelBuilder, kind: String, o: Vector3i, rnd: float) -> Vec
 		"carrot":
 			carrot(vb, o + Vector3i(2, 0, 0), 0); return Vector3i(9, 2, 2)
 		"banana":
-			bananas(vb, o); return Vector3i(8, 4, 4)
+			bananas(vb, o); return Vector3i(10, 4, 6)
 		"lettuce":
 			lettuce(vb, o); return Vector3i(5, 4, 5)
 		"broccoli":
@@ -215,9 +216,9 @@ static func heap(vb: VoxelBuilder, kind: String, from: Vector3i, size: Vector3i,
 	var fp := item(probe, kind, Vector3i.ZERO, 0.0)
 	var step := Vector3i(fp.x, fp.y, fp.z)
 	if kind == "carrot":
-		step = Vector3i(9, 2, 2)
+		step = Vector3i(10, 2, 3)
 	elif kind == "banana":
-		step = Vector3i(8, 3, 4)
+		step = Vector3i(10, 3, 6)
 	var nx := maxi(1, size.x / step.x)
 	var nz := maxi(1, size.z / step.z)
 	var ox := (size.x - nx * step.x) / 2

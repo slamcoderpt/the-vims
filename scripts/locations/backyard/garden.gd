@@ -325,10 +325,10 @@ func _trees() -> void:
 	# Canopies at 0.25 m: chunky leaves, a fraction of the triangles.
 	var vb := VoxelBuilder.new()
 	vb.jitter = 0.08
-	_tree(vb, Vector3(-10.5, 0, -8.6), 3.4, 1.9, 3)
-	_tree(vb, Vector3(-17.0, 0, -9.0), 3.6, 2.2, 3)
+	_tree(vb, Vector3(-10.5, 0, -8.6), 3.4, 1.9, 4)
+	_tree(vb, Vector3(-17.0, 0, -9.0), 3.6, 2.2, 4)
 	_tree(vb, Vector3(-15.0, 0, -3.0), 4.0, 2.5, 1)
-	_tree(vb, Vector3(-5.5, 0, -10.0), 3.6, 1.9, 3)
+	_tree(vb, Vector3(-5.5, 0, -10.0), 3.6, 1.9, 4)
 	_tree(vb, Vector3(15.5, 0, -4.0), 4.2, 2.5, 0)
 	# Hedge along the back fence (outside).
 	var x := -13.0
@@ -383,7 +383,15 @@ func _neighbours() -> void:
 	]
 	for hd in houses:
 		_house(vb, hd, walls[hd[5] % walls.size()], roofs[hd[5] % roofs.size()])
-	V.inst(vb, root, V.SIZE_BIG, Vector3.ZERO, 0.0, Vector3.ZERO, false, false, "Neighbours")
+	# No AO on the distant row: it is blurred anyway, and flat faces merge
+	# into a handful of quads.
+	var nmi := MeshInstance3D.new()
+	nmi.name = "Neighbours"
+	nmi.mesh = vb.build(V.SIZE_BIG, Vector3.ZERO, false)
+	nmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	if not vb.glow.is_empty():
+		nmi.set_surface_override_material(nmi.mesh.get_surface_count() - 1, V.glow_soft())
+	root.add_child(nmi)
 	# Dark tree clumps at 0.5 m: between and behind the houses.
 	var tl := VoxelBuilder.new()
 	tl.jitter = 0.06

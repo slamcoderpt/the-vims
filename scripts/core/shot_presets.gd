@@ -20,7 +20,7 @@ const PRESETS := {
 	"festival": {
 		"ref": "refs/ref2_autumn_festival.png",
 		"location": "festival", "day": 5, "hour": 16, "minute": 42, "season": 2,
-		"camera": {"target": Vector3(0.6, 1.2, -0.8), "yaw": 0.0, "pitch": 15.0, "distance": 11.0, "fov": 42.0},
+		"camera": {"target": Vector3(0.5, 1.35, -0.9), "yaw": 0.0, "pitch": 15.0, "distance": 9.2, "fov": 50.0},
 		"tasks": [
 			{"title": "Buy Festival Snack", "icon": "apple", "done": true},
 			{"title": "Meet 3 Neighbors", "icon": "chat"},
@@ -59,7 +59,7 @@ const PRESETS := {
 	"market": {
 		"ref": "refs/ref5_grocery_market.png",
 		"location": "market", "day": 0, "hour": 8, "minute": 24, "season": 1,
-		"camera": {"target": Vector3(0.2, 1.4, 1.0), "yaw": 0.0, "pitch": 10.0, "distance": 4.75, "fov": 46.0},
+		"camera": {"target": Vector3(0.3, 0.9, -0.6), "yaw": 0.0, "pitch": 24.0, "distance": 8.6, "fov": 46.0},
 		"tasks": [
 			{"title": "Buy Groceries", "icon": "cart", "done": true},
 			{"title": "Meet a Neighbor", "icon": "people"},

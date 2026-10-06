@@ -10,7 +10,7 @@ const Party := preload("res://scripts/locations/backyard/party.gd")
 const Cast := preload("res://scripts/locations/backyard/cast.gd")
 const SunsetEnv := preload("res://scripts/locations/backyard/sunset_env.gd")
 
-const CAMERA := {"target": Vector3(1.4, 0.6, -0.6), "yaw": -8.0, "pitch": 24.0, "distance": 12.5, "fov": 36.0}
+const CAMERA := {"target": Vector3(0.3, 1.0, -0.4), "yaw": -5.0, "pitch": 19.0, "distance": 10.0, "fov": 52.0}
 
 var garden
 var house
@@ -19,6 +19,7 @@ var cast
 var sunset
 var _t := 0.0
 var _shared_env: Environment
+var fill: DirectionalLight3D
 
 
 func build() -> void:
@@ -37,6 +38,16 @@ func build() -> void:
 	if lighting and "env" in lighting:
 		shared = lighting.env
 	sunset.setup(get_viewport(), shared)
+	# Warm golden bounce from the camera side (no shadows): keeps faces,
+	# pickets and the table cloth reading warm instead of lilac while the
+	# real sun sits low behind the yard.
+	fill = DirectionalLight3D.new()
+	fill.name = "SunsetFill"
+	fill.shadow_enabled = false
+	fill.light_color = Color(1.0, 0.74, 0.5)
+	fill.rotation_degrees = Vector3(-28.0, -20.0, 0.0)
+	fill.light_specular = 0.0
+	add_child(fill)
 	_shared_env = shared
 	sunset.update(Game.hour())
 	# Lighting.configure() runs right after build(); sync once it has.
@@ -86,6 +97,14 @@ func _sync_env() -> void:
 	if sunset:
 		sunset.sync(_shared_env)
 		sunset.update(Game.hour())
+	if fill:
+		var h := Game.hour()
+		# Golden around sunset, a faint cool moon-fill at night, off by day.
+		var gold := smoothstep(16.5, 18.5, h) * (1.0 - smoothstep(20.0, 21.5, h))
+		var nite := smoothstep(20.5, 22.0, h) if h > 12.0 else 1.0 - smoothstep(4.5, 6.0, h)
+		fill.light_color = Color(1.0, 0.74, 0.5).lerp(Color(0.6, 0.66, 1.0), nite)
+		fill.light_energy = gold * 0.45 + nite * 0.12
+		fill.visible = fill.light_energy > 0.01
 
 
 func _process(delta: float) -> void:
@@ -147,7 +166,7 @@ func lighting_profile() -> Dictionary:
 	# (camera environment override, synced from the shared environment).
 	return {
 		"sun_heading": 262.0, "sun_elev": 14.0, "sun_energy": 3.2,
-		"ambient_day": Color(0.98, 0.74, 0.66), "ambient_night": Color(0.52, 0.42, 0.70),
+		"ambient_day": Color(1.0, 0.8, 0.66), "ambient_night": Color(0.52, 0.42, 0.70),
 		"ambient_energy": 0.8, "ambient_night_energy": 0.62,
 		"exposure": 1.08, "shadow_distance": 34.0,
 		"post": {"focus_y": 0.58, "band": 0.2, "falloff": 0.36, "blur_px": 6.0, "top_boost": 0.8,

@@ -7,7 +7,7 @@ const K := preload("res://scripts/locations/festival/kit.gd")
 const U := 1.0 / 16.0
 const W := 96
 const D := 44
-const DECK := 10
+const DECK := 18
 
 var node: Node3D
 var glow_points: Array = []
@@ -32,7 +32,7 @@ func build(parent: Node3D, pos: Vector3, rot: float) -> void:
 	K.inst(node, vb, U, Vector3.ZERO, 0.0, true, origin)
 	var xf := node.transform
 	for p: Vector3i in vb.glow:
-		if p.y > 60 and posmod(p.x, 2) == 0:
+		if p.y > 70 and posmod(p.x, 2) == 0:
 			glow_points.append([xf * ((Vector3(p) + Vector3(0.5, 0.5, 0.5) - origin) * U), 0.45, Color(1.0, 0.75, 0.4)])
 	performer_spot = xf * Vector3(-0.2, DECK * U, 0.35)
 
@@ -46,14 +46,14 @@ func _deck(vb: VoxelBuilder) -> void:
 		return K.shade(Color("6a4228"), f if posmod(q.x, 3) != 0 else f * 0.8))
 	K.box(vb, -1, DECK - 1, 0, W + 2, 1, D + 1, K.wood(Color("b07a48"), 0, 3))
 	# Front steps.
-	K.box(vb, W / 2 - 10, 0, D, 20, 3, 4, K.wood(Color("9a6a40"), 0, 2))
-	K.box(vb, W / 2 - 10, 3, D, 20, 3, 2, K.wood(Color("9a6a40"), 0, 2))
-	K.box(vb, W / 2 - 10, 6, D - 2, 20, 3, 2, K.wood(Color("9a6a40"), 0, 2))
+	for st in 5:
+		K.box(vb, W / 2 - 10, st * 3, D + 4 - st * 2, 20, 3, 2 + st * 0, K.wood(Color("9a6a40"), 0, 2))
+		K.box(vb, W / 2 - 10, 0, D + 4 - st * 2, 20, st * 3, 2, Color("3a2a20"))
 
 
 func _truss(vb: VoxelBuilder) -> void:
 	var dark := Color("2e2a28")
-	var top := 76
+	var top := 86
 	for c in [Vector2i(0, 2), Vector2i(W - 3, 2), Vector2i(0, D - 3), Vector2i(W - 3, D - 3)]:
 		K.box(vb, c.x, DECK, c.y, 3, top - DECK, 3, func(q: Vector3i) -> Color:
 			return dark if posmod(q.y, 6) != 0 else Color("4a4440"))
@@ -89,26 +89,33 @@ func _truss(vb: VoxelBuilder) -> void:
 
 
 func _backdrop(vb: VoxelBuilder) -> void:
-	# Big fabric banner with a maple leaf between the back posts.
-	var x0 := 10
-	var x1 := W - 10
-	for x in range(x0, x1):
-		for y in range(DECK + 14, 70):
-			var c := Color("f0a43a")
-			var edge := x < x0 + 3 or x >= x1 - 3 or y >= 67
-			if edge:
-				c = Color("c8401e")
-			elif (x / 6 + y / 6) % 2 == 0:
-				c = Color("ec9a32")
+	# Dark plank back wall with a cream banner + red maple leaf in the middle.
+	K.box(vb, 3, DECK, 2, W - 6, 74 - DECK, 1, func(q: Vector3i) -> Color:
+		var plank := q.x / 4
+		var f := 0.85 + K.hs(plank, 3, 7) * 0.25
+		if posmod(q.x, 4) == 0:
+			f *= 0.75
+		return K.shade(Color("5a3a26"), f))
+	var bx0 := W / 2 - 22
+	var bx1 := W / 2 + 22
+	for x in range(bx0, bx1):
+		for y in range(DECK + 18, 76):
+			var c := Color("f4e6c8")
+			if x < bx0 + 2 or x >= bx1 - 2 or y >= 74:
+				c = Color("d2541e")
+			elif x < bx0 + 4 or x >= bx1 - 4 or y >= 72:
+				c = Color("f2a43a")
 			vb.set_v(Vector3i(x, y, 3), c)
-	K.maple(vb, W / 2 - 14, 30, 4, Color("d0381e"), 4)
-	# Scalloped bottom edge.
-	for x in range(x0, x1):
-		if posmod(x, 4) < 2:
-			vb.set_v(Vector3i(x, DECK + 13, 3), Color("c8401e"))
+	# Pointed (pennant) bottom edge of the banner.
+	for x in range(bx0, bx1):
+		var k := posmod(x - bx0, 8)
+		var drop := 3 - absi(k - 4) if absi(k - 4) < 3 else 0
+		for d in drop:
+			vb.set_v(Vector3i(x, DECK + 17 - d, 3), Color("d2541e"))
+	K.maple(vb, W / 2 - 14, 38, 4, Color("c8301a"), 4)
 	# Side drapes.
 	for x in [3, W - 9]:
-		K.box(vb, x, DECK, 3, 6, 64, 2, func(q: Vector3i) -> Color:
+		K.box(vb, x, DECK, 3, 6, 68, 2, func(q: Vector3i) -> Color:
 			return K.shade(Color("8a2a24"), 0.85 + 0.15 * float(posmod(q.x, 2))))
 
 

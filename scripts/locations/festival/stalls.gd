@@ -22,16 +22,16 @@ var glow_points: Array = []   # [pos, size, color] for halos
 func build(parent: Node3D) -> void:
 	treats = _place(parent, "TreatsStall", _treats_stall(), Vector3(-3.0, 0, 0.1), 20.0)
 	_sign(treats, "FALL TREATS", Vector3(0.22, 2.66, 0.975), 0.0042, 0.0)
-	game = _place(parent, "GameStall", _game_stall(), Vector3(1.2, 0, 0.6), -8.0)
-	crafts = _place(parent, "CraftsStall", _crafts_table(), Vector3(5.5, 0, 3.0), -25.0)
+	game = _place(parent, "GameStall", _game_stall(), Vector3(1.5, 0, -0.5), -8.0)
+	crafts = _place(parent, "CraftsStall", _crafts_table(), Vector3(5.6, 0, 2.2), -25.0)
 	_place(parent, "RedStall", _side_stall(RED, CREAM, 0), Vector3(6.9, 0, -2.6), -38.0)
 	_place(parent, "BlueStall", _side_stall(BLUE, CREAM, 1), Vector3(9.2, 0, -7.4), -60.0)
 	# Chalkboards.
 	var menu := _chalkboard(parent, Vector3(-2.5, 0, 3.1), 18.0, 0.9)
 	K.label(menu, "Apple Cider\n· Pumpkin Pie\n· Pretzels\nCandy Apples", Vector3(-0.1, 0.86, 0.13), 0.00155, Color("f4f1e6"), 0.0, Color(0, 0, 0, 0), 64, HORIZONTAL_ALIGNMENT_LEFT)
-	var hm := _chalkboard(parent, Vector3(4.4, 0, 4.8), -25.0, 0.8)
+	var hm := _chalkboard(parent, Vector3(4.5, 0, 4.0), -25.0, 0.8)
 	K.label(hm, "HANDMADE", Vector3(0, 0.95, 0.13), 0.0021, Color("f4f1e6"))
-	var gm := _chalkboard(parent, Vector3(2.3, 0, 1.2), -20.0, 0.6)
+	var gm := _chalkboard(parent, Vector3(2.5, 0, 0.3), -20.0, 0.6)
 	K.label(gm, "3 TRIES", Vector3(-0.02, 0.62, 0.13), 0.0015, Color("f8e9a0"))
 
 
@@ -222,23 +222,29 @@ func _game_stall() -> VoxelBuilder:
 		return K.shade(RED if posmod(q.x / 3, 2) == 0 else CREAM, 0.96 + K.hs(q.x, q.y, 1) * 0.06))
 	K.box(vb, -1, 14, 5, W + 2, 1, 10, K.wood(WOOD_L, 0, 3))
 	# Back board with shelves of bottles.
-	K.box(vb, 0, 0, 0, W, 34, 2, Color("9a2a22"))
-	for sy in [18, 25]:
+	K.box(vb, 0, 0, 0, W, 27, 2, Color("9a2a22"))
+	for sy in [16, 21]:
 		K.box(vb, 1, sy, 1, W - 2, 1, 4, K.wood(WOOD_L, 0, 3))
 		for i in 6:
 			var bc: Color = [Color("3f8fd8"), Color("4fb06a"), Color("e0a030"), Color("3f8fd8"), Color("d84a3a"), Color("4fb06a")][(i + sy) % 6]
-			K.box(vb, 3 + i * 4, sy + 1, 2, 2, 4, 2, bc)
-			vb.set_v(Vector3i(3 + i * 4, sy + 5, 2), K.shade(bc, 0.8))
-			vb.set_v(Vector3i(3 + i * 4, sy + 6, 2), Color("f2f2f2"))
-	# Side posts and roof sign with a target.
-	_post(vb, -1, 0, 40, Color("f2e6d0"))
-	_post(vb, W - 1, 0, 40, Color("f2e6d0"))
+			K.box(vb, 3 + i * 4, sy + 1, 2, 2, 3, 2, bc)
+			vb.set_v(Vector3i(3 + i * 4, sy + 4, 2), Color("f2f2f2"))
+	# Side posts, a low striped canopy and a round target sign on top.
+	_post(vb, -1, 0, 30, Color("f2e6d0"))
+	_post(vb, W - 1, 0, 30, Color("f2e6d0"))
 	for x in range(-2, W + 2):
 		for z in range(0, 10):
-			vb.set_v(Vector3i(x, 40 + mini(z, 9 - z) / 3, z), RED if posmod(x / 3, 2) == 0 else CREAM)
-	K.box(vb, W / 2 - 6, 42, 8, 12, 9, 1, Color("5a3218"))
-	K.box(vb, W / 2 - 5, 43, 9, 10, 7, 1, Color("f6efe0"))
-	K.maple(vb, W / 2 - 3, 43, 10, Color("d8401e"))
+			vb.set_v(Vector3i(x, 30 + mini(z, 9 - z) / 3, z), RED if posmod(x / 3, 2) == 0 else CREAM)
+	var tc := Vector2(W / 2.0, 38.0)
+	for x in range(-6, 7):
+		for y in range(-6, 7):
+			var d := Vector2(x + 0.5, y + 0.5).length()
+			if d > 6.2:
+				continue
+			var ring := int(d / 1.6)
+			var c := RED if ring % 2 == 0 else CREAM
+			vb.set_v(Vector3i(int(tc.x) + x, int(tc.y) + y, 7), c)
+	K.box(vb, W / 2 - 1, 32, 6, 2, 2, 1, Color("5a3218"))
 	# Rubber duck + prizes on the counter.
 	K.box(vb, 4, 15, 9, 3, 2, 3, Color("f7d43a"))
 	K.box(vb, 5, 17, 10, 2, 2, 2, Color("f7d43a"))
@@ -246,8 +252,8 @@ func _game_stall() -> VoxelBuilder:
 	vb.set_v(Vector3i(6, 18, 12), Color("2a2420"))
 	# Hanging plush prizes on the posts.
 	for side in [-3, W + 1]:
-		K.box(vb, side, 28, 3, 2, 4, 3, Color("e88a3a"))
-		K.box(vb, side, 32, 3, 2, 3, 3, Color("f2b060"))
+		K.box(vb, side, 20, 3, 2, 4, 3, Color("e88a3a"))
+		K.box(vb, side, 24, 3, 2, 3, 3, Color("f2b060"))
 	# Stack of rings / bean bags.
 	for i in 3:
 		K.box(vb, 18 + i * 2, 15, 9 + (i % 2), 2, 1, 2, [Color("3a7ad8"), Color("f2c03a"), Color("d83a3a")][i])

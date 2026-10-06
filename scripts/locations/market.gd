@@ -41,7 +41,7 @@ func build() -> void:
 
 
 func camera_home() -> Dictionary:
-	return {"target": Vector3(0.2, 1.4, 1.0), "yaw": 0.0, "pitch": 10.0, "distance": 4.75, "fov": 46.0}
+	return {"target": Vector3(0.3, 0.9, -0.6), "yaw": 0.0, "pitch": 24.0, "distance": 8.6, "fov": 46.0}
 
 
 func lighting_profile() -> Dictionary:
@@ -51,11 +51,11 @@ func lighting_profile() -> Dictionary:
 		"ambient_night": Color(0.75, 0.62, 0.5), "ambient_night_energy": 0.7,
 		"lamp_night_mult": 1.2,
 		"sky_day": Color(0.36, 0.27, 0.2), "sky_night": Color(0.2, 0.14, 0.1),
-		"fog_day": Color(0.98, 0.9, 0.78), "fog_night": Color(0.4, 0.3, 0.22), "fog_density": 0.004,
+		"fog_day": Color(0.98, 0.9, 0.78), "fog_night": Color(0.4, 0.3, 0.22), "fog_density": 0.0015,
 		"exposure": 1.02,
 		"shadow_distance": 24.0,
-		"post": {"focus_y": 0.52, "band": 0.2, "falloff": 0.3, "blur_px": 6.5, "top_boost": 0.6,
-			"saturation": 1.2, "contrast": 1.14, "tint": Vector3(1.03, 1.0, 0.94), "vignette": 0.26},
+		"post": {"focus_y": 0.55, "band": 0.3, "falloff": 0.35, "blur_px": 3.0, "top_boost": 0.4,
+			"saturation": 1.2, "contrast": 1.12, "tint": Vector3(1.02, 1.0, 0.96), "vignette": 0.18},
 	}
 
 
@@ -113,23 +113,28 @@ func _place(key: String, pos: Vector3, face_to: Vector3, pose: String) -> SimAct
 func _stage() -> void:
 	if actors.is_empty():
 		return
-	var cam := Vector3(0.4, 0, 6.0)
-	var jack := _place("dad", Vector3(-0.3, 0, 0.45), Vector3(1.1, 0, 5.0), "stand_type")
+	var cam := Vector3(0.3, 0, 7.3)
+	# Jack pushes the cart towards the camera, angled a touch to screen right.
+	var jack := _place("dad", Vector3(-0.35, 0, 0.2), cam + Vector3(2.4, 0, 0), "idle")
 	var fwd := Vector3(sin(jack.rotation.y), 0, cos(jack.rotation.y))
-	_cart.position = jack.position + fwd * 0.4
+	_cart.position = jack.position + fwd * 0.42
 	_cart.rotation.y = jack.rotation.y
 	var dog := _place("beagle", _cart.position + fwd * 0.45 + Vector3(0, 13 * P * 1.2, 0), cam + Vector3(-1.5, 0, 0), "sit")
 	dog.rotation.y = jack.rotation.y + 0.35
-	var lily := _place("bunny_girl", Vector3(-1.25, 0, 0.25), Vector3(-0.4, 0, 5.0), "stand_type")
-	var maya := _place("cat_girl", Vector3(1.0, 0, 0.8), Vector3(0.0, 0, 6.0), "stand_type")
+	# The "type" pose turns the head ~0.9 rad to the sim's left, so the
+	# girls' bodies are turned the other way to keep their faces on camera.
+	var lily := _place("bunny_girl", Vector3(-1.35, 0, 0.55), cam, "stand_type")
+	lily.rotation.y -= 0.75
+	var maya := _place("cat_girl", Vector3(1.0, 0, 1.0), cam, "stand_type")
+	maya.rotation.y -= 0.8
 	_hold(lily, "carrots")
 	_hold(maya, "cereal")
 	_place("cashier", Vector3(2.95, 0, 0.75), Vector3(0.6, 0, 3.0), "idle")
 	_place("npc_2", Vector3(-0.85, 0, -2.4), Vector3(-2.6, 0, -3.4), "idle")
-	_place("npc_5", Vector3(0.9, 0, -6.4), Vector3(0.6, 0, -10.0), "idle")
-	_place("npc_4", Vector3(-0.2, 0, -4.4), Vector3(-0.4, 0, -9.0), "idle")
+	_place("npc_5", Vector3(0.7, 0, -5.5), Vector3(1.0, 0, -9.0), "idle")
+	_place("npc_4", Vector3(-0.4, 0, -3.9), Vector3(-0.4, 0, -9.0), "idle")
 	_place("npc_0", Vector3(1.95, 0, -3.6), Vector3(3.0, 0, -3.8), "stand_read")
-	_place("npc_6", Vector3(-3.0, 0, -7.4), Vector3(-6.0, 0, -7.2), "idle")
+	_place("npc_6", Vector3(-3.4, 0, -6.4), Vector3(-6.0, 0, -6.2), "idle")
 
 
 ## Give an actor a hand-held voxel item (attached to the right forearm).
@@ -184,7 +189,10 @@ func _process(_delta: float) -> void:
 	if _frames == 12 and OS.get_environment("VIMS_STATS") != "":
 		print("MARKET_STATS draw_calls=", RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME),
 			" prims=", RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_PRIMITIVES_IN_FRAME),
-			" objects=", RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_OBJECTS_IN_FRAME))
+			" objects=", RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_OBJECTS_IN_FRAME),
+			" main_vp_draws=", get_viewport().get_render_info(Viewport.RENDER_INFO_TYPE_VISIBLE, Viewport.RENDER_INFO_DRAW_CALLS_IN_FRAME),
+			" main_vp_shadow_draws=", get_viewport().get_render_info(Viewport.RENDER_INFO_TYPE_SHADOW, Viewport.RENDER_INFO_DRAW_CALLS_IN_FRAME),
+			" main_vp_prims=", get_viewport().get_render_info(Viewport.RENDER_INFO_TYPE_VISIBLE, Viewport.RENDER_INFO_PRIMITIVES_IN_FRAME))
 		var rows := []
 		for mi in find_children("*", "MeshInstance3D", true, false):
 			if not (mi.mesh is ArrayMesh):
@@ -198,6 +206,14 @@ func _process(_delta: float) -> void:
 		var tot := 0
 		for r in rows:
 			tot += r[0]
+		var by := {}
+		for n in find_children("*", "GeometryInstance3D", true, false):
+			var par: Node = n
+			while par.get_parent() != self and par.get_parent() != null:
+				par = par.get_parent()
+			var key := n.get_class() + ":" + String(par.name)
+			by[key] = by.get(key, 0) + 1
+		print("MARKET_NODES ", by)
 		print("MARKET_TRIS total=", tot, " meshes=", rows.size(), " top=", rows.slice(0, 12))
 	if _frames > 12:
 		set_process(false)

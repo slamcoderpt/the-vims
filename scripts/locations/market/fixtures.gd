@@ -43,20 +43,26 @@ static func put(dst: VoxelBuilder, src: VoxelBuilder, at: Vector3i, q := 0) -> v
 static func product(vb: VoxelBuilder, o: Vector3i, kind: String, col: Color, col2: Color, max_h: int) -> int:
 	match kind:
 		"cereal":
-			var hh := mini(max_h, 6)
-			for x in 3:
+			# 4 wide box: coloured top band, white brand strip, mascot patch.
+			var hh := mini(max_h, 7)
+			for x in 4:
 				for y in hh:
 					for z in 2:
 						var p := o + Vector3i(x, y, z)
 						var cc := col
-						if z == 1 and y == hh - 2:
-							cc = Color("fdf8ec")
-						elif z == 1 and y == 1 and x == 1:
-							cc = col2
-						elif z == 1 and y == 2 and x != 1:
-							cc = Kit.shade(col2, 1.1)
+						if z == 1:
+							if y == hh - 1:
+								cc = Kit.shade(col2, 0.95)
+							elif y == hh - 2:
+								cc = Color("fdf8ec") if (x + y) % 3 != 0 else Kit.shade(col2, 1.1)
+							elif y >= 1 and y <= 3 and (x == 1 or x == 2):
+								cc = Color("f6d7a8") if y == 3 else (Color("fbf3e4") if y == 1 else col2)
+							elif y == 0:
+								cc = Kit.shade(col, 0.82)
+						elif x == 0 or x == 3:
+							cc = Kit.shade(col, 0.85)
 						vb.set_v(p, cc)
-			return 3
+			return 4
 		"bag":
 			var hh := mini(max_h, 5)
 			for x in 3:
@@ -125,7 +131,7 @@ static func gondola(length: int, seed: int, kinds: Array, double_sided := false)
 	var vb := VoxelBuilder.new()
 	vb.jitter = 0.03
 	var D := 8
-	var H := 30
+	var H := 34
 	var z0 := -D if double_sided else 0
 	# back panel
 	vb.box(Vector3i(0, 0, z0 if double_sided else 0), Vector3i(length, H, 1 if not double_sided else 1), Color("e9dcc3"))
@@ -135,7 +141,7 @@ static func gondola(length: int, seed: int, kinds: Array, double_sided := false)
 		vb.box(Vector3i(x, 0, z0), Vector3i(1, H + 1, D - z0), Kit.wood(WOOD_D, 2))
 	# base plinth
 	vb.box(Vector3i(0, 0, z0), Vector3i(length, 2, D - z0), Color("5b4636"))
-	var levels := [2, 9, 16, 23]
+	var levels := [2, 10, 18, 26]
 	for li in levels.size():
 		var y: int = levels[li]
 		vb.box(Vector3i(1, y, z0 + 1), Vector3i(length - 2, 1, D - z0 - 1), Kit.wood(WOOD_L, 1, 1))
@@ -143,14 +149,14 @@ static func gondola(length: int, seed: int, kinds: Array, double_sided := false)
 		vb.box(Vector3i(1, y, D - 1), Vector3i(length - 2, 1, 1), Color("fbf3dc"))
 		for tx in range(3, length - 2, 6):
 			vb.set_v(Vector3i(tx, y, D), Color("f5d03b"))
-		stock(vb, 1, length - 2, y + 1, D - 1, 6, seed * 7 + li, kinds)
+		stock(vb, 1, length - 2, y + 1, D - 1, 7, seed * 7 + li, kinds)
 		if double_sided:
 			var back := VoxelBuilder.new()
-			stock(back, 1, length - 2, y + 1, D - 1, 6, seed * 11 + li + 3, kinds)
+			stock(back, 1, length - 2, y + 1, D - 1, 7, seed * 11 + li + 3, kinds)
 			for p: Vector3i in back.vox:
 				vb.set_v(Vector3i(length - 1 - p.x, p.y, -p.z), back.vox[p])
 	# header
-	vb.box(Vector3i(0, H, z0), Vector3i(length, 2, D - z0), Kit.wood(WOOD, 1))
+	vb.box(Vector3i(0, H, z0), Vector3i(length, 2, D - z0), Kit.wood(WOOD_D, 1))
 	return vb
 
 

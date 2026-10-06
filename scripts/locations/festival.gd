@@ -14,7 +14,7 @@ const Stage := preload("res://scripts/locations/festival/stage.gd")
 const Decor := preload("res://scripts/locations/festival/decor.gd")
 const Crowd := preload("res://scripts/locations/festival/crowd.gd")
 
-const CAMERA := {"target": Vector3(0.6, 1.2, -0.8), "yaw": 0.0, "pitch": 15.0, "distance": 11.0, "fov": 42.0}
+const CAMERA := {"target": Vector3(0.5, 1.35, -0.9), "yaw": 0.0, "pitch": 15.0, "distance": 9.2, "fov": 50.0}
 
 var stalls
 var stage
@@ -42,6 +42,8 @@ func build() -> void:
 	crowd.build(self, stalls, stage)
 	_lights()
 	_interactables()
+	_tune_env.call_deferred()
+	Game.time_changed.connect(_on_time_changed)
 	if OS.has_environment("VIMS_STATS"):
 		print("FESTIVAL_BUILD_MS ", Time.get_ticks_msec() - t0)
 		_print_stats.call_deferred()
@@ -54,6 +56,11 @@ func _lights() -> void:
 	pts.append_array(decor.glow_points)
 	for w: Vector3 in town.window_glows:
 		pts.append([w, 1.2, Color(1.0, 0.7, 0.35, 0.6)])
+	# Halos are subtle: they suggest glow without washing the frame out.
+	for e: Array in pts:
+		var c: Color = e[2]
+		e[1] = e[1] * 0.8
+		e[2] = Color(c.r * 0.5, c.g * 0.45, c.b * 0.4, c.a)
 	halos = K.halos(pts)
 	add_child(halos)
 	# A handful of real lights (each costs an extra pass per lit mesh on GL Compatibility).
@@ -125,18 +132,40 @@ func camera_home() -> Dictionary:
 
 
 ## Golden late-afternoon light (the shared lighting.gd reads this).
+## Kept deliberately restrained: mid-value cobbles, crisp backdrop, only a
+## mild tilt-shift past the fountain (critic round 1: haze/bloom too strong).
 func lighting_profile() -> Dictionary:
 	return {
-		"sun_heading": -28.0, "sun_elev": 30.0, "sun_energy": 1.7,
-		"ambient_day": Color(0.94, 0.86, 0.8), "ambient_energy": 0.75,
-		"ambient_night": Color(0.42, 0.38, 0.62), "ambient_night_energy": 0.5,
-		"sky_day": Color(0.93, 0.84, 0.72), "sky_night": Color(0.1, 0.1, 0.22),
-		"fog_day": Color(0.95, 0.85, 0.72), "fog_night": Color(0.12, 0.12, 0.26),
-		"fog_density": 0.0045, "exposure": 1.0, "shadow_distance": 40.0,
+		"sun_heading": -32.0, "sun_elev": 34.0, "sun_energy": 1.25,
+		"ambient_day": Color(0.78, 0.74, 0.8), "ambient_energy": 0.5,
+		"ambient_night": Color(0.42, 0.38, 0.62), "ambient_night_energy": 0.45,
+		"sky_day": Color(0.74, 0.8, 0.92), "sky_night": Color(0.1, 0.1, 0.22),
+		"fog_day": Color(0.86, 0.8, 0.78), "fog_night": Color(0.12, 0.12, 0.26),
+		"fog_density": 0.0012, "exposure": 0.92, "shadow_distance": 45.0,
 		"lamp_night_mult": 1.6,
-		"post": {"focus_y": 0.62, "band": 0.22, "falloff": 0.32, "blur_px": 5.5, "top_boost": 1.1,
-			"saturation": 1.08, "contrast": 1.07, "tint": Vector3(1.01, 1.0, 0.98), "vignette": 0.2},
+		"post": {"focus_y": 0.6, "band": 0.24, "falloff": 0.42, "blur_px": 2.6, "top_boost": 0.85,
+			"saturation": 1.14, "contrast": 1.12, "tint": Vector3(1.02, 0.99, 0.95),
+			"lift": Vector3(0.0, 0.0, 0.0), "vignette": 0.24, "gamma": 1.04},
 	}
+
+
+func _on_time_changed(_d: int, _m: float) -> void:
+	_tune_env()
+
+
+## lighting.gd owns the Environment; it re-applies a fairly strong global glow
+## on every time change, which washes this bright scene out. Tame it here.
+func _tune_env() -> void:
+	var lt := get_parent().get_node_or_null("Lighting") if get_parent() else null
+	if lt == null or not ("env" in lt) or lt.env == null:
+		return
+	var env: Environment = lt.env
+	var n: float = lt.night
+	env.glow_intensity = lerpf(0.22, 0.6, n)
+	env.glow_strength = 0.9
+	env.glow_bloom = 0.0
+	env.glow_hdr_threshold = lerpf(1.25, 0.85, n)
+	env.tonemap_white = 5.0
 
 
 func _print_stats() -> void:

@@ -91,6 +91,7 @@ static func leaves(seed := 0, tone := 0, top := 0.0) -> Callable:
 		[Color("3e7d3a"), Color("4c9446"), Color("2f6630"), Color("5aa64f"), Color("6bb85a")],
 		[Color("6aa83f"), Color("7fbd4a"), Color("8ccc55"), Color("5b9636"), Color("a1d26a")],
 		[Color("2f5f34"), Color("3b7340"), Color("264f2c"), Color("487f45"), Color("335f36")],
+		[Color("1f3a26"), Color("28462c"), Color("1b3322"), Color("31523a"), Color("243f2a")],
 	]
 	var cols: Array = sets[tone % sets.size()]
 	return func(q: Vector3i) -> Color:

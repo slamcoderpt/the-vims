@@ -9,7 +9,7 @@ const C := 0.125
 const U := 0.0625
 const X0 := -6.75
 const X1 := 7.75
-const Z0 := -11.25
+const Z0 := -8.25
 const ZF := 8.0
 const H := 5.0
 
@@ -60,7 +60,7 @@ static func _walls(root: Node3D) -> void:
 	var win := VoxelBuilder.new()
 	win.jitter = 0.0
 	var night := Game.is_night()
-	for wx in [-5.5, -2.75, 0.0, 2.75, 5.5]:
+	for wx in [-4.4, -1.5, 1.4, 4.3]:
 		var a := cc(wx - 1.1)
 		var w := cc(2.2)
 		var y0 := cc(2.55)
@@ -103,7 +103,7 @@ static func _ceiling(root: Node3D, halo_pts: Array) -> void:
 		var k := p.z / 3
 		return Kit.shade(CEIL, 0.85 + 0.25 * Kit.h(Vector3i(0, 0, k), 4)))
 	# beams across x
-	for bz in [-9.0, -6.0, -3.0, 0.0, 3.0, 6.0]:
+	for bz in [-6.0, -3.0, 0.0, 3.0, 6.0]:
 		vb.box(Vector3i(x0, hh - 3, cc(bz)), Vector3i(x1 - x0, 3, 2), BEAM)
 	# two long beams along z
 	for bx in [-2.25, 3.25]:
@@ -113,10 +113,10 @@ static func _ceiling(root: Node3D, halo_pts: Array) -> void:
 	var lamps := VoxelBuilder.new()
 	lamps.jitter = 0.02
 	var pts := [
-		Vector3(-4.6, 3.55, 1.6), Vector3(-2.2, 3.7, 1.0), Vector3(0.6, 3.85, 1.2), Vector3(3.3, 3.75, 1.4), Vector3(5.6, 3.6, 0.6),
+		Vector3(-4.2, 4.15, 3.2), Vector3(-1.4, 4.2, 3.4), Vector3(1.7, 4.2, 3.3), Vector3(4.6, 4.15, 3.1),
 		Vector3(-4.4, 3.5, -2.0), Vector3(-1.8, 3.6, -1.6), Vector3(1.0, 3.7, -2.4), Vector3(4.4, 3.6, -1.9),
-		Vector3(-4.0, 3.6, -5.6), Vector3(-1.2, 3.6, -5.2), Vector3(1.6, 3.6, -5.8), Vector3(4.6, 3.55, -5.4),
-		Vector3(-3.0, 3.5, -8.6), Vector3(0.2, 3.5, -8.8), Vector3(3.2, 3.5, -8.6),
+		Vector3(-4.0, 3.6, -5.0), Vector3(-1.2, 3.6, -4.8), Vector3(1.6, 3.6, -5.2), Vector3(4.6, 3.55, -4.9),
+		Vector3(-2.6, 3.5, -7.0), Vector3(0.3, 3.45, -7.1), Vector3(3.2, 3.5, -7.0),
 	]
 	for p: Vector3 in pts:
 		var cord := int((H - 0.19 - p.y) / U) - 4
@@ -127,12 +127,12 @@ static func _ceiling(root: Node3D, halo_pts: Array) -> void:
 	Kit.light(root, Vector3(-3.4, 3.0, 1.2), Color(1.0, 0.78, 0.52), 1.6, 6.0)
 	Kit.light(root, Vector3(0.6, 3.2, 0.6), Color(1.0, 0.8, 0.56), 1.3, 6.5)
 	Kit.light(root, Vector3(3.6, 3.0, 1.2), Color(1.0, 0.78, 0.52), 1.4, 6.0)
-	Kit.light(root, Vector3(0.4, 2.6, -8.6), Color(0.85, 0.92, 1.0), 1.2, 6.0)
+	Kit.light(root, Vector3(0.4, 2.6, -6.4), Color(0.85, 0.92, 1.0), 1.2, 6.0)
 
 
 # ------------------------------------------------------------------ signs
 
-static func _board(root: Node3D, nm: String, center: Vector3, rot_y: float, w: float, h: float, face: Color, frame: Color, chains := true) -> MeshInstance3D:
+static func _board(root: Node3D, nm: String, center: Vector3, rot_y: float, w: float, h: float, face: Color, frame: Color, chains := true, chain_top := -1.0) -> MeshInstance3D:
 	var vb := VoxelBuilder.new()
 	vb.jitter = 0.03
 	var W := int(round(w / U))
@@ -147,7 +147,7 @@ static func _board(root: Node3D, nm: String, center: Vector3, rot_y: float, w: f
 			else:
 				vb.set_v(p, Kit.vary(face, p, 0.035, 1))
 	if chains:
-		var top := int(round((H - 0.25 - (center.y + h * 0.5)) / U))
+		var top := int(round(((H - 0.25 if chain_top < 0.0 else chain_top) - (center.y + h * 0.5)) / U))
 		for cx in [6, W - 7]:
 			for y in top:
 				vb.set_v(Vector3i(cx, Hh + y, 0), Color("2a2624") if y % 2 == 0 else Color("4a4440"))
@@ -175,7 +175,7 @@ static func _signs(root: Node3D) -> void:
 	Fx.leaf_icon(lv, Vector3i(0, 0, 0), Color("8fd14f"), Color("3d8a2a"))
 	Kit.add(fresh, lv, U * 1.3, "Leaf", false, null, Vector3(1.3, -0.02, 0.11), Vector3(3.5, 4, 0))
 	# Produce
-	var prod := _board(root, "SignProduce", Vector3(-1.95, 2.62, -2.6), 25.0, 1.15, 0.36, Color("3a2a20"), Color("7a5130"))
+	var prod := _board(root, "SignProduce", Vector3(-1.95, 2.62, -2.6), 25.0, 1.15, 0.36, Color("3a2a20"), Color("7a5130"), true, 2.95)
 	_text(prod, "Produce", Vector3(0, 0.0, z), 0.9, 0.22, Color("f6efe0"))
 	# MARKET
 	var mk := _board(root, "SignMarket", Vector3(2.4, 3.35, -3.1), -8.0, 2.6, 0.78, Color("34302d"), Color("8a5a31"))
@@ -201,10 +201,8 @@ static func _greenery(root: Node3D) -> void:
 	vb.jitter = 0.06
 	# Hanging ivy along the top of the left wall and from the front beam.
 	var strands := []
-	for i in 18:
-		strands.append(Vector3(X0 + 0.15, H - 0.2, -10.5 + i * 0.55))
-	for i in 8:
-		strands.append(Vector3(-6.2 + i * 0.5, H - 0.4, 3.0))
+	for i in 13:
+		strands.append(Vector3(X0 + 0.15, H - 0.2, -7.8 + i * 0.55))
 	for i in strands.size():
 		var s: Vector3 = strands[i]
 		var base := Vector3i(int(round(s.x / U)), int(round(s.y / U)), int(round(s.z / U)))
@@ -222,8 +220,8 @@ static func _greenery(root: Node3D) -> void:
 			if y % 3 == 1:
 				vb.set_v(p + Vector3i(0, 0, 1), Kit.shade(col, 0.9))
 	# Hanging planters with trailing ivy (top of frame, like the reference).
-	for hp: Vector3 in [Vector3(-3.5, 3.55, -1.0), Vector3(-4.7, 3.2, -2.9), Vector3(-0.9, 3.95, -2.2),
-			Vector3(4.6, 3.55, -1.3), Vector3(6.0, 3.25, -3.2), Vector3(0.9, 3.9, -6.6), Vector3(-2.5, 3.6, -6.2)]:
+	for hp: Vector3 in [Vector3(-5.2, 3.4, -0.6), Vector3(-4.7, 3.2, -2.9), Vector3(0.55, 3.95, -3.3),
+			Vector3(5.9, 3.45, -0.8), Vector3(6.0, 3.25, -3.2), Vector3(0.9, 3.9, -5.9), Vector3(-2.5, 3.6, -5.6)]:
 		var o := Vector3i(int(round(hp.x / U)), int(round(hp.y / U)), int(round(hp.z / U)))
 		for x in range(-3, 4):
 			for z in range(-3, 4):

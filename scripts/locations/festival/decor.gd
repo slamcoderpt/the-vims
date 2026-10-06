@@ -16,7 +16,7 @@ const LAMPS := [
 ]
 const FOUNTAIN := Vector3(0.0, 0, -8.6)
 const LAMP_TOP := 4.2
-const SU := 0.1  # string-light cell size
+const SU := 0.06  # string-light cell size
 
 var glow_points: Array = []
 var lamp_heads: Array = []
@@ -65,16 +65,22 @@ func _lamp_model(banner: bool) -> VoxelBuilder:
 			var bx0 := 3 if side > 0 else -11
 			for x in range(bx0, bx0 + 8):
 				for y in range(33, 58):
-					var c := Color("e8742a")
+					var c := Color("f0b440")
 					if x == bx0 or x == bx0 + 7:
-						c = Color("c8501e")
+						c = Color("d8822a")
 					vb.set_v(Vector3i(x, y, 0), c)
 			# Fringe.
 			for x in range(bx0, bx0 + 8):
 				if posmod(x, 2) == 0:
 					vb.set_v(Vector3i(x, 32, 0), Color("f2b33a"))
-			K.maple(vb, bx0 + 1 - 1 + 1, 44, 1, Color("c8301a"))
-			K.maple(vb, bx0 + 1, 44, -1, Color("c8301a"))
+			K.maple(vb, bx0 + 1 - 1 + 1, 46, 1, Color("c8381a"))
+			K.maple(vb, bx0 + 1, 46, -1, Color("c8381a"))
+			# Small second leaf lower down, like the reference banners.
+			for k in 3:
+				vb.set_v(Vector3i(bx0 + 2 + k, 38 + k, 1), Color("c8381a"))
+				vb.set_v(Vector3i(bx0 + 2 + k, 38 + k, -1), Color("c8381a"))
+				vb.set_v(Vector3i(bx0 + 3 + k, 37 + k, 1), Color("d8582a"))
+				vb.set_v(Vector3i(bx0 + 3 + k, 37 + k, -1), Color("d8582a"))
 	return vb
 
 
@@ -101,7 +107,7 @@ func _fountain(parent: Node3D) -> void:
 	vb.jitter = 0.0
 	var stone := func(q: Vector3i) -> Color:
 		var row := q.y / 3
-		var c := K.pick([Color("b8b2a6"), Color("aaa498"), Color("c4beb2"), Color("9e988c")], K.hs(q.x / 3, row, q.z / 3))
+		var c := K.pick([Color("9a968e"), Color("8a867e"), Color("a8a49a"), Color("7e7a72")], K.hs(q.x / 3, row, q.z / 3))
 		if posmod(q.y, 3) == 0:
 			c = K.shade(c, 0.88)
 		return c
@@ -110,7 +116,7 @@ func _fountain(parent: Node3D) -> void:
 	# Octagon-ish basin.
 	K.cyl(vb, 0, 0, 0, 24.0, 2, stone)
 	K.cyl(vb, 0, 2, 0, 23.0, 8, stone, false, 20.0)
-	K.cyl(vb, 0, 10, 0, 23.5, 1, Color("d2ccbe"), false, 19.5)
+	K.cyl(vb, 0, 10, 0, 23.5, 1, Color("b4afa4"), false, 19.5)
 	K.cyl(vb, 0, 2, 0, 20.0, 5, water)
 	# Pedestal and middle bowl.
 	K.cyl(vb, 0, 7, 0, 4.5, 16, stone)
@@ -122,7 +128,7 @@ func _fountain(parent: Node3D) -> void:
 	K.cyl(vb, 0, 38, 0, 6.0, 2, stone, false, 4.0)
 	K.cyl(vb, 0, 38, 0, 4.0, 1, water)
 	K.cyl(vb, 0, 40, 0, 1.5, 5, stone)
-	K.cyl(vb, 0, 45, 0, 2.5, 2, Color("d2ccbe"))
+	K.cyl(vb, 0, 45, 0, 2.5, 2, Color("b4afa4"))
 	# Water streams falling from the bowls.
 	for a in 8:
 		var ang := TAU * a / 8.0
@@ -159,7 +165,7 @@ func _catenary(vb: VoxelBuilder, a: Vector3, b: Vector3, sag: float, bunting := 
 	var cb := b / SU
 	var n := maxi(int((cb - ca).length()), 2)
 	var wire := Color("3a3530")
-	var bulb_every := 5
+	var bulb_every := 8
 	var flag_cols := [Color("e2662a"), Color("f2b33a"), Color("c8401e"), Color("f6efe0"), Color("d8902a")]
 	for i in n + 1:
 		var t := float(i) / n
@@ -168,16 +174,15 @@ func _catenary(vb: VoxelBuilder, a: Vector3, b: Vector3, sag: float, bunting := 
 		var q := Vector3i(floori(p.x), floori(p.y), floori(p.z))
 		vb.set_v(q, wire)
 		if bulbs and i % bulb_every == 3:
-			vb.set_v(q + Vector3i(0, -1, 0), Color("ffd060"), true)
-			vb.set_v(q + Vector3i(0, -2, 0), Color("ffc048"), true)
-			vb.set_v(q + Vector3i(1, -2, 0), Color("ffc048"), true)
-			vb.set_v(q + Vector3i(0, -2, 1), Color("ffc048"), true)
-			glow_points.append([(Vector3(q) + Vector3(0.5, -1.0, 0.5)) * SU, 0.8, Color(1.0, 0.7, 0.34)])
-		if bunting and i % 6 == 0 and i > 2 and i < n - 2:
-			var c: Color = flag_cols[(i / 6) % flag_cols.size()]
+			vb.set_v(q + Vector3i(0, -1, 0), Color("2a2622"))
+			vb.set_v(q + Vector3i(0, -2, 0), Color("ffd070"), true)
+			vb.set_v(q + Vector3i(0, -3, 0), Color("ffc050"), true)
+			glow_points.append([(Vector3(q) + Vector3(0.5, -2.0, 0.5)) * SU, 0.55, Color(1.0, 0.72, 0.36)])
+		if bunting and i % 8 == 0 and i > 3 and i < n - 3:
+			var c: Color = flag_cols[(i / 8) % flag_cols.size()]
 			var dir := (cb - ca).normalized()
-			for row in 4:
-				var half := 1.8 - row * 0.5
+			for row in 5:
+				var half := 2.6 - row * 0.6
 				for k in range(-int(half), int(half) + 1):
 					var fp := p + dir * k + Vector3(0, -1 - row, 0)
 					vb.set_v(Vector3i(floori(fp.x), floori(fp.y), floori(fp.z)), c)
@@ -192,18 +197,16 @@ func _strings(parent: Node3D) -> void:
 	var runs := [
 		# [a, b, sag, bunting]
 		[L[0], Vector3(-3.6, 2.9, 1.4), 0.35, false],
-		[L[0], L[1], 0.5, true],
+		[L[0], L[1], 0.5, false],
 		[L[0], L[2], 0.45, false],
-		[L[0], Vector3(5.6, 2.7, 0.0), 0.6, true],
+		[L[0], Vector3(5.6, 2.7, 0.0), 0.6, false],
 		[L[1], Vector3(7.0, 2.7, -4.0), 0.4, false],
 		[L[1], L[3], 0.4, true],
-		[L[2], L[4], 0.5, true],
+		[L[2], L[4], 0.5, false],
 		[L[4], L[1], 0.6, false],
 		[L[2], Vector3(-8.4, 4.4, -1.4), 0.4, false],
-		[L[1], Vector3(-0.6, 4.6, -13.5), 0.4, false],
-		[Vector3(-9.0, 5.2, -9.0), Vector3(9.0, 5.2, -8.0), 0.9, true],
-		[Vector3(-9.0, 5.0, -15.0), Vector3(8.5, 5.0, -16.0), 0.8, false],
-		[L[3], Vector3(10.0, 4.8, -6.0), 0.4, false],
+		[L[3], Vector3(10.0, 4.8, -6.0), 0.4, true],
+		[Vector3(7.6, 4.4, -4.6), Vector3(11.5, 3.6, 1.0), 0.4, true],
 	]
 	for r: Array in runs:
 		_catenary(vb, r[0], r[1], r[2], r[3])

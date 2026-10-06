@@ -213,7 +213,7 @@ static func glow_mat(kind: String) -> StandardMaterial3D:
 		"warm":
 			m.emission = Color(1.0, 0.78, 0.45); m.emission_energy_multiplier = 2.2
 		"cool":
-			m.emission = Color(0.85, 0.95, 1.0); m.emission_energy_multiplier = 0.12
+			m.emission = Color(0.85, 0.95, 1.0); m.emission_energy_multiplier = 0.3
 		"sky":
 			m.emission = Color(0.9, 0.95, 1.0); m.emission_energy_multiplier = 0.45
 		_:

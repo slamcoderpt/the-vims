@@ -3,7 +3,7 @@ extends RefCounted
 ## Voxel size 0.15 m: chunky like the reference, cheap enough for phones.
 
 const K := preload("res://scripts/locations/festival/kit.gd")
-const VS := [0.3, 0.3, 0.4]
+const VS := [0.22, 0.22, 0.3]
 
 ## [x, z, height_m, crown_radius_m, palette (0 orange, 1 red, 2 yellow, 3 mixed), group]
 const TREES := [
@@ -17,8 +17,10 @@ const TREES := [
 	[10.6, -10.0, 5.2, 2.8, 0, 1],
 	# Back, framing the town hall.
 	[-16.5, -13.0, 5.6, 2.8, 0, 2],
+	[-5.4, -22.0, 6.4, 3.4, 0, 2],
+	[10.5, -19.0, 6.2, 3.0, 1, 2],
 	[8.0, -18.0, 5.6, 2.8, 3, 2],
-	[-2.0, -28.0, 6.5, 3.4, 2, 2],
+	[3.6, -34.0, 6.5, 3.4, 2, 2],
 	[13.5, -14.0, 5.6, 3.0, 2, 2],
 ]
 
@@ -86,11 +88,14 @@ func _tree(vb: VoxelBuilder, occ: Dictionary, vs: float, x: float, z: float, h: 
 	for bi in blobs.size():
 		var bl: Array = blobs[bi]
 		K.blob(vb, bl[0], bl[1], func(q: Vector3i) -> Color:
-			var hh := VoxelBuilder.hash3(q + Vector3i(seed * 7, 1, 3))
+			# Leaf clumps: colour picked per 2x2x2 cluster, small per-voxel jitter.
+			var cq := Vector3i(floori(q.x / 2.0), floori(q.y / 2.0), floori(q.z / 2.0))
+			var hh := VoxelBuilder.hash3(cq + Vector3i(seed * 7, 1, 3))
 			var c: Color = K.pick(cols, hh)
-			# Sun-bleached highlights on top, deeper colour underneath.
+			# Sun-lit crown top / sun side, deeper colour underneath.
 			var k := clampf((q.y - lo) / maxf(hi - lo, 1.0), 0.0, 1.0)
-			c = K.shade(c, 0.78 + 0.32 * k)
-			if hh > 0.96:
+			var side := clampf((float(q.x - cx) * -0.4 + float(q.z - cz) * 0.6) / maxf(rc, 1.0), -1.0, 1.0)
+			c = K.shade(c, 0.74 + 0.34 * k + 0.08 * side + (VoxelBuilder.hash3(q) - 0.5) * 0.08)
+			if hh > 0.95:
 				c = Color("f7d46a")
 			return c, 0.4, seed * 13 + bi, occ)
