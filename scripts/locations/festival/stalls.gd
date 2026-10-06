@@ -27,9 +27,9 @@ func _lp(cell: Vector3) -> Vector3:
 
 func build(parent: Node3D) -> void:
 	treats = _place(parent, "TreatsStall", _treats_stall(), Vector3(-3.1, 0, 0.2), 28.0)
-	var sc := Vector3(TW * 0.5 + 3.0, (SIGN_Y0 + SIGN_Y1) * 0.5 - 0.3, TD + 1.06)
+	var sc := Vector3(TW * 0.5 + 4.5, (SIGN_Y0 + SIGN_Y1) * 0.5 - 0.3, TD + 1.06)
 	_sign(treats, "FALL TREATS", _lp(sc), 0.0031, 0.0)
-	vendor_spot = treats.transform * _lp(Vector3(13.0, 1.0, TD - 15.0))
+	vendor_spot = treats.transform * _lp(Vector3(13.0, 0.0, TD - 14.0))
 	game = _place(parent, "GameStall", _game_stall(), Vector3(1.5, 0, -0.5), -8.0)
 	crafts = _place(parent, "CraftsStall", _crafts_table(), Vector3(5.6, 0, 2.2), -25.0)
 	_place(parent, "RedStall", _side_stall(RED, CREAM, 0), Vector3(6.9, 0, -2.6), -38.0)
@@ -273,10 +273,10 @@ func _treats_stall() -> VoxelBuilder:
 	# Hanging lanterns on the outside of the front posts.
 	_lantern(vb, -5, 22, D - 4)
 	_lantern(vb, W + 1, 22, D - 4)
-	for lx in [-3, W + 3]:
+	for lx in [-4, W + 2]:
 		for y in range(29, 33):
 			vb.set_v(Vector3i(lx, y, D - 3), Color("2c2622"))
-		K.box(vb, mini(lx, W) if lx > 0 else lx, 33, D - 3, 3, 1, 1, Color("2c2622"))
+		K.box(vb, mini(lx, 0) if lx < 0 else W, 32, D - 3, 3 if lx < 0 else 2, 1, 1, Color("2c2622"))
 	# Barrel of apples (left front) and hay with pumpkins (right).
 	K.cyl(vb, -5.0, 0, D + 1.0, 4.6, 12, func(q: Vector3i) -> Color:
 		if q.y == 2 or q.y == 9:

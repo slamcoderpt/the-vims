@@ -25,8 +25,7 @@ func spawn(parent: Node3D, key: String, look: String, pos: Vector3, face_to: Vec
 
 func build(parent: Node3D, stalls, stage) -> void:
 	# --- Family (positions match the reference composition).
-	var tre: Node3D = stalls.treats
-	var vendor_pos: Vector3 = tre.transform * Vector3(0.3, 0, -0.25)
+	var vendor_pos: Vector3 = stalls.vendor_spot
 	var jack := spawn(parent, "Jack", "dad", Vector3(-1.5, 0, 2.2), Vector3(-3.4, 0, 5.4), "talk")
 	var lily := spawn(parent, "Lily", "bunny_girl", Vector3(0.2, 0, 1.65), Vector3(-0.5, 0, 8.0), "talk")
 	_hold(lily, "candy_apple", "fore_r")
@@ -35,7 +34,7 @@ func build(parent: Node3D, stalls, stage) -> void:
 	var maya := spawn(parent, "Maya", "cat_girl", Vector3(3.0, 0, 2.7), Vector3(2.0, 0, 9.0), "stand_type")
 	_hold(maya, "fox_plush", "torso")
 	# --- Stall keepers.
-	spawn(parent, "vendor", "npc_3", vendor_pos, jack.position, "talk")
+	spawn(parent, "vendor", "npc_6", vendor_pos, jack.position, "talk")
 	var g: Node3D = stalls.game
 	spawn(parent, "game_host", "npc_5", g.transform * Vector3(0.0, 0, -0.35), g.transform * Vector3(0, 0, 3.0), "wave")
 	var cr: Node3D = stalls.crafts
