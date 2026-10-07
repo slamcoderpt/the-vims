@@ -7,7 +7,7 @@ const PRESETS := {
 	"home_day": {
 		"ref": "refs/ref1_home_office_day.png",
 		"location": "home", "day": 1, "hour": 14, "minute": 16, "season": 1,
-		"camera": {"target": Vector3(-4.9, 3.25, -1.3), "yaw": 24.0, "pitch": 37.0, "distance": 9.9, "fov": 40.0},
+		"camera": {"target": Vector3(-4.8, 3.45, -1.4), "yaw": 24.0, "pitch": 34.0, "distance": 10.2, "fov": 40.0},
 		"tasks": [
 			{"title": "Answer Emails", "icon": "laptop", "done": true},
 			{"title": "Practice Creativity", "icon": "palette"},
@@ -33,7 +33,7 @@ const PRESETS := {
 	"home_night": {
 		"ref": "refs/ref3_home_night_cutaway.png",
 		"location": "home", "day": 0, "hour": 21, "minute": 18, "season": 1,
-		"camera": {"target": Vector3(3.9, 3.3, -1.6), "yaw": 22.0, "pitch": 33.0, "distance": 16.0, "fov": 37.0},
+		"camera": {"target": Vector3(3.3, 2.7, -1.5), "yaw": 22.0, "pitch": 38.0, "distance": 19.5, "fov": 37.0},
 		"tasks": [
 			{"title": "Take Bath", "icon": "bath"},
 			{"title": "Brush Teeth", "icon": "brush", "done": true},

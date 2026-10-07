@@ -9,6 +9,8 @@ extends RefCounted
 ## Skeleton3D. Results are cached per look, so many NPCs share one mesh.
 
 const Looks := preload("res://scripts/world/actors/sim_looks.gd")
+const HeadHD := preload("res://scripts/world/actors/sim_head_hd.gd")
+const DogHD := preload("res://scripts/world/actors/sim_dog_hd.gd")
 
 ## Character voxel size (metres). Slightly finer than the 1/16 m world grid so
 ## faces get enough cells for readable eyes, blush and beards at phone size.
@@ -125,12 +127,12 @@ class Acc:
 		joints.append(joint_vox * vs)
 		return names.size() - 1
 
-	func part(bone_name: String, vb: VoxelBuilder, origin: Vector3) -> void:
+	func part(bone_name: String, vb: VoxelBuilder, origin: Vector3, voxel_size := 0.0) -> void:
 		if vb == null or vb.vox.is_empty():
 			return
 		var bi := names.find(bone_name)
 		var j: Vector3 = joints[bi]
-		var m := vb.build(vs, origin)
+		var m := vb.build(vs if voxel_size <= 0.0 else voxel_size, origin)
 		for s in m.get_surface_count():
 			var arr := m.surface_get_arrays(s)
 			var v: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
@@ -275,7 +277,15 @@ static func _build_human(L: Dictionary) -> Dictionary:
 	acc.bone("hips", "root", Vector3(0, hip_j, 0))
 	acc.bone("torso", "hips", Vector3(0, P, 0))
 	acc.bone("head", "torso", Vector3(0, neck, 0))
-	acc.bone("eyes", "head", Vector3(0, neck + 1 + hh * 0.5, 0))
+	# r15: hi-res head (1/32 m voxels, see sim_head_hd.gd).
+	var hv := HeadHD.build(L)
+	var k := HeadHD.HVS / VS          # head voxel -> body voxel units
+	var hW: int = hv.W
+	var hD: int = hv.D
+	var hH: int = hv.H
+	var hB: int = hv.B
+	var eye_c := float(hB) + hH * 0.5
+	acc.bone("eyes", "head", Vector3(0, neck + eye_c * k, 0))
 	acc.bone("arm_l", "torso", Vector3(ax, sh_y, 0))
 	acc.bone("fore_l", "arm_l", Vector3(ax, sh_y - (ua - 1.5), 0))
 	acc.bone("arm_r", "torso", Vector3(-ax, sh_y, 0))
@@ -285,27 +295,21 @@ static func _build_human(L: Dictionary) -> Dictionary:
 	acc.bone("thigh_r", "hips", Vector3(-lx, hip_j, 0))
 	acc.bone("shin_r", "thigh_r", Vector3(-lx, shin, 0))
 
-	var head := _human_head(L, D)
 	var hat: String = L.get("hat", "")
-	var ear_y := float(neck) + hh + 1.5
-	var ear_x := hw * 0.5 - 2.5
-	# r13: ears stand on the flat crown of the box beanie (top row hh + 2),
-	# their base row buried one voxel into it.
-	ear_y = float(neck) + hh + 2.4
-	if hat == "cat":
-		ear_x = hw * 0.5 - 2.0
-	if hat == "bunny" or hat == "cat":
-		acc.bone("ear_l", "head", Vector3(ear_x, ear_y, -0.5))
-		acc.bone("ear_r", "head", Vector3(-ear_x, ear_y, -0.5))
+	var hz0 := hD * 0.5
+	if hv.has("ear"):
+		var ep: Vector3 = hv.ear_pos
+		acc.bone("ear_l", "head", Vector3(ep.x * k, neck + ep.y * k, (ep.z - hz0) * k))
+		acc.bone("ear_r", "head", Vector3(-ep.x * k, neck + ep.y * k, (ep.z - hz0) * k))
 	else:
-		acc.bone("ear_l", "head", Vector3(0, neck + hh * 0.5, 0))
-		acc.bone("ear_r", "head", Vector3(0, neck + hh * 0.5, 0))
+		acc.bone("ear_l", "head", Vector3(0, neck + eye_c * k, 0))
+		acc.bone("ear_r", "head", Vector3(0, neck + eye_c * k, 0))
 
-	acc.part("head", head.head, Vector3(hw * 0.5, 0, hd * 0.5))
-	acc.part("eyes", head.eyes, Vector3(hw * 0.5, 1 + hh * 0.5, hd * 0.5))
-	if head.has("ear_l"):
-		acc.part("ear_l", head.ear_l, head.ear_origin)
-		acc.part("ear_r", head.ear_r, head.ear_origin)
+	acc.part("head", hv.head, Vector3(hW * 0.5, 0, hz0), HeadHD.HVS)
+	acc.part("eyes", hv.eyes, Vector3(hW * 0.5, eye_c, hz0), HeadHD.HVS)
+	if hv.has("ear"):
+		acc.part("ear_l", hv.ear, hv.ear_origin, HeadHD.HVS)
+		acc.part("ear_r", hv.ear, hv.ear_origin, HeadHD.HVS)
 
 	acc.part("torso", _human_torso(L, D), Vector3(tw * 0.5, 0, td * 0.5))
 	acc.part("hips", _human_pelvis(L, D), Vector3(tw * 0.5, 0.5, td * 0.5))
@@ -318,19 +322,19 @@ static func _build_human(L: Dictionary) -> Dictionary:
 	acc.part("shin_l", _human_shin(L, D), Vector3(lw * 0.5, shin, lw * 0.5))
 	acc.part("shin_r", _human_shin(L, D), Vector3(lw * 0.5, shin, lw * 0.5))
 
-	var top_extra := 2.0
+	var head_top := float(hv.top + 1)
 	if hat == "bunny":
-		top_extra = 9.0
+		head_top += 10.0
 	elif hat == "cat":
-		top_extra = 6.0
+		head_top += 5.0
 	var meta := {
 		"species": "human",
 		"kind": "child" if child else "adult",
 		"hip_y": hip_j * VS,
 		"leg_half": lw * 0.5 * VS,
 		"torso_half": td * 0.5 * VS,
-		"head_h": (hh + 1 + top_extra) * VS,
-		"height": (neck + 1 + hh + 2) * VS,
+		"head_h": head_top * HeadHD.HVS,
+		"height": neck * VS + float(hv.top + 1) * HeadHD.HVS,
 		"fore_len": fa * VS,
 		"shin_len": shin * VS,
 		"arm_x": ax * VS,
@@ -1261,6 +1265,15 @@ static func _in_rbox(p: Vector3i, size: Vector3, n: float, fat := 0.0) -> bool:
 
 
 static func _build_dog(L: Dictionary) -> Dictionary:
+	# r15: hi-res, larger beagle (sim_dog_hd.gd).
+	var acc := Acc.new()
+	acc.vs = DogHD.DV
+	var meta: Dictionary = DogHD.build(acc, L)
+	return acc.finish(meta)
+
+
+## Previous (r14) beagle, kept for reference / A-B previews.
+static func _build_dog_r14(L: Dictionary) -> Dictionary:
 	# r14 beagle puppy (ref1 "Play"; critic r13): a low, elongated lying
 	# puppy. Body ~2.7x longer than tall; the head is narrower than the body
 	# and ~45% of its length, with a domed (not flat) crown. Clear tri-colour

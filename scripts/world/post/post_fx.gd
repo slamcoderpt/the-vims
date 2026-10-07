@@ -27,7 +27,7 @@ func _init() -> void:
 ## tint (Vector3/Color), lift, vignette, gamma, enabled.
 func configure(p: Dictionary) -> void:
 	rect.visible = p.get("enabled", true)
-	for k in ["focus_y", "band", "falloff", "blur_px", "top_boost", "saturation", "contrast", "vignette", "gamma"]:
+	for k in ["focus_y", "band", "falloff", "blur_px", "top_boost", "bottom_boost", "saturation", "contrast", "vignette", "gamma"]:
 		if p.has(k):
 			mat.set_shader_parameter(k, float(p[k]))
 	for k in ["tint", "lift"]:

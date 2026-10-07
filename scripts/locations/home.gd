@@ -121,18 +121,18 @@ func camera_home() -> Dictionary:
 
 func lighting_profile() -> Dictionary:
 	return {
-		"sun_heading": 205.0, "sun_elev": 34.0, "sun_energy": 1.55,
+		"sun_heading": 205.0, "sun_elev": 34.0, "sun_energy": 1.3,
 		"sun_color_day": Color(1.0, 0.83, 0.6),
-		"ambient_day": Color(0.92, 0.86, 0.8), "ambient_energy": 0.6,
+		"ambient_day": Color(0.94, 0.87, 0.8), "ambient_energy": 0.7,
 		"ambient_night": Color(0.66, 0.54, 0.52), "ambient_night_energy": 0.34, "lamp_night_mult": 3.8,
 		"sky_day": Color(0.64, 0.8, 0.94), "sky_night": Color(0.07, 0.09, 0.22),
 		"fog_day": Color(0.94, 0.88, 0.8), "fog_night": Color(0.12, 0.15, 0.32), "fog_density": 0.004,
 		"moon_heading": 150.0, "moon_energy": 0.45, "glow_boost_night": 1.2,
 		"shadow_distance": 40.0, "shadow_blur": 3.2,
 		"post_day": {"focus_y": 0.5, "band": 0.35, "falloff": 0.18, "blur_px": 4.0, "top_boost": 1.0,
-			"saturation": 1.14, "contrast": 1.1, "tint": Vector3(1.02, 1.0, 0.955),
+			"saturation": 1.07, "contrast": 1.08, "tint": Vector3(1.02, 1.0, 0.96),
 			"vignette": 0.24},
-		"post_night": {"focus_y": 0.56, "band": 0.36, "falloff": 0.14, "blur_px": 2.8, "top_boost": 0.7,
+		"post_night": {"focus_y": 0.5, "band": 0.36, "falloff": 0.14, "blur_px": 2.8, "top_boost": 0.8, "bottom_boost": 0.45,
 			"saturation": 1.04, "contrast": 1.12, "gamma": 1.08, "tint": Vector3(1.0, 0.95, 0.94), "vignette": 0.36},
 	}
 
@@ -633,6 +633,11 @@ func _build_office_roof() -> void:
 	var half := (x1 - x0) * 0.5
 	var slope := 0.4
 	var slate := [Color("4c587c"), Color("434d6e"), Color("58658c")]
+	# Soft warm halos over the lit skylights (night only: halos are off by day).
+	for zc: int in [cc(-3.0), cc(0.2), cc(3.2)]:
+		var hx := mid + 14.0
+		var hy := base + floori((half - 14.0) * slope) + 1
+		_halo_pts.append({"pos": Vector3(hx * C, hy * C, zc * C), "size": 1.1, "color": Color(1.4, 1.0, 0.55, 1.0)})
 	for x in range(x0, x1):
 		var h := base + floori((half - absf(x + 0.5 - mid)) * slope)
 		for z in range(z0, z1):
@@ -646,6 +651,18 @@ func _build_office_roof() -> void:
 					c = TRIM if yy == h else CAP
 				if absf(x + 0.5 - mid) < 1.0:
 					c = CAP
+				# Moonlit slate: a pale ridge-line sheen on the camera-side
+				# slope so the big roof reads as tiles, not a dark slab.
+				if yy == h and not edge and x > mid and posmod(z, 4) == 0:
+					c = c.lerp(Color("8592bd"), 0.35)
+				# Three lit skylights on the camera-side slope (warm glow +
+				# white frame), like the lit attic windows around ref3.
+				var sk := _skylight(x - mid, z)
+				if yy == h and sk > 0:
+					if sk == 2:
+						_sgroup(_zone(q), sig, "base").set_v(q, Color("ffcf7a").lerp(Color("ffe6a8"), VoxelBuilder.hash3(q) * 0.5), true)
+						continue
+					c = TRIM
 				_sgroup(_zone(q), sig, "base").set_v(q, c)
 		# Gable ends (siding up to the roof line), front and back.
 		for gz: int in [cc(-5.0), cc(-5.0) + 1, cc(4.75), cc(4.75) + 1]:
@@ -661,6 +678,18 @@ func _build_office_roof() -> void:
 						continue
 					c = TRIM
 				_sgroup(_zone(q), sig, "base").set_v(q, c)
+
+
+## Roof skylight mask: 0 none, 1 frame, 2 glass. dx = cells from the ridge
+## (camera side > 0), z in structure cells.
+func _skylight(dx: float, z: int) -> int:
+	if dx < 9.0 or dx > 19.0:
+		return 0
+	for zc: int in [cc(-3.0), cc(0.2), cc(3.2)]:
+		var dz := z - zc
+		if dz >= -4 and dz <= 4:
+			return 1 if (dz == -4 or dz == 4 or dx < 10.0 or dx > 18.0) else 2
+	return 0
 
 
 # =================================================================== rooms
@@ -939,7 +968,6 @@ func _build_office() -> void:
 	_put(R, "plant", Vector3(-4.3, y, 4.1), 0, 4)
 	_put(R, "toy_blocks", Vector3(-2.75, y, 3.85), 0, 0)
 	# Beanbag + pouf by the railing corner so the foreground floor is lived-in.
-	_put(R, "beanbag", Vector3(-3.95, y, 1.25), 2, 2)
 	_put(R, "pouf", Vector3(-2.95, y, 1.55), 0, 1)
 	_put(R, "book_stack", Vector3(-2.9, y + 5 * PU, 1.62), 0, 0)
 	# --- Balcony railing over the living room, with trailing planters on it.
@@ -1258,20 +1286,22 @@ func _build_bath() -> void:
 	var toilet := _wallput(R, "toilet", "+x", rx, 2.55, y)
 	_wallput(R + "@bed", "bath_shelf", "+x", rx, 2.45, y + 1.5)
 	_put(R, "basket", Vector3(rx - 0.6, y, 3.35), 0, 2)
-	# Vanity + tall mirror on the hall|bath wall, a sconce either side.
-	var vz := 0.75
-	var vanity := _wallput(R, "vanity_unit", "-x", lx, vz, y)
+	# Vanity + arched mirror on the back (blue|bath) wall, square-on to the
+	# night camera so basin, tap and mirror read (ref3); the kid stands on
+	# her step stool at its right-hand end, turned to the basin in 3/4.
+	var vanity := _put(R, "vanity_unit", Vector3(lx + 0.12, y, bz + 0.02), 0)
 	_spots["vanity"] = vanity
-	_wallput(R + "@bed", "vanity_mirror", "-x", lx, vanity.get_center().z - 8 * PU, y + 1.08)
-	_sconce(R + "@bed", "-x", lx, vanity.position.z - 0.12, y + 1.6, 0.4, 1)
-	_sconce(R + "@bed", "-x", lx, vanity.end.z - 0.16, y + 1.6, 0.4, 1)
-	var step := _put(R, "step_stool", Vector3(vanity.end.x + 0.05, y, vanity.get_center().z - 0.2), 1)
+	_put(R + "@bed", "vanity_mirror", Vector3(vanity.get_center().x - 8 * PU, y + 1.12, bz + 0.0), 0)
+	_sconce(R + "@bed", "-x", lx, bz + 0.25, y + 1.75, 0.45, 1)
+	_lamp(Vector3(vanity.get_center().x + 0.2, y + 1.6, vanity.end.z + 0.5), 0.35, 2.4, 0.0, Color(1.0, 0.76, 0.5), 0.0)
+	var step := _put(R, "step_stool", Vector3(vanity.end.x - 0.38, y, vanity.end.z + 0.04), 0)
 	_spots["step"] = step
-	_put(R, "bath_mat", Vector3(vanity.end.x - 0.05, y, vanity.end.z + 0.05), 1, 1)
-	_wallput(R + "@bed", "towel_rack", "-x", lx, vanity.end.z + 0.1, y + 0.95, 2)
-	_wallput(R + "@bed", "wall_planter", "-x", lx, vanity.end.z + 0.25, y + 2.0, 1)
-	_wallput(R + "@bed", "frame", "-x", lx, vanity.position.z + 0.15, y + 2.3, 5)
-	_put(R, "plant", Vector3(lx + 0.05, y, vanity.end.z + 0.75), 0, 6)
+	_put(R, "bath_mat", Vector3(vanity.position.x + 0.1, y, vanity.end.z + 0.08), 0, 1)
+	_wallput(R + "@bed", "towel_rack", "-x", lx, 1.35, y + 0.95, 2)
+	_wallput(R + "@bed", "bath_shelf", "-x", lx, 2.05, y + 1.45)
+	_wallput(R + "@bed", "frame", "-x", lx, 3.4, y + 1.6, 5)
+	_wallput(R + "@bed", "wall_planter", "-x", lx, 2.9, y + 2.2, 1)
+	_put(R, "plant", Vector3(lx + 0.05, y, 2.6), 0, 6)
 	_put(R, "plant", Vector3(rx - 0.55, y, fz - 0.55), 0, 6)
 	_wallput(R + "@bed", "wall_planter", "+x", rx, 4.45, y + 2.3, 2)
 	# Tub across the front of the room (low, never hides the sink scene).
@@ -1373,6 +1403,8 @@ func _build_exterior() -> void:
 		# Right-hand lawns (seen beside the bathroom in the night shot).
 		Vector3(24.0, 0, -5.0), Vector3(22.5, 0, -2.5), Vector3(20.5, 0, -7.5),
 		Vector3(10.5, 0, -9.0), Vector3(19.0, 0, -12.0), Vector3(23.0, 0, 3.0),
+		# Round trees between the side path and the next-door houses (ref3 right edge).
+		Vector3(12.0, 0, -1.4), Vector3(12.3, 0, 3.0), Vector3(11.8, 0, 7.4),
 	]
 	for i in trees.size():
 		var p: Vector3 = trees[i]
@@ -1552,9 +1584,9 @@ func _ensure_neighbourhood(lit: bool) -> void:
 			Vector3(10.6, 0, -7.4),
 			# Houses across the side lawn on the right, lit fronts turned to
 			# the house (ref3's right edge: homes, trees and lamps).
-			Vector3(9.6, 0, -3.4), Vector3(9.8, 0, 4.4)]
+			Vector3(13.4, 0, -3.0), Vector3(13.6, 0, 5.2)]
 		var styles := [1, 4, 2, 0, 5, 3, 2, 5, 3, 0, 4, 1, 2, 4, 1, 3]
-		var rots := [0, 0, 0, 0, 0, 0, 1, 3, 0, 0, 0, 0, 0, 0, 3, 3]
+		var rots := [0, 0, 0, 0, 0, 0, 1, 3, 0, 0, 0, 0, 0, 0, 0, 0]
 		# Neighbour houses drawn a little smaller than authored (0.2 m cells):
 		# they read as a street of homes behind ours, roofs in frame (ref3).
 		var hs: float = PropLib.scale_of("house") * 0.9
@@ -1946,7 +1978,8 @@ func _stage(preset: String) -> void:
 		var jack := _place("dad", Vector3(cc3.x, y, cc3.z - 0.04), Vector3(hx + 0.2, y, lz + 1.1), "sit_read", 7 * PU)
 		_big_book(jack)
 		var st: AABB = _spots["step"]
-		var maya := _place("cat_girl", Vector3(st.get_center().x, y + 6 * PU, st.get_center().z), Vector3(st.get_center().x - 0.6, y, st.get_center().z + 1.3), "brush_teeth")
+		# Turned to the basin/mirror on the left wall, 3/4 so her face reads.
+		var maya := _place("cat_girl", Vector3(st.get_center().x, y + 6 * PU, st.get_center().z), Vector3(st.get_center().x - 0.35, y, st.get_center().z + 0.9), "brush_teeth")
 		var cu: AABB = _spots["dog_cushion"]
 		var dog := _place("beagle", Vector3(cu.get_center().x, y + 3 * PU, cu.get_center().z), Vector3(cu.get_center().x + 0.45, y, cu.get_center().z + 1.2), "sleep")
 		Game.show_bubble(jack, {"text": "Read Story", "icon": "book_open", "kind": "action", "id": "action", "progress": -1})

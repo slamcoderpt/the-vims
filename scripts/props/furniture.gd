@@ -680,11 +680,15 @@ static func _shower_cubicle(vb: VoxelBuilder) -> void:
 	V.b(vb, 0, 0, 0, 16, 1, 16, Color("f3f5f6"))
 	V.b(vb, 1, 1, 1, 14, 1, 14, Color("e2e9ed"))
 	V.b(vb, 7, 1, 7, 2, 1, 2, chrome_d)
+	# Big pale-aqua tiles with soft grout and one darker accent band, so the
+	# walls read as a solid tiled cubicle (not a fine grid) through the glass.
 	var tile := func(q: Vector3i) -> Color:
 		var a := q.x + q.z
-		var grout := posmod(q.y, 3) == 0 or posmod(a, 3) == 0
-		var c := Color("a9d6ea") if posmod(floori(q.y / 3.0) + floori(a / 3.0), 2) == 0 else Color("8cc4de")
-		return Color("f2f6f7") if grout else c
+		if q.y >= 12 and q.y <= 13:
+			return Color("5f9fbf") if posmod(a, 2) == 0 else Color("6aa9c8")
+		var grout := posmod(q.y, 5) == 0 or posmod(a + (2 if posmod(floori(q.y / 5.0), 2) == 1 else 0), 5) == 0
+		var c := Color("cfe8f2").lerp(Color("b6dcec"), VoxelBuilder.hash3(Vector3i(floori(a / 5.0), floori(q.y / 5.0), 3)) * 0.8)
+		return c.lerp(Color("eef6f8"), 0.55) if grout else c
 	V.b(vb, 0, 1, 0, 16, H, 1, tile)
 	V.b(vb, 0, 1, 1, 1, H, 15, tile)
 	V.b(vb, 0, H + 1, 0, 16, 1, 1, Color("f2f6f7")); V.b(vb, 0, H + 1, 0, 1, 1, 16, Color("f2f6f7"))
@@ -692,6 +696,7 @@ static func _shower_cubicle(vb: VoxelBuilder) -> void:
 	V.b(vb, 15, 1, 15, 1, H, 1, chrome)
 	V.b(vb, 15, 1, 1, 1, H, 1, chrome_d)
 	V.b(vb, 1, 1, 15, 1, H, 1, chrome_d)
+	V.b(vb, 1, H - 1, 15, 15, 1, 1, chrome_d); V.b(vb, 15, H - 1, 1, 1, 1, 15, chrome_d)
 	V.b(vb, 1, H, 15, 15, 1, 1, chrome); V.b(vb, 15, H, 1, 1, 1, 15, chrome)
 	V.b(vb, 1, 1, 15, 15, 1, 1, chrome_d); V.b(vb, 15, 1, 1, 1, 1, 15, chrome_d)
 	# Door hinge line + handle.
@@ -713,15 +718,13 @@ static func _shower_cubicle(vb: VoxelBuilder) -> void:
 ## v1 matches the cubicle: light-blue panes, a frosted band at mid height.
 static func m_shower_glass(vb: VoxelBuilder, v: int) -> void:
 	if v == 1:
-		# Clear light-blue panes with two soft diagonal glints and a frosted
-		# privacy band (reads as glass, not as a tiled grid).
+		# Clear light-blue panes with one broad soft glint (reads as a sheet
+		# of glass, not a grid of planes).
 		var gb := func(q: Vector3i) -> Color:
-			if q.y >= 11 and q.y <= 14:
-				return Color("e2f2f8")
-			var d := posmod(q.x + q.z - q.y, 22)
-			if d == 3 or d == 4 or d == 9:
-				return Color("e8f7fc")
-			return Color("a8d8ec")
+			var d := posmod(q.x + q.z - q.y, 26)
+			if d >= 4 and d <= 6:
+				return Color("eaf8fd")
+			return Color("b4def0")
 		V.b(vb, 2, 2, 15, 13, 24, 1, gb)
 		V.b(vb, 15, 2, 2, 1, 24, 13, gb)
 		return

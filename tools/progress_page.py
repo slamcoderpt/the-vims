@@ -23,6 +23,7 @@ if os.path.exists(p):
         try: rounds.append(json.loads(line))
         except Exception: pass
 stamp = os.environ.get("STAMP", "")
+APPROVED = {"hud": "Approved by owner, frozen"}
 cards = []
 for key, name, ref in PIECES:
     shots = sorted(glob.glob(os.path.join(ROOT, f"progress/shots/{key}_r*.png")), key=lambda s: int(re.search(r"_r(\d+)", s).group(1)))
@@ -31,12 +32,14 @@ for key, name, ref in PIECES:
     if last and last.get("preset") == "home_night": ref = "refs/ref3_home_night_cutaway.png"
     status = "waiting" if not shots and not rs else ("won" if last and last.get("winner") == "OURS" else ("lost" if last else "building"))
     label = {"waiting": "Queued", "building": "Building"}.get(status) or (f"Round {last['round']} · " + ("ours won" if status == "won" else "reference won"))
+    if key in APPROVED:
+        status, label = "won", APPROVED[key]
     ours = f'<img src="{uri(shots[-1])}" alt="Our latest render of {html.escape(name)}">' if shots else '<div class="empty">No render yet</div>'
     hist = "".join(f'<li><span class="r">R{r["round"]}</span><span class="w {"ok" if r["winner"]=="OURS" else "no"}">{"Ours" if r["winner"]=="OURS" else "Ref"}</span><span class="g">{html.escape(r["gap"])}</span></li>' for r in reversed(rs))
     cards.append(f'''<section class="piece" id="{key}"><header><h2>{html.escape(name)}</h2><span class="chip {status}">{label}</span></header>
 <div class="pair"><figure><figcaption>Ours</figcaption>{ours}</figure><figure><figcaption>Reference</figcaption><img src="{uri(os.path.join(ROOT, ref))}" alt="Reference"></figure></div>
 <details {"open" if rs else ""}><summary>Critic verdicts ({len(rs)})</summary><ol class="log">{hist or '<li class="none">No verdicts yet</li>'}</ol></details></section>''')
-won = sum(1 for k,_,_ in PIECES if any(r.get("piece")==k and r.get("winner")=="OURS" for r in rounds))
+won = sum(1 for k,_,_ in PIECES if k in APPROVED or any(r.get("piece")==k and r.get("winner")=="OURS" for r in rounds))
 page = open(os.path.join(ROOT, "tools/progress_template.html")).read()
 page = page.replace("{{CARDS}}", "\n".join(cards)).replace("{{STAMP}}", html.escape(stamp)).replace("{{WON}}", str(won)).replace("{{TOTAL}}", str(len(PIECES))).replace("{{ROUNDS}}", str(len(rounds)))
 os.makedirs(os.path.join(ROOT, "progress"), exist_ok=True)

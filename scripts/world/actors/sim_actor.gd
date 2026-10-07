@@ -132,7 +132,7 @@ func _ready() -> void:
 	mesh_instance.name = "Body"
 	mesh_instance.mesh = _rig.mesh
 	mesh_instance.skin = _rig.skin
-	mesh_instance.custom_aabb = AABB(Vector3(-1.2, -0.3, -1.2), Vector3(2.4, 2.6, 2.4))
+	mesh_instance.custom_aabb = AABB(Vector3(-1.6, -0.4, -1.6), Vector3(3.2, 2.8, 3.2))
 	skeleton.add_child(mesh_instance)
 	mesh_instance.skeleton = NodePath("..")
 	_cur.resize(_nb)
@@ -166,6 +166,7 @@ func _ready() -> void:
 	elif _meta.kind == "child":
 		walk_speed = 1.1
 	_apply_scale()
+	_make_shadow()
 	_phase = VoxelBuilder.hash3(Vector3i(get_instance_id() % 9973, 3, 7)) * TAU
 	_t = _phase * 3.0
 	_blink_t = 1.0 + _phase
@@ -309,7 +310,79 @@ func _step_walk(delta: float) -> void:
 	_walk_phase += step / stride * PI
 
 
+static var _shadow_mat: StandardMaterial3D
+static var _shadow_mesh: QuadMesh
+var _shadow: MeshInstance3D
+## Soft contact shadow on the floor under the actor (cheap stand-in for AO,
+## which the Compatibility renderer lacks). Hidden automatically when a
+## location adds its own "Blob" shadow child.
+var contact_shadow := true
+
+
+func _make_shadow() -> void:
+	if _shadow_mat == null:
+		var g := Gradient.new()
+		g.set_color(0, Color(0, 0, 0, 1))
+		g.set_color(1, Color(0, 0, 0, 0))
+		g.add_point(0.4, Color(0, 0, 0, 0.8))
+		g.add_point(0.72, Color(0, 0, 0, 0.22))
+		var tex := GradientTexture2D.new()
+		tex.gradient = g
+		tex.fill = GradientTexture2D.FILL_RADIAL
+		tex.fill_from = Vector2(0.5, 0.5)
+		tex.fill_to = Vector2(1.0, 0.5)
+		tex.width = 64
+		tex.height = 64
+		_shadow_mat = StandardMaterial3D.new()
+		_shadow_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		_shadow_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		_shadow_mat.albedo_texture = tex
+		_shadow_mat.albedo_color = Color(0.16, 0.09, 0.05, 0.5)
+		_shadow_mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+		_shadow_mat.disable_fog = true
+		_shadow_mesh = QuadMesh.new()
+		_shadow_mesh.size = Vector2(1, 1)
+		_shadow_mesh.orientation = PlaneMesh.FACE_Y
+	_shadow = MeshInstance3D.new()
+	_shadow.name = "ContactShadow"
+	_shadow.mesh = _shadow_mesh
+	_shadow.material_override = _shadow_mat
+	_shadow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(_shadow)
+
+
+func _update_shadow() -> void:
+	if _shadow == null:
+		return
+	var p := _base_pose()
+	var vis := contact_shadow and not (not _dog and (p == "lie" or p == "sleep"))
+	if vis and _frames >= 1 and _frames <= 3 and get_node_or_null("Blob") != null:
+		contact_shadow = false
+		vis = false
+	_shadow.visible = vis
+	if not vis:
+		return
+	var yaw := _root_rot.y
+	var f := Vector3(sin(yaw), 0.0, cos(yaw))
+	var c := Vector3(_root_pos.x, 0.0, _root_pos.z) * _s
+	if _dog:
+		var lying := p in ["lie", "sleep", "play", "chew"]
+		c += f * (0.12 if lying else 0.05) * _s
+		_shadow.scale = Vector3(0.75, 1.0, 1.9 if lying else 1.6) * _s
+	else:
+		var child: bool = _meta.kind == "child"
+		var w := (0.62 if child else 0.72) * _s
+		if _seated():
+			c += f * 0.12 * _s
+			_shadow.scale = Vector3(w, 1.0, w * 1.15)
+		else:
+			_shadow.scale = Vector3(w, 1.0, w * 0.8)
+	_shadow.position = c + Vector3(0, 0.012, 0)
+	_shadow.rotation.y = yaw
+
+
 func _apply() -> void:
+	_update_shadow()
 	for i in _nb:
 		skeleton.set_bone_pose_rotation(i, Quaternion.from_euler(_cur[i]))
 	var hb := b_body if _dog else b_hips
@@ -567,7 +640,7 @@ func _human_pose() -> void:
 			_ab(b_torso, 0.26, 0.0, 0.0)
 			# Body square to the canvas; the head turns part way toward the
 			# player (stopping ~50 deg short) so eyes and smile read in 3/4.
-			var py := _present(0.85, 0.9, 0.03, 0.07)
+			var py := _present(0.7, 1.0, 0.04, 0.1)
 			_ab(bi, 0.0, -py, 0.0)
 			_ab(pi_, 0.0, -py, 0.0)
 		"talk":
@@ -688,7 +761,7 @@ func _dog_pose() -> void:
 	_sb(b_head, -0.05 + 0.03 * breath, 0.12 * sin(t * 0.45 + _phase), 0.12 * smoothstep(0.6, 1.0, sin(t * 0.3 + _phase)))
 	_sb(b_ear_l, 0.0, 0.0, 0.08 + 0.03 * breath)
 	_sb(b_ear_r, 0.0, 0.0, -0.08 - 0.03 * breath)
-	var vs: float = RigBuilder.VS
+	var vs: float = float(_meta.get("u", RigBuilder.VS))
 	match bp:
 		"walk":
 			var f := _walk_phase
@@ -764,7 +837,7 @@ func _dog_pose() -> void:
 func _dog_lie(front := false) -> float:
 	# Sphinx pose: belly on the floor, front legs stretched forward, hind legs
 	# folded out to the sides.
-	var vs: float = RigBuilder.VS
+	var vs: float = float(_meta.get("u", RigBuilder.VS))
 	var look_yaw := 0.0
 	# Presentation (a lying dog seen nose-on from above is a shapeless blob):
 	# side: nose toward screen-right and a little toward the viewer, body and

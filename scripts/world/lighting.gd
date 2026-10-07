@@ -151,7 +151,7 @@ func _apply() -> void:
 					l.shadow_enabled = night > 0.5
 	# --- Post
 	var pp := {
-		"focus_y": 0.55, "band": 0.14, "falloff": 0.3, "blur_px": 7.0, "top_boost": 1.3,
+		"focus_y": 0.55, "band": 0.14, "falloff": 0.3, "blur_px": 7.0, "top_boost": 1.3, "bottom_boost": 1.0,
 		"saturation": lerpf(1.03, 1.08, night), "contrast": lerpf(1.08, 1.06, night),
 		"tint": Vector3(1.005, 1.0, 0.985).lerp(Vector3(0.99, 0.98, 1.03), night),
 		"lift": Vector3(0.004, 0.004, 0.006).lerp(Vector3(0.0, 0.004, 0.02), night),

@@ -8,6 +8,7 @@ uniform float band = 0.16;         // half height of the sharp band
 uniform float falloff = 0.32;      // distance over which blur ramps to max
 uniform float blur_px = 7.0;       // max blur radius in pixels (at 1672 px wide)
 uniform float top_boost = 1.25;    // the top edge (far away) blurs a bit more
+uniform float bottom_boost = 1.0;  // scales the bottom-edge blur (keep the lower floor legible)
 uniform float saturation = 1.1;
 uniform float contrast = 1.05;
 uniform vec3 tint = vec3(1.03, 1.0, 0.95);
@@ -28,6 +29,8 @@ void fragment() {
 	float amt = smoothstep(band, band + falloff, abs(d));
 	if (d < 0.0) {
 		amt *= top_boost;
+	} else {
+		amt *= bottom_boost;
 	}
 	amt = clamp(amt, 0.0, 1.5);
 	vec3 col;
