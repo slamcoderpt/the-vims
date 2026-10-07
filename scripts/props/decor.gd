@@ -118,17 +118,25 @@ static func m_lamp_floor(vb: VoxelBuilder, _v: int) -> void:
 	V.b(vb, 1, 27, 1, 5, 2, 5, LAMP, true)
 
 
-## Wall sconce / lantern, back on the wall at z=0.
+## Wall sconce / lantern, back on the wall at z=0. A small glass lantern
+## (iron or brass corner posts) whose glowing panes also show from above, so
+## it reads lit in the high Sims camera (ref3 wall lanterns).
 static func m_sconce(vb: VoxelBuilder, v: int) -> void:
-	# Small brass/iron wall sconce: back plate, arm, warm amber shade.
-	var metal := Color("3c3633") if v == 0 else Color("b8893f")
-	V.b(vb, 1, 0, 0, 2, 5, 1, WOOD_D)
-	V.b(vb, 1, 2, 1, 2, 1, 1, metal)
+	var metal := Color("2e2a28") if v == 0 else Color("b8893f")
+	var glow := Color("ffb85e")
+	V.b(vb, 1, 0, 0, 2, 6, 1, metal)
+	V.b(vb, 1, 3, 1, 2, 1, 1, metal)
+	# Lantern body 4 x 4 x 3: glowing panes, dark corner posts.
+	V.b(vb, 0, 1, 2, 4, 4, 3, glow, true)
+	V.b(vb, 1, 2, 3, 2, 2, 1, Color("ffe2a6"), true)
+	for c in [Vector2i(0, 2), Vector2i(3, 2), Vector2i(0, 4), Vector2i(3, 4)]:
+		V.b(vb, c.x, 1, c.y, 1, 4, 1, metal)
 	V.b(vb, 0, 1, 2, 4, 1, 3, metal)
-	V.b(vb, 0, 2, 2, 4, 3, 3, Color("ffb45c"), true)
-	V.b(vb, 1, 3, 3, 2, 1, 1, Color("ffd890"), true)
-	V.b(vb, 0, 5, 2, 4, 1, 3, metal)
-	V.b(vb, 1, 6, 3, 2, 1, 1, metal)
+	# Open cap ring (the lit top still shows) + finial.
+	V.b(vb, 0, 5, 2, 4, 1, 1, metal); V.b(vb, 0, 5, 4, 4, 1, 1, metal)
+	V.p(vb, 0, 5, 3, metal); V.p(vb, 3, 5, 3, metal)
+	V.b(vb, 1, 5, 3, 2, 1, 1, Color("ffd890"), true)
+	V.p(vb, 1, 6, 3, metal)
 
 
 static func m_desk_lamp(vb: VoxelBuilder, _v: int) -> void:

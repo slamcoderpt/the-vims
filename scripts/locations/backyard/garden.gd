@@ -436,6 +436,9 @@ func _fences() -> void:
 	_fence_run(vb, -10.0, 0.4, 4.85, false)
 	# Short side return at the left foreground.
 	_fence_side(vb, -10.0, 4.85, 7.5)
+	# Low decorative picket border along the front flower bed (the white
+	# pickets that frame the bottom of the bbq shot).
+	_fence_run(vb, -3.4, 1.3, 2.8, false, 13)
 	V.inst(vb, root, V.SIZE_FINE, Vector3.ZERO, 0.0, Vector3.ZERO, true, true, "Fence")
 
 
@@ -446,15 +449,14 @@ func _picket_col(q: Vector3i) -> Color:
 
 
 ## Picket fence along X at depth z (metres). Pickets 3 cells wide, 1 gap.
-func _fence_run(vb: VoxelBuilder, x0: float, x1: float, z: float, rails_front: bool) -> void:
+func _fence_run(vb: VoxelBuilder, x0: float, x1: float, z: float, rails_front: bool, h := 15) -> void:
 	var zi := int(z * F)
-	var h := 15
 	var xs := int(x0 * F)
 	var xe := int(x1 * F)
 	var rz := zi + (1 if rails_front else -1)
 	# Rails.
 	for x in range(xs, xe):
-		for ry in [4, 11]:
+		for ry in [3, h - 4]:
 			vb.set_v(Vector3i(x, ry, rz), V.shade(PICKET, 0.86))
 			vb.set_v(Vector3i(x, ry + 1, rz), V.shade(PICKET, 0.9))
 	# Posts every ~2 m.
@@ -500,9 +502,9 @@ func _trees() -> void:
 	# Canopies at 0.25 m: chunky leaves, a fraction of the triangles.
 	var vb := VoxelBuilder.new()
 	vb.jitter = 0.08
-	_tree(vb, Vector3(-10.5, 0, -8.6), 3.4, 1.9, 4)
+	_tree(vb, Vector3(-10.5, 0, -8.6), 3.4, 1.9, 0)
 	_tree(vb, Vector3(-15.0, 0, -3.0), 4.0, 2.5, 1)
-	_tree(vb, Vector3(-5.5, 0, -10.0), 3.6, 1.9, 3)
+	_tree(vb, Vector3(-5.5, 0, -10.0), 3.6, 1.9, 2)
 	_tree(vb, Vector3(15.5, 0, -4.0), 4.2, 2.5, 0)
 	# Hedge along the back fence (outside).
 	var x := -13.0
@@ -510,6 +512,21 @@ func _trees() -> void:
 		var hr := _rng.randf_range(0.6, 0.95)
 		V.blob(vb, Vector3(x * T, hr * T * 0.9, -7.2 * T), Vector3(hr * T, hr * T * 1.1, 0.7 * T), V.leaves(int(x * 10) & 63, 1, 0), 0.3, int(x * 7) & 31)
 		x += _rng.randf_range(0.8, 1.2)
+	# Flowering shrubs on the neighbour's lawn behind the back fence.
+	for sp in [Vector3(-12.0, 0, -9.5), Vector3(-8.0, 0, -11.5), Vector3(-3.0, 0, -9.2), Vector3(-0.5, 0, -12.0), Vector3(-14.0, 0, -12.5)]:
+		var rr := _rng.randf_range(0.8, 1.15)
+		var cx: float = sp.x * T
+		var cz: float = sp.z * T
+		V.blob(vb, Vector3(cx, rr * T * 0.95, cz), Vector3(rr * T, rr * T, rr * T), V.leaves(int(sp.x * 5) & 63, 2, 0), 0.3, int(sp.z * 3) & 31)
+		var fl: Array = [PINKS, WHITES, PURPLES, YELLOWS][int(absf(sp.x)) % 4]
+		for i in 7:
+			var a: float = float(i) * 0.9 + sp.x
+			var fx := int(round(cx + cos(a) * rr * T * 0.7))
+			var fz := int(round(cz + sin(a) * rr * T * 0.7 + rr * T * 0.4))
+			var fy := int(rr * T * 1.6)
+			while fy > 0 and not vb.has(Vector3i(fx, fy - 1, fz)):
+				fy -= 1
+			vb.set_v(Vector3i(fx, fy, fz), fl[i % fl.size()])
 	# Shrubs inside the yard.
 	for sp in [Vector3(-8.6, 0, -4.4), Vector3(13.2, 0, -0.8), Vector3(-11.6, 0, -1.6), Vector3(-11.0, 0, 3.0)]:
 		var rr := _rng.randf_range(0.55, 0.8)
@@ -554,6 +571,9 @@ func _neighbours() -> void:
 		[-4.0, -40.0, 8.0, 7.0, 5.0, 4],
 		[6.0, -45.0, 8.0, 6.0, 5.0, 1],
 		[18.0, -42.0, 9.0, 7.0, 5.0, 2],
+		# Closer row right behind the back fence: warm lit windows above the
+		# hedge, like the neighbours peeking over in ref4.
+		[-15.5, -19.0, 7.0, 5.0, 4.5, 1],
 	]
 	for hd in houses:
 		_house(vb, hd, walls[hd[5] % walls.size()], roofs[hd[5] % roofs.size()])

@@ -670,7 +670,9 @@ func find_path(from: Vector3, to: Vector3, exact := true) -> PackedVector3Array:
 		# The last open cell is next to `to` (use spots sit on chairs, in front
 		# of counters): finish the approach. Never walk a long straight line
 		# through walls to a place the grid could not reach.
-		if links_ok and ((ok and last_gap < 1.0) or last_gap < 0.5):
+		# (A double bed or a bathtub is entered from its side: up to ~1.4 m
+		# over the furniture the approach search already crossed.)
+		if links_ok and ((ok and last_gap < 1.4) or last_gap < 0.5):
 			if out.is_empty() or out[out.size() - 1].distance_to(to) > 0.04:
 				out.append(to)
 			last_ok = true

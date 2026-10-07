@@ -40,7 +40,7 @@ func _run() -> void:
 	var only: Array = []
 	if args.has("only"):
 		only = (args.only as String).split(",")
-	for sec in ["boot", "loop", "money", "unlocks", "mood", "queue", "autonomy", "meal", "wishes", "clock", "gohere", "build", "social", "townies", "travel"]:
+	for sec in ["boot", "loop", "money", "unlocks", "mood", "queue", "autonomy", "meal", "wishes", "clock", "gohere", "build", "social", "townies", "travel", "save"]:
 		if only.is_empty() or sec in only or sec == "boot":
 			await call("_s_" + sec)
 
@@ -429,25 +429,27 @@ func _s_meal() -> void:
 				a.member.needs[k] = maxf(a.member.needs[k], 0.75)
 	lily.member.needs.hunger = 0.35
 	maya.member.needs.hunger = 0.9   # not hungry: keeps doing her own thing
+	# Only Jack cooks: free will off until dinner is called.
+	for a in [jack, lily, maya]:
+		a.autonomy = false
 	Game.selected = jack.index
 	Game.speed = 1
 	var stove = _find_it("Stove")
-	_menus.clear()
-	await _tap_world(_it_center(stove))
-	await _frames(3)
-	if _menus.is_empty() or _menus[-1][0] != "Stove":
-		print("  (tap on the stove hit something else: opening its menu directly)")
-		sim.open_object_menu(stove, _cam().unproject_position(_it_center(stove)))
-		await _frames(3)
-	await _choose("Cook")
+	# (Menus are covered by the loop section; order directly.)
+	jack.command({"action": _action_of(stove, jack, "cook"), "target": stove})
+	await _frames(2)
+	print("  Jack after choosing Cook: %s '%s' spot=%s" % [jack.phase, jack.current_label(), str(jack.spot)])
 	Game.speed = 3
 	await _until_game(func(): return not sim.meal.is_empty(), 150.0)
 	var served: bool = not sim.meal.is_empty()
 	var n0: int = int(sim.meal.get("servings", 0))
 	await _frames(3)
 	var called: bool = lily.order.get("action", {}).get("id", "") == "meal" or lily.queue.any(func(q): return q.get("action", {}).get("id", "") == "meal")
+	for a in [jack, lily, maya]:
+		a.autonomy = true
 	_step("cook_serves_meal", served and n0 >= 2 and sim.meal.plates.size() == n0,
-		"Jack cooked -> %s, %d servings on the %s" % [sim.meal.get("dish", "-"), n0, str(sim.meal.table.title) if served else "-"])
+		"Jack cooked -> %s, %d servings on the %s (Jack %s '%s' last=%s fails=%d refused=%d)" % [sim.meal.get("dish", "-"), n0, str(sim.meal.table.title) if served else "-",
+		jack.phase, jack.current_label(), jack.last_done, jack.route_fails, jack.refused])
 	_step("call_to_meal", called and maya.order.get("action", {}).get("id", "") != "meal",
 		"hungry Lily -> '%s' (%s), full Maya -> '%s'" % [lily.current_label(), lily.phase, maya.current_label()])
 	await _until_game(func(): return lily.phase == "act" and lily.current_label().begins_with("Eat"), 120.0)
@@ -920,6 +922,35 @@ func _s_travel() -> void:
 	await _shot("home_again")
 
 
+func _s_save() -> void:
+	var path := "user://vims_playtest_save.txt"
+	var lily = _agent("Lily")
+	Game.add_moodlet(lily.index, "t_save", "Saved Joy", "star", 5.0, 0.0)
+	var money0 := Game.money
+	var music0 := Game.skill_level(lily.index, "Music")
+	var rel0 := Game.rel("Jack", "Lily")
+	var lth0 := Game.lth(lily.index)
+	var nw0 := Game.wishes(lily.index).size()
+	var day0 := Game.day
+	var min0 := Game.minutes
+	var ok_save := Game.save_game(path)
+	# Mess everything up, then load.
+	Game.money = 1
+	lily.member.skills["Music"] = 9.0
+	Game.change_rel("Jack", "Lily", -50.0)
+	Game.minutes = 3.0
+	var ok_load := Game.load_game(path)
+	var ml: bool = Game.has_moodlet(lily.index, "t_save") and Game.moodlets(lily.index).any(func(m): return m.id == "t_save" and m.expires == INF)
+	_step("save_load", ok_save and ok_load and Game.money == money0 and absf(Game.skill_level(lily.index, "Music") - music0) < 0.001
+		and absf(Game.rel("Jack", "Lily") - rel0) < 0.01 and Game.lth(lily.index) == lth0 and Game.wishes(lily.index).size() == nw0
+		and Game.day == day0 and absf(Game.minutes - min0) < 0.01 and ml,
+		"saved + reloaded: money $%d, Music %.2f, Jack-Lily %.0f, LTH %d, %d wishes, moodlet kept=%s" % [Game.money, Game.skill_level(lily.index, "Music"), Game.rel("Jack", "Lily"), Game.lth(lily.index), Game.wishes(lily.index).size(), str(ml)])
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+	# The agents hold the old member dicts: rebind the lot like a real load does.
+	main.load_location(Game.location)
+	await _frames(3)
+
+
 # =================================================================== helpers
 
 ## A content household (the soak leaves needs low; a starving sim would
@@ -1073,6 +1104,8 @@ func _choose(label: String) -> void:
 
 
 func _shot(tag: String) -> void:
+	if DisplayServer.get_name() == "headless":
+		return   # nothing is drawn (and frame_post_draw never fires)
 	await RenderingServer.frame_post_draw
 	_shot_n += 1
 	var img := get_viewport().get_texture().get_image()

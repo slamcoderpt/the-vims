@@ -17,7 +17,7 @@ const LAMPS := [
 	[-4.4, -19.0, false],  # 6 far back by the town hall
 ]
 const FOUNTAIN := Vector3(0.2, 0, -10.2)
-const FOUNTAIN_SCALE := 1.4
+const FOUNTAIN_SCALE := 1.6
 const LAMP_TOP := 4.2
 const SU := 0.06  # string-light cell size
 
@@ -141,9 +141,10 @@ func _fountain(parent: Node3D) -> void:
 		var ang := TAU * k / 36.0
 		var x := int(round(cos(ang) * 14.8))
 		var z := int(round(sin(ang) * 14.8))
-		var n := 3 + int(K.hs(k, 1, 9) * 4.0)
-		for y in range(34 - n, 34):
-			vb.set_v(Vector3i(x, y, z), Color("bfe2f2") if posmod(y + k, 2) else Color("e4f4fb"))
+		var n := 2 + int(K.hs(k, 1, 9) * 4.0)
+		if k % 2 == 0:
+			for y in range(34 - n, 34):
+				vb.set_v(Vector3i(x, y, z), Color("9fcfe6") if posmod(y + k, 2) else Color("c8e6f4"))
 		if k % 3 == 0:
 			var x2 := int(round(cos(ang) * 15.5))
 			var z2 := int(round(sin(ang) * 15.5))
@@ -154,8 +155,9 @@ func _fountain(parent: Node3D) -> void:
 		var ang := TAU * (k + 0.5) / 20.0
 		var x := int(round(cos(ang) * 8.4))
 		var z := int(round(sin(ang) * 8.4))
-		for y in range(43 - int(K.hs(k, 3, 9) * 4.0), 47):
-			vb.set_v(Vector3i(x, y, z), Color("d4ecf6"))
+		if k % 2 == 0:
+			for y in range(44 - int(K.hs(k, 3, 9) * 3.0), 47):
+				vb.set_v(Vector3i(x, y, z), Color("a8d4ea"))
 	# Spout plume on top.
 	for y in range(56, 61):
 		vb.set_v(Vector3i(0, y, 0), Color("e8f6fc"))
@@ -185,9 +187,12 @@ func _catenary(vb: VoxelBuilder, a: Vector3, b: Vector3, sag: float, bunting := 
 		vb.set_v(q, wire)
 		if bulbs and i % bulb_every == 3 and i > 2 and i < n - 2:
 			vb.set_v(q + Vector3i(0, -1, 0), Color("2a2622"))
-			vb.set_v(q + Vector3i(0, -2, 0), Color("ffd070"), true)
-			vb.set_v(q + Vector3i(0, -3, 0), Color("ffc050"), true)
-			glow_points.append([(Vector3(q) + Vector3(0.5, -2.0, 0.5)) * SU, 0.55, Color(1.0, 0.72, 0.36)])
+			for bx in 2:
+				for bz in 2:
+					vb.set_v(q + Vector3i(bx, -2, bz), Color("ffd070"), true)
+					vb.set_v(q + Vector3i(bx, -3, bz), Color("ffc050"), true)
+			vb.set_v(q + Vector3i(0, -4, 0), Color("ffb848"), true)
+			glow_points.append([(Vector3(q) + Vector3(1.0, -2.5, 1.0)) * SU, 0.75, Color(1.0, 0.72, 0.36)])
 		if bunting and i % 8 == 0 and i > 3 and i < n - 3:
 			var c: Color = flag_cols[(i / 8) % flag_cols.size()]
 			var dir := (cb - ca).normalized()
@@ -210,7 +215,6 @@ func _strings(parent: Node3D) -> void:
 		[L[0], L[1], 0.5, true],
 		[L[0], L[5], 0.7, false],
 		[L[2], L[0], 0.55, false],
-		[L[2], Vector3(-3.9, 4.2, -0.4), 0.35, false],
 		[L[1], stage_fl, 0.45, false],
 		[L[5], L[1], 0.6, true],
 		[L[5], Vector3(10.6, 3.6, -3.4), 0.4, false],
@@ -280,8 +284,8 @@ func _props(parent: Node3D) -> void:
 	# Flower barrels: foreground corners (framing, not blocking) + around the square.
 	var barrels := [
 		[-6.9, 2.6, 0], [-6.0, 3.5, 1], [-7.6, 0.4, 1],
-		[-2.2, -6.2, 2], [2.0, -7.6, 0], [-3.2, -10.6, 1], [3.4, -12.6, 3], [7.4, -2.0, 2],
-		[7.6, 3.4, 1], [2.6, 3.6, 0], [-1.8, -12.8, 2],
+		[-2.2, -6.2, 2], [2.0, -7.6, 0], [7.4, -2.0, 2],
+		[7.6, 3.4, 1], [2.6, 3.6, 0],
 	]
 	var i := 0
 	for b: Array in barrels:

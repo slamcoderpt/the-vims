@@ -629,6 +629,10 @@ func _process(delta: float) -> void:
 	for s in household:
 		for k in s.needs:
 			s.needs[k] = clampf(s.needs[k] - hours * NEED_DECAY.get(k, NEED_DECAY_DEFAULT), 0.0, 1.0)
+	if autosave and live:
+		_save_acc += dm
+		if _save_acc >= AUTOSAVE_EVERY:
+			save_game()
 	_mood_acc += dm
 	if _mood_acc >= 2.0:
 		_mood_acc = 0.0
@@ -727,3 +731,96 @@ func fulfil_wish(i: int, id: String) -> int:
 		wishes_changed.emit(i)
 		return pts
 	return 0
+
+
+# =================================================================== save / load
+
+const SAVE_PATH := "user://vims_save.txt"
+const SAVE_VERSION := 1
+## In-game minutes between autosaves in live play.
+const AUTOSAVE_EVERY := 60.0
+## Off for screenshot presets and automated playtests (set by main.gd).
+var autosave := false
+var _save_acc := 0.0
+
+
+func has_save() -> bool:
+	return FileAccess.file_exists(SAVE_PATH)
+
+
+## Everything that makes up a game in progress, as plain data.
+func save_data() -> Dictionary:
+	location_tasks[location] = tasks.duplicate(true)
+	var hh: Array = []
+	for m in household:
+		var d: Dictionary = m.duplicate(true)
+		d.erase("queue_view")
+		for ml in d.get("moodlets", []):
+			if ml.expires == INF:
+				ml.expires = -1.0
+		hh.append(d)
+	return {"version": SAVE_VERSION, "day": day, "minutes": minutes, "season": season, "money": money,
+		"location": location, "selected": selected, "household": hh, "relationships": relationships.duplicate(true),
+		"location_tasks": location_tasks.duplicate(true), "placed": placed.duplicate(true), "uid": _uid}
+
+
+func save_game(path := SAVE_PATH) -> bool:
+	var f := FileAccess.open(path, FileAccess.WRITE)
+	if f == null:
+		push_warning("Game.save_game: can't write " + path)
+		return false
+	f.store_string(var_to_str(save_data()))
+	f.close()
+	_save_acc = 0.0
+	return true
+
+
+## Restore a saved game (before the location is loaded). False if none / bad.
+func load_game(path := SAVE_PATH) -> bool:
+	if not FileAccess.file_exists(path):
+		return false
+	var txt := FileAccess.get_file_as_string(path)
+	var d = str_to_var(txt)
+	if not d is Dictionary or int(d.get("version", 0)) != SAVE_VERSION:
+		push_warning("Game.load_game: unreadable save, starting fresh")
+		return false
+	day = int(d.day)
+	minutes = float(d.minutes)
+	season = int(d.get("season", 0))
+	money = int(d.money)
+	location = str(d.location) if str(d.location) in LOCATIONS else "home"
+	var hh: Array[Dictionary] = []
+	for m in d.household:
+		var md: Dictionary = m
+		for ml in md.get("moodlets", []):
+			if float(ml.expires) < 0.0:
+				ml.expires = INF
+		_ensure_member(md)
+		hh.append(md)
+	household = hh
+	relationships = d.get("relationships", {})
+	location_tasks = d.get("location_tasks", {})
+	placed = d.get("placed", {})
+	_uid = int(d.get("uid", _uid))
+	var lt: Array = location_tasks.get(location, [])
+	tasks.clear()
+	for t in lt:
+		tasks.append(t)
+	for i in household.size():
+		_recompute_mood(i, false)
+	selected = clampi(int(d.get("selected", 0)), 0, household.size() - 1)
+	household_changed.emit()
+	tasks_changed.emit()
+	time_changed.emit(day, minutes)
+	return true
+
+
+func delete_save() -> void:
+	if has_save():
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE_PATH))
+
+
+func _notification(what: int) -> void:
+	# Phones kill backgrounded apps; browsers close tabs: save on the way out.
+	if autosave and live and what in [NOTIFICATION_APPLICATION_PAUSED, NOTIFICATION_WM_CLOSE_REQUEST, NOTIFICATION_APPLICATION_FOCUS_OUT]:
+		save_game()

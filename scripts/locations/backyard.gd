@@ -10,7 +10,7 @@ const Party := preload("res://scripts/locations/backyard/party.gd")
 const Cast := preload("res://scripts/locations/backyard/cast.gd")
 const SunsetEnv := preload("res://scripts/locations/backyard/sunset_env.gd")
 
-const CAMERA := {"target": Vector3(0.3, 1.0, -0.4), "yaw": -5.0, "pitch": 19.0, "distance": 10.0, "fov": 52.0}
+const CAMERA := {"target": Vector3(1.2, 0.95, -2.0), "yaw": -12.0, "pitch": 22.0, "distance": 8.5, "fov": 62.0}
 
 var garden
 var house
@@ -136,7 +136,7 @@ func _interactables() -> void:
 		 "needs": {"hunger": 0.6, "social": 0.1}},
 		{"id": "chat_table", "label": "Chat at Table", "icon": "chat", "minutes": 20.0, "pose": "sit_talk",
 		 "needs": {"social": 0.25}, "task": "Talk to Neighbors"},
-	], Vector3(3.2, 0.8, 1.2), Vector3(0, 0.4, 0), Vector3(0, 0, 0.85))
+	], Vector3(4.4, 0.8, 1.6), Vector3(0, 0.4, 0), Vector3(0, 0, 1.0))
 	var pit := Node3D.new()
 	pit.name = "FirePit"
 	pit.position = Party.PIT_POS
@@ -178,6 +178,6 @@ func lighting_profile() -> Dictionary:
 		"ambient_energy": 0.62, "ambient_night_energy": 0.5,
 		"exposure": 1.0, "shadow_distance": 30.0,
 		"lamp_night_mult": 1.35, "glow_boost_night": 1.9,
-		"post": {"focus_y": 0.6, "band": 0.25, "falloff": 0.42, "blur_px": 4.5, "top_boost": 1.25,
+		"post": {"focus_y": 0.6, "band": 0.27, "falloff": 0.45, "blur_px": 4.0, "top_boost": 0.95,
 			"saturation": 1.12, "contrast": 1.06, "tint": Vector3(1.04, 0.97, 0.98), "vignette": 0.26},
 	}

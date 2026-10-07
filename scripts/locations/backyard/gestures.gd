@@ -20,13 +20,13 @@ func _init() -> void:
 
 ## mode: "toast" (glass raised high), "drink" (glass at chest), "burger"
 ## (burger held up near the mouth), "mug" (mug at chest), "cheer" (both arms).
-func add(actor: Node3D, mode: String, left := false, item := "") -> void:
+func add(actor: Node3D, mode: String, left := false, item := "", lift := 0.0) -> void:
 	if actor == null:
 		return
 	if item == "":
 		item = {"toast": "glass", "drink": "glass", "burger": "burger", "mug": "mug", "cheer": "glass"}.get(mode, "glass")
 	_items.append({"a": actor, "mode": mode, "left": left, "item": item, "mi": null,
-		"ph": randf_range(0.0, TAU)})
+		"ph": randf_range(0.0, TAU), "lift": lift})
 
 
 func _process(delta: float) -> void:
@@ -69,6 +69,10 @@ func _process(delta: float) -> void:
 			if arm2 >= 0:
 				skel.set_bone_pose_rotation(arm2, Quaternion.from_euler(Vector3(-1.0, -0.2 * m, 0.2 * m)))
 				skel.set_bone_pose_rotation(fore2, Quaternion.from_euler(Vector3(-1.1, 0.0, 0.0)))
+		# Diners lift their chins a touch so faces read from the high camera.
+		var hb: int = a.get("b_head")
+		if hb >= 0 and float(it.lift) != 0.0:
+			skel.set_bone_pose_rotation(hb, skel.get_bone_pose_rotation(hb) * Quaternion.from_euler(Vector3(-float(it.lift), 0.0, 0.0)))
 		# Held item: in skeleton space, at the hand, kept upright.
 		var mi: MeshInstance3D = it.mi
 		if mi == null:

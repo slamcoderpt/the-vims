@@ -65,6 +65,26 @@ static func product(vb: VoxelBuilder, o: Vector3i, kind: String, col: Color, col
 							cc = Kit.shade(col, 0.85)
 						vb.set_v(p, cc)
 			return 4
+		"box":
+			# snack / cracker box: 3 wide, 5 tall, white window + logo dot.
+			var hh := mini(max_h, 5)
+			for x in 3:
+				for y in hh:
+					for z in 2:
+						var cc := col
+						if z == 1:
+							if y == hh - 1:
+								cc = Kit.shade(col, 1.12)
+							elif y == 2:
+								cc = Color("fdf8ec") if x != 1 else col2
+							elif y == 0:
+								cc = Kit.shade(col, 0.8)
+							if x == 0:
+								cc = Kit.shade(cc, 0.8)
+						else:
+							cc = Kit.shade(col, 0.85)
+						vb.set_v(o + Vector3i(x, y, z), cc)
+			return 3
 		"bag":
 			var hh := mini(max_h, 5)
 			for x in 3:

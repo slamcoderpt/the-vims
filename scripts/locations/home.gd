@@ -25,7 +25,10 @@ const UH := 25             # upstairs wall height in structure cells (3.125 m)
 const C := 0.125           # structure grid
 const UF := 3.0            # upstairs floor height (m)
 const VIEWS := ["office", "bed"]
-const ACTOR_SCALE := {"dad": 0.86, "bunny_girl": 0.86, "cat_girl": 0.86, "beagle": 0.62}
+## Household display scale relative to the rig's life size (dad ~1.4 m, kids
+## ~1.0 m, beagle about the size of its bed). SimActor clamps body_scale to a
+## hero minimum, so the remainder is applied as a node scale (see _spawn_household).
+const ACTOR_SCALE := {"dad": 0.9, "bunny_girl": 0.84, "cat_girl": 0.84, "beagle": 0.62}
 ## Ground-floor front facade windows (x0, x1 metres), y 0.9..2.1.
 const FRONT_WINDOWS := [[-8.2, -6.8], [-5.6, -4.2], [-3.0, -1.6], [2.0, 3.0], [5.9, 7.3], [7.6, 8.5]]
 const HALO_NIGHT := 0.55
@@ -112,7 +115,7 @@ func lighting_profile() -> Dictionary:
 		"ambient_night": Color(0.66, 0.54, 0.52), "ambient_night_energy": 0.34, "lamp_night_mult": 3.8,
 		"sky_day": Color(0.64, 0.8, 0.94), "sky_night": Color(0.07, 0.09, 0.22),
 		"fog_day": Color(0.9, 0.9, 0.88), "fog_night": Color(0.12, 0.15, 0.32), "fog_density": 0.004,
-		"moon_heading": 40.0, "moon_energy": 0.36, "glow_boost_night": 1.2,
+		"moon_heading": 150.0, "moon_energy": 0.32, "glow_boost_night": 1.2,
 		"shadow_distance": 40.0,
 		"post_day": {"focus_y": 0.5, "band": 0.3, "falloff": 0.24, "blur_px": 4.5, "top_boost": 1.0,
 			"saturation": 1.16, "contrast": 1.12, "tint": Vector3(1.02, 1.0, 0.96), "vignette": 0.22},
@@ -516,7 +519,9 @@ func _build_structure() -> void:
 	_wall(0, 0.0, -0.75, 5.5, 1, "pink", "hall", both_low, [[2.3, 3.2, 0.0, 2.1], [4.2, 5.2, 0.0, 2.1]])
 	_wall(0, 0.0, 5.5, 8.75, 1, "blue", "bath", both_low)
 	# Pink | blue divider, hall | bath divider.
-	_wall(2, 3.5, -4.75, 0.0, 1, "pink", "blue", {"office": "low", "bed": "tall"})
+	# Low in both views: the camera looks in from the +x side, so a tall
+	# divider would hide the bedside story scene behind it.
+	_wall(2, 3.5, -4.75, 0.0, 1, "pink", "blue", both_low)
 	_wall(2, 5.5, 0.25, 4.75, 1, "hall", "bath", {"office": "low", "bed": "tall"}, [[3.4, 4.4, 0.0, 2.1]])
 
 
@@ -638,19 +643,21 @@ func _build_office() -> void:
 	_wallput(R, "bookshelf", "+x", rx, -2.2, y, 3)
 	_put(R, "plant", Vector3(-1.5, y + 18 * PU, -2.1), 0, 0)
 	_put(R, "plant", Vector3(-1.5, y + 18 * PU, -1.4), 0, 6)
-	# --- Play area (dog + cat girl).
-	_rug(R, -6.9, y, -1.75, 3.0, 2.6, "check_blue")
-	_rug(R, -3.6, y, -1.0, 2.5, 3.0, "blue_braid")
-	var ball := _put(R, "tennis_ball", Vector3(-3.95, y + PU, -0.05))
-	var dogbed := _putc(R, "dog_bed", -3.9, y, 2.4, 0)
-	var toybox := _wallput(R, "toy_box", "+x", rx, 1.45, y)
-	_put(R, "soccer_ball", Vector3(-2.05, y + PU, 2.95))
-	_put(R, "toy_blocks", Vector3(-2.45, y + PU, 0.95), 0, 1)
-	_put(R, "toy_robot", Vector3(-1.85, y + PU, 1.15), 1)
-	_put(R, "toy_blocks", Vector3(-2.75, y, 3.05), 0, 0)
-	_put(R, "plush", Vector3(-1.55, y + PU, -0.45), 3, 1)
+	# --- Play area (dog + cat girl), pulled in front of the work/art/music
+	# corners so the ref1 framing shows them all with breathing room.
+	_rug(R, -7.4, y, -1.9, 3.0, 2.5, "check_blue")
+	_rug(R, -3.9, y, -1.75, 2.6, 2.6, "blue_braid")
+	var ball := _put(R, "tennis_ball", Vector3(-4.35, y + PU, -0.85))
+	var dogbed := _putc(R, "dog_bed", -5.55, y, 0.35, 0)
+	var toybox := _wallput(R, "toy_box", "+x", rx, -0.95, y)
+	_put(R, "soccer_ball", Vector3(-1.75, y + PU, 0.35))
+	_put(R, "toy_blocks", Vector3(-2.85, y + PU, -0.55), 0, 1)
+	_put(R, "toy_robot", Vector3(-2.35, y + PU, -1.15), 1)
+	_put(R, "toy_blocks", Vector3(-2.2, y + PU, 0.35), 0, 0)
+	_put(R, "plush", Vector3(-1.55, y + PU, -1.35), 3, 1)
 	_put(R, "plant", Vector3(-1.55, y, 4.15), 0, 4)
 	_put(R, "plant", Vector3(-4.3, y, 4.1), 0, 4)
+	_put(R, "toy_blocks", Vector3(-2.75, y, 3.05), 0, 0)
 	# --- Balcony railing over the living room, with trailing planters on it.
 	PropLib.railing(_g(R), Vector3i(fc(-8.75), fc(y), fc(1.5) - 2), fc(4.25) + 2, 0, 16)
 	PropLib.railing(_g(R), Vector3i(fc(-4.5), fc(y), fc(1.5) - 2), fc(3.25) + 2, 2, 16)
@@ -682,7 +689,7 @@ func _build_office() -> void:
 	_use(toybox, "Toy Box", [
 		_act("play_toys", "Play", "toys", 40, {"fun": 0.3}, {"pose": "play", "who": ["child"]}),
 		_act("tidy", "Tidy Toys", "broom", 15, {"fun": -0.05}, {"pose": "play", "task": "Tidy Toys"}),
-	], Vector3(-2.6, y, 2.05))
+	], Vector3(-1.9, y, -0.5))
 	_use(dogbed, "Dog Bed", [
 		_act("nap", "Nap", "zzz", 60, {"energy": 0.4}, {"pose": "sleep", "who": ["dog"]}),
 		_act("pet", "Pet Dog", "paw", 10, {"social": 0.1, "fun": 0.1}, {"pose": "talk", "who": ["adult", "child"]}),
@@ -743,48 +750,51 @@ func _build_pink() -> void:
 	var rx := 3.5     # right wall face (divider with the blue room)
 	# ref3 layout: bunny bed with its headboard on the back wall and the quilt
 	# running towards the camera, so the tucked-in girl's face reads; dad's
-	# reading chair beside the bed (right side), angled to the camera.
-	_rug(R, -0.35, y, -3.3, 3.6, 3.0, "patch_pink")
+	# reading chair beside the bed (right side) in the open, turned to the
+	# camera. Tall pieces stay on the back/left walls so nothing in the front
+	# right corner (the camera side) hides the story scene.
+	_rug(R, -0.3, y, -3.2, 3.5, 2.9, "patch_pink")
 	var ns := _put(R, "nightstand", Vector3(fx + 0.04, y, bz + 0.04), 0, 2)
 	var bed := _put(R, "bed", Vector3(ns.end.x + 0.06, y, bz + 0.02), 0, 0)
 	_put(R, "lamp_table", Vector3(ns.position.x + 0.12, y + 10 * PU, ns.position.z + 0.1), 0, 1)
-	_lamp(Vector3(ns.get_center().x + 0.3, y + 1.3, ns.end.z + 0.35), 0.75, 3.6, 0.2, Color(1.0, 0.64, 0.38), 0.6)
+	_lamp(Vector3(ns.get_center().x + 0.25, y + 1.3, ns.end.z + 0.3), 0.55, 3.2, 0.2, Color(1.0, 0.6, 0.3), 0.55, true)
 	_put(R, "plush", Vector3(bed.end.x - 0.55, y + 10 * PU, bz + 0.3), 0, 0)
-	var chair := _putc(R, "chair", bed.end.x + 0.5, y, bed.position.z + 1.35, 3, 2)
-	_put(R, "side_table", Vector3(bed.end.x + 0.15, y, bz + 0.08), 0, 2)
-	_put(R, "book_stack", Vector3(bed.end.x + 0.25, y + 11 * PU, bz + 0.2), 0, 2)
+	var chair := _putc(R, "chair", bed.end.x + 0.55, y, bed.position.z + 1.55, 3, 2)
+	var st := _put(R, "side_table", Vector3(bed.end.x + 0.12, y, bz + 0.08), 0, 2)
+	_put(R, "lamp_table", Vector3(st.position.x + 0.05, y + 11 * PU, bz + 0.12), 0, 1)
+	_put(R, "book_stack", Vector3(st.end.x - 0.4, y + 11 * PU, bz + 0.2), 0, 2)
 	_spots["pink_bed"] = bed
 	_spots["pink_chair"] = chair
 	# Back wall: bunny pictures above the headboard, window with pink curtains.
-	_wallput(R, "frame", "-z", bz, bed.position.x + 0.15, y + 2.15, 2)
-	_wallput(R, "frame", "-z", bz, bed.position.x + 0.95, y + 2.35, 5)
+	_wallput(R, "frame", "-z", bz, bed.position.x + 0.1, y + 2.1, 2)
+	_wallput(R, "frame", "-z", bz, bed.position.x + 0.95, y + 2.3, 5)
 	_put(R, "curtain", Vector3(1.6, y, bz + 0.02), 0, 1)
 	_put(R, "curtain", Vector3(3.2 - 5 * PU, y, bz + 0.02), 0, 1)
 	_put(R, "plant", Vector3(2.05, y + 0.9, bz - 0.04), 0, 6)
 	_put(R, "plant", Vector3(2.6, y + 0.9, bz - 0.04), 0, 3)
 	_put(R, "hanging_plant", Vector3(2.3, y + 1.95, bz + 0.1), 0, 2)
 	# Left wall: plush/book shelves, frames, sconce, toy box + plushies on the floor.
-	_wallput(R + "@bed", "shelf_unit", "-x", fx, -3.2, y + 1.35, 0)
-	_wallput(R + "@bed", "frame", "-x", fx, -1.85, y + 1.7, 2)
-	_sconce(R + "@bed", "-x", fx, -1.35, y + 1.75, 0.7)
-	var toybox := _wallput(R, "toy_box", "-x", fx, -1.55, y)
-	_put(R, "plush", Vector3(fx + 0.15, y + 9 * PU, -1.25), 1, 1)
-	_put(R, "plant", Vector3(fx + 0.06, y, -0.68), 0, 0)
-	# Right wall: dresser + lamp, mirror, low bookshelf, frame, planter, sconce.
-	var dr := _wallput(R, "dresser", "+x", rx, -3.25, y, 2)
-	_put(R, "lamp_table", Vector3(dr.position.x + 0.15, y + 14 * PU, dr.position.z + 0.1), 0, 1)
-	_put(R, "plant", Vector3(dr.position.x + 0.15, y + 14 * PU, dr.end.z - 0.5), 0, 6)
-	_wallput(R + "@bed", "mirror", "+x", rx, -3.0, y + 1.75, 1)
-	_wallput(R, "bookshelf", "+x", rx, -1.75, y, 1)
-	_put(R, "plush", Vector3(rx - 0.45, y + 13 * PU, -1.55), 3, 2)
-	_wallput(R + "@bed", "frame", "+x", rx, -1.6, y + 1.75, 5)
-	_wallput(R + "@bed", "wall_planter", "+x", rx, -0.75, y + 1.95, 1)
-	_sconce(R + "@bed", "+x", rx, -2.0, y + 1.85, 1.0)
-	_lamp(Vector3(1.2, y + 2.4, -2.4), 0.8, 4.2, 0.0, Color(1.0, 0.7, 0.45), 0.0)
-	# Floor: pouf, blocks, plant in the front corner.
-	_put(R, "pouf", Vector3(1.0, y, -1.15), 0, 0)
-	_put(R, "toy_blocks", Vector3(0.1, y + PU, -1.0), 0, 3)
-	_put(R, "plant", Vector3(rx - 0.62, y, -0.68), 0, 1)
+	_wallput(R + "@bed", "shelf_unit", "-x", fx, -3.15, y + 1.3, 0)
+	_wallput(R + "@bed", "wall_shelf", "-x", fx, -1.6, y + 2.15, 2)
+	_wallput(R + "@bed", "frame", "-x", fx, -1.55, y + 1.3, 2)
+	_sconce(R + "@bed", "-x", fx, -2.0, y + 1.85, 0.6)
+	var toybox := _wallput(R, "toy_box", "-x", fx, -1.2, y)
+	_put(R, "plush", Vector3(fx + 0.15, y + 9 * PU, -0.95), 1, 1)
+	_put(R, "plant", Vector3(fx + 0.06, y, -2.05), 0, 0)
+	# Right wall (pink|blue divider): dresser + lamp at the back, mirror and
+	# frames above, a wall planter and a sconce; only low pieces at the front.
+	var dr := _wallput(R, "dresser", "+x", rx, -4.7, y, 2)
+	_put(R, "plant", Vector3(dr.position.x + 0.12, y + 14 * PU, dr.position.z + 0.08), 0, 6)
+	_put(R, "plush", Vector3(dr.position.x + 0.1, y + 14 * PU, dr.end.z - 0.45), 3, 2)
+	_put(R, "lamp_table", Vector3(dr.position.x + 0.12, y + 14 * PU, dr.end.z - 1.0), 0, 1)
+	_lamp(Vector3(dr.position.x - 0.1, y + 1.75, dr.end.z - 0.7), 0.5, 3.0, 0.2, Color(1.0, 0.62, 0.34), 0.5)
+	_sconce(R, "-z", bz, 2.55 - 0.2, y + 2.5, 0.0)
+	_lamp(Vector3(1.4, y + 2.3, -2.0), 0.35, 4.0, 0.0, Color(1.0, 0.62, 0.36), 0.0)
+	# Floor: pouf, blocks, small plants in the front corners.
+	_put(R, "pouf", Vector3(1.25, y, -1.1), 0, 0)
+	_put(R, "toy_blocks", Vector3(0.35, y + PU, -1.0), 0, 3)
+	_put(R, "plant", Vector3(rx - 0.5, y, -0.62), 0, 3)
+	_put(R, "basket", Vector3(2.2, y, -0.75), 0, 1)
 	_use(toybox, "Pink Toy Box", [
 		_act("play_toys", "Play", "toys", 40, {"fun": 0.3}, {"pose": "play", "who": ["child"]}),
 		_act("tidy", "Tidy Toys", "broom", 15, {"fun": -0.05}, {"pose": "play", "task": "Tidy Toys"}),
@@ -830,8 +840,6 @@ func _build_blue() -> void:
 	_sconce(R + "@bed", "+x", rx, -1.0, y + 1.7, 1.5)
 	# Left wall: bookshelf, poster, wall shelf.
 	_wallput(R, "bookshelf", "-x", lx, -1.55, y, 0)
-	_wallput(R + "@bed", "frame", "-x", lx, -2.35, y + 1.5, 8)
-	_wallput(R + "@bed", "wall_shelf", "-x", lx, -2.3, y + 2.35, 2)
 	_put(R, "plush", Vector3(5.1, y + PU, -1.3), 0, 1)
 	_rug(R, 5.9, y, -2.8, 1.9, 1.8, "star")
 	_put(R, "toy_blocks", Vector3(6.3, y + PU, -2.2), 0, 1)
@@ -908,38 +916,38 @@ func _build_bath() -> void:
 	var lx := 5.75     # left wall face (hall)
 	var rx := 8.75     # right exterior wall face
 	var fz := 4.75
-	# Glass shower stall in the back-left corner (towel on the door).
+	# Glass shower stall in the back-left corner (towel on the door), tub on
+	# the back wall beside it; vanity + mirror on the right wall facing the
+	# camera side (ref3: the kid on a step stool brushes her teeth side-on).
 	var shower := _put(R, "shower", Vector3(lx, y, bz), 0)
 	var gs := PropLib.size_of("shower_glass")
 	var glass := PropLib.instance("shower_glass", 0, false)
 	glass.scale = Vector3.ONE * (PU / PropLib.FU)
 	glass.position = Vector3(lx + PU + gs.x * PU * 0.5, y + PU, bz + PU + gs.z * PU * 0.5)
 	add_child(glass)
-	# Toilet on the back wall, right of the shower; laundry basket beside it.
-	var toilet := _put(R, "toilet", Vector3(shower.end.x + 0.12, y, bz + 0.02), 0)
-	_put(R, "basket", Vector3(rx - 0.75, y, bz + 0.08), 0, 2)
-	# Vanity + mirror on the right wall (ref3: faces the camera; the kid on a
-	# step stool brushes her teeth side-on to the camera).
-	var vanity := _wallput(R, "vanity", "+x", rx, 2.0, y)
+	var tsz := PropLib.rotated_size("bathtub", 1)
+	var tub := _put(R, "bathtub", Vector3(rx - tsz.x * PU - 0.02, y, bz + 0.04), 1)
+	_put(R, "plant", Vector3(shower.end.x + 0.04, y, bz + 0.05), 0, 3)
+	var vanity := _wallput(R, "vanity", "+x", rx, tub.end.z + 0.12, y)
 	_spots["vanity"] = vanity
 	var ss := PropLib.rotated_size("step_stool", 3)
 	var step := _put(R, "step_stool", Vector3(vanity.position.x - ss.x * PU - 0.02, y, vanity.get_center().z - ss.z * PU * 0.5), 3)
 	_spots["step"] = step
-	_put(R, "bath_mat", Vector3(step.position.x - 0.35, y, step.position.z - 0.1), 1, 0)
+	_put(R, "bath_mat", Vector3(step.position.x - 0.45, y, step.position.z - 0.15), 1, 0)
 	_put(R, "plant", Vector3(rx - 0.42, y + 13 * PU, vanity.end.z - 0.42), 0, 3)
-	_wallput(R + "@bed", "towel_rack", "+x", rx, 1.0, y + 0.75, 1)
-	_wallput(R + "@bed", "shelf_unit", "+x", rx, 0.75, y + 1.75, 2)
+	_wallput(R + "@bed", "shelf_unit", "+x", rx, 0.55, y + 1.8, 2)
 	_wallput(R + "@bed", "towel_rack", "+x", rx, vanity.end.z + 0.1, y + 0.75, 2)
-	_sconce(R + "@bed", "+x", rx, vanity.position.z - 0.3, y + 2.0, 0.75, 1)
-	_sconce(R + "@bed", "+x", rx, vanity.end.z + 0.0, y + 2.0, 0.75, 1)
-	_wallput(R + "@bed", "frame", "+x", rx, vanity.end.z + 0.55, y + 1.55, 7)
+	_sconce(R + "@bed", "+x", rx, vanity.position.z - 0.35, y + 2.0, 0.55, 1)
+	_sconce(R + "@bed", "+x", rx, vanity.end.z + 0.05, y + 2.0, 0.55, 1)
+	_wallput(R + "@bed", "frame", "+x", rx, vanity.end.z + 0.65, y + 1.55, 7)
+	# Front-left: toilet against the hall wall, laundry basket, plants.
+	var toilet := _put(R, "toilet", Vector3(lx + 0.02, y, 3.3), 1)
+	_put(R, "basket", Vector3(lx + 0.05, y, 2.45), 1, 2)
+	_wallput(R + "@bed", "towel_rack", "-x", lx, 2.3, y + 0.95, 1)
+	_wallput(R + "@bed", "wall_planter", "-x", lx, 3.5, y + 1.7, 2)
 	_put(R, "plant", Vector3(rx - 0.6, y, fz - 0.6), 0, 6)
-	# Tub along the left (hall) wall at the front, with a bath mat.
-	var tub := _put(R, "bathtub", Vector3(lx + 0.02, y, fz - 28 * PU - 0.04), 1)
-	_put(R, "plant", Vector3(lx + 0.05, y, shower.end.z + 0.08), 0, 2)
-	_wallput(R + "@bed", "wall_planter", "-x", lx, tub.position.z + 0.6, y + 1.6, 2)
-	_rug(R, tub.end.x + 0.1, y, tub.position.z + 0.4, 0.8, 1.5, "round_blue")
-	_lamp(Vector3(7.3, y + 2.6, 2.4), 0.45, 3.5, 0.0, Color(1.0, 0.7, 0.45), 0.0)
+	_put(R, "plant", Vector3(lx + 0.05, y, fz - 0.55), 0, 2)
+	_lamp(Vector3(7.3, y + 2.6, 2.4), 0.35, 3.5, 0.0, Color(1.0, 0.66, 0.4), 0.0)
 	_use(shower, "Shower", [_act("shower", "Take Shower", "shower", 20, {"hygiene": 0.8}, {"pose": "idle"})])
 	_use(tub, "Bathtub", [_act("bath", "Take Bath", "bath", 40, {"hygiene": 0.9, "fun": 0.1}, {"pose": "lie", "task": "Take Bath"})])
 	_use(vanity, "Sink", [
@@ -1189,7 +1197,7 @@ func _ensure_neighbourhood(lit: bool) -> void:
 		# Neighbour houses sit darker than the lawn so their lit windows pop.
 		if _hood_mat == null:
 			_hood_mat = PropLib.night_exterior_material().duplicate()
-			_hood_mat.albedo_color = Color(0.46, 0.5, 0.72)
+			_hood_mat.albedo_color = Color(0.34, 0.36, 0.52)
 		_hood_night.set_surface_override_material(0, _hood_mat)
 
 
@@ -1285,7 +1293,7 @@ void fragment() {
 }
 """
 ## Depth (m, along the view axis beyond the orbit target) of the sky card.
-const SKY_BEYOND := 14.0
+const SKY_BEYOND := 40.0
 
 
 func _place_moon(_cam: Dictionary) -> void:
@@ -1352,6 +1360,12 @@ func _spawn_household() -> void:
 		# chunkier street-scene scale.
 		a.body_scale = ACTOR_SCALE.get(look, 1.0)
 		add_child(a)
+		# body_scale is clamped to SimActor.HERO_MIN; shrink the node itself by
+		# what the clamp kept, so the household sits at house scale.
+		var eff := a.skeleton.scale.x if a.skeleton else 1.0
+		var k: float = ACTOR_SCALE.get(look, 1.0) / maxf(eff, 0.01)
+		if k < 0.999:
+			a.scale = Vector3.ONE * k
 		actors[look] = a
 	for m in Game.household:
 		if actors.has(m.get("look", "")):
@@ -1362,7 +1376,7 @@ func _place(look: String, pos: Vector3, face_to: Vector3, pose: String, seat := 
 	var a: SimActor = actors[look]
 	a.position = pos
 	if seat > 0.0:
-		a.seat_height = seat
+		a.seat_height = seat / a.scale.y   # actor-local (node may be scaled)
 	a.face(face_to)
 	a.set_pose(pose)
 	return a
@@ -1377,7 +1391,7 @@ func _stage(preset: String) -> void:
 		var bc := bed.get_center()
 		# Tucked in: head on the pillow at the headboard (back wall), feet to the camera.
 		var lily := _place("bunny_girl", Vector3(bc.x, y, bed.position.z + 1.05), Vector3(bc.x, y, bed.end.z + 2.0), "lie")
-		lily.lie_height = 8 * PU
+		lily.lie_height = 8 * PU / lily.scale.y
 		var ch: AABB = _spots["pink_chair"]
 		var cc3 := ch.get_center()
 		var jack := _place("dad", Vector3(cc3.x, y, cc3.z), Vector3(cc3.x - 1.0, y, cc3.z + 0.75), "sit_read", 7 * PU)
@@ -1404,9 +1418,9 @@ func _stage(preset: String) -> void:
 		var jack := _place("dad", Vector3(ch.get_center().x, y, ch.get_center().z), Vector3(dk.get_center().x - 0.1, y, dk.position.z), "type", 7 * PU)
 		var stl: AABB = _spots["stool"]
 		var lily := _place("bunny_girl", Vector3(stl.get_center().x, y, stl.get_center().z), Vector3(-4.45, y, -3.7), "sit_paint", 6 * PU)
-		var maya := _place("cat_girl", Vector3(-2.0, y, 0.35), Vector3(-2.2, y, 1.8), "play")
+		var maya := _place("cat_girl", Vector3(-2.55, y, -0.15), Vector3(-2.35, y, 1.2), "play")
 		var ball: AABB = _spots["ball"]
-		var dog := _place("beagle", ball.get_center() + Vector3(-0.85, -ball.size.y * 0.5, -0.2), ball.get_center() + Vector3(0.3, 0, 0.6), "play")
+		var dog := _place("beagle", ball.get_center() + Vector3(-0.75, -ball.size.y * 0.5, 0.1), ball.get_center() + Vector3(0.4, 0, 0.9), "play")
 		Game.show_bubble(jack, {"text": "Work", "icon": "laptop", "kind": "action", "id": "action", "progress": 0.32})
 		Game.show_bubble(lily, {"text": "Paint", "icon": "palette", "kind": "action", "id": "action", "progress": 0.48})
 		Game.show_bubble(maya, {"text": "Play", "icon": "toys", "kind": "action", "id": "action", "progress": 0.55})

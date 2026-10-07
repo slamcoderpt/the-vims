@@ -14,6 +14,8 @@ extends CanvasLayer
 const UI := preload("res://scripts/ui/ui_kit.gd")
 
 const TILE := 56.0
+## Height of the strip (queue row + mood row).
+const STRIP_H := TILE + 9.0 + 34.0
 const TILE_SMALL := 44.0
 const GAP := 7.0
 const CHIP := 34.0
@@ -154,28 +156,29 @@ func _layout() -> void:
 	toasts.size = vs
 	strip.position = _strip_origin()
 	strip.size = Vector2(560, 120)
-	panel.position = strip.position + Vector2(0, 112)
 	panel.size = Vector2(PANEL_W, 300)
+	_place_panel()
 
 
-## Right of the selected sim's portrait + need bars (Sims 3 puts the queue next
-## to the portrait).
+## Bottom left, right of the Build / Buy / Decorate / Manage bar (where Sims 3
+## keeps the action queue): queue tiles on top, mood + moodlets below. Down
+## there it never collides with the speech bubbles over the sims' heads.
 func _strip_origin() -> Vector2:
-	var x := 322.0
-	var y := 30.0
+	var vs := root.size if root else Vector2(1672, 941)
+	var x := 470.0
+	var y := vs.y - 120.0
 	if hud:
-		var hb = hud.get("household_box")
-		if hb is Control:
-			var w := 0.0
-			if hud.has_method("cw_max"):
-				w = hud.cw_max()
-			x = hb.position.x + maxf(w, 280.0) + 14.0
-			y = hb.position.y + 2.0
-			var ps = hud.get("_portraits")
-			var sel := Game.selected
-			if ps is Array and sel >= 0 and sel < ps.size() and is_instance_valid(ps[sel]):
-				y = hb.position.y + (ps[sel] as Control).position.y + 2.0
+		var mb = hud.get("modes")
+		if mb is Control and mb.visible:
+			x = mb.position.x + mb.size.x + 18.0
+			y = mb.position.y + mb.size.y - STRIP_H
 	return Vector2(x, y)
+
+
+## The panel opens upward from the strip.
+func _place_panel() -> void:
+	if panel and strip:
+		panel.position = strip.position + Vector2(0, -panel.size.y - 10.0)
 
 
 # =================================================================== per frame
@@ -187,7 +190,7 @@ func _process(delta: float) -> void:
 		var o := _strip_origin()
 		if o != strip.position:
 			strip.position = o
-			panel.position = o + Vector2(0, 112)
+			_place_panel()
 		strip.queue_redraw()
 		if panel.visible:
 			panel.queue_redraw()
@@ -499,7 +502,9 @@ func _draw_panel() -> void:
 		return
 	var row_h := 44.0
 	var h := 58.0 + _panel_rows() * row_h + 50.0
-	panel.size = Vector2(PANEL_W, h)
+	if absf(panel.size.y - h) > 0.5:
+		panel.size = Vector2(PANEL_W, h)
+		_place_panel()
 	panel.draw_style_box(_card, Rect2(Vector2.ZERO, panel.size))
 	var f := UI.font(800)
 	var f7 := UI.font(700)
@@ -655,9 +660,9 @@ func _draw_toasts() -> void:
 	if _toast_list.is_empty():
 		return
 	var f := UI.font(800)
-	# Bottom centre, between the mode bar and the money pill; newest lowest.
-	var cx := toasts.size.x * 0.56
-	var y := toasts.size.y - 48.0 - 44.0 * (_toast_list.size() - 1) - 52.0
+	# Top centre, between the portraits and the clock; newest lowest.
+	var cx := toasts.size.x * 0.5
+	var y := 22.0
 	for t in _toast_list:
 		var a := clampf(t.t / 0.4, 0.0, 1.0) * clampf((TOAST_TTL - t.t) / 0.15 + 0.2, 0.0, 1.0)
 		var tw := f.get_string_size(t.text, HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x

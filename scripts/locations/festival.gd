@@ -156,7 +156,7 @@ func lighting_profile() -> Dictionary:
 		"fog_day": Color(0.86, 0.8, 0.78), "fog_night": Color(0.12, 0.12, 0.26),
 		"fog_density": 0.0012, "exposure": 1.0, "shadow_distance": 45.0,
 		"lamp_night_mult": 1.6,
-		"post": {"focus_y": 0.6, "band": 0.24, "falloff": 0.42, "blur_px": 2.6, "top_boost": 0.85,
+		"post": {"focus_y": 0.56, "band": 0.27, "falloff": 0.4, "blur_px": 2.4, "top_boost": 0.8,
 			"saturation": 1.2, "contrast": 1.12, "tint": Vector3(1.04, 0.99, 0.92),
 			"lift": Vector3(0.0, 0.0, 0.0), "vignette": 0.24, "gamma": 1.04},
 	}

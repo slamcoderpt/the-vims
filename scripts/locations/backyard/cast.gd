@@ -4,7 +4,7 @@ extends RefCounted
 
 const Party := preload("res://scripts/locations/backyard/party.gd")
 const Gestures := preload("res://scripts/locations/backyard/gestures.gd")
-const DOG_POS := Vector3(3.45, 0.0, 1.5)
+const DOG_POS := Vector3(2.85, 0.0, 2.0)
 
 ## key -> [look, aliases]
 const PEOPLE := {
@@ -14,17 +14,17 @@ const PEOPLE := {
 	"Biscuit": ["beagle", ["beagle", "dog"]],
 	"neighbor_1": ["npc_5", ["npc_5"]],
 	"neighbor_2": ["npc_1", ["npc_1"]],
-	"neighbor_3": ["npc_0", ["npc_0"]],
+	"neighbor_3": ["npc_3", ["npc_3"]],
 	"neighbor_4": ["npc_2", ["npc_2"]],
 	"neighbor_5": ["npc_6", ["npc_6"]],
 	"neighbor_6": ["npc_4", ["npc_4"]],
 	"neighbor_7": ["npc_7", ["npc_7"]],
-	"neighbor_8": ["npc_3", ["npc_3"]],
+	"neighbor_8": ["npc_0", ["npc_0"]],
 }
 
 const GUEST_NAMES := {
-	"neighbor_1": "Nia", "neighbor_2": "Marcus", "neighbor_3": "Rosie", "neighbor_4": "Edith",
-	"neighbor_5": "Walter", "neighbor_6": "Sam", "neighbor_7": "Leo", "neighbor_8": "June",
+	"neighbor_1": "Nia", "neighbor_2": "Marcus", "neighbor_3": "June", "neighbor_4": "Edith",
+	"neighbor_5": "Walter", "neighbor_6": "Sam", "neighbor_7": "Leo", "neighbor_8": "Rosie",
 }
 
 var actors := {}   # key/alias -> Node3D
@@ -43,18 +43,18 @@ func build(parent: Node3D, party) -> void:
 	_spawn("Jack", gf, 0.0, "grill").face(Party.GRILL_POS + Vector3(0.0, 0.0, 0.45))
 	# Table: diners turned toward the camera on the far side and the ends,
 	# two guests with their backs to us on the near side (ref4).
-	_seat("Lily", party, "end_l", "sit_talk", -1.25)
-	_seat("neighbor_7", party, "far_l", "sit_talk")
-	_seat("neighbor_4", party, "far_m", "sit_talk")
+	_seat("Lily", party, "far_l", "sit_talk", 0.15)
+	_seat("neighbor_7", party, "far_m", "sit_talk")
+	_seat("neighbor_4", party, "far_m2", "sit_talk", -0.1)
 	_seat("Maya", party, "far_r", "sit_talk", -0.3)
-	_seat("neighbor_6", party, "near_l", "sit_talk", -0.6)
-	_seat("neighbor_3", party, "near_r", "sit_talk", 0.8)
+	_seat("neighbor_6", party, "near_l", "sit_talk", -0.85)
+	_seat("neighbor_3", party, "near_r", "sit_talk", 1.15)
 	gestures = Gestures.new()
 	parent.add_child(gestures)
-	gestures.add(actors.get("Lily"), "burger", false)
-	gestures.add(actors.get("neighbor_7"), "toast", true)
-	gestures.add(actors.get("neighbor_4"), "drink", false)
-	gestures.add(actors.get("Maya"), "burger", true)
+	gestures.add(actors.get("Lily"), "burger", false, "", 0.12)
+	gestures.add(actors.get("neighbor_7"), "toast", false, "", 0.12)
+	gestures.add(actors.get("neighbor_4"), "drink", false, "", 0.15)
+	gestures.add(actors.get("Maya"), "burger", true, "", 0.2)
 	gestures.add(actors.get("neighbor_6"), "drink", false)
 	gestures.add(actors.get("neighbor_3"), "drink", true)
 	# On the deck, chatting with plates and drinks.
@@ -65,14 +65,14 @@ func build(parent: Node3D, party) -> void:
 	gestures.add(a, "burger", true, "burger")
 	gestures.add(b, "toast", false)
 	# Lounge by the fire pit.
-	var c := _spawn_seated("neighbor_5", Vector3(6.55, 0, 1.05), -PI * 0.5 - 0.25, "sit_talk", 0.5)
-	var e := _spawn_seated("neighbor_8", Vector3(6.55, 0, 2.5), -PI * 0.5 + 0.1, "sit", 0.5)
+	var c := _spawn_seated("neighbor_5", Vector3(6.05, 0, 0.75), -PI * 0.5 - 0.25, "sit_talk", 0.5)
+	var e := _spawn_seated("neighbor_8", Vector3(6.05, 0, 1.9), -PI * 0.5 + 0.1, "sit", 0.5)
 	gestures.add(c, "mug", true)
 	gestures.add(e, "mug", false)
 	# Biscuit trotting across the lawn between the table and the fire pit.
-	var d := _spawn("Biscuit", DOG_POS, -PI * 0.36, "walk")
+	var d := _spawn("Biscuit", DOG_POS, -PI * 0.62, "walk")
 	d.position.y = 0.0
-	d.scale = Vector3.ONE * 0.86
+	d.scale = Vector3.ONE * 0.66
 	# Chat interactables on guests.
 	for k in GUEST_NAMES:
 		var act: Node3D = actors.get(k)
@@ -130,7 +130,7 @@ func _seat(key: String, party, seat: String, pose: String, turn := 0.0) -> Node3
 ## bodies so torsos + arms show above the table.
 const HEAD_SCALE := {"adult": 0.86, "child": 0.9, "dog": 1.0}
 ## Diners are the heroes of the shot: a bit larger than the rest of the cast.
-const DINER_BOOST := 1.14
+const DINER_BOOST := 1.12
 const BODY_SCALE := {"adult": 1.2, "child": 1.26, "dog": 1.0}
 
 

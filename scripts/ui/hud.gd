@@ -262,13 +262,26 @@ func _is_selected_actor(a: Node3D) -> bool:
 	return a != null and a == _selected_actor()
 
 
-## Clear screen space (px) between the top of a sim's head and the tip of its
-## bubble's tail: about half a head, never less than MIN_GAP.
-const MIN_GAP := 40.0
-const MAX_GAP := 54.0
-## Space kept free right of the selected sim's bubble for the plumbob.
-const PLUMBOB_RESERVE := 62.0
-const BUBBLE_PAD := 8.0
+## Screen gap (px) between the top of a sim's head and the tip of its
+## bubble's tail; scales a little with head size so far sims stay snug.
+const MIN_GAP := 18.0
+const MAX_GAP := 30.0
+## Top of the area bubbles may use (below the screen edge).
+const SAFE_TOP := 12.0
+const BUBBLE_PAD := 14.0
+## Plumbob slot beside the selected sim's bubble (ref1: right of "Work").
+const PB_W := 40.0
+const PB_H := 70.0
+## Candidate tail positions (fraction of bubble width) and extra lifts; the
+## layout picks the cheapest combination per bubble (greedy, selected first).
+const FRACS: Array[float] = [0.5, 0.38, 0.62, 0.26, 0.74, 0.16, 0.84]
+const LIFTS: Array[float] = [0.0, 22.0, 46.0, 76.0, 110.0]
+## Hard obstacle weight per px² of overlap, soft (background NPC heads).
+const W_HARD := 12.0
+const W_SOFT := 0.35
+## Base cost of hanging a bubble beside the head instead of above it.
+const SIDE_COST := 9000.0
+const _SIDE_DY: Array[float] = [0.0, -30.0, 30.0]
 
 ## Per-frame scratch (reused, no allocations in the steady state).
 var _heads: Array[Rect2] = []
@@ -276,11 +289,19 @@ var _head_actors: Array = []
 var _mains: Array = []
 var _chips: Array = []
 var _hud_rects: Array[Rect2] = []
+var _placed: Array[Rect2] = []
 var _scene_actors: Array = []
 var _head_hard: Array[bool] = []
 var _n_hard := 0
 var _scan_loc: Node
 var _scan_t := 0.0
+var _sel_actor: Node3D
+var _sort_mains := func(p, q) -> bool:
+	var ps: bool = p.anchor != null and p.anchor == _sel_actor
+	var qs: bool = q.anchor != null and q.anchor == _sel_actor
+	if ps != qs:
+		return ps
+	return p.tip.y < q.tip.y
 
 
 ## Head point + head height in pixels (z), used to scale gaps/rects.
@@ -303,10 +324,11 @@ func _head_metrics(a: Node3D) -> Vector3:
 
 
 func _gap_for(dy: float) -> float:
-	return clampf(dy * 0.45, MIN_GAP, MAX_GAP)
+	return clampf(dy * 0.3, MIN_GAP, MAX_GAP)
 
 
-## Desired placement of one bubble (before the overlap pass).
+## Anchor point for one bubble: `head` (projected head top) and the base tail
+## tip straight above it. The layout pass then picks the body position.
 func _position_bubble(b) -> void:
 	var tip := Vector2.INF
 	var a: Node3D = b.anchor
@@ -318,11 +340,7 @@ func _position_bubble(b) -> void:
 			b.head = head
 			b.head_px = hm.z
 			tip = head + Vector2(0, -_gap_for(hm.z)) + b.offset
-			if b.kind == "skill":
-				b.target = tip + Vector2(24, -b.size.y)
-			else:
-				var frac := 0.72 if (_is_selected_actor(a) or b.selected_side) else 0.5
-				b.target = tip - Vector2(b.size.x * frac, b.size.y + WorldBubble.TAIL_H)
+			b.base_tip = tip
 	else:
 		var at = b.fallback_at
 		var sp = b.fallback_screen
@@ -344,6 +362,8 @@ func _collect_hud_rects() -> void:
 	for c in [clock, tasks, modes, money, side_list]:
 		if c != null and c.visible:
 			_hud_rects.append(Rect2(c.position, c.size).grow(10.0))
+	if menu != null and menu.visible:
+		_hud_rects.append(Rect2(menu.position, menu.size).grow(8.0))
 
 
 ## Screen rects around every visible sim's head; bubbles and chips keep off.
@@ -381,39 +401,42 @@ func _collect_heads() -> void:
 		var hm := _head_metrics(a)
 		if hm == Vector3.INF:
 			continue
+		# the face: from just above the head top down to the chin (+ a bit)
 		var w := maxf(hm.z * 0.95, 34.0)
-		_heads.append(Rect2(hm.x - w * 0.5, hm.y - 6.0, w, hm.z * 1.15 + 6.0))
+		_heads.append(Rect2(hm.x - w * 0.5, hm.y - 4.0, w, hm.z * 1.15 + 4.0))
 		# household + bubble owners are hard obstacles; extras are soft
 		_head_hard.append(i < _n_hard)
 
 
-func _rect_of(b) -> Rect2:
-	return Rect2(b.target, b.size)
+static func _ov(a: Rect2, b: Rect2) -> float:
+	var x := minf(a.end.x, b.end.x) - maxf(a.position.x, b.position.x)
+	var y := minf(a.end.y, b.end.y) - maxf(a.position.y, b.position.y)
+	return x * y if (x > 0.0 and y > 0.0) else 0.0
 
 
-## Body + tail footprint of a main bubble (+ plumbob space if selected).
-func _footprint(b, sel: Node3D) -> Rect2:
-	var w: float = b.size.x + (PLUMBOB_RESERVE if (sel != null and b.anchor == sel) else 0.0)
-	return Rect2(b.target, Vector2(w, b.size.y + WorldBubble.TAIL_H))
+## Cost of covering `r` on screen: overlap with placed bubbles/chips/plumbob,
+## faces, HUD cards, and leaving the safe area.
+func _cost(r: Rect2, vs: Vector2) -> float:
+	var c := 0.0
+	var g := r.grow(BUBBLE_PAD * 0.5)
+	for pr in _placed:
+		c += _ov(g, pr) * W_HARD
+	for i in _heads.size():
+		c += _ov(r, _heads[i]) * (W_HARD if _head_hard[i] else W_SOFT)
+	for hr in _hud_rects:
+		c += _ov(r, hr) * W_HARD
+	var out := maxf(0.0, SAFE_TOP - r.position.y) + maxf(0.0, 8.0 - r.position.x) \
+		+ maxf(0.0, r.end.x - (vs.x - 8.0)) + maxf(0.0, r.end.y - (vs.y - 8.0))
+	c += out * r.size.x * W_HARD
+	return c
 
 
-## Shift a bubble horizontally but keep its tail tip inside the body span.
-func _shift_x(b, dx: float) -> float:
-	if b.head == Vector2.INF:
-		b.target.x += dx
-		return dx
-	var lo: float = b.tip.x - b.size.x + 22.0
-	var hi: float = b.tip.x - 22.0
-	var nx := clampf(b.target.x + dx, lo, hi)
-	var done: float = nx - b.target.x
-	b.target.x = nx
-	return done
-
-
-## Screen-space overlap pass: bubbles vs bubbles (+plumbob slot), vs sim
-## heads and vs the fixed HUD cards; then chips beside their bubbles.
+## Screen-space layout: every bubble floats straight above its own sim with
+## the tail tip just over the head; per bubble we try a few tail positions
+## and lifts and keep the cheapest, so bubbles, chips, the plumbob, faces
+## and HUD cards never touch. Chips go beside their bubble.
 func _resolve_layout() -> void:
-	var sel := _selected_actor()
+	_sel_actor = _selected_actor()
 	_mains.clear()
 	_chips.clear()
 	for key in _bubbles:
@@ -425,119 +448,148 @@ func _resolve_layout() -> void:
 				_mains.append(b)
 	_collect_heads()
 	_collect_hud_rects()
+	_placed.clear()
 	var vs: Vector2 = root.size
-	# 1. bubbles never cover a head: lift above any head they touch
+	_mains.sort_custom(_sort_mains)
 	for b in _mains:
-		_lift_off_heads(b)
-	# 2. bubbles vs bubbles: split horizontally, then lift the higher one
-	for _pass in 4:
-		var moved := false
-		for i in _mains.size():
-			for j in range(i + 1, _mains.size()):
-				var p = _mains[i]
-				var q = _mains[j]
-				var pr := _footprint(p, sel).grow(BUBBLE_PAD * 0.5)
-				var qr := _footprint(q, sel).grow(BUBBLE_PAD * 0.5)
-				if not pr.intersects(qr):
-					continue
-				moved = true
-				var left = p if pr.get_center().x <= qr.get_center().x else q
-				var right = q if left == p else p
-				var lr: Rect2 = pr if left == p else qr
-				var rr: Rect2 = qr if left == p else pr
-				var ox: float = lr.end.x - rr.position.x
-				var a := _shift_x(left, -ox * 0.5)
-				var c := _shift_x(right, ox * 0.5)
-				var rest: float = ox + a - c
-				if rest > 0.5:
-					rest -= _shift_x(right, rest) 
-					rest += _shift_x(left, -rest)
-				if rest > 0.5:
-					# no horizontal room: stack the upper bubble above the other
-					var up = left if left.target.y <= right.target.y else right
-					var dn = right if up == left else left
-					up.target.y = dn.target.y - up.size.y - WorldBubble.TAIL_H - BUBBLE_PAD
-		if not moved:
-			break
-	# 3. keep off fixed HUD cards and inside the screen
-	for b in _mains:
-		_keep_off_hud(b, vs)
-	# 4. skill chips: below-right of their bubble, clear of faces/bubbles
+		_place_main(b, vs)
 	for ch in _chips:
-		var mb = _main_bubble_for(ch.anchor) if ch.anchor != null and is_instance_valid(ch.anchor) else null
-		if mb != null:
-			ch.target = Vector2(mb.target.x + mb.size.x * 0.62, mb.target.y + mb.size.y + 12.0)
-			# chip tail points down-left at the head
-			ch.tip = ch.target + Vector2(4.0, ch.size.y + 9.0)
-		for _k in 3:
-			var cr := Rect2(ch.target, ch.size).grow(4.0)
-			var hit := false
-			for i in _heads.size():
-				if _head_hard[i] and _heads[i].intersects(cr):
-					ch.target.x = _heads[i].end.x + 6.0
-					hit = true
-			for ob in _mains:
-				if ob == mb:
-					continue
-				var orr := Rect2(ob.target, ob.size + Vector2(0, WorldBubble.TAIL_H)).grow(4.0)
-				if orr.intersects(Rect2(ch.target, ch.size)):
-					ch.target.y = orr.end.y + 4.0
-					hit = true
-			for oc in _chips:
-				if oc == ch:
-					break
-				var ocr := Rect2(oc.target, oc.size).grow(4.0)
-				if ocr.intersects(Rect2(ch.target, ch.size)):
-					ch.target.y = ocr.end.y + 2.0
-					hit = true
-			if not hit:
-				break
-		ch.tip = ch.target + Vector2(4.0, ch.size.y + 9.0)
-		_keep_off_hud(ch, vs)
+		_place_chip(ch, vs)
 	for b in _mains:
 		_apply(b)
 	for ch in _chips:
 		_apply(ch)
 
 
-func _lift_off_heads(b) -> void:
-	# any head: slide sideways if the tail still reaches its sim; soft heads
-	# (background NPCs) are ignored when that fails, hard ones lift below
-	for i in _heads.size():
-		var hr: Rect2 = _heads[i]
-		var r := Rect2(b.target, b.size + Vector2(0, WorldBubble.TAIL_H)).grow(4.0)
-		if not hr.intersects(r):
-			continue
-		var x0: float = b.target.x
-		var go_r: float = hr.end.x - r.position.x
-		var go_l: float = r.end.x - hr.position.x
-		var want := go_r if go_r < go_l else -go_l
-		if absf(_shift_x(b, want) - want) > 0.5:
-			b.target.x = x0
-	for _k in 3:
-		var r := Rect2(b.target, b.size + Vector2(0, WorldBubble.TAIL_H)).grow(4.0)
-		var hit := false
-		for i in _heads.size():
-			var hr: Rect2 = _heads[i]
-			if not (_head_hard[i] and hr.intersects(r)):
-				continue
-			var ny: float = hr.position.y - b.size.y - WorldBubble.TAIL_H - 10.0
-			if b.head != Vector2.INF and b.target.y - ny > maxf(70.0, b.head_px * 0.8):
-				# lifting would detach the bubble from its sim: slide it off
-				# the other face instead, letting the tail sit near the edge
-				var go_r: float = hr.end.x + 4.0 - b.target.x
-				var go_l: float = b.target.x + b.size.x - hr.position.x + 4.0
-				var nx: float = b.target.x + (go_r if go_r < go_l else -go_l)
-				b.target.x = clampf(nx, b.tip.x - b.size.x + 14.0, b.tip.x - 14.0)
-			else:
-				b.target.y = ny
-			hit = true
-		if not hit:
-			return
+func _place_main(b, vs: Vector2) -> void:
+	b.plumb_side = 0
+	if b.head == Vector2.INF:
+		_placed.append(Rect2(b.target, b.size + Vector2(0, WorldBubble.TAIL_H)))
+		return
+	var sel: bool = _sel_actor != null and b.anchor == _sel_actor
+	var full: Vector2 = b.size + Vector2(0, WorldBubble.TAIL_H)
+	var best := INF
+	var best_pos := Vector2.ZERO
+	var best_lift := 0.0
+	var best_side := 0
+	var pref := 0.5
+	if sel or b.selected_side:
+		pref = 0.62   # bubble leans left, plumbob slot on the right (ref1)
+	for li in LIFTS.size():
+		var lift: float = LIFTS[li]
+		# lifting costs about as much as a 12 px² face overlap per px
+		var base_c := lift * lift * 0.9 + lift * 30.0
+		if base_c >= best:
+			break
+		for fr in FRACS:
+			var pos := Vector2(b.base_tip.x - b.size.x * fr, b.base_tip.y - lift - full.y)
+			var r := Rect2(pos, full)
+			var c := base_c + absf(fr - pref) * 900.0 + _cost(r, vs)
+			var side := 0
+			if sel:
+				# plumbob slot right (preferred) or left of the bubble
+				var pr := _pb_rect(pos, b.size, 1)
+				var pl := _pb_rect(pos, b.size, -1)
+				var cr := _cost(pr, vs)
+				var cl := _cost(pl, vs) + 400.0
+				side = 1 if cr <= cl else -1
+				c += minf(cr, cl)
+			if c < best:
+				best = c
+				best_pos = pos
+				best_lift = lift
+				best_side = side
+	var best_tip: Vector2 = b.base_tip - Vector2(0, best_lift)
+	if best > SIDE_COST:
+		# no room above (head near the top edge / crowded): try beside the
+		# head, body level with the face, tail reaching in toward the head
+		var hw: float = maxf(b.head_px * 0.5, 18.0)
+		for dir in [1.0, -1.0]:
+			for dy in _SIDE_DY:
+				var x: float = b.head.x + hw + 10.0 if dir > 0.0 else b.head.x - hw - 10.0 - b.size.x
+				var pos := Vector2(x, b.head.y + dy - b.size.y * 0.5)
+				var r := Rect2(pos, full)
+				var c: float = SIDE_COST + absf(dy) * 20.0 + _cost(r, vs)
+				var side := 0
+				if sel:
+					var pr := _pb_rect(pos, b.size, int(dir))
+					c += _cost(pr, vs)
+					side = int(dir)
+				if c < best:
+					best = c
+					best_pos = pos
+					best_side = side
+					best_tip = Vector2(b.head.x + dir * hw * 0.6, b.head.y + 6.0)
+	b.target = best_pos
+	b.tip = best_tip
+	b.plumb_side = best_side
+	_placed.append(Rect2(best_pos, full))
+	if best_side != 0:
+		_placed.append(_pb_rect(best_pos, b.size, best_side))
 
 
-## Nudge a bubble off the portrait column / clock / tasks / mode bar / money
-## and inside the screen; the tail keeps pointing at the sim.
+## Plumbob slot beside a bubble at `pos`: level with the bubble, bottom a bit
+## below the body like the gem in ref1.
+func _pb_rect(pos: Vector2, sz: Vector2, side: int) -> Rect2:
+	var h: float = PB_H * plumbob.gem_scale
+	var y: float = pos.y + sz.y - 2.0 - h
+	var x: float = pos.x + sz.x + 4.0 if side > 0 else pos.x - PB_W - 4.0
+	return Rect2(x, y - 4.0, PB_W, h + 8.0)
+
+
+const _CHIP_DX: Array[float] = [0.0, 30.0, -30.0, 60.0]
+const _CHIP_SLOTS: Array[Vector3] = [
+	# (fx of bubble width, fy: 1 below / 0 middle / -1 above, extra cost)
+	Vector3(0.6, 1.0, 0.0), Vector3(0.35, 1.0, 120.0), Vector3(1.0, 0.0, 200.0),
+	Vector3(0.75, 1.0, 160.0), Vector3(0.6, -1.0, 500.0), Vector3(-1.0, 0.0, 600.0),
+	Vector3(0.0, 1.0, 400.0), Vector3(0.6, 2.0, 900.0), Vector3(1.0, 1.0, 300.0),
+]
+
+
+## Skill chip ("+ Creativity"): just below-right of its own bubble (ref1),
+## else beside it, never on a face, bubble or HUD card.
+func _place_chip(ch, vs: Vector2) -> void:
+	var mb = _main_bubble_for(ch.anchor) if ch.anchor != null and is_instance_valid(ch.anchor) else null
+	var origin := Rect2()
+	if mb != null:
+		origin = Rect2(mb.target, mb.size)
+	elif ch.head != Vector2.INF:
+		# no action bubble: hang beside the head
+		origin = Rect2(ch.head + Vector2(-ch.size.x * 0.5, -ch.size.y - 40.0), Vector2(ch.size.x, ch.size.y + 10.0))
+	else:
+		_placed.append(Rect2(ch.target, ch.size))
+		ch.tip = ch.target + Vector2(4.0, ch.size.y + 9.0)
+		return
+	var best := INF
+	var best_pos: Vector2 = ch.target
+	for s in _CHIP_SLOTS:
+		var pos := Vector2.ZERO
+		if s.x >= 1.0:
+			pos.x = origin.end.x + 8.0
+		elif s.x <= -1.0:
+			pos.x = origin.position.x - ch.size.x - 8.0
+		else:
+			pos.x = origin.position.x + origin.size.x * s.x
+		if s.y >= 2.0:
+			pos.y = origin.end.y + 12.0 + ch.size.y + 8.0
+		elif s.y >= 1.0:
+			pos.y = origin.end.y + 12.0
+		elif s.y <= -1.0:
+			pos.y = origin.position.y - ch.size.y - 8.0
+		else:
+			pos.y = origin.position.y + (origin.size.y - ch.size.y) * 0.5
+		for dx in _CHIP_DX:
+			var p2 := pos + Vector2(dx, 0)
+			var c: float = s.z + absf(dx) * 4.0 + _cost(Rect2(p2, ch.size + Vector2(0, 9)), vs)
+			if c < best:
+				best = c
+				best_pos = p2
+	ch.target = best_pos
+	ch.tip = best_pos + Vector2(4.0, ch.size.y + 9.0)
+	_placed.append(Rect2(best_pos, ch.size + Vector2(0, 9)))
+
+
+## Nudge a bubble off the HUD cards and inside the screen (fallback bubbles).
 func _keep_off_hud(b, vs: Vector2) -> void:
 	for hr in _hud_rects:
 		var r := Rect2(b.target, b.size)
@@ -700,25 +752,14 @@ func _update_plumbob() -> void:
 	if a:
 		var hm := _head_metrics(a)
 		if hm != Vector3.INF:
-			var head := Vector2(hm.x, hm.y)
-			# no bubble: float the gem in the head gap
-			tip = head + Vector2(0, -10.0)
+			# no bubble: float the gem in the gap over the head
+			tip = Vector2(hm.x, hm.y - 8.0)
 			var b = _main_bubble_for(a)
-			if b != null:
-				# in the reserved slot right of the sim's own bubble, its
-				# bottom level with the bubble body's bottom (ref1)
-				tip = Vector2(b.target.x + b.size.x + PLUMBOB_RESERVE * 0.5 + 2.0, b.target.y + b.size.y + 26.0 * plumbob.gem_scale)
-				var gr := Rect2(tip.x - 18.0, tip.y - 70.0 * plumbob.gem_scale, 36.0, 66.0 * plumbob.gem_scale)
-				var blocked := false
-				for o in _mains:
-					if o != b and Rect2(o.target, o.size).intersects(gr):
-						blocked = true
-				for i in _heads.size():
-					if _head_hard[i] and _heads[i].intersects(gr):
-						blocked = true
-				if blocked:
-					# fall back to sitting on top of the bubble, over its tail
-					tip = Vector2(b.tip.x, b.target.y - 4.0)
+			if b != null and b.plumb_side != 0:
+				var r := _pb_rect(b.target, b.size, b.plumb_side)
+				tip = Vector2(r.get_center().x, r.end.y)
+			elif b != null:
+				tip = Vector2(b.tip.x, b.target.y - 4.0)
 	else:
 		tip = plumbob_fallback
 	plumbob.active = tip != Vector2.INF

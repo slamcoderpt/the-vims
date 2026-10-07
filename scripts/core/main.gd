@@ -32,6 +32,8 @@ const STAGED := {
 			"Lily": [["had_fun", "Had Fun", "need_fun", 10.0, 3.0, "Paint"], ["learned", "Learned Something", "bulb", 12.0, 4.0, "Reached Creativity level 2"]],
 			"Maya": [["had_fun", "Had Fun", "need_fun", 10.0, 3.0, "Play"], ["tired", "Tired", "need_energy", -12.0, 0.0, ""]],
 			"Biscuit": [["belly_rubs", "Belly Rubs", "paw", 12.0, 3.0, "Loved by Lily"]]},
+		"wishes": {"Jack": [["skill_Logic_4", "Reach Logic Level 4", "chart", 600, true], ["rel_Lily_3", "Become Best Friends with Lily", "heart", 700, false],
+			["earn_250", "Earn $250", "money", 450, false]]},
 	},
 }
 
@@ -60,6 +62,15 @@ func _ready() -> void:
 	sim = SimWorld.new()
 	sim.main = self
 	add_child(sim)
+	# Real play keeps a save (continue where you left off; autosave hourly,
+	# on travel and when the app is backgrounded). Playtests start fresh.
+	# --new=1 starts a new game.
+	if not args.has("playtest"):
+		Game.autosave = true
+		if args.has("new"):
+			Game.delete_save()
+		elif Game.has_save() and Game.load_game():
+			print("Loaded save: day %d %s, $%d at %s" % [Game.day, Game.clock_text(), Game.money, Game.location])
 	if args.has("location"):
 		Game.location = args.location
 	load_location(Game.location)
@@ -74,6 +85,10 @@ func _ready() -> void:
 
 func load_location(loc_name: String) -> void:
 	if location:
+		# Drop every bubble anchored to the old lot's people before they are freed.
+		for n in location.find_children("*", "Node3D", true, false):
+			if n is SimActor:
+				Game.clear_bubble(n, "")
 		world.remove_child(location)
 		location.queue_free()
 		location = null
@@ -129,6 +144,8 @@ func _stage_gameplay(preset_name: String) -> void:
 		Game.set_queue_view(i, view)
 		for ml in st.get("moodlets", {}).get(m.name, []):
 			Game.add_moodlet(i, ml[0], ml[1], ml[2], ml[3], ml[4], ml[5])
+		for w in st.get("wishes", {}).get(m.name, []):
+			Game.add_wish(i, {"id": w[0], "label": w[1], "icon": w[2], "kind": "staged", "arg": "", "n": 1, "reward": w[3], "promised": w[4], "born": 0.0})
 	var ov := SimOverlay.new()
 	ov.name = "SimOverlay"
 	ov.hud = hud

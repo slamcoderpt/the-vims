@@ -33,6 +33,9 @@ var id := ""
 var fallback_at = null
 var fallback_screen = null
 var selected_side := false
+## Tail tip straight above the head before layout lifts; plumbob side (+1/-1/0).
+var base_tip := Vector2.ZERO
+var plumb_side := 0
 var offset := Vector2.ZERO
 ## Horizontal lean of the tail tip (px) so it can point toward the head.
 var tail_lean := 0.0
@@ -134,6 +137,12 @@ func _draw() -> void:
 		# chip sits beside the head: short tail pointing down-left at it
 		var cx := clampf(lt.x + 4.0, 12.0, size.x - 14.0)
 		tail = PackedVector2Array([Vector2(cx - 3, size.y - 1), Vector2(cx + 9, size.y - 1), Vector2(cx - 7, size.y + 8.0)])
+	elif lt.y < size.y - 4.0 and (lt.x < 0.0 or lt.x > size.x):
+		# hung beside the head (no room above): tail out of the side
+		var cy := clampf(lt.y, 16.0, size.y - 14.0)
+		var ex := 1.0 if lt.x < 0.0 else size.x - 1.0
+		var px := -TAIL_H if lt.x < 0.0 else size.x + TAIL_H
+		tail = PackedVector2Array([Vector2(ex, cy - 10), Vector2(ex, cy + 10), Vector2(px, cy + 7)])
 	else:
 		var tx := _tail_base_x()
 		var lean := clampf((lt.x - tx) * 0.5, -9.0, 9.0)

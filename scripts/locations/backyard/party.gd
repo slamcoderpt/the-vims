@@ -16,7 +16,7 @@ const BULB := Color("ffd889")
 ## World placement of the main pieces.
 const TABLE_POS := Vector3(0.9, 0.0, 0.5)
 const TABLE_ROT := 0.30
-const GRILL_POS := Vector3(-3.6, 0.0, -1.15)
+const GRILL_POS := Vector3(-3.9, 0.0, -1.45)
 const GRILL_ROT := PI + 0.55
 const PIT_POS := Vector3(4.1, 0.0, 2.4)
 ## Lanterns (fine cells: x, y, z of the base corner; 7x7 footprint).
@@ -49,11 +49,12 @@ const TL := 34
 const TD := 12
 ## Seats in table-local cells: Vector3(x, z, unused) — facing is derived in _facing().
 const SEATS := {
-	"far_l": Vector3(-21, -16, 0.0),
-	"far_m": Vector3(0, -16, 0.0),
-	"far_r": Vector3(21, -16, 0.0),
-	"near_l": Vector3(-8, 16, PI),
-	"near_r": Vector3(18, 16, PI),
+	"far_l": Vector3(-24, -16, 0.0),
+	"far_m": Vector3(-8, -16, 0.0),
+	"far_m2": Vector3(8, -16, 0.0),
+	"far_r": Vector3(24, -16, 0.0),
+	"near_l": Vector3(-19, 16, PI),
+	"near_r": Vector3(17, 16, PI),
 	"end_l": Vector3(-41, 0, PI * 0.5),
 	"end_r": Vector3(41, 0, -PI * 0.5),
 }
@@ -79,8 +80,8 @@ func build(parent: Node3D) -> void:
 	yard.jitter = 0.05
 	_prep_table(yard, -28, -40)
 	_fire_pit(yard, int(PIT_POS.x * F), int(PIT_POS.z * F))
-	_sofa(yard, 100, 28)
-	_side_table(yard, 96, 8)
+	_sofa(yard, 92, 28)
+	_side_table(yard, 88, 6)
 	for lp in LANTERNS:
 		_lantern(yard, lp.x, lp.y, lp.z, 1.0)
 		halos.add(Vector3((lp.x + 3.5) / F, (lp.y + 5.5) / F, (lp.z + 3.5) / F), 1.5, Color(1.0, 0.6, 0.24, 1.0))
@@ -323,15 +324,20 @@ func _grill() -> void:
 		return Color("ff7a2a").lerp(Color("ffcf5a"), V.h1(q, 2)), true)
 	for gz in [-5, -3, -1, 1]:
 		V.b(vb, -9, 16, gz, 18, 1, 1, Color("45464c"))
-	# Food on the grate.
+	# Food on the grate: thick patties, sausages and corn cobs.
 	for i in 4:
 		var px := -8 + i * 4
-		V.b(vb, px, 17, -4, 3, 1, 3, V.mix([Color("6b3a1f"), Color("5a2e18"), Color("7b4526")], i))
+		V.b(vb, px, 17, -4, 3, 2, 3, V.mix([Color("6b3a1f"), Color("5a2e18"), Color("7b4526"), Color("3e2012")], i))
+		if i % 2 == 0:
+			V.b(vb, px, 19, -4, 3, 1, 1, Color("f2c22a"))
+		else:
+			V.p(vb, px + 1, 19, -3, Color("3e2012"))
 	for i in 3:
-		V.b(vb, -7 + i * 3, 17, 1, 2, 1, 1, Color("a2512e"))
+		V.b(vb, -7 + i * 3, 17, 1, 2, 2, 1, Color("a2512e"))
 		V.b(vb, -7 + i * 3, 17, 2, 2, 1, 1, Color("8a4426"))
-	V.b(vb, 6, 17, 0, 1, 1, 3, Color("f3d24a")); V.b(vb, 8, 17, 0, 1, 1, 3, Color("f3d24a"))
-	V.p(vb, 6, 17, 3, Color("6cb04a")); V.p(vb, 8, 17, 3, Color("6cb04a"))
+	for cx in [4, 6, 8]:
+		V.b(vb, cx, 17, -1, 1, 2, 4, func(q: Vector3i) -> Color: return Color("f3d24a") if (q.z + q.y) % 2 == 0 else Color("e2b432"))
+		V.p(vb, cx, 17, 3, Color("6cb04a"))
 	# Open lid, flipped down over the back of the firebox (faces the camera,
 	# so the grate and food stay visible).
 	V.b(vb, -10, 7, -8, 20, 9, 2, V.noisy(IRON, 0.05))
@@ -354,28 +360,28 @@ func _grill() -> void:
 	smoke.name = "Smoke"
 	# Rises off the right end of the grate (between Jack and the table) and
 	# drifts back, so it never veils his face.
-	smoke.position = Vector3(-0.5, 1.12, 0.0)
+	smoke.position = Vector3(-0.2, 1.15, 0.0)
 	smoke.amount = 44
-	smoke.lifetime = 3.2
-	smoke.preprocess = 3.2
+	smoke.lifetime = 4.0
+	smoke.preprocess = 4.0
 	smoke.local_coords = false
 	smoke.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
-	smoke.emission_box_extents = Vector3(0.12, 0.02, 0.1)
+	smoke.emission_box_extents = Vector3(0.3, 0.02, 0.12)
 	smoke.direction = Vector3(0, 1, 0)
 	smoke.spread = 12.0
-	smoke.gravity = Vector3(0.18, 0.22, -0.35)
+	smoke.gravity = Vector3(0.05, 0.22, -0.2)
 	smoke.initial_velocity_min = 0.25
 	smoke.initial_velocity_max = 0.45
-	smoke.scale_amount_min = 0.7
-	smoke.scale_amount_max = 1.3
+	smoke.scale_amount_min = 1.0
+	smoke.scale_amount_max = 1.7
 	var curve := Curve.new()
 	curve.add_point(Vector2(0, 0.35))
 	curve.add_point(Vector2(0.5, 1.0))
 	curve.add_point(Vector2(1, 1.6))
 	smoke.scale_amount_curve = curve
 	var grad := Gradient.new()
-	grad.set_color(0, Color(0.95, 0.9, 0.88, 0.62))
-	grad.set_color(1, Color(0.8, 0.74, 0.86, 0.0))
+	grad.set_color(0, Color(0.86, 0.84, 0.88, 0.78))
+	grad.set_color(1, Color(0.66, 0.62, 0.74, 0.0))
 	smoke.color_ramp = grad
 	var bm := BoxMesh.new()
 	bm.size = Vector3.ONE * 0.2

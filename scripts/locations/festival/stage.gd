@@ -55,7 +55,7 @@ func _notes(n: Node3D) -> void:
 	K.pattern(vb, note, 0, 0, 0, {"#": Color("fffaf0")}, true)
 	K.pattern(vb, dbl, 6, 7, 0, {"#": Color("fffaf0")}, true)
 	K.pattern(vb, note, 13, 3, 0, {"#": Color("fffaf0")}, true)
-	var mi := K.inst(n, vb, 0.07, Vector3(-2.65, DECK * U + 1.75, 1.2), 0.0, false)
+	var mi := K.inst(n, vb, 0.07, Vector3(-2.35, DECK * U + 1.75, 1.0), 0.0, false)
 	mi.name = "MusicNotes"
 
 
@@ -99,7 +99,6 @@ func _truss(vb: VoxelBuilder) -> void:
 			if posmod(z, 4) == 0:
 				c = K.shade(c, 0.82)
 			vb.set_v(Vector3i(x, y, z), c)
-			vb.set_v(Vector3i(x, y - 1, z), Color("2a2220"))
 	# Fascia board along the front edge, with a row of warm bulbs under it.
 	K.box(vb, -3, top + 1, D + 2, W + 6, 3, 1, Color("5a2a22"))
 	for x in range(-2, W + 3, 4):

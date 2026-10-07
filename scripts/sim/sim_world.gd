@@ -663,7 +663,10 @@ func _on_action_chosen(title: String, action: Dictionary) -> void:
 					stats.orders += 1
 		"travel":
 			var dest: String = action.get("loc", "")
-			if dest != "":
+			if action.get("id", "") == "save_game":
+				if Game.save_game():
+					Game.notify.emit("Game saved · %s" % Game.clock_text(), "star")
+			elif dest != "":
 				travel(dest)
 		"catalog", "ghost", "placed":
 			build.on_menu(ctx, action)
@@ -676,6 +679,7 @@ func travel_menu(screen := Vector2(450, 520)) -> void:
 			continue
 		var label: String = "Go Home" if l == "home" else Game.LOCATION_NAMES[l]
 		rows.append({"id": "go_" + l, "label": label, "icon": TRAVEL_ICONS.get(l, "house_white"), "loc": l})
+	rows.append({"id": "save_game", "label": "Save Game", "icon": "star"})
 	open_menu("Travel", rows, {"type": "travel"}, screen)
 
 
@@ -694,6 +698,8 @@ func travel(dest: String) -> void:
 			if n is SimActor:
 				Game.clear_bubble(n, "")
 	Game.travel(dest)
+	if Game.autosave:
+		Game.save_game()
 
 
 func _on_mode(m: String) -> void:
@@ -943,6 +949,11 @@ func choose_autonomous(ag) -> Dictionary:
 				if not Game.can_afford(cost) or not _desperate_fix(ag, a):
 					continue
 			var s := SimActions.score(a, ag.member, dist) + randf() * 0.05 - busy_pen + Wishes.bias(ag, a)
+			if not meal.is_empty():
+				if a.get("id", "") == "meal":
+					s += 0.15   # food's on the table: eat it before it goes cold
+				elif is_meal_cook(it, a) and float(a.get("needs", {}).get("hunger", 0.0)) > 0.0:
+					s -= 0.6
 			if s > best_s:
 				best_s = s
 				best_a = a
@@ -1082,11 +1093,20 @@ func serve_meal(cook, a: Dictionary) -> void:
 	var table = _meal_table(cook)
 	if table == null:
 		return
-	clear_meal()
 	var humans: Array = agents.filter(func(x): return x != null and x.kind != "dog")
 	var cook_ate := float(a.get("needs", {}).get("hunger", 0.0)) >= 0.5
-	var n := maxi(1, humans.size() - (1 if cook_ate else 0))
+	var n := clampi(humans.size() - (1 if cook_ate else 0), 1, 4)
 	var q: float = Game.skill_level(cook.index, "Cooking")
+	if not meal.is_empty() and meal.get("table") == table:
+		# More food for the table: top up the servings already out.
+		var add := mini(n, 4 - int(meal.servings))
+		if add > 0:
+			_spawn_plates(table, add)
+			meal.servings = int(meal.servings) + add
+		meal.expires = Game.total_minutes() + MEAL_SPOILS
+		_call_to_meal(cook if cook_ate else null, humans, table)
+		return
+	clear_meal()
 	var dishes := ["Mac & Cheese", "Veggie Stew", "Spaghetti", "Pancakes", "Roast Chicken", "Gourmet Lasagna"]
 	if str(table.title) == "Dinner Table" or str(a.get("label", "")).contains("Burger") or str(a.get("label", "")).contains("Grill"):
 		dishes = ["Hot Dogs", "Burgers", "Burgers", "BBQ Ribs", "BBQ Ribs", "Gourmet Burgers"]
@@ -1097,12 +1117,18 @@ func serve_meal(cook, a: Dictionary) -> void:
 	Game.notify.emit("%s served %s: %d serving%s on the %s" % [cook.display_name(), dish, n, "" if n == 1 else "s", str(table.title).to_lower()], "plate")
 	cook._say("Dinner's ready!", "plate")
 	stats["meals"] = int(stats.get("meals", 0)) + 1
-	# Call to meal: hungry family drop what free will had them doing.
+	_call_to_meal(cook if cook_ate else null, humans, table)
+
+
+## Call to meal: hungry family drop what free will had them doing.
+func _call_to_meal(skip, humans: Array, table) -> void:
 	for ag in humans:
-		if ag == cook and cook_ate:
+		if ag == skip:
 			continue
 		if float(ag.member.needs.get("hunger", 1.0)) > 0.7:
 			continue
+		if ag.order.get("action", {}).get("id", "") == "meal" or ag.queue.any(func(q2): return q2.get("action", {}).get("id", "") == "meal"):
+			continue   # already on the way
 		if ag.phase != "idle" and (not ag.order.get("auto", false) or ag.order.get("forced", false)):
 			continue
 		if ag.queue.any(func(q2): return not q2.get("auto", false)):
@@ -1185,10 +1211,12 @@ func _spawn_plates(table: Node, n: int) -> void:
 			fb.set_v(Vector3i(2, 2, 3), cols[2])
 			fb.set_v(Vector3i(4, 1, 2), cols[2])
 			_food_meshes.append(fb.build(0.035, Vector3(3.5, 0, 3.5)))
-	var root := Node3D.new()
-	root.name = "FamilyMeal"
-	location.add_child(root)
-	meal.node = root
+	var root: Node3D = meal.get("node")
+	if root == null or not is_instance_valid(root):
+		root = Node3D.new()
+		root.name = "FamilyMeal"
+		location.add_child(root)
+		meal.node = root
 	var half := _box_half(table)
 	var c: Vector3 = table.global_transform * table.look_at_spot
 	var top := c.y + half.y + 0.005
@@ -1198,9 +1226,12 @@ func _spawn_plates(table: Node, n: int) -> void:
 	var short_ax := bz if half.x >= half.z else bx
 	var ll := maxf(half.x, half.z)
 	var sl := minf(half.x, half.z)
-	var plates: Array = []
-	for k in n:
-		var t := (float(k / 2) + 0.5) / float(maxi(1, (n + 1) / 2)) - 0.5
+	var plates: Array = meal.get("plates", [])
+	var first := plates.size()
+	n += first
+	for k in range(first, n):
+		# Four place settings: two along each long side.
+		var t := (-0.25 if (k % 4) < 2 else 0.25)
 		var side := 1.0 if k % 2 == 0 else -1.0
 		var pos := c + long_ax * t * ll * 1.3 + short_ax * side * sl * 0.5
 		pos.y = top

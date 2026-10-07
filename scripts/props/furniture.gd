@@ -258,10 +258,10 @@ static func m_bed(vb: VoxelBuilder, v: int) -> void:
 ## Turned-down quilt to lay over a sim in bed (16 x 3 x 15), v as m_bed.
 static func m_blanket(vb: VoxelBuilder, v: int) -> void:
 	var quilt: Callable = V.plaid(Color("f7b6c8"), Color("ef8fab"), Color("e36f92"), 2) if v == 0 else V.noisy(Color("34468f"), 0.06)
+	# Low mound (a small sim under it), folded white sheet band at the top.
 	V.b(vb, 0, 0, 0, 16, 1, 15, quilt)
-	V.b(vb, 1, 1, 1, 14, 2, 13, quilt)
+	V.b(vb, 2, 1, 2, 12, 1, 11, quilt)
 	V.b(vb, 0, 1, 0, 16, 1, 2, Color("fbfbf8"))
-	V.b(vb, 2, 3, 4, 12, 1, 8, quilt)
 
 
 static func m_sofa(vb: VoxelBuilder, v: int) -> void:
@@ -335,26 +335,31 @@ static func m_side_table(vb: VoxelBuilder, v: int) -> void:
 # ------------------------------------------------------------------ music / art
 
 static func m_piano(vb: VoxelBuilder, _v: int) -> void:
-	# Digital piano on a stand, keys along X, player at +Z.
+	# Digital piano on an X stand (ref1), keys along X, player at +Z. The white
+	# key bed runs the full front so it reads as a keyboard from above.
 	var blk := Color("2a2b31")
-	V.b(vb, 2, 0, 1, 2, 11, 2, blk); V.b(vb, 24, 0, 1, 2, 11, 2, blk)
-	V.b(vb, 2, 0, 0, 2, 1, 6, blk); V.b(vb, 24, 0, 0, 2, 1, 6, blk)
-	V.b(vb, 4, 3, 1, 20, 1, 1, blk)
-	V.b(vb, 0, 11, 0, 28, 2, 8, V.noisy(blk, 0.04))
-	# Keys.
+	for side in [2, 24]:
+		for k in 11:
+			var dz := int(round(k * 5.0 / 10.0))
+			V.p(vb, side, k, dz, blk); V.p(vb, side + 1, k, dz, blk)
+			V.p(vb, side, k, 5 - dz, blk); V.p(vb, side + 1, k, 5 - dz, blk)
+	V.b(vb, 0, 11, 0, 28, 2, 4, V.noisy(blk, 0.04))
+	V.b(vb, 0, 11, 4, 28, 1, 5, blk)
+	V.b(vb, 0, 11, 0, 1, 3, 9, blk); V.b(vb, 27, 11, 0, 1, 3, 9, blk)
+	# White keys (with gaps), then short black keys at the back of the key bed.
 	for x in range(1, 27):
-		V.b(vb, x, 13, 4, 1, 1, 4, Color("f7f5ef") if x % 2 == 0 else Color("e8e4dc"))
+		V.b(vb, x, 12, 4, 1, 1, 5, Color("fbfaf6") if x % 2 == 0 else Color("ecE8e0"))
 	for x in range(1, 27):
 		var m := x % 7
 		if m == 1 or m == 2 or m == 4 or m == 5 or m == 6:
-			V.b(vb, x, 14, 4, 1, 1, 2, Color("16161a"))
-	V.b(vb, 0, 13, 0, 28, 1, 4, blk)
-	V.b(vb, 3, 14, 1, 3, 1, 1, Color("4fd07a"), true)
+			V.b(vb, x, 13, 4, 1, 1, 2, Color("16161a"))
+	V.b(vb, 3, 13, 1, 3, 1, 1, Color("4fd07a"), true)
+	V.b(vb, 22, 13, 1, 3, 1, 1, Color("e05050"), true)
 	# Sheet music stand.
-	V.b(vb, 8, 14, 1, 12, 7, 1, Color("f8f6f0"))
+	V.b(vb, 8, 13, 1, 12, 8, 1, Color("f8f6f0"))
 	for k in 3:
 		V.b(vb, 9, 16 + k * 2, 2, 10, 1, 1, Color("8e8a86"))
-	V.b(vb, 8, 14, 2, 12, 1, 1, blk)
+	V.b(vb, 8, 13, 2, 12, 1, 1, blk)
 
 
 static func m_piano_bench(vb: VoxelBuilder, _v: int) -> void:
@@ -484,18 +489,22 @@ static func m_toilet(vb: VoxelBuilder, _v: int) -> void:
 
 
 static func m_bathtub(vb: VoxelBuilder, _v: int) -> void:
+	# Compact tub (1.4 x 0.8 m authored), rim + water + a few foam bubbles,
+	# tap at the x=0 end, pink towel folded on the far rim.
 	var w := Color("f8f7f4")
-	V.b(vb, 0, 0, 0, 28, 9, 14, V.noisy(w, 0.02))
-	V.b(vb, 2, 3, 2, 24, 6, 10, Color(0, 0, 0, 0))
-	vb.clear_box(Vector3i(2, 4, 2), Vector3i(24, 5, 10))
-	V.b(vb, 2, 4, 2, 24, 3, 10, V.noisy(Color("9fd3ea"), 0.04))
-	# Bubbles.
-	for k in 14:
-		var bx := 3 + int(V.hs(k, 1, 2) * 22)
-		var bz := 2 + int(V.hs(k, 3, 4) * 9)
+	var L := 22
+	var D := 13
+	V.b(vb, 0, 1, 0, L, 8, D, V.noisy(w, 0.02))
+	for q in [Vector2i(1, 1), Vector2i(L - 2, 1), Vector2i(1, D - 2), Vector2i(L - 2, D - 2)]:
+		V.b(vb, q.x, 0, q.y, 1, 1, 1, Color("c9a35a"))
+	vb.clear_box(Vector3i(2, 4, 2), Vector3i(L - 4, 5, D - 4))
+	V.b(vb, 2, 4, 2, L - 4, 3, D - 4, V.noisy(Color("8fcbe6"), 0.05))
+	for k in 6:
+		var bx := 4 + int(V.hs(k, 1, 2) * (L - 9))
+		var bz := 3 + int(V.hs(k, 3, 4) * (D - 7))
 		V.b(vb, bx, 7, bz, 2, 1, 2, Color("ffffff"))
-	V.b(vb, 1, 9, 6, 2, 1, 2, METAL); V.b(vb, 1, 9, 6, 1, 4, 1, METAL)
-	V.b(vb, 20, 9, 0, 6, 2, 3, Color("f2b5c6"))
+	V.b(vb, 1, 9, 5, 2, 1, 2, METAL); V.b(vb, 1, 9, 5, 1, 4, 1, METAL)
+	V.b(vb, L - 7, 9, 0, 6, 2, 3, Color("f2b5c6"))
 
 
 static func m_shower(vb: VoxelBuilder, _v: int) -> void:

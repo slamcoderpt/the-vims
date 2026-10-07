@@ -9,7 +9,7 @@ const C := 0.125
 const U := 0.0625
 const X0 := -6.75
 const X1 := 7.75
-const Z0 := -8.25
+const Z0 := -11.75
 const ZF := 17.0
 const H := 5.0
 
@@ -52,10 +52,12 @@ static func _walls(root: Node3D) -> void:
 		if p.y == 21 or p.y == 22:
 			return Color("6f8f5a")
 		# warm honey-wood vertical planks (2 cells wide) above the green rail
-		var k := (p.x + p.z) / 3
-		var f := 0.88 + 0.2 * Kit.h(Vector3i(k, p.y / 12, 3), 2)
-		if (p.x + p.z) % 3 == 0:
-			f *= 0.9
+		# horizontal shiplap boards; colour changes every ~2 m along the wall
+		# so the mesher can merge long runs (cheap on mobile).
+		var k := (p.x + p.z) / 16
+		var f := 0.88 + 0.2 * Kit.h(Vector3i(k, p.y / 2, 3), 2)
+		if p.y % 2 == 0:
+			f *= 0.92
 		return Kit.shade(WALL, f)
 	# left / right / back
 	vb.box(Vector3i(x0, 0, z0), Vector3i(1, hh, zf - z0), wall_fn)
@@ -108,7 +110,7 @@ static func _ceiling(root: Node3D, halo_pts: Array) -> void:
 		var k := p.z / 3
 		return Kit.shade(CEIL, 0.85 + 0.25 * Kit.h(Vector3i(0, 0, k), 4)))
 	# beams across x
-	for bz in [-6.0, -3.0, 0.0, 3.0, 6.0, 9.0, 12.0, 15.0]:
+	for bz in [-9.0, -6.0, -3.0, 0.0, 3.0, 6.0, 9.0, 12.0, 15.0]:
 		vb.box(Vector3i(x0, hh - 3, cc(bz)), Vector3i(x1 - x0, 3, 2), BEAM)
 	# two long beams along z
 	for bx in [-2.25, 3.25]:
@@ -120,8 +122,9 @@ static func _ceiling(root: Node3D, halo_pts: Array) -> void:
 	var lamps := VoxelBuilder.new()
 	lamps.jitter = 0.02
 	var pools := []
-	var rows := [[4.4, 3.95, [-4.0, -1.3, 1.6, 4.4], true], [1.2, 3.85, [-4.3, -1.5, 1.5, 4.5], true], [-1.8, 3.7, [-4.4, -1.6, 1.3, 4.3], true],
-		[-4.6, 3.6, [-4.1, -1.3, 1.6, 4.5], true], [-7.0, 3.55, [-2.8, 0.1, 3.0], false]]
+	var rows := [[3.4, 3.95, [-4.0, -1.3, 1.5, 4.4], true], [0.6, 3.85, [-4.3, -0.8, 1.3, 5.3], true],
+		[-2.3, 3.75, [-4.4, -1.6, 1.2, 3.5, 6.0], true], [-5.2, 3.65, [-4.1, -1.5, 1.2, 3.5, 6.0], true],
+		[-8.0, 3.55, [-4.0, -1.4, 1.2, 3.5, 6.0], false], [-10.5, 3.5, [-3.0, -0.2, 2.4, 5.0], false]]
 	for r: Array in rows:
 		for x: float in r[2]:
 			var p := Vector3(x, r[1], r[0])
@@ -129,15 +132,16 @@ static func _ceiling(root: Node3D, halo_pts: Array) -> void:
 			Fx.pendant(lamps, Vector3i(int(round(p.x / U)), int(round(p.y / U)), int(round(p.z / U))), cord)
 			halo_pts.append([p + Vector3(0.03, -0.1, 0.03), 1.7, Color(1.0, 0.7, 0.38, 1.0)])
 			halo_pts.append([p + Vector3(0.03, -0.12, 0.03), 0.45, Color(1.0, 0.92, 0.75, 1.0)])
-			if r[3]:
+			if r[3] and absf(x - 3.5) > 0.1:
 				Kit.light(root, p + Vector3(0, -0.35, 0), Color(1.0, 0.8, 0.55), 1.15, 4.6)
-				pools.append([Vector3(x, 0.012, r[0]), Vector2(3.0, 3.0), Color(1.0, 0.7, 0.4, 0.6)])
+			pools.append([Vector3(x, 0.012, r[0]), Vector2(2.6, 2.6), Color(1.0, 0.7, 0.4, 0.55 if r[3] else 0.4)])
 	Kit.add(root, lamps, U, "Pendants", false, Kit.glow_mat("warm"), Vector3.ZERO, Vector3.ZERO, false, false)
 	# Cool spill from the fridge bank + its reflection streak on the tiles.
-	Kit.light(root, Vector3(0.6, 1.4, -6.9), Color(0.8, 0.9, 1.0), 1.4, 4.5)
-	Kit.light(root, Vector3(5.8, 1.4, -6.9), Color(0.8, 0.9, 1.0), 1.0, 3.5)
-	pools.append([Vector3(0.6, 0.014, -6.9), Vector2(7.2, 1.8), Color(0.62, 0.8, 1.0, 0.55)])
-	pools.append([Vector3(5.9, 0.014, -6.9), Vector2(3.6, 1.6), Color(0.62, 0.8, 1.0, 0.45)])
+	Kit.light(root, Vector3(-1.4, 1.4, -10.4), Color(0.8, 0.9, 1.0), 1.4, 4.5)
+	Kit.light(root, Vector3(2.0, 1.4, -10.4), Color(0.8, 0.9, 1.0), 1.4, 4.5)
+	Kit.light(root, Vector3(5.6, 1.4, -10.4), Color(0.8, 0.9, 1.0), 1.0, 3.5)
+	pools.append([Vector3(0.4, 0.014, -10.4), Vector2(9.0, 1.8), Color(0.62, 0.8, 1.0, 0.55)])
+	pools.append([Vector3(5.6, 0.014, -10.4), Vector2(3.6, 1.6), Color(0.62, 0.8, 1.0, 0.45)])
 	root.add_child(Kit.pools(pools))
 
 
@@ -179,30 +183,30 @@ static func _text(board: Node3D, text: String, at: Vector3, w: float, h: float, 
 
 static func _signs(root: Node3D) -> void:
 	var z := 0.105
-	# FRESH & LOCAL (big green, angled towards the aisle)
-	var fresh := _board(root, "SignFresh", Vector3(-1.55, 3.3, -3.2), 32.0, 3.4, 1.0, Color("2f7f3b"), Color("8a5a31"))
-	_text(fresh, "FRESH & LOCAL", Vector3(-0.3, 0.0, z), 2.45, 0.6, Color("fbf6e6"), 1.3)
+	# FRESH & LOCAL (big green, over the produce side, angled towards the aisle)
+	var fresh := _board(root, "SignFresh", Vector3(-2.6, 3.95, -1.2), 24.0, 4.0, 1.12, Color("2f7f3b"), Color("8a5a31"))
+	_text(fresh, "FRESH & LOCAL", Vector3(-0.3, 0.0, z), 2.9, 0.68, Color("fbf6e6"), 1.3)
 	var lv := VoxelBuilder.new()
 	Fx.leaf_icon(lv, Vector3i(0, 0, 0), Color("8fd14f"), Color("3d8a2a"))
-	Kit.add(fresh, lv, U * 1.3, "Leaf", false, null, Vector3(1.3, -0.02, 0.11), Vector3(3.5, 4, 0))
+	Kit.add(fresh, lv, U * 1.3, "Leaf", false, null, Vector3(1.55, -0.02, 0.11), Vector3(3.5, 4, 0))
 	# Produce
-	var prod := _board(root, "SignProduce", Vector3(-1.95, 2.62, -2.6), 25.0, 1.15, 0.36, Color("3a2a20"), Color("7a5130"), true, 2.95)
-	_text(prod, "Produce", Vector3(0, 0.0, z), 0.9, 0.22, Color("f6efe0"))
-	# MARKET
-	var mk := _board(root, "SignMarket", Vector3(2.4, 3.35, -3.1), -8.0, 2.6, 0.78, Color("34302d"), Color("8a5a31"))
-	_text(mk, "MARKET", Vector3(0.08, 0.0, z), 1.45, 0.42, Color("f4eedf"), 1.25)
+	var prod := _board(root, "SignProduce", Vector3(-3.3, 2.6, -2.3), 28.0, 1.2, 0.38, Color("3a2a20"), Color("7a5130"), true, 2.9)
+	_text(prod, "Produce", Vector3(0, 0.0, z), 0.95, 0.24, Color("f6efe0"))
+	# MARKET (over the grocery aisles, right)
+	var mk := _board(root, "SignMarket", Vector3(3.5, 4.0, -2.0), -14.0, 3.1, 0.9, Color("34302d"), Color("8a5a31"))
+	_text(mk, "MARKET", Vector3(0.1, 0.0, z), 1.6, 0.46, Color("f4eedf"), 1.25)
 	var cv := VoxelBuilder.new()
 	Fx.cart_icon(cv, Vector3i(0, 0, 0), Color("f4eedf"))
-	Kit.add(mk, cv, U * 0.75, "CartIcon", false, null, Vector3(-0.95, 0.0, 0.11), Vector3(5.5, 4.5, 0))
+	Kit.add(mk, cv, U * 0.8, "CartIcon", false, null, Vector3(-1.05, 0.0, 0.11), Vector3(5.5, 4.5, 0))
 	var lv2 := VoxelBuilder.new()
 	Fx.leaf_icon(lv2, Vector3i(0, 0, 0), Color("6cbf45"), Color("2f7a2a"))
-	Kit.add(mk, lv2, U * 0.7, "Leaf", false, null, Vector3(1.03, 0.0, 0.11), Vector3(3.5, 4, 0))
-	# Aisle signs
-	var aisles := [["Dairy", Vector3(-0.05, 2.5, -5.4), 6.0, 1.0], ["Snacks", Vector3(1.0, 2.62, -5.4), 0.0, 1.1],
-		["Beverages", Vector3(2.55, 2.68, -5.4), -6.0, 1.45], ["Bakery", Vector3(4.75, 2.8, -4.2), -22.0, 1.2]]
+	Kit.add(mk, lv2, U * 0.75, "Leaf", false, null, Vector3(1.15, 0.0, 0.11), Vector3(3.5, 4, 0))
+	# Aisle signs hanging over the aisles, deeper in the store.
+	var aisles := [["Dairy", Vector3(0.0, 2.6, -8.2), 0.0, 1.05], ["Snacks", Vector3(3.7, 2.45, -4.6), -6.0, 1.15],
+		["Beverages", Vector3(6.0, 2.8, -7.4), -8.0, 1.5], ["Bakery", Vector3(6.6, 2.95, -2.2), -24.0, 1.25]]
 	for a in aisles:
-		var b := _board(root, "Sign" + a[0], a[1], a[2], a[3], 0.4, Color("3b2a1f"), Color("7a5130"))
-		_text(b, a[0], Vector3(0, 0.0, z), a[3] - 0.26, 0.25, Color("f6efe0"))
+		var b := _board(root, "Sign" + a[0], a[1], a[2], a[3], 0.42, Color("3b2a1f"), Color("7a5130"))
+		_text(b, a[0], Vector3(0, 0.0, z), a[3] - 0.26, 0.26, Color("f6efe0"))
 
 
 # ------------------------------------------------------------------ greenery
@@ -212,8 +216,8 @@ static func _greenery(root: Node3D) -> void:
 	vb.jitter = 0.06
 	# Hanging ivy along the top of the left wall and from the front beam.
 	var strands := []
-	for i in 13:
-		strands.append(Vector3(X0 + 0.15, H - 0.2, -7.8 + i * 0.55))
+	for i in 10:
+		strands.append(Vector3(X0 + 0.15, H - 0.2, -11.2 + i * 1.0))
 	for i in strands.size():
 		var s: Vector3 = strands[i]
 		var base := Vector3i(int(round(s.x / U)), int(round(s.y / U)), int(round(s.z / U)))
@@ -231,8 +235,8 @@ static func _greenery(root: Node3D) -> void:
 			if y % 3 == 1:
 				vb.set_v(p + Vector3i(0, 0, 1), Kit.shade(col, 0.9))
 	# Hanging planters with trailing ivy (top of frame, like the reference).
-	for hp: Vector3 in [Vector3(-5.2, 3.4, -0.6), Vector3(-4.7, 3.2, -2.9), Vector3(0.55, 3.95, -3.3),
-			Vector3(5.9, 3.45, -0.8), Vector3(6.0, 3.25, -3.2), Vector3(0.9, 3.9, -5.9), Vector3(-2.5, 3.6, -5.6)]:
+	for hp: Vector3 in [Vector3(-5.2, 3.4, -0.6), Vector3(-4.9, 3.2, -4.4), Vector3(0.2, 3.95, -1.0),
+			Vector3(7.0, 3.45, 0.4), Vector3(-5.0, 3.3, -8.4), Vector3(0.9, 3.7, -6.0), Vector3(-2.6, 3.6, -9.6)]:
 		var o := Vector3i(int(round(hp.x / U)), int(round(hp.y / U)), int(round(hp.z / U)))
 		for x in range(-3, 4):
 			for z in range(-3, 4):
