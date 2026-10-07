@@ -59,7 +59,7 @@ const PRESETS := {
 	"market": {
 		"ref": "refs/ref5_grocery_market.png",
 		"location": "market", "day": 0, "hour": 8, "minute": 24, "season": 1,
-		"camera": {"target": Vector3(0.4, 1.1, -1.4), "yaw": 0.0, "pitch": 12.5, "distance": 16.0, "fov": 34.0},
+		"camera": {"target": Vector3(0.4, 1.35, -1.4), "yaw": 0.0, "pitch": 7.0, "distance": 16.0, "fov": 34.0},
 		"tasks": [
 			{"title": "Buy Groceries", "icon": "cart", "done": true},
 			{"title": "Meet a Neighbor", "icon": "people"},

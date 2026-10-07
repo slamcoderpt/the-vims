@@ -151,7 +151,7 @@ static func _ceiling(root: Node3D, halo_pts: Array) -> void:
 	# the FRESH & LOCAL and MARKET boards), like the reference's foreground lamps.
 	var big := VoxelBuilder.new()
 	big.jitter = 0.02
-	const BU := 0.085
+	const BU := 0.075
 	for bp: Vector3 in [Vector3(0.45, 4.12, 6.6), Vector3(3.35, 4.2, 6.4)]:
 		var cord := int((H - bp.y) / BU) - 7
 		Fx.pendant(big, Vector3i(int(round(bp.x / BU)), int(round(bp.y / BU)), int(round(bp.z / BU))), cord)

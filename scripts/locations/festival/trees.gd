@@ -5,7 +5,7 @@ extends RefCounted
 ## Merged per group into one mesh.
 
 const K := preload("res://scripts/locations/festival/kit.gd")
-const VS := [0.24, 0.24, 0.35]
+const VS := [0.3, 0.3, 0.35]  # side groups sit mostly under the HUD panels
 
 ## [x, z, height_m, crown_radius_m, palette (0 orange, 1 red, 2 yellow, 3 mixed), group]
 const TREES := [

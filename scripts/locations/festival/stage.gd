@@ -9,6 +9,21 @@ const W := 96
 const D := 44
 const DECK := 28
 const SCALE := 0.82
+## Five-lobed maple leaf with a stem (row 0 = top).
+const MAPLE_BIG := [
+	"......#......",
+	".....###.....",
+	"..#.#####.#..",
+	"..#########..",
+	"#.#########.#",
+	"##.#######.##",
+	".###########.",
+	"..#########..",
+	"...#######...",
+	"....##.##....",
+	"......#......",
+	"......#......",
+]
 
 var node: Node3D
 var glow_points: Array = []
@@ -30,7 +45,8 @@ func build(parent: Node3D, pos: Vector3, rot: float) -> void:
 	var deck := VoxelBuilder.new()
 	deck.jitter = 0.0
 	_deck(deck)
-	_roof(deck)
+	# Round 9: open truss (no roof) so the higher camera sees the maple
+	# banner, bulbs and bunting like the ref instead of a dark plank lid.
 	_steps(vb)
 	_truss(vb)
 	_backdrop(vb)
@@ -110,6 +126,16 @@ func _truss(vb: VoxelBuilder) -> void:
 	K.box(vb, 0, top, 2, W, 3, 3, dark)
 	K.box(vb, 0, top, 2, 3, 3, D - 2, dark)
 	K.box(vb, W - 3, top, 2, 3, 3, D - 2, dark)
+	for bx in [W / 3, 2 * W / 3]:
+		K.box(vb, bx, top, 2, 2, 2, D - 2, dark)
+	# Bulb strings zig-zagging across the open top (front to back).
+	for k in 5:
+		var x0 := 8 + k * (W - 16) / 4
+		for zi in range(4, D - 3, 3):
+			var sag := int(sin(float(zi) / float(D) * PI) * 3.0)
+			vb.set_v(Vector3i(x0, top - 1 - sag, zi), Color("3a3530"))
+			if zi % 6 == 1:
+				vb.set_v(Vector3i(x0, top - 2 - sag, zi), Color("ffd060"), true)
 	# Dark pitched roof over the truss (reads as a covered bandstand).
 	# (Built at 2x cells in the deck builder: see _roof.)
 	# Fascia board along the front edge, with a row of warm bulbs under it.
@@ -128,8 +154,8 @@ func _truss(vb: VoxelBuilder) -> void:
 			var x := int(t * W)
 			var sag := int(sin(t * PI * 3.0) ** 2 * 3.0)
 			vb.set_v(Vector3i(x, top - 2 - sag, zz), Color("3a3530"))
-			vb.set_v(Vector3i(x, top - 3 - sag, zz), Color("ffd060"), true)
-			vb.set_v(Vector3i(x, top - 4 - sag, zz), Color("ffb848"), true)
+			K.box(vb, x, top - 4 - sag, zz, 2, 2, 1, Color("ffd060"), true)
+			vb.set_v(Vector3i(x, top - 5 - sag, zz), Color("ffb848"), true)
 	# Bunting across the front beam.
 	var cols := [Color("e2662a"), Color("f2b33a"), Color("c8401e"), Color("f6efe0"), Color("8a3a2a")]
 	var i := 0
@@ -155,13 +181,14 @@ func _backdrop(vb: VoxelBuilder) -> void:
 	# blob); the lower wall stays dark so the guitarist pops against it.
 	var bx0 := W / 2 - 4
 	var bx1 := W / 2 + 36
-	var by0 := 62
+	var by0 := 42
+	var by1 := 71
 	for x in range(bx0, bx1):
-		for y in range(by0, 80):
-			var c := K.shade(Color("f2b04a"), 0.95 + K.hs(x / 3, y / 3, 2) * 0.07)
-			if x < bx0 + 2 or x >= bx1 - 2 or y >= 78:
+		for y in range(by0, by1):
+			var c := K.shade(Color("f4dcae"), 0.95 + K.hs(x / 3, y / 3, 2) * 0.07)
+			if x < bx0 + 2 or x >= bx1 - 2 or y >= by1 - 2:
 				c = Color("8a2a1a")
-			elif x < bx0 + 3 or x >= bx1 - 3 or y >= 77:
+			elif x < bx0 + 3 or x >= bx1 - 3 or y >= by1 - 3:
 				c = Color("f6e2b0")
 			vb.set_v(Vector3i(x, y, 3), c)
 	# Pennant bottom edge.
@@ -170,7 +197,7 @@ func _backdrop(vb: VoxelBuilder) -> void:
 		var drop := 3 - absi(k - 4) if absi(k - 4) < 3 else 0
 		for d in drop:
 			vb.set_v(Vector3i(x, by0 - 1 - d, 3), Color("c8461e"))
-	K.maple(vb, W / 2 + 9, 63, 4, Color("c02414"), 2)
+	K.pattern(vb, MAPLE_BIG, W / 2 + 3, by0 + 3, 4, {"#": Color("c8301a")}, false, 2)
 	# Triangle pennants either side of the banner (ref: bunting framing it).
 	var pc := [Color("e2662a"), Color("f6efe0"), Color("c8401e"), Color("f2b33a")]
 	var k := 0
@@ -222,3 +249,8 @@ func _front(vb: VoxelBuilder) -> void:
 	K.pumpkin(vb, W - 4, 8, D + 7, 3.0, 4, 0)
 	K.mums(vb, W / 2 + 18, 0, D + 6, 4.0, 0, 3)
 	K.mums(vb, W / 2 - 20, 0, D + 6, 4.0, 1, 5)
+	# Hay bales + pumpkins on the deck edge (ref: band among hay bales).
+	K.hay(vb, W / 2 - 4, DECK, D - 9, 14, 8, 8)
+	K.hay(vb, W - 30, DECK, D - 10, 12, 7, 8)
+	K.pumpkin(vb, W / 2 + 2, DECK + 8, D - 5, 2.6, 6, 1)
+	K.pumpkin(vb, W - 26, DECK, D - 1, 2.4, 7, 0)

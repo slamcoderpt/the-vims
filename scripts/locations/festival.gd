@@ -140,6 +140,10 @@ func apply_preset(preset: String) -> void:
 	if preset != "festival" or crowd == null:
 		return
 	# Staged poses for the reference screenshot are set at spawn already.
+	# Keep every face open-eyed for the still (no mid-blink captures).
+	for a in crowd.actors.values():
+		if "_blink_t" in a:
+			a._blink_t = 600.0
 	# Debug: VIMS_FCAM="x,y,z,yaw,pitch,dist,fov" overrides the shot camera.
 	if OS.has_environment("VIMS_FCAM"):
 		_debug_cam.call_deferred(OS.get_environment("VIMS_FCAM"))
@@ -165,7 +169,7 @@ func lighting_profile() -> Dictionary:
 	# no haze, very light tilt-shift confined to thin top/bottom bands.
 	return {
 		"sun_heading": -12.0, "sun_elev": 24.0, "sun_energy": 1.5,
-		"ambient_day": Color(0.66, 0.72, 0.9), "ambient_energy": 0.62,
+		"ambient_day": Color(0.84, 0.74, 0.7), "ambient_energy": 0.7,
 		"ambient_night": Color(0.42, 0.38, 0.62), "ambient_night_energy": 0.45,
 		"sky_day": Color(0.56, 0.72, 0.92), "sky_night": Color(0.1, 0.1, 0.22),
 		"fog_day": Color(0.78, 0.8, 0.88), "fog_night": Color(0.12, 0.12, 0.26),

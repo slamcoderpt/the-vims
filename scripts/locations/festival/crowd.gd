@@ -35,6 +35,11 @@ func build(parent: Node3D, stalls, stage) -> void:
 	dog.scale = Vector3.ONE * 0.85
 	var maya := spawn(parent, "Maya", "cat_girl", Vector3(3.2, 0, 2.35), Vector3(0.4, 0, 12.0), "talk")
 	_hold(maya, "fox_plush", "torso")
+	# The preset camera looks down ~30 deg at the near heroes; a slight
+	# lean back (pivot at the feet) lifts the faces out from under the hats.
+	maya.rotation.x = deg_to_rad(-11.0)
+	jack.rotation.x = deg_to_rad(-5.0)
+	lily.rotation.x = deg_to_rad(-5.0)
 	# --- Stall keepers.
 	spawn(parent, "vendor", "npc_6", vendor_pos, jack.position, "talk")
 	var g: Node3D = stalls.game
@@ -142,8 +147,8 @@ func _hold(a: SimActor, prop: String, bone: String) -> void:
 			mi.position = Vector3(0.0, 0.1, 0.17)
 			mi.rotation = Vector3(0, 0, 0)
 		"guitar":
-			mi.position = Vector3(0.0, 0.14, 0.17)
-			mi.rotation = Vector3(0, 0, deg_to_rad(-55.0))
+			mi.position = Vector3(0.02, 0.1, 0.17)
+			mi.rotation = Vector3(0, 0, deg_to_rad(-68.0))
 	att.add_child(mi)
 
 

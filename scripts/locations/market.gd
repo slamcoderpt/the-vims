@@ -42,7 +42,7 @@ func build() -> void:
 
 
 func camera_home() -> Dictionary:
-	return {"target": Vector3(0.4, 1.1, -1.4), "yaw": 0.0, "pitch": 12.5, "distance": 16.0, "fov": 34.0}
+	return {"target": Vector3(0.4, 1.35, -1.4), "yaw": 0.0, "pitch": 7.0, "distance": 16.0, "fov": 34.0}
 
 
 func lighting_profile() -> Dictionary:
@@ -148,7 +148,7 @@ func _stage() -> void:
 	# so the tall glowing fridge wall and the shelving runs read behind.
 	# "stand_type" holds both forearms forward at chest height: hands on the
 	# cart handle.
-	var jack := _place("dad", Vector3(-0.15, 0, 1.6), cam + Vector3(8.0, 0, 0), "stand_type")
+	var jack := _place("dad", Vector3(-0.1, 0, 2.55), cam + Vector3(8.0, 0, 0), "stand_type")
 	jack.body_scale = 1.0
 	var cart_yaw := jack.rotation.y
 	var fwd := Vector3(sin(cart_yaw), 0, cos(cart_yaw))
@@ -159,9 +159,9 @@ func _stage() -> void:
 	dog.rotation.y = lerp_angle(cart_yaw, dog.rotation.y, 0.6)
 	# The "type" pose turns the head ~0.9 rad to the sim's left, so the
 	# girls' bodies are turned the other way to keep their faces on camera.
-	var lily := _place("bunny_girl", Vector3(-1.45, 0, 3.2), cam, "stand_type")
+	var lily := _place("bunny_girl", Vector3(-1.6, 0, 2.75), cam, "stand_type")
 	lily.rotation.y -= 0.75
-	var maya := _place("cat_girl", Vector3(2.2, 0, 2.75), cam, "stand_type")
+	var maya := _place("cat_girl", Vector3(2.1, 0, 2.65), cam, "stand_type")
 	maya.rotation.y -= 0.8
 	lily.body_scale = 1.0
 	maya.body_scale = 1.0
@@ -173,8 +173,8 @@ func _stage() -> void:
 	# the family (never directly behind a head).
 	_place("npc_2", Vector3(-3.6, 0, -3.6), Vector3(-5.0, 0, -4.2), "idle")
 	_place("npc_5", Vector3(1.75, 0, -10.3), Vector3(-2.0, 0, -6.0), "idle")
-	_place("npc_4", Vector3(0.9, 0, -7.4), Vector3(3.0, 0, 6.0), "idle")
-	_place("npc_0", Vector3(-1.5, 0, -5.6), Vector3(-2.6, 0, 2.0), "stand_read")
+	_place("npc_4", Vector3(0.3, 0, -9.1), Vector3(-0.6, 0, -12.0), "idle")
+	_place("npc_0", Vector3(-2.5, 0, -8.0), Vector3(-4.6, 0, -6.6), "stand_read")
 	_place("npc_6", Vector3(4.0, 0, -6.6), Vector3(4.6, 0, -6.6), "idle")
 	_hold(actors["npc_4"], "basket")
 	_hold(actors["npc_2"], "basket")
