@@ -10,7 +10,7 @@ const Party := preload("res://scripts/locations/backyard/party.gd")
 const Cast := preload("res://scripts/locations/backyard/cast.gd")
 const SunsetEnv := preload("res://scripts/locations/backyard/sunset_env.gd")
 
-const CAMERA := {"target": Vector3(0.9, 1.3, -1.2), "yaw": -14.0, "pitch": 13.5, "distance": 10.5, "fov": 48.0}
+const CAMERA := {"target": Vector3(0.9, 1.3, -0.8), "yaw": -14.0, "pitch": 17.0, "distance": 9.7, "fov": 48.0}
 
 var garden
 var house
@@ -112,7 +112,7 @@ func _sync_env() -> void:
 		var gold := smoothstep(16.5, 18.5, h) * (1.0 - smoothstep(20.0, 21.5, h))
 		var nite := smoothstep(20.5, 22.0, h) if h > 12.0 else 1.0 - smoothstep(4.5, 6.0, h)
 		fill.light_color = Color(1.0, 0.74, 0.5).lerp(Color(0.6, 0.66, 1.0), nite)
-		fill.light_energy = gold * 0.34 + nite * 0.1
+		fill.light_energy = gold * 0.42 + nite * 0.1
 		fill.visible = fill.light_energy > 0.01
 
 
@@ -176,11 +176,11 @@ func lighting_profile() -> Dictionary:
 	# Dusk: a low, weak orange sun and a cool violet ambient so the lanterns,
 	# string lights, fire pit and the lit house make the warm pools.
 	return {
-		"sun_heading": 262.0, "sun_elev": 11.0, "sun_energy": 1.25,
-		"ambient_day": Color(0.64, 0.58, 0.88), "ambient_night": Color(0.36, 0.38, 0.72),
-		"ambient_energy": 0.7, "ambient_night_energy": 0.5,
+		"sun_heading": 262.0, "sun_elev": 13.0, "sun_energy": 1.55,
+		"ambient_day": Color(0.66, 0.6, 0.8), "ambient_night": Color(0.36, 0.38, 0.72),
+		"ambient_energy": 0.62, "ambient_night_energy": 0.5,
 		"exposure": 1.0, "shadow_distance": 30.0,
 		"lamp_night_mult": 1.35, "glow_boost_night": 1.9,
 		"post": {"focus_y": 0.52, "band": 0.3, "falloff": 0.24, "blur_px": 3.2, "top_boost": 1.25,
-			"saturation": 1.12, "contrast": 1.06, "tint": Vector3(1.0, 0.97, 1.03), "vignette": 0.26},
+			"saturation": 1.12, "contrast": 1.06, "tint": Vector3(1.05, 1.0, 0.93), "vignette": 0.26},
 	}

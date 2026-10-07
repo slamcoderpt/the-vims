@@ -19,7 +19,7 @@ const BODY := {
 	"big": {"lw": 5, "shin": 6, "thigh": 6, "tw": 12, "td": 7, "th": 9, "aw": 3, "ua": 6, "fa": 6, "hw": 12, "hh": 11, "hd": 11},
 	"slim": {"lw": 4, "shin": 6, "thigh": 6, "tw": 10, "td": 6, "th": 9, "aw": 3, "ua": 6, "fa": 6, "hw": 12, "hh": 11, "hd": 11},
 	# Chibi child: head (with hat) ~40% of total height, about 1:1.5 head:body.
-	"child": {"lw": 4, "shin": 4, "thigh": 4, "tw": 10, "td": 6, "th": 7, "aw": 3, "ua": 5, "fa": 4, "hw": 12, "hh": 11, "hd": 11},
+	"child": {"lw": 4, "shin": 5, "thigh": 4, "tw": 10, "td": 6, "th": 8, "aw": 3, "ua": 6, "fa": 5, "hw": 12, "hh": 11, "hd": 11},
 }
 
 static var _cache := {}
@@ -663,17 +663,19 @@ static func _human_hair(vb: VoxelBuilder, style: String, hc: Callable, W: int, H
 			for iz in 4:
 				var q := Vector3i(ix, 0, iz)
 				var u := Vector2(ix - 1.5, iz - 1.5).length() / 2.1
-				cs.append([Vector3(0.6 + ix * 3.25, T + 2.0 - 1.3 * u * u + _h(q, 50) * 0.5, 0.4 + iz * 3.0), 2.05 + _h(q, 51) * 0.5])
+				cs.append([Vector3(0.6 + ix * 3.25, T + 1.0 - 1.4 * u * u + _h(q, 50) * 0.6, 0.4 + iz * 3.0), 1.85 + _h(q, 51) * 0.45])
 		for ix in 4:
 			var q := Vector3i(ix, 1, 0)
 			cs.append([Vector3(0.9 + ix * 3.1, T - 0.3 - _h(q, 52) * 0.5, F - 0.4), 1.7])
-		for sx: float in [-0.7, W - 0.3]:
+		# Sides and back stay close to the skull (a swept, wavy cut rather
+		# than a round afro) so the face and beard own the silhouette.
+		for sx: float in [-0.25, W - 0.75]:
 			for iz in 3:
-				cs.append([Vector3(sx, T - 2.0 - float(iz % 2) * 0.8, 1.0 + iz * 2.4), 1.85])
-			cs.append([Vector3(sx, E - 0.5, 1.2), 1.7])
+				cs.append([Vector3(sx, T - 2.0 - float(iz % 2) * 0.8, 1.0 + iz * 2.4), 1.6])
+			cs.append([Vector3(sx, E - 0.5, 1.2), 1.5])
 		for ix in 4:
 			for iy in 3:
-				cs.append([Vector3(0.7 + ix * 3.2, T - 1.0 - iy * 2.5, -0.7), 1.95])
+				cs.append([Vector3(0.7 + ix * 3.2, T - 1.0 - iy * 2.5, -0.35), 1.7])
 		var ci := 0
 		for c: Array in cs:
 			ci += 1
@@ -842,12 +844,15 @@ static func _human_hat(vb: VoxelBuilder, L: Dictionary, W: int, H: int, Dd: int,
 		var hax := W * 0.5 + 1.1
 		var haz := (F + 1) * 0.5 + 1.1
 		var in_hat := func(x: int, y: int, z: int) -> bool:
-			if y < c0 or y > T + 3:
+			if y < c0 or y > T + 4:
 				return false
 			var dx := absf(x - hcx) / hax
 			var dz := absf(z - hcz) / haz
-			var dy := maxf(0.0, (y - (T - 0.5)) / 3.9)
-			return pow(dx, 3.0) + pow(dz, 3.0) + pow(dy, 2.0) <= 1.0
+			var dy := maxf(0.0, (y - (T - 0.5)) / 4.6)
+			# Squarish at the cuff, rounder toward the crown: a soft knit
+			# dome instead of stacked cake tiers.
+			var e := lerpf(3.0, 2.1, clampf(dy * 1.4, 0.0, 1.0))
+			return pow(dx, e) + pow(dz, e) + pow(dy, 2.2) <= 1.0
 		# Hair can't poke through the hat: clear anything above the cuff
 		# outside the hat volume (hair below the cuff stays: bangs, sides).
 		for y in range(c0, T + 7):
@@ -855,7 +860,7 @@ static func _human_hat(vb: VoxelBuilder, L: Dictionary, W: int, H: int, Dd: int,
 				for z in range(-4, F + 3):
 					if not in_hat.call(x, y, z):
 						vb.erase(Vector3i(x, y, z))
-		for y in range(c0, T + 4):
+		for y in range(c0, T + 5):
 			for x in range(-1, W + 1):
 				for z in range(-1, F + 2):
 					if not in_hat.call(x, y, z):
@@ -1246,7 +1251,7 @@ static func _build_dog(L: Dictionary) -> Dictionary:
 			c = white
 		elif (p.z == BL - 5 or p.z == BL - 4) and p.y >= 4:
 			c = collar
-		elif p.z >= 3 - wob and p.z <= BL - 7 + wob and (p.y >= BH - 2 or (p.y >= BH - 4 + wob and cx >= 3.5)):
+		elif p.z >= 5 - wob and p.z <= BL - 8 + wob and (p.y >= BH - 1 or (p.y >= BH - 2 + wob and cx < 4.0) or (p.y >= BH - 3 + wob and cx < 2.5)):
 			c = saddle.lerp(tan, 0.12 * _h(p, 35))
 		elif p.y == 2 and _h(p, 31) > 0.55:
 			c = white.lerp(tan, 0.45)

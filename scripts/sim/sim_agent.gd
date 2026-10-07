@@ -661,7 +661,9 @@ func _begin_act() -> void:
 func join_social(from_agent, _a: Dictionary) -> void:
 	if phase == "act" and order.get("other") == from_agent:
 		return
-	if phase == "walk":
+	# Free will may drop what it was doing for a chat; something the player
+	# asked for carries on (the other sim talks while we walk past).
+	if phase == "walk" and order.get("auto", false) and not order.get("forced", false):
 		cancel_current()
 	if phase == "idle":
 		actor.face(from_agent.actor.global_position)
@@ -674,6 +676,9 @@ func _act(dm: float) -> void:
 	var mins: float = maxf(1.0, a.get("minutes", 30.0))
 	if dm <= 0.0:
 		return
+	if order.get("work_home", false):
+		# A home shift ends with the clock, not after a fixed duration.
+		dm = maxf(dm, (mins - (float(member.work.until) - Game.total_minutes())) - elapsed)
 	var step := minf(dm, mins - elapsed)
 	elapsed += step
 	var eff: Dictionary = a.get("needs", {})
@@ -762,6 +767,9 @@ func _complete() -> void:
 			other.idle_minutes = 0.0
 	completed += 1
 	last_done = a.get("id", "")
+	if order.get("work_home", false):
+		member.work.state = ""
+		_evaluate_shift(1.0)
 	world.on_action_done(self, order)
 	_end(true)
 
@@ -799,6 +807,12 @@ func _apply_social(a: Dictionary) -> bool:
 		delta *= clampf(0.75 + (Game.mood_mult(index) - 0.6) / 0.8 * 0.5, 0.75, 1.25)
 		# Friendly / Family-Oriented / Loyal sims bond faster.
 		delta *= Traits.rel_mult(member, other != null)
+		# Sims 3 pacing: close friends gain slowly, and the same pair
+		# chatting again straight away counts for less.
+		delta *= clampf(1.0 - maxf(Game.rel(me, partner), 0.0) / 140.0, 0.3, 1.0)
+		var rr = Game.relationships.get(Game.rel_key(me, partner))
+		if rr != null and Game.total_minutes() - float(rr.last) < 60.0:
+			delta *= 0.6
 	if reject_p > 0.0 and randf() < reject_p:
 		Game.change_rel(me, partner, -absf(delta) * 0.5)
 		Game.add_moodlet(index, "rejected", "Rejected", "dots", -10.0, 2.0, "%s wasn't in the mood" % partner)
@@ -830,6 +844,15 @@ func _meet_task_ok(task: String) -> bool:
 func _end(_ok: bool) -> void:
 	if order.get("work", false) and phase != "away":
 		member.work.state = ""
+	if order.get("work_home", false) and str(member.work.get("state", "")) == "home":
+		# Stopped before the shift was over (cancelled, passed out...).
+		member.work.state = ""
+		var span := maxf(1.0, float(member.work.until) - float(member.work.start))
+		var frac := clampf(elapsed / span, 0.0, 1.0) if phase == "act" else 0.0
+		if frac > 0.02:
+			_evaluate_shift(frac)
+		else:
+			member.career.last_day = -1   # never sat down: try again
 	if _reserved != null:
 		world.release(_reserved, self)
 		_reserved = null
@@ -1051,7 +1074,8 @@ func check_career() -> void:
 		return
 	var now := Game.total_minutes()
 	var st := Careers.shift_start(c, d)
-	if now < st - Careers.LEAVE_BEFORE or now >= Careers.shift_end(c, d):
+	var lead: float = Careers.HOME_LEAD if Careers.track(c).get("home", false) else Careers.LEAVE_BEFORE
+	if now < st - lead or now >= Careers.shift_end(c, d):
 		return
 	if now > st + Careers.MISS_AFTER:
 		miss_shift()
@@ -1066,6 +1090,9 @@ func check_career() -> void:
 ## evening), walk to the door / lot edge, get into the carpool.
 func go_to_work() -> void:
 	var c: Dictionary = member.career
+	if Careers.track(c).get("home", false):
+		_work_from_home()
+		return
 	var school := Careers.is_school(c)
 	member.work.state = "going"
 	var exit: Vector3 = world.exit_spot(actor.global_position)
@@ -1095,6 +1122,8 @@ func _leave_for_work() -> void:
 	var now := Game.total_minutes()
 	var st := Careers.shift_start(c, Game.day)
 	w.state = "away"
+	_chance_rolled = false
+	chance = {}
 	w.start = now
 	w.until = Careers.shift_end(c, Game.day)
 	w.late = now > st + 5.0
@@ -1133,8 +1162,19 @@ func _tick_away(dm: float) -> void:
 	if _away_acc >= 5.0:
 		_away_acc = 0.0
 		_sync_queue()
-	if Game.total_minutes() >= float(member.work.until):
+	var w: Dictionary = member.work
+	if Game.total_minutes() >= float(w.until):
+		if not chance.is_empty():
+			resolve_chance(false)   # nobody answered: carry on as normal
 		come_home()
+		return
+	# Halfway through a job shift: maybe a chance card.
+	if not _chance_rolled and not Careers.is_school(member.career) and Game.chance_cards:
+		var span := maxf(1.0, float(w.until) - float(w.start))
+		if (Game.total_minutes() - float(w.start)) / span >= 0.5:
+			_chance_rolled = true
+			if randf() < Careers.CHANCE_P:
+				offer_chance(Careers.CHANCES[randi() % Careers.CHANCES.size()])
 
 
 ## Restore the away state on a freshly built lot (traveling mid-shift).
@@ -1160,19 +1200,34 @@ func come_home() -> void:
 	phase = "idle"
 	order = {}
 	idle_minutes = 0.0
-	shifts_done += 1
 	var sn: Dictionary = Careers.shift_needs(c)
 	for k in sn:
 		Game.change_need(index, k, float(sn[k]))
+	_evaluate_shift(1.0)
+
+
+## Paycheck, performance, notices and promotion after a shift (frac: the
+## part of the shift actually worked; a home worker who stops early).
+func _evaluate_shift(frac: float) -> void:
+	var c: Dictionary = member.career
+	var w: Dictionary = member.work
+	var school := Careers.is_school(c)
+	shifts_done += 1
 	# Performance: tendency, mood, skill, lateness, traits, homework.
 	var t: Dictionary = Careers.track(c)
 	var sk := Game.skill_level(index, str(t.get("skill", ""))) if str(t.get("skill", "")) != "" else 0.0
 	var hw := int(member.get("homework_day", -10)) >= Game.day - 1
 	var d := Careers.perf_delta(c, Game.mood(index), sk, bool(w.late), Traits.work_bonus(member), hw)
+	if frac < 0.95:
+		d = d * frac - 10.0
+		Game.add_moodlet(index, "left_early", "Left Work Early", "dots", -6.0, 3.0, "Only did %d%% of the shift" % roundi(frac * 100.0))
 	c.perf = clampf(float(c.perf) + d, 0.0, 100.0)
 	c.trend = d
 	c.shifts = int(c.get("shifts", 0)) + 1
-	var pay := Careers.paycheck(c)
+	var pay := roundi(Careers.paycheck(c) * clampf(frac, 0.0, 1.0))
+	# Overtime from a chance card is paid by the hour.
+	pay += roundi(Careers.wage(c) * last_overtime)
+	last_overtime = 0.0
 	last_pay = pay
 	if pay > 0:
 		Game.add_money(pay)
@@ -1188,7 +1243,8 @@ func come_home() -> void:
 		if not hw:
 			Game.notify.emit("%s has homework to do" % display_name(), "book")
 	else:
-		Game.notify.emit("%s is home from work · Paycheck +$%d · Performance %s%d" % [display_name(), pay, arrow, absi(roundi(d))], "money")
+		var home: bool = Careers.track(c).get("home", false)
+		Game.notify.emit("%s %s · Paycheck +$%d · Performance %s%d" % [display_name(), "finished work" if home else "is home from work", pay, arrow, absi(roundi(d))], "money")
 		Game.show_bubble(actor, {"kind": "skill", "text": "+$%d" % pay, "icon": "money", "id": "skill", "ttl": 3.5})
 		match str(c.get("tendency", "normal")):
 			"hard":
@@ -1255,3 +1311,84 @@ func miss_shift() -> void:
 	if not school:
 		_review(c, Game.skill_level(index, str(Careers.track(c).get("skill", ""))))
 	Game.career_changed.emit(index)
+
+
+## Home-office careers: at shift time the sim sits down at the computer for
+## the rest of the shift (a forced "Work" action with a progress bubble).
+func _work_from_home() -> void:
+	var c: Dictionary = member.career
+	var desk = world.home_desk(self)
+	if desk == null:
+		miss_shift()
+		return
+	var now := Game.total_minutes()
+	var st := Careers.shift_start(c, Game.day)
+	var en := Careers.shift_end(c, Game.day)
+	var w: Dictionary = member.work
+	w.state = "home"
+	w.start = maxf(now, st)
+	w.until = en
+	w.late = now > st + 5.0
+	c.last_day = Game.day
+	var a := {"id": "work_home", "label": "Work", "icon": "laptop", "minutes": maxf(30.0, en - now), "pose": "type",
+		"needs": {"fun": -0.15, "energy": -0.15}, "skill": str(Careers.track(c).get("skill", "Logic"))}
+	var o := {"action": a, "target": desk, "auto": true, "forced": true, "work_home": true}
+	forced += 1
+	var keep: Array = queue.filter(func(q): return not q.get("auto", false))
+	queue.clear()
+	if phase != "idle":
+		_end(false)
+	queue = keep
+	queue.push_front(o)
+	_say("Time to work!", "laptop")
+	Game.notify.emit("%s starts work at the computer" % display_name(), "laptop")
+	if OS.has_environment("VIMS_PLAYTEST"):
+		print("  work: %s works from home (%s)" % [display_name(), Game.clock_text()])
+	if phase == "idle":
+		_next()
+
+
+# =================================================================== chance cards
+
+## The card on offer (empty = none) and whether this shift rolled for one.
+var chance: Dictionary = {}
+var _chance_rolled := false
+
+
+func offer_chance(card: Dictionary) -> void:
+	chance = card
+	Game.notify.emit(str(card.text) % display_name(), str(card.get("icon", "laptop")))
+	world.open_chance(self, card)
+	if OS.has_environment("VIMS_PLAYTEST"):
+		print("  chance: %s -> %s" % [display_name(), card.id])
+
+
+## The player answered (yes) or not (no / unanswered).
+func resolve_chance(yes: bool) -> void:
+	if chance.is_empty():
+		return
+	var card := chance
+	chance = {}
+	var out: Dictionary = card.get("yes" if yes else "no", {})
+	if yes and card.has("odds") and randf() >= float(card.odds):
+		out = card.get("fail", out)
+	var c: Dictionary = member.get("career", {})
+	if c.is_empty():
+		return
+	c.perf = clampf(float(c.perf) + float(out.get("perf", 0.0)), 0.0, 100.0)
+	if out.has("hours") and phase == "away":
+		member.work.until = float(member.work.until) + float(out.hours) * 60.0
+		last_overtime = float(out.hours)
+	if out.has("social"):
+		Game.change_need(index, "social", float(out.social))
+	if out.has("mood"):
+		var ml: Array = out.mood
+		Game.add_moodlet(index, ml[0], ml[1], ml[2], ml[3], ml[4], str(card.text) % display_name())
+	var p := float(out.get("perf", 0.0))
+	if p != 0.0:
+		Game.notify.emit("%s: performance %+d" % [display_name(), roundi(p)], "chart" if p > 0.0 else "dots")
+	Game.career_changed.emit(index)
+	_sync_queue()
+
+
+var last_overtime := 0.0

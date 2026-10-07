@@ -264,8 +264,8 @@ func _is_selected_actor(a: Node3D) -> bool:
 
 ## Screen gap (px) between the top of a sim's head and the tip of its
 ## bubble's tail; scales a little with head size so far sims stay snug.
-const MIN_GAP := 8.0
-const MAX_GAP := 18.0
+const MIN_GAP := 5.0
+const MAX_GAP := 12.0
 ## Top of the area bubbles may use (below the screen edge).
 const SAFE_TOP := 12.0
 const BUBBLE_PAD := 14.0

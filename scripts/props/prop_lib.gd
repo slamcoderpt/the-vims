@@ -204,7 +204,7 @@ void fragment() {
 static func night_exterior_material() -> StandardMaterial3D:
 	if _night_ext_mat == null:
 		_night_ext_mat = VoxelBuilder.solid_material().duplicate()
-		_night_ext_mat.albedo_color = Color(0.66, 0.72, 0.95)
+		_night_ext_mat.albedo_color = Color(0.78, 0.84, 1.0)
 	return _night_ext_mat
 
 
@@ -249,9 +249,21 @@ static func rug(vb: VoxelBuilder, at: Vector3i, w: int, d: int, style := "check_
 					if e == 0:
 						c = Color("c35a74")
 				"check_blue":
-					c = Color("dfe6f2") if (int(x / 3) + int(z / 3)) % 2 == 0 else Color("a9b9d8")
+					# Woven gingham (ref1's rug under the dog): cream ground,
+					# blue bands crossing into darker squares, a braided border.
+					var bx := posmod(x - 2, 6) < 3
+					var bz := posmod(z - 2, 6) < 3
+					c = Color("f2ecdf")
+					if bx and bz:
+						c = Color("8fa6d2")
+					elif bx or bz:
+						c = Color("c4d1e8")
+					if (x + z) % 2 == 0:
+						c = c.darkened(0.04)
+					if e == 1:
+						c = Color("e9dcc0")
 					if e == 0:
-						c = Color("6f86b8")
+						c = Color("6f86b8") if (x + z) % 2 == 0 else Color("8298c6")
 				"blue_braid":
 					var r := e % 4
 					c = [Color("4e6fb3"), Color("8fa6da"), Color("c9d4ee"), Color("6a86c4")][r]

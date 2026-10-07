@@ -758,6 +758,8 @@ func fulfil_wish(i: int, id: String) -> int:
 ## Shifts only happen while this is true (automated playtests switch it off
 ## for the sections that need the whole family at home).
 var work_enabled := true
+## Mid-shift chance cards (Careers.CHANCES) on / off.
+var chance_cards := true
 
 
 func career(i: int) -> Dictionary:

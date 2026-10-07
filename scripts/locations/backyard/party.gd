@@ -14,14 +14,16 @@ const IRON := Color("2b2b31")
 const BULB := Color("ffd889")
 
 ## World placement of the main pieces.
-const TABLE_POS := Vector3(0.9, 0.0, 0.5)
-const TABLE_ROT := 0.30
+const TABLE_POS := Vector3(0.75, 0.0, 0.75)
+## Long axis runs diagonally into the picture (ref4): the near end points at
+## the camera-left, so both long sides and every chair read.
+const TABLE_ROT := 0.95
 const GRILL_POS := Vector3(-3.3, 0.0, -1.25)
 const GRILL_ROT := PI + 0.55
 const PIT_POS := Vector3(3.5, 0.0, 2.45)
 ## Lanterns (fine cells: x, y, z of the base corner; 7x7 footprint).
 const LANTERNS := [Vector3i(-66, 0, 14), Vector3i(24, 0, -38), Vector3i(122, 0, -10), Vector3i(-88, 0, -58), Vector3i(150, 0, 50),
-		Vector3i(44, 6, -50), Vector3i(118, 6, -50), Vector3i(-22, 0, 30), Vector3i(70, 0, 68),
+		Vector3i(44, 6, -50), Vector3i(118, 6, -50), Vector3i(-50, 0, 44), Vector3i(70, 0, 68),
 		Vector3i(-118, 0, 42), Vector3i(100, 0, 62), Vector3i(-140, 0, -20)]
 ## Lanterns that also get a real OmniLight (the rest only bake a pool on the lawn).
 const LIT_LANTERNS := [0, 2, 7, 8, 10]
@@ -47,25 +49,24 @@ static func light_pools() -> Array:
 ## Table half-length / half-depth in fine cells (cloth edge). A long
 ## farmhouse table (5.75 m) so eight chairs fit with elbow room and every
 ## diner reads as their own silhouette (ref4).
-const TL := 46
-const TD := 12
+const TL := 36
+const TD := 11
 ## Seats in table-local cells: Vector3(x, z, unused) — facing is derived in _facing().
-## Four diners on the far side face the camera; the near side is staggered
-## between them so no back-of-head ever covers a face.
+## The table runs into the picture: "far" (-z) is the left long side on
+## screen, "near" (+z) the right one; end_l is the end nearest the camera.
 const SEATS := {
-	"far_l": Vector3(-34, -17, 0.0),
-	"far_m": Vector3(-12, -17, 0.0),
-	"far_m2": Vector3(11, -17, 0.0),
-	"far_r": Vector3(33, -17, 0.0),
-	"near_l": Vector3(-23, 17, PI),
-	"near_m": Vector3(0, 17, PI),
-	"near_r": Vector3(23, 17, PI),
-	"end_l": Vector3(-53, 0, PI * 0.5),
-	"end_r": Vector3(53, 0, -PI * 0.5),
+	"far_l": Vector3(-24, -16, 0.0),
+	"far_m": Vector3(0, -16, 0.0),
+	"far_r": Vector3(24, -16, 0.0),
+	"near_l": Vector3(-24, 16, PI),
+	"near_m": Vector3(0, 16, PI),
+	"near_r": Vector3(24, 16, PI),
+	"end_l": Vector3(-43, 0, PI * 0.5),
+	"end_r": Vector3(43, 0, -PI * 0.5),
 }
 ## Seats with a thick booster cushion so seated kids sit up above the table
 ## edge (their faces would otherwise drop behind the food). Seat top in m.
-const BOOSTED := {"far_l": Color("e88fb4"), "far_r": Color("a98fd8"), "near_l": Color("7fb0d8")}
+const BOOSTED := {"far_l": Color("e88fb4"), "near_l": Color("7fb0d8"), "near_m": Color("a98fd8")}
 const SEAT_Y := 0.4375
 const BOOST_Y := 0.625
 
@@ -114,7 +115,7 @@ func build(parent: Node3D) -> void:
 	# Glow sprites: fire pit, grill coals, table candles, house lamps + doors.
 	halos.add(PIT_POS + Vector3(0, 0.6, 0), 1.9, Color(1.0, 0.45, 0.12, 0.85))
 	var tb := Transform3D(Basis(Vector3.UP, TABLE_ROT), TABLE_POS)
-	for cq in [Vector2(-26, -2), Vector2(5, -2), Vector2(26, 3)]:
+	for cq in [Vector2(-18, -2), Vector2(5, -2), Vector2(31, -2)]:
 		halos.add(tb * Vector3(cq.x / 16.0, 1.14, cq.y / 16.0), 0.55, Color(1.0, 0.65, 0.3, 0.9))
 	for wx in [29.5 / 16.0, 193.5 / 16.0]:
 		halos.add(Vector3(wx, 2.4, -5.9), 0.9, Color(1.0, 0.7, 0.35, 0.6))
@@ -171,74 +172,96 @@ func _table() -> void:
 	vb.jitter = 0.04
 	var L := TL
 	var D := TD
-	# Chunky turned legs + apron.
+	# Chunky legs + apron (only the feet show under the cloth drape).
 	for q in [Vector2i(-L + 2, -D + 2), Vector2i(L - 4, -D + 2), Vector2i(-L + 2, D - 4), Vector2i(L - 4, D - 4)]:
 		V.b(vb, q.x, 0, q.y, 2, 11, 2, WOOD_D)
 		V.b(vb, q.x, 3, q.y, 2, 1, 2, V.shade(WOOD_D, 0.8))
 	V.b(vb, -L + 1, 11, -D + 1, L * 2 - 2, 1, D * 2 - 2, V.wood(WOOD_D, 0, 2))
-	# Farmhouse plank top (planks run lengthwise, dark seams between them)
-	# with a red gingham runner down the middle that hangs over both ends
-	# (ref4: wooden table, checked runner, food on the bare wood).
-	var plank := func(q: Vector3i) -> Color:
-		var row := posmod(q.z + D, 6)
-		var base := V.shade(WOOD_L, 0.9 + V.h1(Vector3i(q.x / 9, 0, (q.z + D) / 6), 11) * 0.18)
-		if row == 5:
-			return V.shade(WOOD_D, 0.9)
-		return V.shade(base, 0.97 + V.h1(q, 2) * 0.06)
-	V.b(vb, -L, 12, -D, L * 2, 2, D * 2, plank)
-	var rw := 5
-	V.b(vb, -L - 1, 14, -rw, L * 2 + 2, 1, rw * 2, func(q: Vector3i) -> Color: return _gingham(q.x, q.z))
-	V.b(vb, -L - 1, 8, -rw, 1, 6, rw * 2, func(q: Vector3i) -> Color: return _gingham(q.y, q.z))
-	V.b(vb, L, 8, -rw, 1, 6, rw * 2, func(q: Vector3i) -> Color: return _gingham(q.y, q.z))
+	V.b(vb, -L, 12, -D, L * 2, 2, D * 2, V.wood(WOOD_L, 0, 3))
+	# Red gingham cloth over the whole top, draping down every side (ref4).
+	var gc := func(q: Vector3i) -> Color:
+		var c: Color = _gingham(q.x, q.z)
+		return V.shade(c, 0.97 + V.h1(q, 6) * 0.05)
+	V.b(vb, -L - 1, 14, -D - 1, L * 2 + 2, 1, D * 2 + 2, gc)
+	for side in [-1, 1]:
+		var zz := -D - 2 if side < 0 else D + 1
+		V.b(vb, -L - 1, 10, zz, L * 2 + 2, 5, 1, func(q: Vector3i) -> Color:
+			return V.shade(_gingham(q.x, q.y), 0.88 if q.y < 14 else 0.95))
+		var xx := -L - 2 if side < 0 else L + 1
+		V.b(vb, xx, 10, -D - 1, 1, 5, D * 2 + 2, func(q: Vector3i) -> Color:
+			return V.shade(_gingham(q.z, q.y), 0.85 if q.y < 14 else 0.95))
 	var y := 15
-	var yp := 14
-	# Place settings: plate with food, tall amber drink, napkin.
+	# Place settings: a big white plate with one clear food item, a tall
+	# amber drink beside it, folded napkin.
+	var foods := [0, 3, 0, 2, 1, 0, 3, 2, 0]
+	var fi := 0
 	for key in SEATS:
 		var s: Vector3 = SEATS[key]
 		var px := int(s.x)
 		var pz := int(s.y)
 		if absf(s.x) > L:
-			px = -L + 6 if s.x < 0 else L - 7
-			pz = -1
+			px = -L + 5 if s.x < 0 else L - 6
+			pz = 0
 		else:
 			pz = -D + 4 if s.y < 0 else D - 5
-		_plate(vb, px, yp, pz, int(V.hs(px, pz, 1) * 4.0))
-		var gx := px + 4
-		var gz := pz + (1 if s.y < 0 else -1)
+		_plate(vb, px, y, pz, foods[fi % foods.size()])
+		fi += 1
+		var gx := px + 5
+		var gz := pz + (-1 if s.y < 0 else 0)
 		if absf(s.x) > L:
 			gx = px
-			gz = pz + 4
-		_glass(vb, gx, yp, gz)
-		V.b(vb, px - 5, yp, pz - 1, 1, 1, 3, Color("f6f3ee"))
-	# Centre line, left to right (spread along the whole long table so each
-	# diner has food in front of them).
-	_bread(vb, -40, y, -4)
-	_bowl(vb, -33, y, 1, Color("6cb04a"), [Color("e2513f"), Color("8fd05a"), Color("fbf3ec")])
-	_candle(vb, -27, y, -3)
-	_burger_board(vb, -21, y, 1)
-	_pitcher(vb, -3, y, 2)
-	_melon(vb, 7, y, -5)
-	_corn_platter(vb, -4, y, -5)
-	# Low flower vase centrepiece, set where it lines up with the empty
-	# near-middle chair from the camera (never in front of a diner's face).
-	V.b(vb, -11, y, -1, 3, 4, 3, Color("8fb7d9"))
-	V.b(vb, -11, y + 4, -1, 3, 1, 3, Color("a8cbe6"))
-	V.blob(vb, Vector3(-9.5, y + 7, 0.5), Vector3(2.6, 2.0, 2.6), V.mix([Color("f59cc6"), Color("fbf7f0"), Color("ee7fb4"), Color("e2513f"), Color("5f9e3a")], 3), 0.4, 3)
+			gz = pz + 5
+		_glass(vb, gx, y, gz)
+		V.b(vb, px - 6, y, pz - 1, 2, 1, 3, Color("f6f3ee"))
+	# A few big readable dishes down the middle (no confetti): salad bowl,
+	# burger platter, drink pitchers, watermelon, corn, candle jars and a
+	# low flower vase.
+	_corn_platter(vb, -40, y, -3)
+	_bowl_big(vb, -27, y, 0, Color("5fa83e"), [Color("e2513f"), Color("8fd05a"), Color("f2c22a"), Color("fbf3ec")])
+	_candle(vb, -19, y, -3)
+	_pitcher(vb, -17, y, 2)
+	_burger_platter(vb, -6, y, 0)
+	V.b(vb, 3, y, 3, 1, 4, 1, Color("d02a24")); V.p(vb, 3, y + 4, 3, Color("f2f2f2"))
+	V.b(vb, 5, y, 3, 1, 4, 1, Color("f2c22a")); V.p(vb, 5, y + 4, 3, Color("f2f2f2"))
 	_candle(vb, 4, y, -3)
-	# Ketchup + mustard.
-	V.b(vb, 3, y, 4, 1, 4, 1, Color("d02a24")); V.p(vb, 3, y + 4, 4, Color("f2f2f2"))
-	V.b(vb, 5, y, 4, 1, 4, 1, Color("f2c22a")); V.p(vb, 5, y + 4, 4, Color("f2f2f2"))
-	_veggie_platter(vb, 8, y, 0)
-	_burger_board(vb, 19, y, -1)
-	_candle(vb, 25, y, 2)
-	_bowl(vb, 29, y, -2, Color("e9c23a"), [Color("f4e04a"), Color("e8b53a")])
-	_pitcher(vb, 34, y, 1)
-	_melon(vb, 38, y, -4)
+	_melon(vb, 9, y, -2)
+	# Low vase, lined up between diners (never in front of a face).
+	V.b(vb, 21, y, -1, 3, 3, 3, Color("8fb7d9"))
+	V.blob(vb, Vector3(22.5, y + 5, 0.5), Vector3(2.4, 1.8, 2.4), V.mix([Color("f59cc6"), Color("fbf7f0"), Color("ee7fb4"), Color("e2513f"), Color("5f9e3a")], 3), 0.4, 3)
+	_pitcher(vb, 27, y, 2)
+	_candle(vb, 30, y, -3)
+	_bowl_big(vb, 38, y, 0, Color("e9c23a"), [Color("f4e04a"), Color("e8b53a"), Color("fff0a0")])
 	# Chairs.
 	for key in SEATS:
 		var s: Vector3 = SEATS[key]
 		_chair(vb, int(s.x), int(s.y), key)
 	table_node = V.inst(vb, root, V.SIZE_FINE, TABLE_POS, TABLE_ROT, Vector3.ZERO, true, false, "DinnerTable")
+
+
+func _bowl_big(vb: VoxelBuilder, x: int, y: int, z: int, food: Color, bits: Array) -> void:
+	# Wide white serving bowl heaped with food (reads from across the yard).
+	var white := Color("f1ede4")
+	V.cyl(vb, x + 0.5, y, z + 0.5, 3.2, 1, white)
+	V.cyl(vb, x + 0.5, y + 1, z + 0.5, 4.6, 2, white)
+	V.cyl(vb, x + 0.5, y + 2, z + 0.5, 3.8, 1, V.mix([food, V.shade(food, 1.18), V.shade(food, 0.85)] + bits, x + 7))
+	V.cyl(vb, x + 0.5, y + 3, z + 0.5, 2.6, 1, V.mix([food, V.shade(food, 1.18)] + bits, x + 3))
+	V.p(vb, x, y + 4, z, bits[0])
+
+
+func _burger_platter(vb: VoxelBuilder, x: int, y: int, z: int) -> void:
+	# Long wooden board with six fat burgers (two rows of three).
+	V.b(vb, x - 7, y, z - 4, 15, 1, 8, V.wood(WOOD_L, 0, 1))
+	V.b(vb, x - 7, y, z - 4, 15, 1, 1, V.shade(WOOD, 0.9))
+	for r in 2:
+		for i in 3:
+			var bx := x - 6 + i * 5
+			var bz := z - 3 + r * 4
+			V.b(vb, bx, y + 1, bz, 3, 1, 3, Color("e0a456"))
+			V.b(vb, bx, y + 2, bz, 3, 1, 3, Color("6cb04a"))
+			V.b(vb, bx, y + 3, bz, 3, 1, 3, Color("5a2e18"))
+			V.p(vb, bx + 2, y + 3, bz + 2, Color("f2c22a")); V.p(vb, bx, y + 3, bz + 2, Color("e2513f"))
+			V.b(vb, bx, y + 4, bz, 3, 1, 3, Color("e9b15e"))
+			V.p(vb, bx + 1, y + 5, bz + 1, Color("f0c27a"))
 
 
 func _candle(vb: VoxelBuilder, x: int, y: int, z: int) -> void:
@@ -531,10 +554,10 @@ func _fire_pit(vb: VoxelBuilder, cx: int, cz: int) -> void:
 					var q := Vector3i(cx + x + int(tp.x), y, cz + z + int(tp.z))
 					if d > rad + (V.h1(q, 12) - 0.5) * 0.8:
 						continue
-					var c := Color("ffc24a").lerp(Color("ff6a14"), clampf(d / maxf(rad, 0.3) * 0.9 + f * 0.7, 0.0, 1.0))
-					if f > 0.5:
-						c = c.lerp(Color("d8301a"), (f - 0.5) * 1.6)
-					c = V.shade(c, 0.8)
+					var c := Color("ffb63a").lerp(Color("ff5a10"), clampf(d / maxf(rad, 0.3) * 1.1 + f * 0.9, 0.0, 1.0))
+					if f > 0.4:
+						c = c.lerp(Color("c8281a"), (f - 0.4) * 1.5)
+					c = V.shade(c, 0.66)
 					vb.set_v(q, c, true)
 	# Sparks.
 	for i in 3:

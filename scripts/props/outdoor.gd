@@ -155,8 +155,26 @@ static func m_hedge(vb: VoxelBuilder, v: int) -> void:
 
 
 ## Classic black street lamp ~3.6 m with a glowing lantern head.
-static func m_street_lamp(vb: VoxelBuilder, _v: int) -> void:
+static func m_street_lamp(vb: VoxelBuilder, v: int) -> void:
 	var blk := Color("23252b")
+	if v == 1:
+		# Chunky lantern-head post (ref3 neighbourhood): 5x5 glowing lantern
+		# with a black cross frame, cap and finial, ~4 m tall.
+		V.b(vb, 2, 0, 2, 5, 2, 5, blk)
+		V.b(vb, 3, 2, 3, 3, 2, 3, Color("2c2f36"))
+		V.b(vb, 4, 4, 4, 1, 22, 1, blk)
+		V.b(vb, 3, 25, 3, 3, 1, 3, blk)
+		V.b(vb, 1, 26, 1, 7, 1, 7, blk)
+		V.b(vb, 2, 27, 2, 5, 6, 5, Color("ffd27a"), true)
+		for c in [Vector2i(2, 2), Vector2i(6, 2), Vector2i(2, 6), Vector2i(6, 6)]:
+			V.b(vb, c.x, 27, c.y, 1, 6, 1, blk)
+		V.b(vb, 4, 27, 2, 1, 6, 1, Color("ffe6aa"), true)
+		V.b(vb, 2, 30, 2, 5, 1, 5, Color("ffe9b0"), true)
+		V.b(vb, 1, 33, 1, 7, 1, 7, blk)
+		V.b(vb, 2, 34, 2, 5, 1, 5, blk)
+		V.b(vb, 3, 35, 3, 3, 1, 3, blk)
+		V.p(vb, 4, 36, 4, blk)
+		return
 	V.b(vb, 1, 0, 1, 3, 2, 3, blk)
 	V.b(vb, 2, 2, 2, 1, 23, 1, blk)
 	V.b(vb, 1, 24, 1, 3, 1, 3, blk)

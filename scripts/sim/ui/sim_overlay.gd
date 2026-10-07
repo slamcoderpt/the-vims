@@ -731,7 +731,7 @@ func _draw_career(sel: int, y: float, row_h: float) -> void:
 		panel.draw_rect(Rect2(bar.end.x - 2, bar.position.y - 3, 2, bar.size.y + 6), gold)
 		panel.draw_string(f, Vector2(110, y + 18), "%d / 100" % roundi(perf), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, UI.INK_SOFT)
 	else:
-		panel.draw_string(f7, Vector2(16, y + 26), "Jobs: Business · Culinary · Journalism · Music", HORIZONTAL_ALIGNMENT_LEFT, PANEL_W - 32, 12, UI.INK_SOFT)
+		panel.draw_string(f7, Vector2(16, y + 26), "Jobs: Business · Freelance · Culinary · Journalism · Music", HORIZONTAL_ALIGNMENT_LEFT, PANEL_W - 32, 12, UI.INK_SOFT)
 	y += row_h
 	# --- row 3: status + next promotion
 	var status := ""

@@ -10,11 +10,11 @@ const VS := [0.24, 0.24, 0.35]
 ## [x, z, height_m, crown_radius_m, palette (0 orange, 1 red, 2 yellow, 3 mixed), group]
 const TREES := [
 	# Left edge, behind the treats stall.
-	[-9.8, -3.2, 3.6, 2.3, 0, 0],
+	[-12.0, -5.8, 3.6, 2.3, 0, 0],
 	[-9.4, -9.6, 3.9, 2.2, 1, 0],
 	[-12.8, -13.5, 4.2, 2.6, 2, 0],
 	# Right edge, behind stalls / stage.
-	[11.8, -5.4, 3.6, 2.2, 2, 1],
+	[14.6, -6.8, 3.6, 2.2, 2, 1],
 	[13.4, -10.4, 3.9, 2.3, 0, 1],
 	[12.2, -17.2, 4.4, 2.5, 3, 1],
 	# Back, framing the town hall.
@@ -66,7 +66,7 @@ func _tree(vb: VoxelBuilder, occ: Dictionary, vs: float, x: float, z: float, h: 
 	var bark := [Color("5e3b22"), Color("4f311c"), Color("6b452a"), Color("573620"), Color("47301f")]
 	# Trunk (3x3 tapering to 2x2) with root flare, bark streaks.
 	for y in th:
-		var wdt := 3 if y < th * 0.6 else 2
+		var wdt := 3 if (y < th * 0.6 and vs > 0.3) else 2
 		var off := 0 if wdt == 3 else (1 if K.hs(seed, 1, 1) > 0.5 else 0)
 		for dx in wdt:
 			for dz in wdt:

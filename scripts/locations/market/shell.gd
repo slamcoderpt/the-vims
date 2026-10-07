@@ -13,11 +13,11 @@ const Z0 := -11.75
 const ZF := 17.0
 const H := 5.0
 
-const WALL := Color("dcb88e")
-const PLASTER := Color("f2ebde")
+const WALL := Color("c7975f")
+const PLASTER := Color("a8774a")
 const WAINSCOT := Color("b07a4a")
-const CEIL := Color("7b5232")
-const BEAM := Color("5e3c22")
+const CEIL := Color("6e4629")
+const BEAM := Color("3f2716")
 
 
 static func cc(m: float) -> int:
@@ -61,7 +61,10 @@ static func _walls(root: Node3D) -> void:
 			f *= 0.92
 		# back wall above the fridges: bright cream plaster (daylight wall)
 		if p.z <= z0:
-			return Kit.shade(PLASTER, 0.97 + 0.04 * Kit.h(Vector3i(p.x / 8, p.y / 4, 1), 2))
+			# vertical warm-wood boards (2 cells wide) with dark seams
+			if p.x % 3 == 0:
+				return Kit.shade(PLASTER, 0.72)
+			return Kit.shade(PLASTER, 0.9 + 0.18 * Kit.h(Vector3i(p.x / 3, 0, 1), 2))
 		return Kit.shade(WALL, f)
 	# left / right / back
 	vb.box(Vector3i(x0, 0, z0), Vector3i(1, hh, zf - z0), wall_fn)
@@ -132,14 +135,30 @@ static func _ceiling(root: Node3D, halo_pts: Array) -> void:
 	for r: Array in rows:
 		for x: float in r[2]:
 			var p := Vector3(x, r[1], r[0])
-			var cord := int((H - 0.19 - p.y) / U) - 4
+			var cord := int((H - 0.19 - p.y) / U) - 7
 			Fx.pendant(lamps, Vector3i(int(round(p.x / U)), int(round(p.y / U)), int(round(p.z / U))), cord)
-			halo_pts.append([p + Vector3(0.03, -0.1, 0.03), 1.7, Color(1.0, 0.7, 0.38, 1.0)])
-			halo_pts.append([p + Vector3(0.03, -0.12, 0.03), 0.45, Color(1.0, 0.92, 0.75, 1.0)])
-			if r[3] and absf(x - 3.5) > 0.1:
-				Kit.light(root, p + Vector3(0, -0.35, 0), Color(1.0, 0.86, 0.66), 1.0, 4.4)
-			pools.append([Vector3(x, 0.012, r[0]), Vector2(2.1, 2.1), Color(1.0, 0.8, 0.5, 0.4 if r[3] else 0.28)])
+			# warm bloom around the bulb: a wide soft amber glow + a hot core
+			halo_pts.append([p + Vector3(0.03, 0.02, 0.03), 2.2, Color(1.0, 0.62, 0.28, 1.0)])
+			halo_pts.append([p + Vector3(0.03, 0.0, 0.03), 0.75, Color(1.0, 0.88, 0.62, 1.0)])
+			if r[3]:
+				# amber cone straight down: a pool on the tiles / crates below
+				Kit.spot(root, p + Vector3(0, -0.05, 0), Color(1.0, 0.8, 0.56), 3.8, 5.5, 34.0)
+			else:
+				Kit.light(root, p + Vector3(0, -0.4, 0), Color(1.0, 0.8, 0.55), 1.3, 4.0)
+			pools.append([Vector3(x, 0.012, r[0]), Vector2(2.6, 2.6), Color(1.0, 0.62, 0.3, 0.55 if r[3] else 0.4)])
 	Kit.add(root, lamps, U, "Pendants", false, Kit.glow_mat("warm"), Vector3.ZERO, Vector3.ZERO, false, false)
+	# Two big near-camera pendants hanging into the top of the frame (between
+	# the FRESH & LOCAL and MARKET boards), like the reference's foreground lamps.
+	var big := VoxelBuilder.new()
+	big.jitter = 0.02
+	const BU := 0.085
+	for bp: Vector3 in [Vector3(0.45, 4.12, 6.6), Vector3(3.35, 4.2, 6.4)]:
+		var cord := int((H - bp.y) / BU) - 7
+		Fx.pendant(big, Vector3i(int(round(bp.x / BU)), int(round(bp.y / BU)), int(round(bp.z / BU))), cord)
+		halo_pts.append([bp + Vector3(0.04, 0.03, 0.04), 2.4, Color(1.0, 0.62, 0.28, 1.0)])
+		halo_pts.append([bp + Vector3(0.04, 0.01, 0.04), 0.9, Color(1.0, 0.88, 0.62, 1.0)])
+		Kit.light(root, bp + Vector3(0, -0.3, 0), Color(1.0, 0.8, 0.55), 1.2, 4.5)
+	Kit.add(root, big, BU, "PendantsNear", false, Kit.glow_mat("warm"), Vector3.ZERO, Vector3.ZERO, false, false)
 	# Cool spill from the fridge bank + its reflection streak on the tiles.
 	Kit.light(root, Vector3(-2.8, 1.4, -10.3), Color(0.78, 0.9, 1.0), 1.6, 4.5)
 	Kit.light(root, Vector3(0.4, 1.4, -10.3), Color(0.78, 0.9, 1.0), 1.6, 4.5)

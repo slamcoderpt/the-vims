@@ -342,15 +342,27 @@ func _clock(cx: int, cy: int, z: int) -> void:
 		var a := TAU * i / 12.0
 		var p := Vector2(sin(a), cos(a)) * (r - 4.0)
 		det.set_v(Vector3i(cx + roundi(p.x - 0.5), cy + roundi(p.y - 0.5), z + 1), Color("2d2a28"))
+	# Hands: chunky 2-cell strokes (thin 1-cell hands read as a frowning
+	# face at phone size). Long minute hand, short wide hour hand.
 	var am := TAU * 42.0 / 60.0
 	var ah := TAU * (4.0 + 42.0 / 60.0) / 12.0
-	for t in range(0, 9):
-		var p := Vector2(sin(am), cos(am)) * t
-		det.set_v(Vector3i(cx + roundi(p.x - 0.5), cy + roundi(p.y - 0.5), z + 1), Color("1e1c1a"))
-	for t in range(0, 6):
-		var p := Vector2(sin(ah), cos(ah)) * t
-		det.set_v(Vector3i(cx + roundi(p.x - 0.5), cy + roundi(p.y - 0.5), z + 1), Color("1e1c1a"))
+	_hand(cx, cy, z, am, 8.6, 1.0, Color("1e1c1a"))
+	_hand(cx, cy, z, ah, 5.6, 1.3, Color("1e1c1a"))
 	det.set_v(Vector3i(cx, cy, z + 2), Color("d9b04a"))
+
+
+func _hand(cx: int, cy: int, z: int, ang: float, length: float, width: float, col: Color) -> void:
+	var dir := Vector2(sin(ang), cos(ang))
+	var nrm := Vector2(dir.y, -dir.x)
+	var t := 0.0
+	while t <= length:
+		var wd := width * (1.0 - 0.35 * t / length)
+		var s := -wd
+		while s <= wd:
+			var p := dir * t + nrm * s * 0.5
+			det.set_v(Vector3i(cx + roundi(p.x - 0.5), cy + roundi(p.y - 0.5), z + 1), col)
+			s += 0.5
+		t += 0.5
 
 
 func _house_left() -> void:

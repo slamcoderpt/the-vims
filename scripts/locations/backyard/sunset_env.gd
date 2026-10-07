@@ -126,9 +126,9 @@ func update(hour: float) -> void:
 	# camera looks down at the yard, so the only sky it sees lies just
 	# below the true horizon (behind the sunken neighbour lots): the
 	# gradient is compressed into that band so it reads purple -> orange.
-	var top := Color(0.30, 0.16, 0.50).lerp(Color(0.05, 0.06, 0.16), n).lerp(Color(0.38, 0.58, 0.9), day)
-	var mid := Color(0.78, 0.28, 0.56).lerp(Color(0.16, 0.12, 0.3), n).lerp(Color(0.6, 0.76, 0.95), day)
-	var low := Color(1.0, 0.44, 0.26).lerp(Color(0.3, 0.16, 0.3), n).lerp(Color(0.8, 0.86, 0.95), day)
+	var top := Color(0.27, 0.2, 0.52).lerp(Color(0.05, 0.06, 0.16), n).lerp(Color(0.38, 0.58, 0.9), day)
+	var mid := Color(0.86, 0.4, 0.5).lerp(Color(0.16, 0.12, 0.3), n).lerp(Color(0.6, 0.76, 0.95), day)
+	var low := Color(1.0, 0.52, 0.28).lerp(Color(0.3, 0.16, 0.3), n).lerp(Color(0.8, 0.86, 0.95), day)
 	var hor := Color(1.0, 0.66, 0.30).lerp(Color(0.36, 0.2, 0.3), n).lerp(Color(0.92, 0.9, 0.86), day)
 	sky_mat.set_shader_parameter("sun_dir", Vector3(-0.45, -0.2, -1.0))
 	sky_mat.set_shader_parameter("horizon_y", -0.05)

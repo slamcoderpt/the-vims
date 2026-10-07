@@ -678,6 +678,11 @@ func _on_action_chosen(title: String, action: Dictionary) -> void:
 			# Deferred: the HUD closes its menu right after reporting the pick.
 			open_menu.call_deferred("Job Listings", Careers.job_rows(sel0.member), {"type": "jobs", "target": it}, Vector2(520, 300))
 		return
+	if t == "chance":
+		var ag_c = ctx.get("agent")
+		if ag_c != null:
+			ag_c.resolve_chance(action.get("id", "") == "chance_yes")
+		return
 	if t == "jobs":
 		var sel1 = selected_agent()
 		var it1 = ctx.get("target")
@@ -1420,6 +1425,22 @@ func on_shift_done(ag, pay: int) -> void:
 		Wishes.on_action(ag, {"id": "work_shift"}, pay)
 	if Careers.is_school(ag.member.get("career", {})) and Careers.grade(float(ag.member.career.perf)) in ["A", "A+"]:
 		Wishes.on_career(ag, "grade")
+
+
+## A chance card as a two-row menu (title: who and where).
+func open_chance(ag, card: Dictionary) -> void:
+	var rows := [{"id": "chance_yes", "label": card.yes_label, "icon": card.get("icon", "laptop")},
+		{"id": "chance_no", "label": card.no_label, "icon": "dots"}]
+	var vs: Vector2 = get_viewport().get_visible_rect().size if is_inside_tree() else Vector2(1672, 941)
+	open_menu.call_deferred("%s at Work" % ag.display_name(), rows, {"type": "chance", "agent": ag}, vs * Vector2(0.42, 0.3))
+
+
+## The computer a home worker uses (null when this lot has none).
+func home_desk(_ag) -> Node:
+	for it in interactables:
+		if is_instance_valid(it) and str(it.title) == "Computer" and townie_of(it) == "":
+			return it
+	return null
 
 
 func on_promotion(ag) -> void:

@@ -211,12 +211,12 @@ static func glow_mat(kind: String) -> StandardMaterial3D:
 	m.emission_enabled = true
 	match kind:
 		"warm":
-			m.albedo_color = Color(1.9, 1.6, 1.2)
-			m.emission = Color(1.0, 0.78, 0.45); m.emission_energy_multiplier = 2.2
+			m.albedo_color = Color(2.4, 1.9, 1.25)
+			m.emission = Color(1.0, 0.74, 0.4); m.emission_energy_multiplier = 2.6
 		"cool":
 			# HDR albedo so the fridge interiors cross the glow threshold.
-			m.albedo_color = Color(1.45, 1.55, 1.75)
-			m.emission = Color(0.82, 0.93, 1.0); m.emission_energy_multiplier = 0.6
+			m.albedo_color = Color(1.2, 1.42, 1.8)
+			m.emission = Color(0.7, 0.86, 1.0); m.emission_energy_multiplier = 0.7
 		"sky":
 			m.emission = Color(0.9, 0.95, 1.0); m.emission_energy_multiplier = 0.45
 		_:
@@ -332,6 +332,27 @@ static func light(parent: Node, pos: Vector3, color: Color, energy: float, rng: 
 	return l
 
 
+## Downward warm spot (a pendant's light cone): paints a pool on the floor /
+## crates below. Registered with lighting.gd like Kit.light.
+static func spot(parent: Node, pos: Vector3, color: Color, energy: float, rng: float, angle := 38.0) -> SpotLight3D:
+	var l := SpotLight3D.new()
+	l.position = pos
+	l.rotation = Vector3(-PI * 0.5, 0, 0)
+	l.light_color = color
+	l.light_energy = energy
+	l.spot_range = rng
+	l.spot_angle = angle
+	l.spot_angle_attenuation = 0.9
+	l.spot_attenuation = 0.6
+	l.shadow_enabled = false
+	l.light_specular = 0.35
+	l.set_meta("base_energy", energy)
+	l.set_meta("day_factor", 1.0)
+	l.add_to_group("vims_lamps")
+	parent.add_child(l)
+	return l
+
+
 # ------------------------------------------------------------------ floor
 
 ## Glossy cream tile floor, split into chunks so each chunk picks up its own
@@ -343,22 +364,26 @@ static func tile_floor(parent: Node3D, size: Vector2, center: Vector3, tile := 0
 	var img := Image.create(px * n, px * n, true, Image.FORMAT_RGB8)
 	for ty in n:
 		for tx in n:
-			var base := Color("fbf6ec") if (tx + ty) % 2 == 0 else Color("eee3cf")
-			var f := 0.97 + 0.06 * h(Vector3i(tx, ty, 5))
+			# warm cream tiles (two tones, faint per-tile variation) with
+			# a clearly visible warm-grey grout line and a bevelled edge.
+			var base := Color("f1e6d0") if (tx + ty) % 2 == 0 else Color("e5d5ba")
+			var f := 0.95 + 0.08 * h(Vector3i(tx, ty, 5))
 			for y in px:
 				for x in px:
-					var c := shade(base, f * (0.985 + 0.03 * h(Vector3i(tx * px + x, ty * px + y, 1))))
-					if x < 1 or y < 1:
-						c = Color("c4baa9")
-					elif x < 2 or y < 2:
-						c = shade(base, 0.92)
+					var c := shade(base, f * (0.98 + 0.04 * h(Vector3i(tx * px + x, ty * px + y, 1))))
+					if x < 2 or y < 2:
+						c = Color("8f7a60")
+					elif x < 3 or y < 3:
+						c = shade(base, 0.86)
+					elif x == px - 1 or y == px - 1:
+						c = shade(base, 1.05)
 					img.set_pixel(tx * px + x, ty * px + y, c)
 	img.generate_mipmaps()
 	var tex := ImageTexture.create_from_image(img)
 	var mat := StandardMaterial3D.new()
 	mat.albedo_texture = tex
-	mat.roughness = 0.28
-	mat.metallic_specular = 0.55
+	mat.roughness = 0.24
+	mat.metallic_specular = 0.6
 	mat.uv1_triplanar = true
 	mat.uv1_world_triplanar = true
 	mat.uv1_scale = Vector3.ONE / (tile * n)

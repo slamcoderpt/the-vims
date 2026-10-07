@@ -188,6 +188,9 @@ func _resize_viewport() -> void:
 	# Cap the render target (~480px tall): plenty for a 140pt card and cheap
 	# on phones.
 	k = minf(k, 480.0 / maxf(_tex.size.y, 1.0))
+	# Integer factor so the box downsample maps whole render pixels to each
+	# screen pixel (crisp voxel edges).
+	k = maxf(floorf(k), 1.0)
 	_mat.set_shader_parameter("ss", k)
 	var s := (_tex.size * k).round()
 	var want := Vector2i(int(s.x), int(s.y))
@@ -319,6 +322,11 @@ func _neutralize_pose() -> void:
 		var e: Vector3 = sk.get_bone_pose_rotation(i).get_euler()
 		var keep_pitch := e.x if bn == "b_body" else 0.0
 		sk.set_bone_pose_rotation(i, Quaternion.from_euler(Vector3(keep_pitch, 0.0, 0.0)))
+	if member.get("kind", "") == "dog":
+		# Pet card (ref): body in 3/4 profile, head turned to the lens.
+		var hb = _actor.get("b_head")
+		if hb != null and int(hb) >= 0:
+			sk.set_bone_pose_rotation(int(hb), Quaternion.from_euler(Vector3(deg_to_rad(-6.0), deg_to_rad(30.0), 0.0)))
 	var eb = _actor.get("b_eyes")
 	if eb != null and int(eb) >= 0:
 		sk.set_bone_pose_scale(int(eb), Vector3.ONE)
@@ -356,6 +364,10 @@ func _frame_camera(measure := false) -> void:
 	var cy := 0.0
 	var view_h := 1.0
 	var origin := _actor.global_position
+	# Voxel grid in the camera plane (front busts only): size of one voxel
+	# and where a grid corner lands, for pixel-exact framing.
+	var snap_unit := 0.0
+	var snap_o := Vector2.ZERO
 	if sk is Skeleton3D and hb >= 0 and meta is Dictionary and not meta.is_empty() and not dog:
 		# Head-and-shoulders close-up: the head (hair included) fills ~62% of
 		# the card width, a small margin over the hair / hat, chin at ~62%
@@ -368,6 +380,8 @@ func _frame_camera(measure := false) -> void:
 			var d: Vector3 = g * (v * vs) - origin
 			return Vector2(d.dot(right), d.dot(up))
 		var mid: Vector2 = pr.call(Vector3(0, 1.0 + hh * 0.5, 0))
+		snap_o = pr.call(Vector3.ZERO)
+		snap_unit = absf((pr.call(Vector3(1, 0, 0)) as Vector2).x - snap_o.x)
 		var l: Vector2 = pr.call(Vector3(-6.2, 1.0 + hh * 0.5, 0))
 		var r: Vector2 = pr.call(Vector3(6.2, 1.0 + hh * 0.5, 0))
 		var head_w := absf(r.x - l.x)
@@ -394,26 +408,11 @@ func _frame_camera(measure := false) -> void:
 			cy = (top + chin) * 0.5
 	else:
 		var pts := PackedVector3Array()
-		if false:
-			var vs := 0.05
-			var g := _bone_xf(sk, hb)
-			# Pet close-up: head, ears and chest (front legs' tops), so the
-			# face fills the card like the ref beagle card.
-			pts.append(g * (Vector3(0, 9.0, 4.0) * vs))
-			for bn in ["b_leg_fl", "b_leg_fr", "b_ear_l", "b_ear_r"]:
-				var bi = _actor.get(bn)
-				if bi != null and int(bi) >= 0:
-					pts.append(_bone_pos(sk, int(bi)))
-			for qx in [-7.5, 7.5]:
-				for qy in [-6.0, 9.0]:
-					for qz in [-3.0, 11.0]:
-						pts.append(g * (Vector3(qx, qy, qz) * vs))
-		else:
-			var box := _actor_aabb()
-			if box.size == Vector3.ZERO:
-				box = AABB(Vector3(-0.3, 0, -0.3), Vector3(0.6, 1.8, 0.6))
-			for i in 8:
-				pts.append(box.get_endpoint(i))
+		var box := _actor_aabb()
+		if box.size == Vector3.ZERO:
+			box = AABB(Vector3(-0.3, 0, -0.3), Vector3(0.6, 1.8, 0.6))
+		for i in 8:
+			pts.append(box.get_endpoint(i))
 		origin = pts[0]
 		var minx := INF
 		var maxx := -INF
@@ -431,19 +430,24 @@ func _frame_camera(measure := false) -> void:
 			miny = _measured.position.y
 			maxy = _measured.end.y
 		cx = (minx + maxx) * 0.5
-		if false:
-			# Centre on the face, not on the whole silhouette.
-			var fc: Vector3 = _bone_xf(sk, hb) * (Vector3(0, 2.0, 6.0) * 0.05) - origin
-			cx = fc.dot(right)
-			var half := maxf(maxx - cx, cx - minx)
-			minx = cx - half
-			maxx = cx + half
 		var w := maxx - minx
 		var h := maxy - miny
-		view_h = maxf(h * (1.12 if dog else 1.14), w * (1.1 if dog else 1.12) / aspect)
+		view_h = maxf(h * (1.05 if dog else 1.14), w * (1.03 if dog else 1.12) / aspect)
 		cy = (maxy + miny) * 0.5 + h * 0.01
 		if measure:
 			view_h *= 1.9
+	if snap_unit > 0.0 and not measure and absf(PERSON_YAW) < 0.01 and absf(PERSON_PITCH) < 0.01:
+		# Pixel-exact bust: an integer number of render pixels per voxel and
+		# voxel corners on pixel boundaries, so after the integer
+		# supersample downscale every block edge is crisp (pixel-art cards
+		# like the refs, no smeared half-texel seams).
+		var W := float(_vp.size.x)
+		var H := float(_vp.size.y)
+		var n := maxf(roundf(H * snap_unit / view_h), 1.0)
+		var px := snap_unit / n
+		view_h = H * px
+		cx = snap_o.x + (roundf((cx - snap_o.x) / px - W * 0.5) + W * 0.5) * px
+		cy = snap_o.y + (roundf((cy - snap_o.y) / px + H * 0.5) - H * 0.5) * px
 	var center := origin + right * cx + up * cy
 	_plane_c = Vector2(cx, cy)
 	_plane_h = view_h

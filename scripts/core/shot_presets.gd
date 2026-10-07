@@ -7,7 +7,7 @@ const PRESETS := {
 	"home_day": {
 		"ref": "refs/ref1_home_office_day.png",
 		"location": "home", "day": 1, "hour": 14, "minute": 16, "season": 1,
-		"camera": {"target": Vector3(-6.0, 3.3, -1.5), "yaw": 42.0, "pitch": 40.0, "distance": 9.5, "fov": 52.0},
+		"camera": {"target": Vector3(-5.6, 3.6, -1.9), "yaw": 38.0, "pitch": 36.0, "distance": 8.7, "fov": 40.0},
 		"tasks": [
 			{"title": "Answer Emails", "icon": "laptop", "done": true},
 			{"title": "Practice Creativity", "icon": "palette"},
@@ -20,7 +20,7 @@ const PRESETS := {
 	"festival": {
 		"ref": "refs/ref2_autumn_festival.png",
 		"location": "festival", "day": 5, "hour": 16, "minute": 42, "season": 2,
-		"camera": {"target": Vector3(-0.5, 1.3, -4.0), "yaw": 0.0, "pitch": 15.0, "distance": 17.5, "fov": 34.0},
+		"camera": {"target": Vector3(0.0, 2.4, -5.0), "yaw": 0.0, "pitch": 22.5, "distance": 26.0, "fov": 33.0},
 		"tasks": [
 			{"title": "Buy Festival Snack", "icon": "apple", "done": true},
 			{"title": "Meet 3 Neighbors", "icon": "chat"},
@@ -33,7 +33,7 @@ const PRESETS := {
 	"home_night": {
 		"ref": "refs/ref3_home_night_cutaway.png",
 		"location": "home", "day": 0, "hour": 21, "minute": 18, "season": 1,
-		"camera": {"target": Vector3(3.3, 3.2, -0.7), "yaw": 16.0, "pitch": 40.0, "distance": 18.0, "fov": 37.0},
+		"camera": {"target": Vector3(3.5, 2.6, -3.2), "yaw": 4.0, "pitch": 25.5, "distance": 22.0, "fov": 37.0},
 		"tasks": [
 			{"title": "Take Bath", "icon": "bath"},
 			{"title": "Brush Teeth", "icon": "brush", "done": true},
@@ -46,7 +46,7 @@ const PRESETS := {
 	"bbq": {
 		"ref": "refs/ref4_backyard_bbq_sunset.png",
 		"location": "backyard", "day": 0, "hour": 19, "minute": 36, "season": 1,
-		"camera": {"target": Vector3(0.9, 1.3, -1.2), "yaw": -14.0, "pitch": 13.5, "distance": 10.5, "fov": 48.0},
+		"camera": {"target": Vector3(0.9, 1.3, -0.8), "yaw": -14.0, "pitch": 17.0, "distance": 9.7, "fov": 48.0},
 		"tasks": [
 			{"title": "Grill Dinner", "icon": "burger", "done": true},
 			{"title": "Talk to Neighbors", "icon": "people"},

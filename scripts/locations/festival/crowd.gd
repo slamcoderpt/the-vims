@@ -28,12 +28,12 @@ func build(parent: Node3D, stalls, stage) -> void:
 	var vendor_pos: Vector3 = stalls.vendor_spot
 	# Heroes ~1/4 screen tall and spaced apart so faces never overlap:
 	# Jack at the treats counter, Biscuit in front of him, Lily centre, Maya right.
-	var jack := spawn(parent, "Jack", "dad", Vector3(-2.75, 0, 0.75), Vector3(-2.9, 0, 6.0), "talk")
-	var lily := spawn(parent, "Lily", "bunny_girl", Vector3(-0.45, 0, 0.2), Vector3(-3.1, 0, 11.0), "talk")
+	var jack := spawn(parent, "Jack", "dad", Vector3(-2.75, 0, 0.75), Vector3(-5.2, 0, 7.0), "talk")
+	var lily := spawn(parent, "Lily", "bunny_girl", Vector3(-0.45, 0, 0.2), Vector3(1.6, 0, 9.0), "talk")
 	_hold(lily, "candy_apple", "fore_r")
-	var dog := spawn(parent, "Biscuit", "beagle", Vector3(-1.8, 0, 1.95), Vector3(1.5, 0, 7.0), "idle")
+	var dog := spawn(parent, "Biscuit", "beagle", Vector3(-1.8, 0, 1.95), Vector3(2.2, 0, 6.0), "idle")
 	dog.scale = Vector3.ONE * 0.85
-	var maya := spawn(parent, "Maya", "cat_girl", Vector3(3.2, 0, 2.35), Vector3(1.0, 0, 12.0), "stand_type")
+	var maya := spawn(parent, "Maya", "cat_girl", Vector3(3.2, 0, 2.35), Vector3(0.4, 0, 12.0), "talk")
 	_hold(maya, "fox_plush", "torso")
 	# --- Stall keepers.
 	spawn(parent, "vendor", "npc_6", vendor_pos, jack.position, "talk")
@@ -54,7 +54,6 @@ func build(parent: Node3D, stalls, stage) -> void:
 		["npc_3", Vector3(5.9, 0, -5.0), Vector3(5.1, 0, -5.7), "talk"],
 		["npc_0", Vector3(5.1, 0, -5.7), Vector3(5.9, 0, -5.0), "idle"],
 		["npc_4", Vector3(1.3, 0, -7.0), Vector3(1.8, 0, 6.0), "walk"],
-		["npc_2", Vector3(8.0, 0, -4.2), Vector3(9.0, 0, -7.0), "idle"],
 	]
 	_far_folk(parent)
 	var i := 1
@@ -98,8 +97,14 @@ func _far_folk(parent: Node3D) -> void:
 	# chatting in pairs at the edges of the walkway.
 	for p in [[-6.4, -5.6, 90, false], [-7.0, -7.4, 0, false], [-6.7, -6.6, 270, true],
 			[3.6, -5.2, 0, false], [7.2, -4.0, 270, false],
-			[9.4, -6.0, 300, false], [9.8, -9.6, 270, false], [-8.0, -3.8, 90, false],
-			[-2.2, -8.0, 135, true], [6.3, -8.4, 200, false], [7.0, -9.0, 30, true]]:
+			[9.4, -6.0, 300, false], [9.8, -9.6, 270, false],
+			[-2.2, -8.0, 135, true], [6.3, -8.4, 200, false], [7.0, -9.0, 30, true],
+			# Round 9 (wider camera): a scattered, smaller crowd filling the
+			# open cobbles between the heroes, fountain, game booth and stage.
+			[8.2, -4.0, 200, false], [9.0, -4.6, 120, false],
+			[0.9, -5.6, 330, false], [1.6, -5.9, 200, true], [4.4, -6.4, 0, false],
+			[-1.6, -12.8, 180, false],
+			[2.4, -8.6, 160, false], [-4.6, -11.6, 220, false], [10.4, -8.0, 300, true]]:
 		F.add(p[0], p[1], p[2], p[3], seed)
 		seed += 1
 	F.build(parent)

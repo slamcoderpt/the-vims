@@ -38,6 +38,8 @@ func build(parent: Node3D) -> void:
 	crafts = _place(parent, "CraftsStall", _crafts_table(), Vector3(5.8, 0, 1.6), -30.0)
 	_place(parent, "RedStall", _side_stall(RED, CREAM, 0), Vector3(8.4, 0, -7.6), -42.0)
 	_place(parent, "BlueStall", _side_stall(BLUE, CREAM, 1), Vector3(11.6, 0, -12.0), -55.0)
+	# Round 9 wider shot: an orange produce stall fills the left edge.
+	_place(parent, "OrangeStall", _side_stall(Color("e2662a"), CREAM, 2), Vector3(-9.9, 0, -1.6), 62.0)
 	# Chalkboards.
 	var menu := _chalkboard(parent, Vector3(-4.3, 0, 2.0), 20.0, 1.25)
 	K.label(menu, "Apple Cider\n· Pumpkin Pie\n· Pretzels\nCandy Apples", Vector3(-0.12, 1.2, 0.13), 0.0021, Color("f4f1e6"), 0.0, Color(0, 0, 0, 0), 64, HORIZONTAL_ALIGNMENT_LEFT)

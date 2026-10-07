@@ -21,6 +21,7 @@ const FOUNTAIN_SCALE := 1.25
 const LAMP_TOP := 4.2
 const SU := 0.06  # string-light wire cell size
 const BU := 0.08  # bulb cell size
+const FV := 1.5 / 16.0  # foreground dressing cell size
 
 var glow_points: Array = []
 var lamp_heads: Array = []
@@ -33,6 +34,7 @@ func build(parent: Node3D) -> void:
 	_fountain(parent)
 	_strings(parent)
 	_props(parent)
+	_foreground(parent)
 
 
 # ------------------------------------------------------------------ lamps
@@ -295,21 +297,24 @@ func _barrel_planter(vb: VoxelBuilder, cx: int, cz: int, r: float, pal: int, see
 	K.mums(vb, cx, 10, cz, r + 0.6, pal, seed)
 
 
-func _ground_lantern(vb: VoxelBuilder, x: int, z: int) -> void:
+func _ground_lantern(vb: VoxelBuilder, x: int, z: int, y0 := 0, cs := U) -> void:
 	# Iron floor lantern with warm amber glass (reads lit in daylight).
 	var iron := Color("2a2622")
-	K.box(vb, x - 3, 0, z - 3, 6, 1, 6, iron)
+	var y := y0
+	K.box(vb, x - 3, y, z - 3, 6, 1, 6, iron)
 	for c in [Vector2i(-3, -3), Vector2i(2, -3), Vector2i(-3, 2), Vector2i(2, 2)]:
-		K.box(vb, x + c.x, 1, z + c.y, 1, 9, 1, iron)
-	K.box(vb, x - 2, 1, z - 2, 4, 9, 4, Color("ffa040"), true)
-	K.box(vb, x - 3, 1, z - 2, 6, 9, 4, Color("ffb450"), true)
-	K.box(vb, x - 2, 1, z - 3, 4, 9, 6, Color("ffa848"), true)
-	K.box(vb, x - 3, 5, z - 3, 6, 1, 6, iron)
-	K.box(vb, x - 4, 10, z - 4, 8, 1, 8, iron)
-	K.box(vb, x - 3, 11, z - 3, 6, 1, 6, iron)
-	K.box(vb, x - 1, 12, z - 1, 2, 2, 2, iron)
-	glow_points.append([Vector3(x, 6, z) * U, 1.5, Color(1.0, 0.7, 0.35)])
-	glow_points.append([Vector3(x, 5, z) * U, 0.6, Color(1.0, 0.86, 0.6)])
+		K.box(vb, x + c.x, y + 1, z + c.y, 1, 9, 1, iron)
+	K.box(vb, x - 2, y + 1, z - 2, 4, 9, 4, Color("ffa040"), true)
+	K.box(vb, x - 3, y + 1, z - 2, 6, 9, 4, Color("ffb450"), true)
+	K.box(vb, x - 2, y + 1, z - 3, 4, 9, 6, Color("ffa848"), true)
+	K.box(vb, x - 3, y + 5, z - 3, 6, 1, 6, iron)
+	K.box(vb, x - 4, y + 10, z - 4, 8, 1, 8, iron)
+	K.box(vb, x - 3, y + 11, z - 3, 6, 1, 6, iron)
+	K.box(vb, x - 1, y + 12, z - 1, 2, 2, 2, iron)
+	K.box(vb, x - 1, y + 14, z, 2, 1, 1, iron)
+	var gk := cs / U
+	glow_points.append([Vector3(x, y + 6, z) * cs, 1.5 * gk, Color(1.0, 0.7, 0.35)])
+	glow_points.append([Vector3(x, y + 5, z) * cs, 0.6 * gk, Color(1.0, 0.86, 0.6)])
 
 
 func _picnic_table(vb: VoxelBuilder, x: int, z: int) -> void:
@@ -337,7 +342,7 @@ func _props(parent: Node3D) -> void:
 	var barrels := [
 		[-6.9, 2.6, 0], [-6.0, 3.5, 1], [-7.6, 0.4, 1],
 		[-2.2, -6.2, 2], [2.0, -7.6, 0], [7.4, -2.0, 2],
-		[7.6, 3.4, 1], [-5.2, 4.6, 0],
+		[-5.2, 4.6, 0],
 		[-2.7, -11.6, 1], [3.1, -12.2, 2],
 	]
 	var i := 0
@@ -345,13 +350,13 @@ func _props(parent: Node3D) -> void:
 		_barrel_planter(near, int(b[0] * C), int(b[1] * C), 5.0, b[2], i)
 		i += 1
 	# Ground lanterns (small, along the walkway edges).
-	for l in [[-7.0, 3.6], [-3.3, 2.9], [1.1, 3.9], [6.9, 0.2], [-2.0, -4.2], [1.9, -5.6], [-2.5, -9.0], [2.9, -9.3]]:
+	for l in [[-7.0, 3.6], [-3.3, 2.9], [6.9, 0.2], [-2.0, -4.2], [1.9, -5.6], [-2.5, -9.0], [2.9, -9.3]]:
 		_ground_lantern(near, int(l[0] * C), int(l[1] * C))
 	# Picnic tables.
 	_picnic_table(near, int(-5.0 * C), int(-8.0 * C))
 	_picnic_table(near, int(3.9 * C), int(-7.2 * C))
 	# Pumpkin piles + hay.
-	var piles := [[-2.6, 3.4], [-1.4, -5.6], [1.6, -6.3], [-7.4, -1.8], [8.4, 0.2], [-1.9, -9.6], [6.0, -11.6]]
+	var piles := [[-1.4, -5.6], [1.6, -6.3], [-7.4, -1.8], [8.4, 0.2], [-1.9, -9.6], [6.0, -11.6]]
 	var j := 0
 	for p: Array in piles:
 		var px := int(p[0] * C)
@@ -365,4 +370,73 @@ func _props(parent: Node3D) -> void:
 	K.hay(near, int(7.6 * C), 0, int(-5.6 * C), 16, 9, 9)
 	K.hay(near, int(-2.6 * C), 0, int(-6.8 * C), 16, 9, 9)
 	K.hay(near, int(1.4 * C), 0, int(-12.4 * C), 16, 9, 9)
+	# Pumpkin display on tiered hay (right edge of the wider round-9 shot).
+	var dx := int(10.2 * C)
+	var dz := int(-2.4 * C)
+	K.hay(near, dx - 16, 0, dz - 6, 32, 9, 12)
+	K.hay(near, dx - 10, 9, dz - 4, 20, 8, 9)
+	K.hay(near, dx - 16, 0, dz + 6, 32, 9, 9)
+	var pk := 0
+	for pp in [[-12, 9, 9, 3.6], [-4, 9, 10, 3.0], [5, 9, 9, 3.8], [12, 9, 10, 2.8],
+			[-6, 17, 0, 3.2], [3, 17, 1, 3.6], [-1, 9, -2, 2.6], [-14, 0, 17, 3.4], [-6, 0, 18, 2.4], [14, 0, 17, 3.0]]:
+		K.pumpkin(near, dx + pp[0], pp[1], dz + pp[2], pp[3], 60 + pk, pk)
+		pk += 1
+	_barrel_planter(near, dx + 22, dz + 10, 5.0, 1, 61)
+	_barrel_planter(near, int(-11.4 * C), int(-4.6 * C), 5.0, 2, 62)
+	K.hay(near, int(-12.6 * C), 0, int(-6.6 * C), 16, 9, 9)
+	K.pumpkin(near, int(-11.9 * C), 9, int(-6.3 * C), 3.4, 63, 2)
 	K.inst(parent, near, U, Vector3.ZERO, 0.0, true, Vector3.ZERO, "SquareProps")
+
+
+# ------------------------------------------------------------------ foreground
+
+## Near-camera set dressing along the bottom edge of the festival shot
+## (ref2: flower barrels with orange mums, glowing lanterns, pumpkins and
+## hay in the near corners, softened by the tilt-shift band). Kept to the
+## corners + a couple of lanterns so the walkway to the heroes stays open.
+func _foreground(parent: Node3D) -> void:
+	# Chunkier cells (1.5x) than the rest of the square: these sit closest to
+	# the lens, so they read big and soft like the ref's corner dressing.
+	var vb := VoxelBuilder.new()
+	vb.jitter = 0.0
+	var C := 1.0 / FV
+	# Bottom-left: hay stack topped with pumpkins, cider barrel, mums.
+	K.hay(vb, int(-5.2 * C), 0, int(2.6 * C), 12, 7, 7)
+	K.hay(vb, int(-4.9 * C), 7, int(2.75 * C), 8, 5, 5)
+	K.pumpkin(vb, int(-4.5 * C), 12, int(3.0 * C), 2.6, 3, 0)
+	K.pumpkin(vb, int(-3.7 * C), 0, int(3.55 * C), 3.2, 4, 1)
+	K.pumpkin(vb, int(-3.0 * C), 0, int(3.1 * C), 2.0, 5, 3)
+	_cider_barrel(vb, int(-6.3 * C), int(2.0 * C))
+	_barrel_planter(vb, int(-8.0 * C), int(2.7 * C), 4.5, 0, 41)
+	K.mums(vb, -7.0 * C, 0, 3.7 * C, 4.6, 1, 42)
+	# Bottom-centre: two big lanterns on low crates + pumpkins.
+	_crate_box(vb, int(-0.5 * C) - 3, int(3.6 * C) - 3, 7, 5, 7)
+	_ground_lantern(vb, int(-0.5 * C), int(3.6 * C), 5, FV)
+	K.pumpkin(vb, int(-1.3 * C), 0, int(3.9 * C), 2.3, 6, 0)
+	_crate_box(vb, int(1.9 * C) - 3, int(3.8 * C) - 3, 7, 5, 7)
+	_ground_lantern(vb, int(1.9 * C), int(3.8 * C), 5, FV)
+	K.mums(vb, 1.2 * C, 0, 4.1 * C, 3.2, 2, 43)
+	# Bottom-right: mums bushes, pumpkins, a planter barrel.
+	_barrel_planter(vb, int(8.8 * C), int(2.0 * C), 4.5, 1, 44)
+	K.mums(vb, 7.5 * C, 0, 3.3 * C, 4.4, 0, 45)
+	K.mums(vb, 9.6 * C, 0, 3.3 * C, 3.8, 2, 46)
+	K.pumpkin(vb, int(6.3 * C), 0, int(3.7 * C), 2.8, 7, 2)
+	K.pumpkin(vb, int(5.7 * C), 0, int(3.3 * C), 1.9, 8, 0)
+	K.inst(parent, vb, FV, Vector3.ZERO, 0.0, true, Vector3.ZERO, "Foreground")
+
+
+func _crate_box(vb: VoxelBuilder, x: int, z: int, w: int, h: int, d: int) -> void:
+	K.box(vb, x, 0, z, w, h, d, K.wood(Color("b07a44"), 2, 2))
+	for yy in [0, h - 1]:
+		K.box(vb, x, yy, z + d - 1, w, 1, 1, Color("7a4a28"))
+
+
+func _cider_barrel(vb: VoxelBuilder, cx: int, cz: int) -> void:
+	K.cyl(vb, cx, 0, cz, 5.5, 14, func(q: Vector3i) -> Color:
+		if q.y == 2 or q.y == 11:
+			return Color("2f2b28")
+		var bulge := 0.85 + 0.1 * (1.0 - absf(q.y - 7.0) / 7.0)
+		var ang := atan2(q.z - cz, q.x - cx)
+		var stave := int((ang + PI) / TAU * 16.0)
+		return K.shade(Color("8a5430"), bulge + K.hs(stave, cx, 5) * 0.2))
+	K.cyl(vb, cx, 14, cz, 4.5, 1, Color("6a4026"))

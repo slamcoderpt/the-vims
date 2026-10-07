@@ -45,6 +45,15 @@ const TRACKS := {
 		"wage": [12, 17, 23, 30, 38, 48, 60, 75, 92, 112],
 		"req": [0, 0, 1, 2, 3, 4, 5, 6, 8, 9],
 	},
+	# Works from the home computer (no commute): a forced "Work" action.
+	"freelance": {
+		"name": "Freelance Dev", "icon": "laptop", "skill": "Logic", "kinds": ["adult"], "home": true,
+		"days": [0, 1, 2, 3, 4], "start": 10, "hours": 6,
+		"titles": ["Junior Freelancer", "Web Developer", "App Developer", "Senior Developer", "Tech Lead",
+			"Software Architect", "Indie Studio Owner", "Startup Founder", "Tech Mogul", "Silicon Legend"],
+		"wage": [13, 17, 22, 28, 35, 44, 55, 68, 84, 102],
+		"req": [0, 0, 1, 2, 3, 4, 5, 6, 8, 9],
+	},
 	# Children are enrolled in school automatically; no pay, a grade instead.
 	"school": {
 		"name": "School", "icon": "book", "skill": "", "kinds": ["child"],
@@ -53,11 +62,13 @@ const TRACKS := {
 	},
 }
 ## Tracks offered by "Find a Job" (in this order).
-const JOB_TRACKS := ["business", "culinary", "journalism", "music"]
+const JOB_TRACKS := ["business", "freelance", "culinary", "journalism", "music"]
 ## The sim leaves this many minutes before the shift (walk to the door + carpool).
 const LEAVE_BEFORE := 30.0
 ## Arriving later than this after the start counts as a missed shift.
 const MISS_AFTER := 120.0
+## Home workers head for the computer this many minutes before the start.
+const HOME_LEAD := 10.0
 const TENDENCIES := ["hard", "normal", "easy"]
 const TENDENCY_LABEL := {"hard": "Work Hard", "normal": "Normal", "easy": "Take It Easy"}
 const TENDENCY_PERF := {"hard": 12.0, "normal": 7.0, "easy": 2.0}
@@ -174,8 +185,11 @@ static func job_rows(member: Dictionary) -> Array:
 		if not kind in t.kinds or id == cur:
 			continue
 		var c := new_career(id)
-		rows.append({"id": "job_" + id, "label": "%s · $%d/h · %s" % [t.name, wage(c), _short_hours(c)], "icon": t.icon, "track": id,
-			"sub": schedule_text(c)})
+		# Short label (the menu card is narrow); "sub" carries the schedule
+		# for a HUD that shows a second line.
+		var where := " · works from home" if t.get("home", false) else ""
+		rows.append({"id": "job_" + id, "label": "%s · $%d/h" % [t.name, wage(c)], "icon": t.icon, "track": id,
+			"sub": schedule_text(c) + where, "hours": _short_hours(c)})
 	return rows
 
 
@@ -212,3 +226,26 @@ static func shift_needs(c: Dictionary) -> Dictionary:
 			n.fun += 0.1
 			n.energy += 0.05
 	return n
+
+
+# =================================================================== chance cards
+
+## Sims 3 career "chance cards": once in a while, mid-shift, a choice pops up.
+## yes / no: {perf, hours (extra shift hours), mood: [id, label, icon, delta, hours],
+## odds (chance the yes-outcome succeeds; else fail)}.
+const CHANCE_P := 0.35
+const CHANCES := [
+	{"id": "overtime", "text": "%s's boss asks for some overtime", "icon": "laptop",
+	 "yes_label": "Stay Late (+2h)", "no_label": "Head Home on Time",
+	 "yes": {"perf": 8.0, "hours": 2.0, "mood": ["overtime", "Overtime", "laptop", -5.0, 4.0]},
+	 "no": {"perf": 0.0}},
+	{"id": "pitch", "text": "%s could pitch an idea at the big meeting", "icon": "bulb",
+	 "yes_label": "Pitch It!", "no_label": "Stay Quiet", "odds": 0.6,
+	 "yes": {"perf": 12.0, "mood": ["nailed_it", "Nailed the Pitch", "bulb", 10.0, 6.0]},
+	 "fail": {"perf": -6.0, "mood": ["flopped", "Pitch Flopped", "dots", -8.0, 4.0]},
+	 "no": {"perf": 0.0}},
+	{"id": "coworker", "text": "A coworker of %s's is swamped", "icon": "people",
+	 "yes_label": "Lend a Hand", "no_label": "Mind Own Work",
+	 "yes": {"perf": 4.0, "social": 0.15, "mood": ["helpful", "Helpful", "heart", 6.0, 4.0]},
+	 "no": {"perf": -2.0}},
+]

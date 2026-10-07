@@ -563,12 +563,26 @@ static func slope_heap(vb: VoxelBuilder, kind: String, x0: float, w: float, zf: 
 	var pitch := big_item(probe, kind, Vector3i.ZERO, 0, 0.0)
 	var px := pitch.x
 	var pz := pitch.z
+	# round items pack a little tighter than their size so no dark bin
+	# floor shows between them
+	if pitch.x <= 7 and kind != "grapes":
+		px -= 1
+		pz -= 1
 	if kind == "carrot":
 		px = 3
+		pz = pitch.z
 	var nx := maxi(1, int(w) / px)
 	var nz := maxi(1, int(d) / pz)
 	if kind == "banana" or kind == "carrot":
 		layers = mini(layers, 2)
+	# under-fill in the produce's own (shadowed) colour along the sloped floor
+	var fill := Kit.shade(_fill_col(kind), 0.55)
+	for zi in int(d):
+		var fr := float(zi) / maxf(d, 1.0)
+		var fy0 := int(round(yf + (yb - yf) * fr)) - 1
+		for xi in range(1, int(w) - 1):
+			vb.set_v(Vector3i(int(round(x0)) + xi, fy0, int(round(zf)) - 1 - zi), fill)
+			vb.set_v(Vector3i(int(round(x0)) + xi, fy0 + 1, int(round(zf)) - 1 - zi), Kit.shade(fill, 1.15))
 	for L in layers:
 		var odd := L % 2
 		var cnx := maxi(1, nx - odd)
@@ -589,3 +603,14 @@ static func slope_heap(vb: VoxelBuilder, kind: String, x0: float, w: float, zf: 
 				var o := Vector3i(int(round(x0 + ox + ix * px)) + jx, int(round(fy)) - 1 + L * pitch.y + jy,
 					int(round(zc - pz * 0.5)) + jz + (1 if iz == 0 and L == 0 else 0))
 				big_item(vb, kind, o, seed + ix * 3 + iz * 7 + L * 11, Kit.h(key, 23))
+
+
+static func _fill_col(kind: String) -> Color:
+	match kind:
+		"tomato", "apple", "pepper_red": return Color("b52620")
+		"orange", "carrot": return Color("d56a12")
+		"lemon", "banana": return Color("d6b02c")
+		"greens", "lettuce", "broccoli", "green_apple": return Color("2f6e26")
+		"grapes", "eggplant": return Color("4b2463")
+		"pepper_mix": return Color("8a3a1a")
+	return Color("6a4a2a")

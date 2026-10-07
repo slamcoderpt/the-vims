@@ -111,11 +111,23 @@ static func m_lamp_table(vb: VoxelBuilder, v: int) -> void:
 
 
 static func m_lamp_floor(vb: VoxelBuilder, _v: int) -> void:
-	V.b(vb, 1, 0, 1, 4, 1, 4, Color("3a3a3f"))
-	V.b(vb, 3, 1, 3, 1, 22, 1, Color("3a3a3f"))
-	V.b(vb, 0, 23, 0, 7, 4, 7, LAMP, true)
-	V.b(vb, 0, 23, 0, 7, 1, 7, LAMP_HI, true)
-	V.b(vb, 1, 27, 1, 5, 2, 5, LAMP, true)
+	# Slim brass floor lamp with a pleated cream drum shade; only the lit
+	# underside / inner band glows, the fabric reads as fabric.
+	var brass := Color("b8893e")
+	V.cyl(vb, 3.5, 0, 3.5, 2.6, 1, Color("2f2f34"))
+	V.b(vb, 3, 1, 3, 1, 21, 1, V.shade(brass, 0.9))
+	V.b(vb, 2, 12, 3, 3, 1, 1, brass)
+	V.b(vb, 3, 22, 3, 1, 1, 1, brass)
+	var shade := func(q: Vector3i) -> Color:
+		# Pleats + a warmer lower band where the bulb shines through.
+		var c := Color("ffe2a8") if posmod(q.x + q.z, 2) == 0 else Color("f4cf8e")
+		return c if q.y < 25 else c.lerp(Color("fff1d2"), 0.5)
+	# Tapered empire shade: wide at the bottom, narrower at the top.
+	V.cyl(vb, 3.5, 22, 3.5, 3.6, 2, shade, true)
+	V.cyl(vb, 3.5, 24, 3.5, 3.1, 2, shade, true)
+	V.cyl(vb, 3.5, 26, 3.5, 2.6, 1, shade, true)
+	V.cyl(vb, 3.5, 27, 3.5, 2.1, 1, Color("e2c697"))
+	V.b(vb, 3, 27, 3, 1, 1, 1, brass)
 
 
 ## Wall sconce, back on the wall at z=0: a small metal bracket holding a warm
@@ -352,19 +364,44 @@ static func m_telescope(vb: VoxelBuilder, _v: int) -> void:
 # ------------------------------------------------------------------ kids / pet
 
 static func m_dog_bed(vb: VoxelBuilder, _v: int) -> void:
-	# Small wooden crate bed with a cushion and a bone on the front (ref1),
-	# 0.84 x 0.7 m: a beagle curls up in it, it never dominates the room.
-	var w := V.wood(Color("9a5f34"), 0, 2)
-	V.b(vb, 0, 0, 0, 12, 1, 10, w)
-	V.b(vb, 0, 1, 0, 12, 3, 1, w); V.b(vb, 0, 1, 9, 12, 3, 1, w)
-	V.b(vb, 0, 1, 0, 1, 3, 10, w); V.b(vb, 11, 1, 0, 1, 3, 10, w)
-	V.b(vb, 0, 4, 0, 12, 1, 1, V.shade(Color("9a5f34"), 1.12)); V.b(vb, 0, 4, 0, 1, 1, 10, V.shade(Color("9a5f34"), 1.12))
-	V.b(vb, 11, 4, 0, 1, 1, 10, V.shade(Color("9a5f34"), 1.12))
-	V.b(vb, 1, 1, 1, 10, 2, 8, V.noisy(Color("efe4cf"), 0.05))
-	V.b(vb, 2, 3, 2, 8, 1, 6, V.noisy(Color("f6eedd"), 0.04))
-	# Bone emblem on the low front.
-	for q in [Vector2i(4, 2), Vector2i(5, 2), Vector2i(6, 2), Vector2i(7, 2), Vector2i(3, 1), Vector2i(3, 3), Vector2i(8, 1), Vector2i(8, 3)]:
-		V.p(vb, q.x, q.y, 10, Color("f3ead8"))
+	# Woven wicker basket bed (ref1): basket-weave sides with a rolled rim, a
+	# low front lip with a cream bone emblem, and a soft blue-cream plaid
+	# cushion that puffs up in the middle. 0.84 x 0.7 m.
+	var wa := Color("a8693a")
+	var wb := Color("8a522a")
+	var weave := func(q: Vector3i) -> Color:
+		var u := q.x + q.z
+		var c := wa if posmod(u + (q.y % 2) * 2, 4) < 2 else wb
+		return V.shade(c, 0.95 + VoxelBuilder.hash3(q) * 0.1)
+	V.b(vb, 0, 0, 0, 12, 1, 10, V.shade(wb, 0.9))
+	# Back + sides 4 high, front lip 2 high.
+	V.b(vb, 0, 1, 0, 12, 4, 1, weave)
+	V.b(vb, 0, 1, 0, 1, 4, 10, weave)
+	V.b(vb, 11, 1, 0, 1, 4, 10, weave)
+	V.b(vb, 0, 1, 9, 12, 2, 1, weave)
+	# Rolled rim (lighter cane) following the stepped top.
+	var rim := Color("c88b52")
+	V.b(vb, 0, 5, 0, 12, 1, 1, rim)
+	for x in [0, 11]:
+		for z in 10:
+			var top := 5 if z < 6 else (4 if z < 8 else 3)
+			V.p(vb, x, top, z, rim)
+			for y in range(3, top):
+				V.p(vb, x, y, z, weave.call(Vector3i(x, y, z)))
+	V.b(vb, 1, 3, 9, 10, 1, 1, rim)
+	# Cushion: plaid with cream piping, raised centre.
+	var pl := V.plaid(Color("9fb4d8"), Color("e9eef6"), Color("6f88b8"), 3)
+	V.b(vb, 1, 1, 1, 10, 2, 8, pl)
+	V.b(vb, 2, 3, 2, 8, 1, 6, pl)
+	for x in range(1, 11):
+		V.p(vb, x, 3, 1, Color("f3ead8")); V.p(vb, x, 2, 8, Color("f3ead8"))
+	# Bone emblem on the front lip.
+	for q in [Vector2i(4, 2), Vector2i(5, 2), Vector2i(6, 2), Vector2i(7, 2), Vector2i(3, 1), Vector2i(3, 2), Vector2i(8, 1), Vector2i(8, 2)]:
+		V.p(vb, q.x, q.y, 10, Color("f6eedc"))
+	# A chew bone left on the cushion.
+	V.b(vb, 6, 4, 4, 3, 1, 1, Color("f3e7cf"))
+	V.p(vb, 5, 4, 3, Color("f3e7cf")); V.p(vb, 5, 4, 5, Color("f3e7cf"))
+	V.p(vb, 9, 4, 3, Color("f3e7cf")); V.p(vb, 9, 4, 5, Color("f3e7cf"))
 
 
 ## Round dog cushion (ref3 hallway).

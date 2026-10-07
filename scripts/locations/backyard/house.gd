@@ -8,7 +8,7 @@ const FastBuilder := preload("res://scripts/locations/backyard/fast_builder.gd")
 const M := 8
 const F := 16
 
-const SIDING := Color("c9c4d6")
+const SIDING := Color("aaa4bf")
 const TRIM := Color("f3efe8")
 const DECK := Color("b5794a")
 const DECK_D := Color("8a5532")

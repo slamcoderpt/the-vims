@@ -43,10 +43,10 @@ const MOUNDS := [
 	[6.9, 3.45, 1.5, 0.7, 1.2],      # right of the fire pit
 	[8.6, 2.0, 0.9, 1.0, 1.1],
 	[-4.4, 2.35, 1.1, 0.6, 1.2],     # left of the table, in front of the patio
-	[-2.2, 3.0, 0.8, 0.45, 1.1],
-	[0.4, 2.75, 0.75, 0.4, 1.15],    # in front of the near chairs
+	[-3.1, 3.25, 0.8, 0.45, 1.1],
+	[1.3, 3.35, 0.75, 0.4, 1.15],    # in front of the near chairs
 	[5.2, 4.05, 1.0, 0.5, 1.15],     # in front of the fire pit
-	[-0.4, -1.45, 1.0, 0.45, 1.0],   # behind the table, by the deck steps
+	[-1.4, -1.6, 0.9, 0.4, 1.0],   # behind the table, by the deck steps
 	[-6.4, -2.6, 0.9, 0.6, 1.0],     # behind the grill
 	[11.0, 2.4, 1.6, 0.9, 1.0],
 ]

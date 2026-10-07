@@ -145,7 +145,7 @@ static func _produce_island(root: Node3D, fix: VoxelBuilder, prod: VoxelBuilder)
 	# Low foreground display (bottom-left of the shot, soft in the DOF).
 	fix.box(Vector3i(u(-3.3), 0, u(5.2)), Vector3i(u(2.75), u(0.38), u(0.95)), wood)
 	var fx := -3.28
-	for e: Array in [["tomato", 0.88, 84], ["pepper_mix", 0.88, 85], ["banana", 0.92, 86]]:
+	for e: Array in [["tomato", 0.88, 84], ["carrot", 0.88, 85], ["banana", 0.92, 86]]:
 		_crate(fix, prod, Vector3(fx, 0.38, 5.22), Vector3(e[1], 0.26, 0.9), e[0], e[2], 3)
 		fx += e[1] + 0.02
 	_tag(root, Vector3(-1.05, 0.36, 6.23), "$0.60", -4.0)

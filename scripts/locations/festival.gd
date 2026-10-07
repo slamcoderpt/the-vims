@@ -14,7 +14,9 @@ const Stage := preload("res://scripts/locations/festival/stage.gd")
 const Decor := preload("res://scripts/locations/festival/decor.gd")
 const Crowd := preload("res://scripts/locations/festival/crowd.gd")
 
-const CAMERA := {"target": Vector3(-0.5, 1.3, -4.0), "yaw": 0.0, "pitch": 15.0, "distance": 17.5, "fov": 34.0}
+## Round 9: pulled back + up (critic r8) so heroes are ~1/5 frame tall and the
+## plaza, fountain, stage and clock tower all read with room to breathe.
+const CAMERA := {"target": Vector3(0.0, 2.4, -5.0), "yaw": 0.0, "pitch": 22.5, "distance": 26.0, "fov": 33.0}
 ## Town backdrop is scaled down so the clock tower stays in frame under the
 ## steeper (ref-like) camera; hall front lands at z ~ -26.
 const TOWN_SCALE := 0.64

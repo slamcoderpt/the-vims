@@ -330,31 +330,47 @@ static func crate(vb: VoxelBuilder, o: Vector3i, w: int, d: int, h: int, col := 
 
 ## Pendant lamp (black cone shade, glowing rim + bulb). o = bottom centre cell.
 static func pendant(vb: VoxelBuilder, o: Vector3i, cord: int) -> void:
-	var shade_c := Color("23201e")
-	var rim := Color("3a3532")
-	# cone: wide at the bottom, narrow at the top
-	for y in 4:
-		var r := 4 - y
+	# Black industrial cone shade (wide bottom), warm-lit inner rim, a big
+	# glowing bulb hanging below the rim so it reads from above and from the
+	# side, and a brass cap + cord.
+	var shade_c := Color("1d1a18")
+	var rim := Color("2e2926")
+	for y in 5:
+		var r := 5 - y
 		for x in range(-r, r + 1):
 			for z in range(-r, r + 1):
-				if x * x + z * z > r * r + r:
+				var d := x * x + z * z
+				if d > r * r + r:
 					continue
-				var inner := x * x + z * z <= (r - 1) * (r - 1) + (r - 1)
-				if y == 0 and inner:
+				var inner := d <= (r - 1) * (r - 1) + (r - 1)
+				if y < 2 and inner:
 					continue
-				vb.set_v(o + Vector3i(x, y + 1, z), rim if y == 0 else shade_c)
-	# glowing underside + hanging bulb
-	for x in range(-3, 4):
-		for z in range(-3, 4):
-			if x * x + z * z <= 10:
-				vb.set_v(o + Vector3i(x, 1, z), Color("fff3d6"), true)
-	for x in range(-1, 1):
-		for z in range(-1, 1):
-			vb.set_v(o + Vector3i(x, 0, z), Color("ffe9b8"), true)
-			vb.set_v(o + Vector3i(x, -1, z), Color("ffdf9a"), true)
-	vb.set_v(o + Vector3i(0, 5, 0), shade_c)
+				vb.set_v(o + Vector3i(x, y + 2, z), rim if y == 0 else shade_c)
+	# glowing inside of the shade (visible through the open bottom)
+	for x in range(-4, 5):
+		for z in range(-4, 5):
+			if x * x + z * z <= 13:
+				vb.set_v(o + Vector3i(x, 3, z), Color("fff0cc"), true)
+	# inner rim ring lit warm (a thin bright line along the lower edge)
+	for x in range(-4, 5):
+		for z in range(-4, 5):
+			var d := x * x + z * z
+			if d <= 20 and d > 12:
+				vb.set_v(o + Vector3i(x, 2, z), Color("ffd890"), true)
+	# bulb: 3x3 glowing globe hanging just below the rim
+	for x in range(-1, 2):
+		for z in range(-1, 2):
+			for y in range(0, 2):
+				if absi(x) + absi(z) <= 1 or y == 1:
+					vb.set_v(o + Vector3i(x, y, z), Color("fff6dc") if y == 1 else Color("ffe4a8"), true)
+	vb.set_v(o + Vector3i(0, -1, 0), Color("ffe09a"), true)
+	vb.set_v(o + Vector3i(0, 2, 0), Color("fff6dc"), true)
+	# brass cap + cord
+	vb.set_v(o + Vector3i(0, 7, 0), Color("b8893e"))
+	vb.set_v(o + Vector3i(1, 7, 0), Color("a07432"))
+	vb.set_v(o + Vector3i(0, 7, 1), Color("a07432"))
 	for y in cord:
-		vb.set_v(o + Vector3i(0, 5 + y, 0), Color("1c1a19"))
+		vb.set_v(o + Vector3i(0, 8 + y, 0), Color("1c1a19"))
 
 
 ## Shopping cart (P = 1/32 grid), local facing +z (handle at -z).

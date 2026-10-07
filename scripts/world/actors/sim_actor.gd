@@ -406,6 +406,21 @@ func _glance(max_turn: float, wh := 0.1, wt := 0.2) -> float:
 	return want * (wh + wt)
 
 
+## Activity presentation (art direction): the body stays square to its prop
+## and only turns a hint (`wh`, `wt` shares), the head turns toward the camera
+## but stops `keep` radians short of it, so faces read in 3/4 while the sim
+## visibly engages with the activity. Returns the hips+torso yaw.
+func _present(keep := 0.85, max_turn := 0.95, wh := 0.03, wt := 0.07) -> float:
+	var a := _cam_a
+	if absf(a) <= keep:
+		return 0.0
+	var want := clampf(a - signf(a) * keep, -max_turn, max_turn)
+	_ab(b_hips, 0.0, want * wh, 0.0)
+	_ab(b_torso, 0.0, want * wt, 0.0)
+	_ab(b_head, 0.0, want * (1.0 - wh - wt), 0.0)
+	return want * (wh + wt)
+
+
 func _sb(i: int, x: float, y := 0.0, z := 0.0) -> void:
 	if i >= 0:
 		_tgt[i] = Vector3(x, y, z)
@@ -483,37 +498,28 @@ func _human_pose() -> void:
 				_sb(b_torso, 0.025 * slow)
 				_sb(b_head, -0.02 * slow, 0.35, 0.0)
 		"type":
-			# Seated at the desk, back three-quarter to a Sims camera: the body
-			# stays square to the keyboard (forearms forward on the desk), and
-			# only the head turns part way so the beard + nose read in profile.
+			# Seated at the desk, body square to the monitor with both forearms
+			# forward on the keyboard. Only the head (plus a hint of shoulder)
+			# turns toward the player, stopping ~50 deg short of the camera so
+			# the face reads in 3/4 profile while he still looks at his work.
 			var tap := sin(t * 13.0)
 			var tap2 := sin(t * 11.0 + 1.3)
 			var body_yaw := 0.0
 			if _seated():
-				# Office chairs swivel: the whole body turns part way toward
-				# the player and the head the rest, so beard, nose and eye
-				# read in profile / 3/4 even from behind the desk.
-				var behind := smoothstep(1.6, 2.6, absf(_cam_a))
-				body_yaw = _glance(2.0, lerpf(0.2, 0.24, behind), lerpf(0.16, 0.22, behind))
-				# Sit squarely ON the seat (scooted to its front edge), sit
-				# up tall and lean in a little toward the screen; the swivel
-				# + head turn above keeps beard, eye and plaid in 3/4 view.
-				var sd := signf(_cam_a) if absf(_cam_a) > 0.3 else 0.0
+				body_yaw = _present(0.85, 0.95, 0.03, 0.07)
 				var ws := _s * maxf(scale.x, 0.01)
-				_tgt_pos.z += (0.1 + 0.03 * behind) / ws
+				# Scoot to the front of the seat, sit tall, lean in to the desk.
+				_tgt_pos.z += 0.1 / ws
 				_tgt_pos.y += 0.03 / ws
-				_ab(b_torso, 0.1, 0.0, -sd * 0.06)
-				_ab(b_head, -0.18, 0.0, sd * 0.08)
-			# The far hand stays on the keyboard; the hand nearer the camera
-			# works the mouse out to the side, so a plaid arm and a hand on
-			# the desk read beside the body instead of hiding behind it.
-			# Both forearms reach forward onto the keyboard (the shoulders
-			# compensate the presentation swivel so the hands stay on it).
-			_sb(b_arm_l, -1.15, -0.16 - body_yaw * 0.9, -0.04)
-			_sb(b_arm_r, -1.15, 0.16 - body_yaw * 0.9, 0.04)
-			_sb(b_fore_l, -0.45 + 0.1 * maxf(0.0, tap), 0.0, 0.0)
-			_sb(b_fore_r, -0.45 + 0.1 * maxf(0.0, tap2), 0.0, 0.0)
-			_ab(b_head, -0.04 + 0.02 * sin(t * 0.8), 0.05 * sin(t * 0.4), 0.04)
+				_ab(b_torso, 0.14, 0.0, 0.0)
+				_ab(b_head, -0.12, 0.0, 0.0)
+			# Both forearms forward and level onto the keyboard (shoulders
+			# compensate the small presentation swivel so the hands stay put).
+			_sb(b_arm_l, -1.0, -0.12 - body_yaw, -0.05)
+			_sb(b_arm_r, -1.0, 0.12 - body_yaw, 0.05)
+			_sb(b_fore_l, -0.62 + 0.08 * maxf(0.0, tap), 0.12, 0.0)
+			_sb(b_fore_r, -0.62 + 0.08 * maxf(0.0, tap2), -0.12, 0.0)
+			_ab(b_head, -0.03 + 0.02 * sin(t * 0.8), 0.05 * sin(t * 0.4), 0.0)
 		"read":
 			_sb(b_arm_l, -0.45, 0.0, -0.18)
 			_sb(b_arm_r, -0.45, 0.0, 0.18)
@@ -529,6 +535,9 @@ func _human_pose() -> void:
 			# reaching arm reads against the body (it stays below the face).
 			var dab := sin(t * 3.2)
 			var dab2 := sin(t * 1.3 + _phase)
+			# Brush in the hand nearer the camera, stretched out toward the
+			# canvas at shoulder height (below the face), elbow out; the far
+			# hand holds the palette at her lap.
 			var want_left := _cam_a > 0.05
 			if want_left != _brush_left:
 				_brush_left = want_left
@@ -540,18 +549,18 @@ func _human_pose() -> void:
 			var pf := b_fore_r if _brush_left else b_fore_l
 			# Brush arm stretched out level toward the canvas (reads as
 			# "painting" in silhouette), small dabbing strokes.
-			_sb(bi, -1.62 + 0.08 * dab, (0.1 + 0.06 * dab2) * m, 0.08 * m)
-			_sb(bf, -0.12 - 0.14 * maxf(0.0, dab))
+			_sb(bi, -1.4 + 0.1 * dab, (0.05 + 0.06 * dab2) * m, -0.32 * m)
+			_sb(bf, -0.55 - 0.2 * maxf(0.0, dab), 0.0, 0.25 * m)
 			if _seated():
 				# Perch on the front edge of the stool, leaning in to the canvas.
 				_tgt_pos.z += 0.12 / _s
-			_sb(pi_, -0.5, 0.0, 0.3 * m)
-			_sb(pf, -1.15)
+			_sb(pi_, -0.75, 0.0, 0.25 * m)
+			_sb(pf, -0.9)
 			_ab(b_head, 0.02, 0.05 * dab2, 0.06 * sin(t * 0.7))
-			_ab(b_torso, 0.24, 0.0, 0.0)
-			# Mostly in profile, looking at her canvas; the head turns only
-			# part way so eyes and smile still read.
-			var py := _glance(1.3, 0.08, 0.14)
+			_ab(b_torso, 0.16, 0.0, 0.0)
+			# Body square to the canvas; the head turns part way toward the
+			# player (stopping ~50 deg short) so eyes and smile read in 3/4.
+			var py := _present(0.85, 0.9, 0.03, 0.07)
 			_ab(bi, 0.0, -py, 0.0)
 			_ab(pi_, 0.0, -py, 0.0)
 		"talk":
@@ -582,17 +591,26 @@ func _human_pose() -> void:
 			_sb(b_arm_l, 0.0, 0.0, 0.08)
 			_ab(b_head, -0.05, 0.0, 0.0)
 		"play":
-			# Cross-legged on the rug, leaning in over the toys, both hands busy.
+			# Cross-legged on the rug, turned 3/4 to the player and leaning in
+			# over the toys, both hands down on the blocks in front of the
+			# knees; the head turns back toward the camera so the face reads.
 			_sit_floor()
 			var pl := sin(t * 3.0 + _phase)
 			var pl2 := sin(t * 2.2 + _phase * 2.0)
-			_sb(b_arm_l, -0.95 + 0.18 * pl, -0.25, -0.05)
-			_sb(b_arm_r, -0.75 - 0.22 * pl2, 0.3, 0.05)
-			_sb(b_fore_l, -0.7 - 0.15 * pl2)
-			_sb(b_fore_r, -0.85 + 0.15 * pl)
-			_ab(b_torso, 0.04)
-			# Head tips back up so the face stays visible from above.
-			_ab(b_head, -0.3, 0.12 * sin(t * 0.7), 0.08 * sin(t * 1.1))
+			var by := clampf(_cam_a * 0.7, -1.2, 1.2) - 0.65
+			_tgt_root_rot.y = by
+			var hy := clampf((_cam_a - by) * 0.6, -0.75, 0.75)
+			# Sitting up tall, shoulders back a touch so the striped top and
+			# overalls show under the big chibi head from the high Sims
+			# camera; the head tips down to the robot in her hands.
+			_ab(b_torso, -0.14, hy * 0.2, 0.0)
+			_ab(b_head, 0.02 + 0.04 * pl2, hy * 0.8, 0.1 + 0.06 * sin(t * 1.1))
+			# Robot held up in front of her chest in one hand, the other hand
+			# reaching down to the blocks on the rug.
+			_sb(b_arm_l, -0.95 + 0.08 * pl, -0.3, 0.05)
+			_sb(b_fore_l, -0.75 - 0.1 * pl2, 0.0, 0.0)
+			_sb(b_arm_r, -0.75 - 0.15 * pl2, 0.3, -0.25)
+			_sb(b_fore_r, -0.3 + 0.12 * pl, 0.0, 0.0)
 
 
 func _sit_chair() -> void:

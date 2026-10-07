@@ -10,27 +10,46 @@ const VS := 0.05
 ## actor -> {mode, arm, fore, prop, side}
 var _items: Array = []
 var _t := 0.0
+## Actors whose eyes stay open in screenshot mode (a blink frozen into a
+## still reads as a sleepy face).
+var _open_eyes: Array = []
+var _shot := false
 static var _meshes := {}
 
 
 func _init() -> void:
 	name = "PartyGestures"
 	process_priority = 100
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--shot"):
+			_shot = true
+
+
+func keep_eyes_open(actor: Node3D) -> void:
+	if actor and _shot:
+		_open_eyes.append(actor)
 
 
 ## mode: "toast" (glass raised high), "drink" (glass at chest), "burger"
 ## (burger held up near the mouth), "mug" (mug at chest), "cheer" (both arms).
-func add(actor: Node3D, mode: String, left := false, item := "", lift := 0.0) -> void:
+## look: max head yaw (radians) toward the camera, so diners glance at the
+## player in 3/4 while their body stays square to the table.
+func add(actor: Node3D, mode: String, left := false, item := "", lift := 0.0, look := 0.0) -> void:
 	if actor == null:
 		return
 	if item == "":
 		item = {"toast": "glass", "drink": "glass", "burger": "burger", "mug": "mug", "cheer": "glass"}.get(mode, "glass")
 	_items.append({"a": actor, "mode": mode, "left": left, "item": item, "mi": null,
-		"ph": randf_range(0.0, TAU), "lift": lift})
+		"ph": randf_range(0.0, TAU), "lift": lift, "look": look})
 
 
 func _process(delta: float) -> void:
 	_t += delta
+	for a: Node3D in _open_eyes:
+		if is_instance_valid(a) and a.get("skeleton") is Skeleton3D:
+			var eb: int = a.get("b_eyes")
+			if eb >= 0 and String(a.get("pose")) != "sleep":
+				(a.get("skeleton") as Skeleton3D).set_bone_pose_scale(eb, Vector3.ONE)
 	for it: Dictionary in _items:
 		var a: Node3D = it.a
 		if not is_instance_valid(a):
@@ -71,8 +90,21 @@ func _process(delta: float) -> void:
 				skel.set_bone_pose_rotation(fore2, Quaternion.from_euler(Vector3(-1.1, 0.0, 0.0)))
 		# Diners lift their chins a touch so faces read from the high camera.
 		var hb: int = a.get("b_head")
-		if hb >= 0 and float(it.lift) != 0.0:
-			skel.set_bone_pose_rotation(hb, skel.get_bone_pose_rotation(hb) * Quaternion.from_euler(Vector3(-float(it.lift), 0.0, 0.0)))
+		var yaw := 0.0
+		if float(it.look) > 0.0:
+			var cam := a.get_viewport().get_camera_3d()
+			if cam:
+				var d := cam.global_position - a.global_position
+				var bb := a.global_transform.basis.orthonormalized()
+				var ang := atan2(bb.x.dot(d), bb.z.dot(d))
+				yaw = clampf(ang * 0.7, -float(it.look), float(it.look))
+		if hb >= 0 and (float(it.lift) != 0.0 or yaw != 0.0):
+			# Replace the pose's idle head sway with a steady turn to the player.
+			var cur := skel.get_bone_pose_rotation(hb).get_euler()
+			if yaw != 0.0:
+				cur.y = yaw
+			cur.x -= float(it.lift)
+			skel.set_bone_pose_rotation(hb, Quaternion.from_euler(cur))
 		# Held item: in skeleton space, at the hand, kept upright.
 		var mi: MeshInstance3D = it.mi
 		if mi == null:

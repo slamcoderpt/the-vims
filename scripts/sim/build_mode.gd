@@ -651,6 +651,22 @@ func rotate_placed(uid: int) -> bool:
 	var nr: int = (int(e.rot) + 1) % 4
 	var p := _snap(item, nr, e.pos)
 	world.nav.remove_obstacle(uid)
+	if not _can_place(item, _box(item, nr, p)) and world.nav:
+		# Turning a long piece next to a wall: nudge it a little (Sims 3 does
+		# the same) before giving up.
+		var cs: float = world.nav.cs
+		var found := false
+		for r in range(1, 4):
+			for k in 8:
+				var a := TAU * k / 8.0
+				var t := _snap(item, nr, e.pos + Vector3(cos(a), 0, sin(a)) * r * cs)
+				var tb := _box(item, nr, t)
+				if _can_place(item, tb) and not _covers_sim(tb):
+					p = t
+					found = true
+					break
+			if found:
+				break
 	if not _can_place(item, _box(item, nr, p)):
 		if not item.get("walk", false):
 			world.nav.add_obstacle(uid, _box(item, e.rot, e.pos))

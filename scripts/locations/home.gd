@@ -38,6 +38,8 @@ const FRONT_WINDOWS := [[-8.2, -6.8], [-5.6, -4.2], [-3.0, -1.6], [2.0, 3.0], [5
 ## Upstairs office front windows (only standing in the "bed" view), x0, x1.
 const UP_FRONT_WINDOWS := [[-7.7, -6.2], [-3.5, -2.0]]
 const HALO_NIGHT := 0.55
+## Street lantern halos burn brighter than indoor lamp halos (HDR colour).
+const STREET_HALO := Color(1.7, 1.2, 0.62, 1.0)
 const ShotPresets := preload("res://scripts/core/shot_presets.gd")
 const PropLib := preload("res://scripts/props/prop_lib.gd")
 const Mesher := preload("res://scripts/props/mesher.gd")
@@ -124,11 +126,11 @@ func lighting_profile() -> Dictionary:
 		"ambient_night": Color(0.66, 0.54, 0.52), "ambient_night_energy": 0.34, "lamp_night_mult": 3.8,
 		"sky_day": Color(0.64, 0.8, 0.94), "sky_night": Color(0.07, 0.09, 0.22),
 		"fog_day": Color(0.9, 0.9, 0.88), "fog_night": Color(0.12, 0.15, 0.32), "fog_density": 0.004,
-		"moon_heading": 150.0, "moon_energy": 0.32, "glow_boost_night": 1.2,
+		"moon_heading": 150.0, "moon_energy": 0.45, "glow_boost_night": 1.2,
 		"shadow_distance": 40.0,
 		"post_day": {"focus_y": 0.5, "band": 0.35, "falloff": 0.18, "blur_px": 4.0, "top_boost": 1.0,
 			"saturation": 1.16, "contrast": 1.12, "tint": Vector3(1.02, 1.0, 0.96), "vignette": 0.22},
-		"post_night": {"focus_y": 0.52, "band": 0.4, "falloff": 0.12, "blur_px": 2.6, "top_boost": 0.8},
+		"post_night": {"focus_y": 0.56, "band": 0.36, "falloff": 0.14, "blur_px": 2.8, "top_boost": 0.7},
 	}
 
 
@@ -148,6 +150,14 @@ const CLOSED_IN_BED := ["Furniture_office", "Fine_office", "Micro_office", "Work
 	"Furniture_living", "Fine_living", "Micro_living", "Furniture_kitchen"]
 
 
+## In the "office_in" view the camera stands inside the office with every
+## office wall up: the other rooms and most of the yard are walled off (the
+## window glass is painted), so their meshes are hidden (mobile budget).
+const CLOSED_ROOMS_OFFICE_IN := ["pink", "blue", "hall", "bath", "kitchen"]
+const CLOSED_EXT_OFFICE_IN := ["Ground", "Garden", "Fine_ext", "Furniture_ext", "ShowerGlass"]
+var _office_in_hidden: Array[Node3D] = []
+
+
 func set_wall_view(view: String) -> void:
 	wall_view = view
 	_sync_front_glass()
@@ -155,6 +165,18 @@ func set_wall_view(view: String) -> void:
 		var c := get_node_or_null(n)
 		if c is Node3D:
 			c.visible = view != "bed"
+	if _office_in_hidden.is_empty():
+		for c in get_children():
+			if not (c is MeshInstance3D):
+				continue
+			var nm := String(c.name)
+			var parts := nm.split("_")
+			if nm in CLOSED_EXT_OFFICE_IN or (parts.size() >= 2 and parts[0] in ["Furniture", "Fine", "Micro"] and parts[1] in CLOSED_ROOMS_OFFICE_IN):
+				_office_in_hidden.append(c)
+	for c in _office_in_hidden:
+		if is_instance_valid(c):
+			c.visible = view != "office_in"
+	_ensure_neighbourhood(_is_night)
 	for vm in _view_meshes:
 		vm[0].visible = vm[1] == view
 	for sig: String in _wall_nodes:
@@ -601,8 +623,8 @@ func _build_office_roof() -> void:
 	var base := 24 + UH          # wall top (cells)
 	var mid := (x0 + x1) * 0.5
 	var half := (x1 - x0) * 0.5
-	var slope := 0.62
-	var slate := [Color("3c4562"), Color("343c56"), Color("444e6c")]
+	var slope := 0.4
+	var slate := [Color("4c587c"), Color("434d6e"), Color("58658c")]
 	for x in range(x0, x1):
 		var h := base + floori((half - absf(x + 0.5 - mid)) * slope)
 		for z in range(z0, z1):
@@ -785,7 +807,8 @@ func _build_office() -> void:
 	_putm(R, "printer_hd", Vector3(fx + 0.02, fcab.end.y, fcab.position.z - 0.05), 1)
 	_put(R, "book_stack", Vector3(fx + 0.06, fcab.end.y, fcab.end.z - 0.02), 1, 2)
 	# Reading corner by the railing: beanbag, floor lamp, a leafy plant.
-	_put(R, "beanbag", Vector3(fx + 0.15, y, 0.05), 1, 0)
+	_put(R, "plant", Vector3(fx + 0.1, y, 0.0), 0, 5)
+	_put(R, "plant", Vector3(fx + 0.75, y, 0.35), 0, 3)
 	_put(R, "lamp_floor", Vector3(fx + 0.05, y, -0.55))
 	_lamp(Vector3(fx + 0.35, y + 1.95, -0.3), 0.5, 2.6, 0.5, Color(1.0, 0.7, 0.4), 0.5)
 	_put(R, "plant", Vector3(fx + 0.06, y, 1.0), 0, 1)
@@ -799,13 +822,14 @@ func _build_office() -> void:
 	_put(R, "plant", Vector3(fx + 0.06, y, -4.2), 0, 1)
 	_lamp(Vector3(bs2.get_center().x, y + 2.3, bz + 0.9), 0.7, 3.0, 0.4)
 	# --- Window wall: two big multi-pane windows, curtains, sill plants, ivy.
-	for cx: float in [-3.82, -1.7]:
-		_put(R, "curtain", Vector3(cx, y, bz + 0.02), 0, 0)
+	_put(R, "curtain", Vector3(-1.7, y, bz + 0.02), 0, 3)
 	for wx: float in [-5.7, -3.6]:
 		_put(R, "plant", Vector3(wx + 0.1, y + 0.45, bz - 0.04), 0, 3)
 		_put(R, "plant", Vector3(wx + 1.3, y + 0.45, bz - 0.04), 0, 6)
 		_put(R, "ivy", Vector3(wx + 0.05, y + 1.35, bz + 0.03), 0, 2)
 	_put(R, "hanging_plant", Vector3(-3.95, y + 2.25, bz + 0.15), 0, 1)
+	_put(R, "hanging_plant", Vector3(-2.2, y + 2.35, bz + 0.25), 0, 0)
+	_put(R, "hanging_plant", Vector3(-5.6, y + 2.4, bz + 0.3), 0, 2)
 	# --- Art corner: easel by the first window, canvas angled to the camera.
 	_rug(R, -6.1, y, -3.95, 2.9, 2.2, "patch_pink")
 	var easel_mi := PropLib.instance("easel", 0)
@@ -820,7 +844,7 @@ func _build_office() -> void:
 	# --- Music corner: keyboard piano under the second window, guitar beside it.
 	var piano := _putc(R, "piano", -2.6, y, bz + 0.4, 0)
 	var bench := _putc(R, "piano_bench", -2.6, y, -3.55, 0)
-	var guitar := _put(R, "guitar", Vector3(-1.85, y, -3.05), 0)
+	var guitar := _put(R, "guitar", Vector3(-4.12, y, bz + 0.1), 0)
 	_put(R, "plant", Vector3(-1.62, y, bz + 0.05), 0, 1)
 	_wallput(R, "frame", "+x", rx, -4.3, y + 1.75, 3)
 	_lamp(Vector3(-2.6, y + 2.2, bz + 0.6), 0.8, 3.0, 0.45)
@@ -1216,7 +1240,7 @@ func _build_exterior() -> void:
 	var g := VoxelBuilder.new()
 	g.jitter = 0.04
 	for x in range(-56, 52):
-		for z in range(-62, 40):
+		for z in range(-68, 40):
 			var xm := x * 0.5 + 0.25
 			var zm := z * 0.5 + 0.25
 			if xm > -9.2 and xm < 9.2 and zm > -5.2 and zm < 5.2:
@@ -1225,7 +1249,9 @@ func _build_exterior() -> void:
 			var hh := VoxelBuilder.hash3(Vector3i(x, 0, z))
 			if zm < -10.0 and zm > -14.0:
 				c = Color("4a4d57") if not (absf(zm + 12.0) < 0.3 and posmod(x, 6) < 3) else Color("e9d98a")
-			elif (zm <= -9.0 and zm >= -10.0) or (zm <= -14.0 and zm >= -15.0):
+			elif zm < -21.5 and zm > -25.5:
+				c = Color("4a4d57") if not (absf(zm + 23.5) < 0.3 and posmod(x, 6) < 3) else Color("e9d98a")
+			elif (zm <= -9.0 and zm >= -10.0) or (zm <= -14.0 and zm >= -15.0) or (zm <= -20.5 and zm >= -21.5) or (zm <= -25.5 and zm >= -26.5):
 				c = Color("bdb6aa") if posmod(x, 4) != 0 else Color("a9a297")
 			elif xm > 0.3 and xm < 1.9 and zm > 5.0:
 				c = Color("d8c8a8") if posmod(z, 2) == 0 else Color("cbb994")
@@ -1262,20 +1288,26 @@ func _build_exterior() -> void:
 		var rs := PropLib.size_of("tree", [0, 2, 0, 1, 2][i])
 		PropLib.place(bt, "tree", Vector3i(roundi(p.x / 0.34) - rs.x / 2, 0, roundi(p.z / 0.34) - rs.z / 2), i % 4, [0, 2, 0, 1, 2][i])
 	_night_tint.append(_add_mesh(Mesher.build(bt, 0.34), "BigTrees", true))
+	# Street lamps (chunky lantern posts, ref3) on both pavements of the
+	# street behind the back garden; their glowing heads + halos read above
+	# the cut-away bedrooms in the night shot.
+	var lh := Vector3(0.56, 3.8, 0.56)    # lantern centre relative to the placed corner
 	for i in 9:
 		var lx := -24.0 + i * 6.5
-		PropLib.place(o, "street_lamp", Vector3i(cc(lx), 0, cc(-9.6)), 0)
-		PropLib.place(o, "street_lamp", Vector3i(cc(lx + 3.2), 0, cc(-14.6)), 0)
+		PropLib.place(o, "street_lamp", Vector3i(cc(lx), 0, cc(-9.6)), 0, 1)
+		PropLib.place(o, "street_lamp", Vector3i(cc(lx + 3.2), 0, cc(-14.6)), 0, 1)
 		if lx > -14.0 and lx < 12.0:
-			_lamp(Vector3(lx + 0.3, 3.3, -9.3), 1.6, 3.4, 0.0, Color(1.0, 0.78, 0.45))
-		else:
-			_halo_pts.append({"pos": Vector3(lx + 0.3, 3.35, -9.3), "size": 2.0, "color": Color(1.0, 0.7, 0.35, 1.0)})
-		_halo_pts.append({"pos": Vector3(lx + 3.5, 3.35, -14.3), "size": 2.0, "color": Color(1.0, 0.7, 0.35, 1.0)})
+			_lamp(Vector3(lx, 0, -9.6) + lh, 1.6, 3.4, 0.0, Color(1.0, 0.78, 0.45), 0.0)
+		_halo_pts.append({"pos": Vector3(lx, 0, -9.6) + lh, "size": 2.6, "color": STREET_HALO})
+		_halo_pts.append({"pos": Vector3(lx + 3.2, 0, -14.6) + lh, "size": 2.8, "color": STREET_HALO})
+		# Second street (between the two rows of neighbour houses).
+		PropLib.place(o, "street_lamp", Vector3i(cc(lx + 1.4), 0, cc(-26.0)), 0, 1)
+		_halo_pts.append({"pos": Vector3(lx + 1.4, 0, -26.0) + lh, "size": 3.0, "color": STREET_HALO})
 	# Lamp posts along the back garden path, in frame above the bedrooms at
 	# night (ref3): glow voxels + halos only (no extra omni lights).
 	for lp: Vector3 in [Vector3(-1.2, 0, -7.4), Vector3(10.6, 0, -6.6), Vector3(11.0, 0, 2.6)]:
-		PropLib.place(o, "street_lamp", Vector3i(cc(lp.x), 0, cc(lp.z)), 0)
-		_halo_pts.append({"pos": lp + Vector3(0.31, 3.35, 0.31), "size": 2.0, "color": Color(1.0, 0.7, 0.35, 1.0)})
+		PropLib.place(o, "street_lamp", Vector3i(cc(lp.x), 0, cc(lp.z)), 0, 1)
+		_halo_pts.append({"pos": lp + lh, "size": 2.6, "color": STREET_HALO})
 	var bushes := [Vector3(-9.8, 0, -3.0), Vector3(-9.8, 0, 1.0), Vector3(9.4, 0, -3.5), Vector3(9.4, 0, 0.5),
 		Vector3(-6.0, 0, 5.6), Vector3(-2.5, 0, 5.6), Vector3(3.5, 0, 5.6), Vector3(6.5, 0, 5.6), Vector3(-9.8, 0, 4.2), Vector3(9.4, 0, 3.6)]
 	for i in bushes.size():
@@ -1406,10 +1438,10 @@ func _ensure_neighbourhood(lit: bool) -> void:
 		var styles := [1, 4, 2, 0, 5, 3, 2, 5, 3, 0, 4, 1, 2]
 		# Neighbour houses drawn a little smaller than authored (0.2 m cells):
 		# they read as a street of homes behind ours, roofs in frame (ref3).
-		var hs: float = PropLib.scale_of("house") * 0.85
+		var hs: float = PropLib.scale_of("house") * 0.78
 		# Mobile budget: the lit (night) street keeps only the houses the
 		# bedroom camera can see.
-		var night_skip := [0, 6, 7, 8, 12]
+		var night_skip := [0, 6, 7]
 		for i in spots.size():
 			if lit and i in night_skip:
 				continue
@@ -1429,15 +1461,15 @@ func _ensure_neighbourhood(lit: bool) -> void:
 		else:
 			_hood_day = cur
 	if _hood_day:
-		_hood_day.visible = not lit
+		_hood_day.visible = not lit and wall_view != "office_in"
 	if _hood_night:
-		_hood_night.visible = lit
+		_hood_night.visible = lit and wall_view != "office_in"
 	_apply_night_tint(lit)
 	if lit and _hood_night and _hood_night.mesh.get_surface_count() > 0:
 		# Neighbour houses sit darker than the lawn so their lit windows pop.
 		if _hood_mat == null:
 			_hood_mat = PropLib.night_exterior_material().duplicate()
-			_hood_mat.albedo_color = Color(0.6, 0.6, 0.82)
+			_hood_mat.albedo_color = Color(0.82, 0.84, 1.0)
 		_hood_night.set_surface_override_material(0, _hood_mat)
 
 
@@ -1493,18 +1525,17 @@ void vertex() {
 void fragment() {
 	vec2 d = UV - 0.5;
 	float r = length(d);
-	float R = 0.17;
+	float R = 0.2;
 	// Pixelated disc (voxel look): quantise to a 16x16 grid inside the disc.
 	vec2 q = floor((d / R) * 8.0) / 8.0 + 0.0625;
 	float disc = step(length(q), 1.0);
 	float crater = h21(floor((d / R) * 8.0));
-	vec3 moon = vec3(1.0, 0.96, 0.84) * (0.9 + 0.1 * crater) - vec3(0.06, 0.07, 0.04) * step(0.82, crater);
-	// Crescent shadow on the left like ref3.
-	float shade = step(length(q + vec2(0.55, 0.05)), 0.95);
-	moon = mix(moon, vec3(0.62, 0.66, 0.82) * 0.55, shade * 0.0);
-	float glow = exp(-max(r - R, 0.0) * 18.0) * 0.32 * (1.0 - disc);
-	ALBEDO = mix(vec3(0.6, 0.68, 0.95), moon * 0.98, disc);
-	ALPHA = clamp(disc + glow, 0.0, 1.0);
+	vec3 moon = vec3(1.0, 0.95, 0.8) * (0.92 + 0.08 * crater) - vec3(0.08, 0.08, 0.05) * step(0.84, crater);
+	// HDR cream disc so the glow pass blooms it softly (ref3's bright moon).
+	moon *= 2.1;
+	float halo = exp(-max(r - R, 0.0) * 11.0) * 0.5 * (1.0 - disc);
+	ALBEDO = mix(vec3(0.75, 0.8, 1.0) * 0.9, moon, disc);
+	ALPHA = clamp(disc + halo, 0.0, 1.0);
 }
 """
 const SKY_W := 160.0
@@ -1523,12 +1554,12 @@ void fragment() {
 	vec3 col = mix(top_col, mid_col, smoothstep(0.0, 0.18, uv.y));
 	col = mix(col, low_col, smoothstep(0.15, 0.4, uv.y));
 	float aspect = VIEWPORT_SIZE.x / VIEWPORT_SIZE.y;
-	vec2 g = uv * vec2(90.0 * aspect, 90.0);
+	vec2 g = uv * vec2(70.0 * aspect, 70.0);
 	vec2 cell = floor(g);
 	float hs = h21(cell);
 	vec2 f = fract(g) - 0.5;
-	float star = step(0.965, hs) * (1.0 - smoothstep(0.1, 0.22, max(abs(f.x), abs(f.y)))) * (1.0 - smoothstep(0.12, 0.3, uv.y));
-	col += vec3(0.85, 0.88, 1.0) * star * (0.5 + 0.5 * h21(cell + 7.0));
+	float star = step(0.955, hs) * (1.0 - smoothstep(0.12, 0.26, max(abs(f.x), abs(f.y)))) * (1.0 - smoothstep(0.15, 0.4, uv.y));
+	col += vec3(0.95, 0.95, 1.0) * star * (0.7 + 0.8 * h21(cell + 7.0));
 	ALBEDO = col;
 }
 """
@@ -1559,7 +1590,7 @@ func _place_sky() -> void:
 const SHAFT_SHADER := """shader_type spatial;
 render_mode unshaded, blend_add, depth_draw_never, cull_disabled, shadows_disabled, fog_disabled;
 uniform vec3 tint = vec3(1.0, 0.8, 0.5);
-uniform float strength = 0.22;
+uniform float strength = 0.085;
 void fragment() {
 	ALBEDO = tint * COLOR.a * strength;
 }

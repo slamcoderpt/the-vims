@@ -824,7 +824,11 @@ func _s_build() -> void:
 	Game.speed = 2
 	if uid >= 0:
 		_menus.clear()
-		await _tap_world(b.nodes[uid].global_position + Vector3(0, 0.45, 0))
+		var chair_it = b.nodes[uid].get_node_or_null("Interactable")
+		if chair_it:
+			await _open_menu_on(chair_it)   # (a sim standing in front of it takes the tap otherwise)
+		else:
+			await _tap_world(b.nodes[uid].global_position + Vector3(0, 0.45, 0))
 		await _frames(2)
 		await _choose("Relax")
 		await _until_game(func(): return lily.phase == "act", 90.0)
@@ -1033,6 +1037,7 @@ func _s_career() -> void:
 	var ov = sim.overlay
 	_top_up()
 	Game.work_enabled = false
+	Game.chance_cards = false   # (offered explicitly below)
 	Game.speed = 1
 	await _tap_portrait(jack.index)
 	await _frames(2)
@@ -1041,7 +1046,7 @@ func _s_career() -> void:
 	var rows: Array = _menus[-1][1].map(func(a): return a.get("label", ""))
 	await _choose("Find a Job")
 	await _frames(4)
-	var listing: bool = not _menus.is_empty() and _menus[-1][0] == "Job Listings" and _menus[-1][1].size() == 4
+	var listing: bool = not _menus.is_empty() and _menus[-1][0] == "Job Listings" and _menus[-1][1].size() == 5
 	await _shot("job_listings")
 	await _choose("Business")
 	Game.speed = 3
@@ -1092,13 +1097,27 @@ func _s_career() -> void:
 	_step("career_tab", ov.panel.visible and ov.panel_tab == "career" and Game.career(jack.index).tendency == "hard",
 		"panel=%s tab=%s tendency=%s" % [str(ov.panel.visible), ov.panel_tab, Game.career(jack.index).get("tendency", "-")])
 	ov.panel.visible = false
+	# A chance card mid-shift: stay late for performance (and overtime pay).
+	var until0: float = float(jack.member.work.until)
+	var perf_c: float = float(Game.career(jack.index).perf)
+	_menus.clear()
+	jack.offer_chance(Careers.CHANCES[0])
+	await _frames(4)
+	var card_menu: bool = not _menus.is_empty() and _menus[-1][0] == "Jack at Work"
+	await _shot("chance_card")
+	await _choose("Stay Late")
+	await _frames(3)
+	_step("chance_card", card_menu and absf(float(jack.member.work.until) - until0 - 120.0) < 0.1 and absf(float(Game.career(jack.index).perf) - perf_c - 8.0) < 0.1
+		and Game.has_moodlet(jack.index, "overtime"),
+		"menu=%s, shift now ends %s, perf %.0f -> %.0f" % [str(card_menu), Game.when_text(float(jack.member.work.until)), perf_c, float(Game.career(jack.index).perf)])
+	perf0 = float(Game.career(jack.index).perf)
 	# --- end of the shift: home with a paycheck and a performance change
-	Game.set_time(Game.day, 16, 58)
+	Game.set_time(Game.day, 18, 58)
 	await _until_game(func(): return jack.phase != "away", 30.0)
 	c = Game.career(jack.index)
 	var paid := Careers.paycheck(c)
-	_step("work_returns", jack.actor.visible and jack.phase != "away" and Game.money == money0 + paid and paid == 14 * 8 and absf(float(c.perf) - perf0) > 0.5
-		and _notes.any(func(t): return "Paycheck +$%d" % paid in t),
+	_step("work_returns", jack.actor.visible and jack.phase != "away" and Game.money == money0 + paid + 14 * 2 and paid == 14 * 8 and absf(float(c.perf) - perf0) > 0.5
+		and _notes.any(func(t): return "Paycheck +$%d" % (paid + 28) in t),
 		"Jack home: paycheck $%d, money %d -> %d, perf %.1f -> %.1f (%s, mood %s)" % [paid, money0, Game.money, perf0, float(c.perf), c.tendency, Game.mood_word(jack.index)])
 	await _until_game(func(): return lily.phase != "away", 10.0)
 	_step("school_returns", lily.actor.visible and int(Game.career(lily.index).get("shifts", 0)) >= 1 and _notes.any(func(t): return "home from school" in t),
@@ -1129,6 +1148,29 @@ func _s_career() -> void:
 	_step("demotion", int(c.level) == 1 and Game.has_moodlet(jack.index, "demoted"), "Jack back to Lv %d %s, perf %.0f" % [int(c.level), Careers.title(c), float(c.perf)])
 	Game.remove_moodlet(jack.index, "t_misery")
 	Game.set_tendency(jack.index, "normal")
+	# --- change jobs: freelance from the home computer (no carpool)
+	_top_up()
+	Game.speed = 1
+	await _open_menu_on(comp)
+	await _choose("Change Jobs")
+	await _frames(4)
+	await _choose("Freelance")
+	Game.speed = 3
+	await _until_game(func(): return Game.career(jack.index).get("track", "") == "freelance", 120.0)
+	var money_h := Game.money
+	Game.set_time(Game.day + 1, 9, 52)
+	Game.speed = 1
+	await _until_game(func(): return jack.phase == "act" and jack.order.get("work_home", false), 90.0)
+	var at_desk: bool = jack.phase == "act" and jack.current_label() == "Work" and jack.actor.visible and jack.actor.pose == "type"
+	await _focus(jack.actor.global_position)
+	await _wait(0.3)
+	await _shot("work_from_home")
+	Game.set_time(Game.day, 15, 58)
+	Game.speed = 2
+	await _until_game(func(): return int(Game.career(jack.index).get("shifts", 0)) >= 1 and jack.order.get("work_home", false) == false, 30.0)
+	c = Game.career(jack.index)
+	_step("work_from_home", at_desk and Game.money == money_h + Careers.paycheck(c) and int(c.get("shifts", 0)) == 1,
+		"Jack %s at the computer (pose %s), paid $%d, money %d -> %d" % [Careers.title(c), jack.actor.pose, jack.last_pay, money_h, Game.money])
 	# --- traits: different sims, different free will / skill gain
 	var ja: float = Game.Traits.skill_mult(jack.member, "Cooking")
 	var la: float = Game.Traits.skill_mult(lily.member, "Creativity")
