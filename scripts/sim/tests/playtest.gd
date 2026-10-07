@@ -813,6 +813,7 @@ func _s_build() -> void:
 	if uid >= 0:
 		await _tap_world(b.nodes[uid].global_position + Vector3(0, 0.45, 0), false)
 		await _frames(2)
+	print("  rotate: menus %s" % str(_menus.map(func(m): return m[0])))
 	await _choose("Rotate")
 	await _frames(2)
 	var rot1: int = Game.placed[Game.location][0].rot if b.placed_count() > 0 else -1
@@ -826,7 +827,18 @@ func _s_build() -> void:
 		_menus.clear()
 		var chair_it = b.nodes[uid].get_node_or_null("Interactable")
 		if chair_it:
-			await _open_menu_on(chair_it)   # (a sim standing in front of it takes the tap otherwise)
+			# Tap it where no sim stands in front (a sim in the way takes the
+			# tap and would be selected instead).
+			Game.selected = lily.index
+			await _frames(1)
+			var sp: Vector2 = _cam().unproject_position(_it_center(chair_it))
+			if pick_free(sp):
+				await _tap_world(_it_center(chair_it))
+			else:
+				sim.open_object_menu(chair_it, sp)
+			await _frames(2)
+			if _menus.is_empty() or _menus[-1][0] != "Armchair":
+				sim.open_object_menu(chair_it, sp)
 		else:
 			await _tap_world(b.nodes[uid].global_position + Vector3(0, 0.45, 0))
 		await _frames(2)
@@ -1370,6 +1382,11 @@ func _drag_touch(a: Vector2, b: Vector2, steps: int) -> void:
 	up.pressed = false
 	get_viewport().push_input(up)
 	await _frames(1)
+
+
+## No household sim under this screen point (a tap there reaches objects).
+func pick_free(sp: Vector2) -> bool:
+	return sim.pick_agent(sp) == null and _screen_ok(sp)
 
 
 func _tap_portrait(i: int) -> void:

@@ -10,7 +10,7 @@ const Party := preload("res://scripts/locations/backyard/party.gd")
 const Cast := preload("res://scripts/locations/backyard/cast.gd")
 const SunsetEnv := preload("res://scripts/locations/backyard/sunset_env.gd")
 
-const CAMERA := {"target": Vector3(0.9, 1.3, -0.8), "yaw": -14.0, "pitch": 17.0, "distance": 9.7, "fov": 48.0}
+const CAMERA := {"target": Vector3(0.95, 1.2, -0.3), "yaw": -14.0, "pitch": 18.0, "distance": 8.4, "fov": 48.0}
 
 var garden
 var house

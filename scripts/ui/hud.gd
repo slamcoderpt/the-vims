@@ -541,22 +541,24 @@ const _SEL_DX: Array[float] = [0.0, 14.0, 30.0]
 ## (left preferred) with its tail dipping toward the head. Returns false when
 ## neither side fits so the generic layout takes over.
 func _place_selected(b, vs: Vector2, full: Vector2) -> bool:
-	var gap := _gap_for(b.head_px)
 	var h: float = PB_H * plumbob.gem_scale
-	var pbr := Rect2(b.head.x - PB_W * 0.5, b.head.y - gap * 0.6 - h, PB_W, h)
+	# head_top() sits a little above the hair; let the gem hover just over
+	# the hair line (ref1) instead of a full gap higher.
+	var pbr := Rect2(b.head.x - PB_W * 0.5, b.head.y + 4.0 - h, PB_W, h)
 	if pbr.position.y < SAFE_TOP:
 		return false
-	var pc := _cost(pbr, vs)
+	# The gem's bottom tip may dip into the hair-line margin of its own head.
+	var pc := _cost(Rect2(pbr.position, pbr.size - Vector2(0, 14.0)), vs)
 	var best := INF
 	var best_pos := Vector2.ZERO
 	var best_side := 0
 	for side in _SEL_SIDES:
 		for lift in _SEL_LIFTS:
 			for dx in _SEL_DX:
-				var x: float = pbr.position.x - 14.0 - dx - b.size.x if side < 0 else pbr.end.x + 14.0 + dx
+				var x: float = pbr.position.x - 8.0 - dx - b.size.x if side < 0 else pbr.end.x + 8.0 + dx
 				# bubble body roughly level with the gem, tail bottom near
 				# the gem's lower half
-				var y: float = pbr.end.y - full.y - 6.0 - lift
+				var y: float = pbr.end.y - full.y + 10.0 - lift
 				var r := Rect2(Vector2(x, y), full)
 				var c: float = _cost(r, vs) + lift * 8.0 + dx * 6.0 + (0.0 if side < 0 else 300.0)
 				if c < best:
@@ -567,7 +569,7 @@ func _place_selected(b, vs: Vector2, full: Vector2) -> bool:
 		return false
 	b.target = best_pos
 	var tx: float = best_pos.x + b.size.x - 22.0 if best_side < 0 else best_pos.x + 22.0
-	b.tip = Vector2(lerpf(tx, b.head.x, 0.5), best_pos.y + full.y)
+	b.tip = Vector2(lerpf(tx, b.head.x, 0.6), best_pos.y + full.y)
 	b.plumb_side = best_side
 	b.pb_rect = pbr
 	_placed.append(Rect2(best_pos, full))

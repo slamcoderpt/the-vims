@@ -969,25 +969,27 @@ func _build_pink() -> void:
 	var fx := -0.75   # left wall face (divider with the office)
 	var bz := -4.75
 	var rx := 3.5     # right wall face (divider with the blue room)
-	# ref3 staging: the bunny canopy bed runs ACROSS the room with its
-	# headboard on the left wall, so the tucked-in girl lies sideways to the
-	# camera (face in profile / 3/4, not foreshortened); dad's reading chair
-	# stands at the foot end, turned to the camera. Tall pieces stay on the
-	# back and left walls; the front (camera side) keeps only low things.
+	# ref3 staging: the bunny canopy bed stands with its headboard against the
+	# back wall, so the tucked-in girl lies facing the camera (face up, propped
+	# on the pillows); dad's reading chair stands at the right side of the bed,
+	# turned 3/4 to the camera so his face and the open book both read.
+	# Tall pieces stay on the back and left walls; the front keeps low things.
 	_rug(R, -0.35, y, -4.1, 3.6, 3.2, "patch_pink")
-	var ns := _put(R, "nightstand", Vector3(fx + 0.04, y, bz + 0.04), 1, 2)
+	var ns := _put(R, "nightstand", Vector3(fx + 0.04, y, bz + 0.06), 0, 2)
 	_put(R, "lamp_table", Vector3(ns.position.x + 0.1, y + 10 * PU, ns.position.z + 0.12), 0, 1)
-	_lamp(Vector3(ns.get_center().x + 0.35, y + 1.2, ns.get_center().z + 0.3), 0.55, 3.0, 0.2, Color(1.0, 0.6, 0.3), 0.5)
-	var bed := _put(R, "bed", Vector3(fx + 0.1, y, ns.end.z + 0.04), 1, 3)
-	_put(R, "plush", Vector3(bed.position.x + 0.3, y + 10 * PU, bed.end.z - 0.5), 1, 0)
-	var chair := _putc(R, "chair", bed.end.x + 0.42, y, bed.get_center().z + 0.35, 3, 2)
-	var st := _put(R, "side_table", Vector3(bed.end.x + 0.15, y, bz + 0.08), 0, 2)
+	_put(R, "plush", Vector3(ns.position.x + 0.05, y, ns.end.z + 0.05), 0, 0)
+	_lamp(Vector3(ns.get_center().x + 0.3, y + 1.2, ns.get_center().z + 0.35), 0.55, 3.0, 0.2, Color(1.0, 0.6, 0.3), 0.5)
+	var bed := _put(R, "bed", Vector3(ns.end.x + 0.04, y, bz + 0.06), 0, 3)
+	_put(R, "plush", Vector3(bed.position.x + 0.22, y + 10 * PU, bed.position.z + 0.55), 0, 0)
+	var chair := _putc(R, "chair", bed.end.x + 0.38, y, bed.position.z + 1.25, 0, 2)
+	var st := _put(R, "side_table", Vector3(bed.end.x + 0.12, y, bz + 0.08), 0, 2)
 	_put(R, "lamp_table", Vector3(st.position.x + 0.05, y + 11 * PU, bz + 0.12), 0, 1)
 	_put(R, "book_stack", Vector3(st.end.x - 0.4, y + 11 * PU, bz + 0.2), 0, 2)
+	_wallput(R, "wall_shelf", "-x", fx, -4.45, y + 1.95, 1)
 	_spots["pink_bed"] = bed
 	_spots["pink_chair"] = chair
 	# Back wall: bunny pictures, window with pink curtains and sill plants.
-	_wallput(R, "frame", "-z", bz, 0.55, y + 1.9, 2)
+	_wallput(R, "frame", "-x", fx, -3.4, y + 1.55, 2)
 	_put(R, "curtain", Vector3(1.6, y, bz + 0.02), 0, 1)
 	_put(R, "curtain", Vector3(3.2 - 5 * PU, y, bz + 0.02), 0, 1)
 	_put(R, "plant", Vector3(2.05, y + 0.9, bz - 0.04), 0, 6)
@@ -1176,6 +1178,13 @@ func _build_bath() -> void:
 	var tub := _put(R, "bathtub", Vector3(lx + 0.06, y, fz - PropLib.size_of("bathtub").z * PU - 0.04), 0)
 	_put(R, "plant", Vector3(lx + 0.05, y, shower.end.z + 0.95), 0, 2)
 	_wallput(R, "towel_rack", "-x", lx, shower.end.z + 0.3, y + 0.9, 1)
+	# Tall hall|bath wall (bath face, seen square-on by the night camera):
+	# framed prints, a wall planter, a warm sconce, a laundry hamper below.
+	_wallput(R + "@bed", "frame", "-x", lx, shower.end.z + 1.0, y + 1.45, 5)
+	_wallput(R + "@bed", "frame", "-x", lx, shower.end.z + 1.55, y + 1.65, 6)
+	_wallput(R + "@bed", "wall_planter", "-x", lx, shower.end.z + 2.15, y + 1.55, 1)
+	_sconce(R + "@bed", "-x", lx, shower.end.z + 1.45, y + 2.3, 0.5, 1)
+	_put(R, "basket", Vector3(lx + 0.05, y, shower.end.z + 1.05), 1, 2)
 	# Warm overhead light so the room reads bright (ref3's bathroom glows).
 	_lamp(Vector3(7.3, y + 2.6, 2.4), 0.45, 3.6, 0.0, Color(1.0, 0.74, 0.48), 0.0)
 	_use(shower, "Shower", [_act("shower", "Take Shower", "shower", 20, {"hygiene": 0.8}, {"pose": "idle"})])
@@ -1438,7 +1447,7 @@ func _ensure_neighbourhood(lit: bool) -> void:
 		var styles := [1, 4, 2, 0, 5, 3, 2, 5, 3, 0, 4, 1, 2]
 		# Neighbour houses drawn a little smaller than authored (0.2 m cells):
 		# they read as a street of homes behind ours, roofs in frame (ref3).
-		var hs: float = PropLib.scale_of("house") * 0.78
+		var hs: float = PropLib.scale_of("house") * 0.9
 		# Mobile budget: the lit (night) street keeps only the houses the
 		# bedroom camera can see.
 		var night_skip := [0, 6, 7]
@@ -1804,13 +1813,13 @@ func _stage(preset: String) -> void:
 	if preset == "home_night":
 		var bed: AABB = _spots["pink_bed"]
 		var bc := bed.get_center()
-		# Tucked in sideways: head on the pillows at the headboard (left wall),
-		# feet towards the reading chair; the rig lies centred on its position.
-		var lily := _place("bunny_girl", Vector3(bed.position.x + 0.98, y, bc.z), Vector3(bed.end.x + 2.0, y, bc.z), "lie")
+		# Tucked in facing the camera: head on the pillows at the headboard
+		# (back wall), feet towards the camera; the rig lies centred on its position.
+		var lily := _place("bunny_girl", Vector3(bc.x + 0.02, y, bed.position.z + 0.98), Vector3(bc.x, y, bed.end.z + 2.0), "lie")
 		lily.lie_height = 10 * PU / lily.scale.y
 		var ch: AABB = _spots["pink_chair"]
 		var cc3 := ch.get_center()
-		var jack := _place("dad", Vector3(cc3.x, y, cc3.z), Vector3(cc3.x - 1.0, y, cc3.z + 0.85), "sit_read", 7 * PU)
+		var jack := _place("dad", Vector3(cc3.x, y, cc3.z + 0.04), Vector3(cc3.x - 1.0, y, cc3.z + 0.9), "sit_read", 7 * PU)
 		var st: AABB = _spots["step"]
 		var maya := _place("cat_girl", Vector3(st.get_center().x, y + 6 * PU, st.get_center().z), Vector3(st.get_center().x + 0.55, y, st.get_center().z + 1.6), "brush_teeth")
 		var cu: AABB = _spots["dog_cushion"]
@@ -1825,8 +1834,8 @@ func _stage(preset: String) -> void:
 			_blanket = PropLib.instance("blanket", 0)
 			_blanket.scale = Vector3.ONE * (PU / PropLib.FU)
 			add_child(_blanket)
-		_blanket.position = Vector3(bed.position.x + 1.3, y + 10 * PU, bc.z)
-		_blanket.rotation_degrees.y = 90.0
+		_blanket.position = Vector3(bc.x, y + 10 * PU, bed.position.z + 1.32)
+		_blanket.rotation_degrees.y = 0.0
 		_blanket.visible = true
 	else:
 		if _blanket:

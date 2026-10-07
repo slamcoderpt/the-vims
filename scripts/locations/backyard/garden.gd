@@ -438,7 +438,7 @@ func _fences() -> void:
 	_fence_side(vb, -10.0, 4.85, 7.5)
 	# Low decorative picket border along the front flower bed (the white
 	# pickets that frame the bottom of the bbq shot).
-	_fence_run(vb, -3.4, 1.3, 2.8, false, 13)
+	_fence_run(vb, -6.6, -1.2, 3.9, false, 13)
 	V.inst(vb, root, V.SIZE_FINE, Vector3.ZERO, 0.0, Vector3.ZERO, true, true, "Fence")
 
 

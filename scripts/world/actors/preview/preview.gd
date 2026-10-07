@@ -45,7 +45,7 @@ func _ready() -> void:
 				a.camera_cheat = false
 				add_child(a)
 				a.position = Vector3(x, 0, 0)
-				a.rotation_degrees.y = 35.0 if mode == "faces34" else 0.0
+				a.rotation_degrees.y = (35.0 if mode == "faces34" else 0.0) + float(OS.get_environment("ROT") if OS.get_environment("ROT") != "" else "0")
 				a._blink_t = 99.0
 				x += 1.1
 			rig.apply({"target": Vector3(-2.2 + float(OS.get_environment("FX") if OS.get_environment("FX") != "" else "0"), 1.75, 0), "yaw": 0.0, "pitch": 22.0, "distance": 9.5, "fov": 13.0})

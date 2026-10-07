@@ -45,26 +45,28 @@ func build(parent: Node3D, party) -> void:
 	var gside := Basis(Vector3.UP, Party.GRILL_ROT) * Vector3(-1, 0, 0)
 	var gf: Vector3 = Party.GRILL_POS + gside * 0.98 + gdir * 0.36
 	_spawn("Jack", gf, -0.32, "grill")
-	# Sit-down dinner (ref4): the long table runs diagonally into the
-	# picture. Four diners on the far side and one at the far end face the
-	# camera in 3/4; the near side sit with their backs to us. Every diner
-	# is on their own chair with their own plate and a held item.
-	_seat("Lily", party, "far_l", "sit_talk")
-	_seat("neighbor_8", party, "far_m", "sit_talk")
-	_seat("neighbor_4", party, "far_r", "sit_talk")
-	_seat("neighbor_3", party, "end_r", "sit_talk")
-	_seat("neighbor_6", party, "near_l", "sit_talk")
-	_seat("Maya", party, "near_m", "sit_talk", 0.55)
-	_seat("neighbor_7", party, "near_r", "sit_talk", 0.5)
+	# Sit-down dinner (ref4): the long table runs across the picture. Four
+	# diners on the far side face the camera in 3/4, two on the near side
+	# sit with their backs to us in the gaps between them (so no head covers
+	# a face), one at the right end; the near-middle and left-end chairs
+	# stay empty so the chairs themselves read. Everyone has a plate and a
+	# held item.
+	_seat("Lily", party, "far_1", "sit_talk", 0.25)
+	_seat("neighbor_8", party, "far_2", "sit_talk", 0.1)
+	_seat("neighbor_3", party, "far_3", "sit_talk", -0.1)
+	_seat("Maya", party, "far_4", "sit_talk", -0.25)
+	_seat("neighbor_6", party, "near_l", "sit_talk", -0.3)
+	_seat("neighbor_4", party, "near_r", "sit_talk", 0.3)
+	_seat("neighbor_7", party, "end_r", "sit_talk", 0.35)
 	gestures = Gestures.new()
 	parent.add_child(gestures)
-	gestures.add(actors.get("Lily"), "toast", false, "", 0.12, 0.6)
-	gestures.add(actors.get("neighbor_8"), "toast", true, "", 0.08, 0.6)
-	gestures.add(actors.get("neighbor_4"), "drink", true, "", 0.05, 0.5)
-	gestures.add(actors.get("neighbor_3"), "toast", true, "", 0.08, 0.3)
-	gestures.add(actors.get("neighbor_6"), "burger", false, "", 0.0, 0.4)
-	gestures.add(actors.get("Maya"), "drink", true, "", 0.15, 0.9)
-	gestures.add(actors.get("neighbor_7"), "toast", true, "", 0.05, 0.8)
+	gestures.add(actors.get("Lily"), "toast", false, "", 0.1, 0.3)
+	gestures.add(actors.get("neighbor_8"), "toast", true, "", 0.08, 0.3)
+	gestures.add(actors.get("neighbor_3"), "drink", false, "", 0.05, 0.3)
+	gestures.add(actors.get("Maya"), "toast", true, "", 0.1, 0.3)
+	gestures.add(actors.get("neighbor_6"), "drink", false, "", 0.0, 0.4)
+	gestures.add(actors.get("neighbor_4"), "drink", false, "", 0.0, 0.4)
+	gestures.add(actors.get("neighbor_7"), "drink", true, "", 0.05, 0.6)
 	# On the deck, chatting with plates and drinks.
 	var a := _spawn("neighbor_1", Vector3(3.6, 0.375, -3.3), 0.0, "talk")
 	var b := _spawn("neighbor_2", Vector3(4.9, 0.375, -3.5), 0.0, "idle")
@@ -137,7 +139,7 @@ func _seat(key: String, party, seat: String, pose: String, turn := 0.0) -> Node3
 ## neck; SimActor never touches the head bone's scale) and slightly shrink the
 ## bodies so torsos + arms show above the table.
 ## Heads ~1/4 of the body (ref4 guests are less chibi than the house cast).
-const HEAD_SCALE := {"adult": 0.88, "child": 1.0, "dog": 1.0}
+const HEAD_SCALE := {"adult": 0.78, "child": 0.86, "dog": 1.0}
 ## Life-size scales for this shot (shared art rule: adult ~1.75 m, child
 ## ~70 % of that, beagle's back at a child's knee-to-hip). SimActor clamps
 ## the household to a "hero minimum" meant for the zoomed-out house view,

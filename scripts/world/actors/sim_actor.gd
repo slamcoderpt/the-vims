@@ -604,7 +604,9 @@ func _human_pose() -> void:
 			# overalls show under the big chibi head from the high Sims
 			# camera; the head tips down to the robot in her hands.
 			_ab(b_torso, -0.14, hy * 0.2, 0.0)
-			_ab(b_head, 0.02 + 0.04 * pl2, hy * 0.8, 0.1 + 0.06 * sin(t * 1.1))
+			# Chin up toward the robot at chest height (not down at the rug),
+			# so the high house camera sees eyes and smile, not the hat crown.
+			_ab(b_head, -0.22 + 0.04 * pl2, hy * 0.8, 0.1 + 0.06 * sin(t * 1.1))
 			# Robot held up in front of her chest in one hand, the other hand
 			# reaching down to the blocks on the rug.
 			_sb(b_arm_l, -0.95 + 0.08 * pl, -0.3, 0.05)
@@ -715,22 +717,25 @@ func _dog_pose() -> void:
 			_sb(b_ear_l, 0.05 * chew, 0.0, 0.3)
 			_sb(b_ear_r, 0.05 * chew, 0.0, -0.3)
 		"play":
-			# Belly down facing the player in a 3/4 front view (ref1): front
-			# paws stretched forward either side of the chew bone, head up
-			# looking at the camera with the ears framing the white blaze,
-			# rump and wagging white-tipped tail up behind.
+			# Play bow facing the player in 3/4 (ref1 "Play"): chest and
+			# outstretched front paws down on the rug either side of the
+			# chew bone, rump and white-tipped tail up and wagging, head
+			# raised looking at the camera with the drop ears framing the
+			# white blaze. The long side shows (saddle, tan flank).
 			var ly := _dog_lie(true)
 			var perk := smoothstep(0.55, 1.0, sin(t * 0.8 + _phase))
-			var paw := pow(maxf(0.0, sin(t * 1.9 + _phase)), 6.0)
-			_sb(b_head, -0.38 - 0.05 * perk + 0.02 * breath, ly, 0.22 * sin(t * 0.6 + _phase) * (0.4 + 0.6 * perk))
-			_sb(b_tail, -0.75, 0.0, 0.6 * sin(t * 13.0))
-			_ab(b_leg_fl, -0.25 * paw, 0.0, 0.0)
-			# Head is tipped up, so tip the ears back down to hang beside the
-			# cheeks (framing the face) instead of sticking out.
-			_sb(b_ear_l, 0.12 + 0.05 * perk, 0.0, 0.02 + 0.04 * perk)
-			_sb(b_ear_r, 0.12 + 0.05 * perk, 0.0, -0.02 - 0.04 * perk)
-			# Rump slightly raised (playful), chest low.
-			_sb(b_body, 0.06)
+			var hop := pow(maxf(0.0, sin(t * 2.4 + _phase)), 4.0)
+			var pitch := 0.3
+			_sb(b_body, pitch, 0.0, 0.0)
+			_tgt_pos.y = -1.7 * vs + 0.015 * hop
+			_sb(b_leg_fl, -1.42, 0.0, 0.12)
+			_sb(b_leg_fr, -1.42, 0.0, -0.12)
+			_sb(b_leg_bl, -pitch - 0.02, 0.05, 0.0)
+			_sb(b_leg_br, -pitch - 0.02, -0.05, 0.0)
+			_sb(b_head, -pitch - 0.42 - 0.05 * perk + 0.02 * breath, ly, 0.2 * sin(t * 0.6 + _phase) * (0.4 + 0.6 * perk))
+			_sb(b_tail, -0.35, 0.0, 0.7 * sin(t * 15.0))
+			_sb(b_ear_l, 0.1 + 0.05 * perk, 0.0, 0.05 + 0.06 * hop)
+			_sb(b_ear_r, 0.1 + 0.05 * perk, 0.0, -0.05 - 0.06 * hop)
 		"bow":
 			var hop := absf(sin(t * 5.0))
 			_sb(b_body, 0.32)
@@ -810,7 +815,7 @@ const _PROPS_FOR := {
 	"play": [["block", "fore_r"], ["robot", "fore_l"]],
 }
 const _DOG_PROPS_FOR := {
-	"play": [["bone", "body"]],
+	"play": [["bone", "root"]],
 	"chew": [["bone", "head"]],
 }
 
@@ -845,7 +850,11 @@ func _make_prop(pname: String, bone: String) -> MeshInstance3D:
 	var mi := MeshInstance3D.new()
 	mi.mesh = RigBuilder.prop_mesh(pname)
 	if _dog:
-		if bone == "body":
+		if bone == "root":
+			# On the rug between the outstretched front paws (play bow).
+			mi.position = _meta.paws_root
+			mi.rotation = Vector3(0.0, 0.35, 0.0)
+		elif bone == "body":
 			# On the floor between the outstretched front paws.
 			mi.position = _meta.paws
 			mi.rotation = Vector3(0.0, 0.35, 0.0)

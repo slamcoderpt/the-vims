@@ -6,7 +6,7 @@ const LOOKS := {
 	"dad": {
 		"body": "big", "skin": Color(0.98, 0.77, 0.63),
 		"hair": Color(0.44, 0.24, 0.12), "hair_style": "shaggy", "beard": "full",
-		"beard_color": Color(0.32, 0.17, 0.085),
+		"beard_color": Color(0.37, 0.2, 0.1),
 		"brow": Color(0.26, 0.14, 0.08), "eye": Color(0.3, 0.18, 0.1),
 		"top": "plaid", "top_color": Color(0.80, 0.13, 0.12), "top_color2": Color(0.16, 0.05, 0.06),
 		"tee": Color(0.2, 0.2, 0.23), "sleeves": "long", "untucked": true,
@@ -38,7 +38,7 @@ const LOOKS := {
 	"beagle": {
 		"species": "dog",
 		"tan": Color(0.88, 0.56, 0.27), "saddle": Color(0.52, 0.29, 0.12),
-		"white": Color(0.99, 0.97, 0.93), "ear": Color(0.50, 0.26, 0.10),
+		"white": Color(0.99, 0.97, 0.93), "ear": Color(0.66, 0.36, 0.14),
 		"collar": Color(0.86, 0.18, 0.18),
 	},
 	# --- Neighbours / townsfolk -------------------------------------------

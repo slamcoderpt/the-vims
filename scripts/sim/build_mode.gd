@@ -656,18 +656,20 @@ func rotate_placed(uid: int) -> bool:
 		# the same) before giving up.
 		var cs: float = world.nav.cs
 		var found := false
-		for r in range(1, 4):
+		for r in range(1, 6):
 			for k in 8:
 				var a := TAU * k / 8.0
 				var t := _snap(item, nr, e.pos + Vector3(cos(a), 0, sin(a)) * r * cs)
 				var tb := _box(item, nr, t)
-				if _can_place(item, tb) and not _covers_sim(tb):
+				if _can_place(item, tb):
 					p = t
 					found = true
 					break
 			if found:
 				break
 	if not _can_place(item, _box(item, nr, p)):
+		if OS.has_environment("VIMS_PLAYTEST"):
+			print("  rotate refused: %s at %s rot %d -> %d" % [item.get("label", ""), str(e.pos), int(e.rot), nr])
 		if not item.get("walk", false):
 			world.nav.add_obstacle(uid, _box(item, e.rot, e.pos))
 		world.say_selected("No room to turn it", "dots")
@@ -676,6 +678,8 @@ func rotate_placed(uid: int) -> bool:
 	e.rot = nr
 	e.pos = p
 	_spawn(e)
+	if not item.get("walk", false):
+		_push_sims(_box(item, nr, p))
 	Game.furniture_changed.emit()
 	return true
 

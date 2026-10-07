@@ -14,12 +14,37 @@ uniform vec4 bg_top : source_color = vec4(0.98, 0.9, 0.8, 1.0);
 uniform vec4 bg_bottom : source_color = vec4(0.9, 0.72, 0.56, 1.0);
 uniform float seed = 0.0;
 uniform float ss = 2.0;
+uniform float smooth_px = 0.0;
+uniform float smooth_sigma = 0.14;
 void fragment() {
 	// Box-filter downsample of the supersampled render (4 bilinear taps
 	// cover ~ss x ss texels): proper AA on voxel edges, no shimmer.
 	vec2 o = TEXTURE_PIXEL_SIZE * ss * 0.25;
 	vec4 t = (texture(TEXTURE, UV + vec2(-o.x, -o.y)) + texture(TEXTURE, UV + vec2(o.x, -o.y))
 		+ texture(TEXTURE, UV + vec2(-o.x, o.y)) + texture(TEXTURE, UV + vec2(o.x, o.y))) * 0.25;
+	// Edge-preserving smooth at one-voxel spacing: neighbouring voxels of
+	// nearly the same colour (the per-voxel jitter on hats / hair) blend
+	// into clean flat planes like the ref cards, while real edges (eyes,
+	// mouth, hair line, plaid) are kept crisp by the colour weight.
+	if (t.a > 0.5 && smooth_px > 0.0) {
+		vec3 c0 = t.rgb / t.a;
+		vec3 acc = c0;
+		float wsum = 1.0;
+		vec2 st = TEXTURE_PIXEL_SIZE * smooth_px;
+		for (int j = -1; j <= 1; j++) {
+			for (int i = -1; i <= 1; i++) {
+				if (i == 0 && j == 0) continue;
+				vec4 s = texture(TEXTURE, UV + vec2(float(i), float(j)) * st);
+				if (s.a < 0.9) continue;
+				vec3 cs = s.rgb / s.a;
+				vec3 d = cs - c0;
+				float w = exp(-dot(d, d) / (smooth_sigma * smooth_sigma)) * (abs(i) + abs(j) == 2 ? 0.6 : 1.0);
+				acc += cs * w;
+				wsum += w;
+			}
+		}
+		t.rgb = acc / wsum * t.a;
+	}
 	vec3 bg = mix(bg_top.rgb, bg_bottom.rgb, UV.y);
 	// soft vignette so the head pops
 	float v = 1.0 - 0.18 * length((UV - vec2(0.5, 0.42)) * vec2(1.2, 1.0));
@@ -35,6 +60,8 @@ void fragment() {
 	float l = dot(fg, vec3(0.299, 0.587, 0.114));
 	fg = clamp(mix(vec3(l), fg, 1.04), 0.0, 1.0);
 	fg = clamp((fg - 0.5) * 1.03 + 0.5, 0.0, 1.0);
+	// Soft studio key from the upper left: a gentle falloff across the bust.
+	fg *= mix(1.07, 0.9, clamp(dot(UV, vec2(0.4, 0.6)), 0.0, 1.0));
 	vec3 c = mix(bg, fg, t.a);
 	vec2 p = (UV - 0.5) * rect_size;
 	vec2 q = abs(p) - (rect_size * 0.5 - vec2(radius));
@@ -107,16 +134,25 @@ var _render_frames := 0
 ## Silhouette bounds in camera-plane coords (from the measure pass) and the
 ## plane centre / height of the last framing.
 var _measured := Rect2()
+## Measured left/right of the head (hair / hat) in the camera plane, and
+## the plane-y band (chin, skull top) it was measured in.
+var _head_span := Vector2.ZERO
+var _head_band := Vector2.ZERO
 var _measuring := false
 var _plane_c := Vector2.ZERO
 var _plane_h := 1.0
 
 ## Framing (fractions of the head height neck->top-of-hat), tuned so the face
 ## fills the card like the refs.
-const PERSON_YAW := 0.0
-const PERSON_PITCH := 0.0
-const DOG_YAW := 42.0
-const DOG_PITCH := -6.0
+const PERSON_YAW := -12.0
+const PERSON_PITCH := -5.0
+const DOG_YAW := -70.0
+const DOG_PITCH := -8.0
+const DOG_HEAD_YAW := -65.0
+const W_FRAC_ADULT := 0.8
+const W_FRAC_KID := 0.84
+const CHIN_ADULT := 0.64
+const CHIN_KID := 0.74
 
 
 func _ready() -> void:
@@ -284,6 +320,7 @@ func _spawn_actor() -> void:
 	# (alpha) and fit the final framing to what is really there (hair tufts,
 	# bunny ears, the dog's ears and tail), so nothing gets clipped.
 	_measured = Rect2()
+	_head_span = Vector2.ZERO
 	_measuring = true
 	_frame_camera(true)
 	for i in 2:
@@ -326,7 +363,7 @@ func _neutralize_pose() -> void:
 		# Pet card (ref): body in 3/4 profile, head turned to the lens.
 		var hb = _actor.get("b_head")
 		if hb != null and int(hb) >= 0:
-			sk.set_bone_pose_rotation(int(hb), Quaternion.from_euler(Vector3(deg_to_rad(-6.0), deg_to_rad(30.0), 0.0)))
+			sk.set_bone_pose_rotation(int(hb), Quaternion.from_euler(Vector3(deg_to_rad(-6.0), deg_to_rad(DOG_HEAD_YAW), 0.0)))
 	var eb = _actor.get("b_eyes")
 	if eb != null and int(eb) >= 0:
 		sk.set_bone_pose_scale(int(eb), Vector3.ONE)
@@ -387,22 +424,36 @@ func _frame_camera(measure := false) -> void:
 		var head_w := absf(r.x - l.x)
 		var skull_top: float = pr.call(Vector3(0, hh + 2.0, 0)).y
 		var chin: float = pr.call(Vector3(0, 0.5, 0)).y
+		_head_band = Vector2(chin, skull_top)
+		cx = mid.x
+		if _head_span != Vector2.ZERO and not measure:
+			# The real head width from the measure render (hair tufts, hat
+			# brim): robust to look / model changes.
+			head_w = _head_span.y - _head_span.x
+			# Centre between the silhouette and the face itself, so at 3/4 the
+			# face (not the back of the hair) sits mid-card like the refs.
+			cx = lerpf((_head_span.x + _head_span.y) * 0.5, mid.x, 0.5)
+			head_w = maxf(head_w, 2.0 * maxf(cx - _head_span.x, _head_span.y - cx) * 0.94)
 		var unit := absf(skull_top - chin) / (hh + 1.5)
 		# Hat ears may rise ~6 voxels above the skull; taller tips get cropped
 		# by the frame edge (like the ref bunny ears) instead of shrinking
 		# the face.
-		var top := skull_top + unit * (8.0 if kid else 4.0)
+		var top := skull_top + unit * (14.0 if kid else 5.0)
 		if _measured.size != Vector2.ZERO and not measure:
 			top = minf(_measured.end.y, top)
 			top = maxf(top, skull_top)
-		var w_frac := 0.8 if kid else 0.84
-		view_h = head_w / w_frac / aspect
-		var top_m := 0.0 if kid else 0.045
-		var chin_frac := 0.8 if kid else 0.74
-		if (top - chin) > (chin_frac - top_m) * view_h:
-			view_h = (top - chin) / (chin_frac - top_m)
+		# Head-and-shoulders bust like the ref cards: the head (hair / hat
+		# included) at ~60% of the card width, the whole hat with its ears
+		# inside the frame, chin a little below mid-card so the collar and
+		# shoulders of the shirt read underneath.
+		# Fit by height (hair / hat top near the card top, chin about 2/3
+		# down so collar and shoulders show), then widen only if the head
+		# would overflow the card sideways.
+		var w_frac := W_FRAC_KID if kid else W_FRAC_ADULT
+		var top_m := 0.04 if kid else 0.05
+		var chin_frac := CHIN_KID if kid else CHIN_ADULT
+		view_h = maxf((top - chin) / (chin_frac - top_m), head_w / w_frac / aspect)
 		cy = top + view_h * top_m - view_h * 0.5
-		cx = mid.x
 		if measure:
 			view_h *= 2.2
 			cy = (top + chin) * 0.5
@@ -432,8 +483,11 @@ func _frame_camera(measure := false) -> void:
 		cx = (minx + maxx) * 0.5
 		var w := maxx - minx
 		var h := maxy - miny
-		view_h = maxf(h * (1.05 if dog else 1.14), w * (1.03 if dog else 1.12) / aspect)
-		cy = (maxy + miny) * 0.5 + h * 0.01
+		view_h = maxf(h * (1.16 if dog else 1.14), w * (1.06 if dog else 1.12) / aspect)
+		if dog:
+			# Pet card: let the tail tip run off the left edge, head centred.
+			cx += w * 0.02
+		cy = (maxy + miny) * 0.5 + h * (0.06 if dog else 0.01)
 		if measure:
 			view_h *= 1.9
 	if snap_unit > 0.0 and not measure and absf(PERSON_YAW) < 0.01 and absf(PERSON_PITCH) < 0.01:
@@ -452,6 +506,11 @@ func _frame_camera(measure := false) -> void:
 	_plane_c = Vector2(cx, cy)
 	_plane_h = view_h
 	_cam.size = view_h
+	# One voxel in render pixels, for the edge-preserving smooth.
+	var vox := 0.05
+	if sk is Skeleton3D:
+		vox *= (sk as Skeleton3D).global_transform.basis.get_scale().y
+	_mat.set_shader_parameter("smooth_px", 0.0 if measure else vox / view_h * float(_vp.size.y))
 	_cam.global_position = center + dir * 6.0
 	_cam.look_at(center, Vector3.UP)
 	# Soft front key from just above-left of the lens (faces read evenly,
@@ -497,6 +556,26 @@ func _measure_silhouette() -> void:
 	var y_top := _plane_c.y - (used.position.y - H * 0.5) * k
 	var y_bot := _plane_c.y - (used.end.y - H * 0.5) * k
 	_measured = Rect2(x0, y_bot, x1 - x0, y_top - y_bot)
+	if _head_band != Vector2.ZERO and member.get("kind", "") != "dog":
+		# Widest row of the head between eye level and the skull top (above
+		# beard and shoulders): that is what must fit the card.
+		var ya := _head_band.x + (_head_band.y - _head_band.x) * 0.05
+		var yb := _head_band.y
+		var r0 := int(clampf(H * 0.5 - (yb - _plane_c.y) / k, 0.0, H - 1.0))
+		var r1 := int(clampf(H * 0.5 - (ya - _plane_c.y) / k, 0.0, H - 1.0))
+		var lo := INF
+		var hi := -INF
+		for yy in range(r0, r1 + 1, 2):
+			for xx in range(used.position.x, used.end.x):
+				if img.get_pixel(xx, yy).a > 0.5:
+					lo = minf(lo, xx)
+					break
+			for xx in range(used.end.x - 1, used.position.x - 1, -1):
+				if img.get_pixel(xx, yy).a > 0.5:
+					hi = maxf(hi, xx + 1)
+					break
+		if hi > lo:
+			_head_span = Vector2(_plane_c.x + (lo - W * 0.5) * k, _plane_c.x + (hi - W * 0.5) * k)
 
 
 ## Render the portrait for a few frames after any change (size, framing,
