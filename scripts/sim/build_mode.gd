@@ -620,7 +620,7 @@ func _spawn(e: Dictionary) -> void:
 		# build modes find them by footprint (_floor_item_at).
 		return
 	var use := Vector3(0, 0, sz.z * 0.5 + 0.4) if item.get("use", "front") == "front" else Vector3.ZERO
-	var it := Interactable.attach(n, item.label, item.get("actions", []), Vector3(maxf(sz.x, 0.3), maxf(sz.y, 0.3), maxf(sz.z, 0.3)), Vector3(0, sz.y * 0.5, 0), use)
+	var it := Interactable.attach(n, str(e.get("label", item.label)), item.get("actions", []), Vector3(maxf(sz.x, 0.3), maxf(sz.y, 0.3), maxf(sz.z, 0.3)), Vector3(0, sz.y * 0.5, 0), use)
 	if item.get("use", "") == "seat":
 		it.look_at_spot = Vector3(0, 0, 2.0)
 	it.set_meta("placed_uid", e.uid)
@@ -715,6 +715,50 @@ func sell_placed(uid: int) -> bool:
 	Game.notify.emit("Sold %s  +$%d" % [item.label, refund], "money")
 	Game.furniture_changed.emit()
 	return true
+
+
+## Gameplay places an object for free near `near` (a crib when a baby is
+## born, a birthday cake, a grave): the nearest free spot, nothing charged.
+## extra is merged into the saved entry (e.g. {"label": "Grave of Jack"}).
+## Returns the new uid, or -1 when no spot was found.
+func place_free(item_id: String, near: Vector3, extra := {}) -> int:
+	if world.location == null or world.nav == null:
+		return -1
+	if not start_ghost(item_id, near):
+		return -1
+	if not ghost_valid:
+		cancel_ghost()
+		return -1
+	var entry := {"uid": Game.next_uid(), "item": ghost_item.id, "pos": ghost_pos, "rot": ghost_rot}
+	entry.merge(extra, true)
+	var box := _box(ghost_item, ghost_rot, ghost_pos)
+	var walk: bool = ghost_item.get("walk", false)
+	ghost.queue_free()
+	ghost = null
+	ghost_item = {}
+	_show_grid(false)
+	_entries().append(entry)
+	_spawn(entry)
+	if not walk:
+		_push_sims(box)
+	Game.furniture_changed.emit()
+	return int(entry.uid)
+
+
+## Gameplay removes a placed object (the cake once the candles are out).
+func remove_placed(uid: int) -> bool:
+	var e := _entry(uid)
+	if e.is_empty():
+		return false
+	_despawn(uid)
+	_entries().erase(e)
+	Game.furniture_changed.emit()
+	return true
+
+
+## Placed node (Node3D holding the mesh + Interactable) of a uid.
+func node_of(uid: int) -> Node3D:
+	return nodes.get(uid)
 
 
 func placed_count() -> int:

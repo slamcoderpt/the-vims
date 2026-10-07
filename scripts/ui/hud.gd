@@ -243,9 +243,14 @@ func clear_bubbles() -> void:
 	_bubbles.clear()
 
 
+## SimActor.head_top() pads ~0.1 m above the hair/hat; pull the anchor down
+## so bubble tails end right over the head as in ref1.
+const ANCHOR_DROP := 0.075
+
+
 func _anchor_point(a: Node3D) -> Vector3:
 	if a.has_method("head_top"):
-		return a.head_top()
+		return a.head_top() - Vector3(0, ANCHOR_DROP, 0)
 	return a.global_position + Vector3(0, 1.9, 0)
 
 
@@ -541,7 +546,7 @@ const _SEL_DX: Array[float] = [0.0, 14.0, 30.0]
 ## and the plumbob floats beside the bubble, level with it, on the right
 ## (left when crowded). Returns false when neither side fits so the generic
 ## layout takes over.
-const _SEL_FRACS: Array[float] = [0.72, 0.62, 0.82, 0.5]
+const _SEL_FRACS: Array[float] = [0.6, 0.5, 0.7, 0.4]
 func _place_selected(b, vs: Vector2, full: Vector2) -> bool:
 	var best := INF
 	var best_pos := Vector2.ZERO
@@ -556,7 +561,7 @@ func _place_selected(b, vs: Vector2, full: Vector2) -> bool:
 				var r := Rect2(pos, b.size + Vector2(0, WorldBubble.TAIL_H * 0.4))
 				var pb := _pb_rect(pos, b.size, side)
 				var c: float = _cost(r, vs) + _cost(pb, vs) + lift * lift * 0.6 + lift * 10.0 \
-					+ absf(fr - 0.72) * 600.0 + (0.0 if side > 0 else 250.0)
+					+ absf(fr - 0.6) * 600.0 + (0.0 if side > 0 else 250.0)
 				if c < best:
 					best = c
 					best_pos = pos
@@ -582,12 +587,12 @@ func _pb_rect(pos: Vector2, sz: Vector2, side: int) -> Rect2:
 	return Rect2(x, y - 4.0, PB_W, h + 8.0)
 
 
-const _CHIP_DX: Array[float] = [0.0, 30.0, -30.0, 60.0]
+const _CHIP_DX: Array[float] = [0.0, 30.0, 60.0, -30.0, 90.0]
 const _CHIP_SLOTS: Array[Vector3] = [
 	# (fx of bubble width, fy: 1 below / 0 middle / -1 above, extra cost)
-	Vector3(0.6, 1.0, 0.0), Vector3(0.35, 1.0, 120.0), Vector3(1.0, 0.0, 200.0),
+	Vector3(0.6, 1.0, 0.0), Vector3(0.35, 1.0, 120.0), Vector3(1.0, 0.0, 420.0),
 	Vector3(0.75, 1.0, 160.0), Vector3(0.6, -1.0, 500.0), Vector3(-1.0, 0.0, 600.0),
-	Vector3(0.0, 1.0, 400.0), Vector3(0.6, 2.0, 900.0), Vector3(1.0, 1.0, 300.0),
+	Vector3(0.0, 1.0, 400.0), Vector3(0.6, 2.0, 900.0), Vector3(0.9, 1.0, 120.0),
 ]
 
 
@@ -616,16 +621,16 @@ func _place_chip(ch, vs: Vector2) -> void:
 		else:
 			pos.x = origin.position.x + origin.size.x * s.x
 		if s.y >= 2.0:
-			pos.y = origin.end.y + 12.0 + ch.size.y + 8.0
+			pos.y = origin.end.y + 14.0 + ch.size.y + 8.0
 		elif s.y >= 1.0:
-			pos.y = origin.end.y + 12.0
+			pos.y = origin.end.y + 14.0
 		elif s.y <= -1.0:
 			pos.y = origin.position.y - ch.size.y - 8.0
 		else:
 			pos.y = origin.position.y + (origin.size.y - ch.size.y) * 0.5
 		for dx in _CHIP_DX:
 			var p2 := pos + Vector2(dx, 0)
-			var c: float = s.z + absf(dx) * 4.0 + _cost(Rect2(p2, ch.size + Vector2(0, 9)), vs)
+			var c: float = s.z + absf(dx) * 2.5 + _cost(Rect2(p2, ch.size + Vector2(0, 9)), vs)
 			if c < best:
 				best = c
 				best_pos = p2

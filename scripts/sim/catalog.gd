@@ -65,6 +65,17 @@ const ITEMS := [
 		{"id": "sleep", "label": "Sleep", "icon": "bed", "minutes": 480.0, "pose": "sleep", "needs": {"energy": 1.0}, "task": "Go to Sleep"},
 		{"id": "nap", "label": "Nap", "icon": "zzz", "minutes": 60.0, "pose": "sleep", "needs": {"energy": 0.3}},
 	]},
+	{"id": "crib", "label": "Crib", "proc": "crib", "price": 250, "cat": "buy", "sub": "beds", "icon": "teddy", "use": "front",
+	 "actions": [
+		{"id": "feed_baby", "label": "Feed Baby", "icon": "milk", "minutes": 15.0, "pose": "idle", "anim": "feed_baby",
+		 "needs": {"social": 0.05}, "baby_fx": {"hunger": 0.85}, "who": ["adult"]},
+		{"id": "change_diaper", "label": "Change Diaper", "icon": "bath", "minutes": 10.0, "pose": "idle", "anim": "change_diaper",
+		 "needs": {"hygiene": -0.03}, "baby_fx": {"hygiene": 0.9}, "who": ["adult"]},
+		{"id": "rock_baby", "label": "Rock to Sleep", "icon": "zzz", "minutes": 20.0, "pose": "idle", "anim": "rock_baby",
+		 "needs": {"social": 0.05}, "baby_fx": {"energy": 0.8}, "who": ["adult"]},
+		{"id": "play_baby", "label": "Play with Baby", "icon": "teddy", "minutes": 15.0, "pose": "idle", "anim": "rock_baby",
+		 "needs": {"fun": 0.15, "social": 0.08}, "baby_fx": {"fun": 0.6, "social": 0.6}, "who": ["adult", "child"]},
+	]},
 	{"id": "dog_bed", "label": "Dog Bed", "model": "dog_bed", "v": 0, "price": 70, "cat": "buy", "sub": "beds", "icon": "paw", "use": "seat",
 	 "actions": [{"id": "nap", "label": "Nap", "icon": "zzz", "minutes": 60.0, "pose": "sleep", "needs": {"fun": 0.05, "energy": 0.3}, "who": ["dog"]}]},
 	# ------------------------------------------------------------ Buy: appliances
@@ -160,6 +171,14 @@ const ITEMS := [
 	{"id": "flower_bed", "label": "Flower Bed", "model": "flower_bed", "v": 0, "price": 70, "cat": "build", "sub": "garden", "icon": "blossom", "use": "front", "actions": [
 		{"id": "tend", "label": "Tend Flowers", "icon": "blossom", "minutes": 30.0, "pose": "idle", "needs": {"fun": 0.15}, "skill": "Gardening", "who": ["adult", "child"]},
 	]},
+	# ------------------------------------------------------------ Life (not sold; placed by gameplay)
+	{"id": "birthday_cake", "label": "Birthday Cake", "proc": "cake", "price": 0, "cat": "life", "sub": "life", "icon": "cake", "use": "front",
+	 "actions": [{"id": "eat_cake", "label": "Have a Slice", "icon": "cake", "minutes": 10.0, "pose": "idle", "anim": "snack_eat", "needs": {"hunger": 0.3, "fun": 0.1}, "who": ["adult", "child"]}]},
+	{"id": "grave", "label": "Grave", "proc": "grave", "price": 0, "cat": "life", "sub": "life", "icon": "dots", "use": "front",
+	 "actions": [
+		{"id": "mourn", "label": "Mourn", "icon": "dots", "minutes": 20.0, "pose": "idle", "anim": "mourn", "needs": {"social": 0.05}, "who": ["adult", "child"]},
+		{"id": "flowers", "label": "Leave Flowers", "icon": "blossom", "minutes": 6.0, "pose": "idle", "anim": "mourn", "needs": {"fun": 0.02}, "who": ["adult", "child"]},
+	]},
 	{"id": "tree", "label": "Maple Tree", "model": "tree", "v": 0, "price": 180, "cat": "build", "sub": "garden", "icon": "leaf", "use": "front", "actions": []},
 ]
 
@@ -246,6 +265,9 @@ static func _proc_size(item: Dictionary, _m: VoxelBuilder) -> Vector3i:
 		"wall": return Vector3i(16, 18, 3)
 		"floor": return Vector3i(16, 1, 16)
 		"rug": return Vector3i(int(item.w), 1, int(item.d))
+		"crib": return Vector3i(18, 15, 11)
+		"cake": return Vector3i(9, 19, 9)
+		"grave": return Vector3i(10, 14, 12)
 	return Vector3i(4, 4, 4)
 
 
@@ -260,6 +282,12 @@ static func _proc(item: Dictionary) -> VoxelBuilder:
 			_wall(vb, item.style)
 		"floor":
 			_floor(vb, item.style)
+		"crib":
+			_crib(vb)
+		"cake":
+			_cake(vb)
+		"grave":
+			_grave(vb)
 	_proc_models[item.id] = vb
 	return vb
 
@@ -326,3 +354,118 @@ static func _floor(vb: VoxelBuilder, style: String) -> void:
 						c = Color("8f5a30")
 			var f := 0.94 + h * 0.1
 			vb.set_v(Vector3i(x, 0, z), Color(c.r * f, c.g * f, c.b * f))
+
+
+
+static func _shade(c: Color, p: Vector3i, amt := 0.08) -> Color:
+	var f := 1.0 - amt * 0.5 + VoxelBuilder.hash3(p) * amt
+	return Color(c.r * f, c.g * f, c.b * f)
+
+
+## A wooden crib (1.1 x 0.7 m): spindle sides, tall end boards with a heart
+## cut-out, a white mattress with a pastel quilt and pillow, and a mobile.
+static func _crib(vb: VoxelBuilder) -> void:
+	var wood := Color("e9d3b0")
+	var wood_dk := Color("c9a87c")
+	var W := 18
+	var D := 11
+	for x in W:
+		for z in D:
+			var p := Vector3i(x, 0, z)
+			var end := x == 0 or x == W - 1
+			var side := z == 0 or z == D - 1
+			if end:
+				var top := 13 if x == 0 else 11
+				for y in range(0, top + 1):
+					# End boards: legs at the corners, a panel above the mattress.
+					if (z == 0 or z == D - 1) or y >= 4:
+						var heart := x == 0 and y >= 8 and y <= 10 and absi(z - 5) <= (2 if y > 8 else 1) and not (y == 10 and z == 5)
+						if not heart:
+							vb.set_v(Vector3i(x, y, z), _shade(wood if y < top else wood_dk, Vector3i(x, y, z)))
+			elif side:
+				vb.set_v(Vector3i(x, 4, z), _shade(wood_dk, p))      # bottom rail
+				vb.set_v(Vector3i(x, 11, z), _shade(wood, p))        # top rail
+				if x % 2 == 0:
+					for y in range(5, 11):
+						vb.set_v(Vector3i(x, y, z), _shade(wood, Vector3i(x, y, z), 0.05))
+			else:
+				vb.set_v(Vector3i(x, 4, z), _shade(wood_dk, p))      # base board
+				vb.set_v(Vector3i(x, 5, z), _shade(Color("f7f5ef"), Vector3i(x, 5, z), 0.04))   # mattress
+				# Quilt over the foot half, a pillow at the head.
+				if x >= 8:
+					var q := Color("a9d4f2") if (x / 2 + z / 2) % 2 == 0 else Color("fbe2a6")
+					vb.set_v(Vector3i(x, 6, z), _shade(q, Vector3i(x, 6, z), 0.05))
+				elif x >= 2 and x <= 4 and z >= 3 and z <= 7:
+					vb.set_v(Vector3i(x, 6, z), Color("ffffff"))
+	# Mobile on an arm over the head end.
+	for y in range(12, 15):
+		vb.set_v(Vector3i(1, y, 5), wood_dk)
+	for x in range(1, 7):
+		vb.set_v(Vector3i(x, 14, 5), wood_dk)
+	var toys := [Color("f28b9b"), Color("8fd18a"), Color("f6d35b")]
+	for k in 3:
+		var tx := 3 + k * 2 - 1
+		vb.set_v(Vector3i(tx, 13, 5 + (k - 1) * 2), toys[k])
+		vb.set_v(Vector3i(tx, 12, 5 + (k - 1) * 2), toys[k].darkened(0.1))
+
+
+## A birthday cake on a little round table, candles lit (glowing flames).
+static func _cake(vb: VoxelBuilder) -> void:
+	var c := Vector2(4, 4)
+	var cloth := Color("fbf6ee")
+	var leg := Color("8a5a36")
+	for x in 9:
+		for z in 9:
+			var d := Vector2(x, z).distance_to(c)
+			if d <= 4.3:
+				vb.set_v(Vector3i(x, 11, z), _shade(cloth, Vector3i(x, 11, z), 0.04))
+				if d > 3.6:
+					vb.set_v(Vector3i(x, 10, z), _shade(Color("f4c6d3"), Vector3i(x, 10, z), 0.04))   # skirt
+			if d <= 3.2:
+				for y in range(12, 14):
+					vb.set_v(Vector3i(x, y, z), _shade(Color("fde7c4"), Vector3i(x, y, z), 0.05))      # sponge
+				vb.set_v(Vector3i(x, 14, z), _shade(Color("f7a3bb"), Vector3i(x, 14, z), 0.05))        # jam layer
+				vb.set_v(Vector3i(x, 15, z), _shade(Color("fff6f8"), Vector3i(x, 15, z), 0.03))        # icing
+				if d > 2.6 and (x + z) % 2 == 0:
+					vb.set_v(Vector3i(x, 16, z), Color("f28bab"))   # piped rim
+	for y in range(0, 11):
+		vb.set_v(Vector3i(4, y, 4), leg)
+	for x in range(2, 7):
+		vb.set_v(Vector3i(x, 0, 4), leg)
+	for z in range(2, 7):
+		vb.set_v(Vector3i(4, 0, z), leg)
+	var cols := [Color("7cc4f2"), Color("f6d35b"), Color("9be08a")]
+	var spots := [Vector3i(3, 16, 4), Vector3i(5, 16, 3), Vector3i(5, 16, 5)]
+	for k in 3:
+		var sp: Vector3i = spots[k]
+		vb.set_v(sp, cols[k])
+		vb.set_v(sp + Vector3i(0, 1, 0), cols[k])
+		vb.set_v(sp + Vector3i(0, 2, 0), Color(1.0, 0.75, 0.3), true)   # flame
+
+
+## A rounded headstone with a carved cross, a grassy mound and flowers.
+static func _grave(vb: VoxelBuilder) -> void:
+	var stone := Color("a7aab0")
+	for x in 10:
+		for y in range(0, 14):
+			var dx := x - 4.5
+			var top := 10.0 + sqrt(maxf(0.0, 20.25 - dx * dx)) * 0.75
+			if y > top:
+				continue
+			for z in range(0, 2):
+				var c := _shade(stone, Vector3i(x, y, z), 0.12)
+				# carved cross on the front face
+				if z == 1 and ((x == 4 or x == 5) and y >= 5 and y <= 11 or (y == 9 and x >= 3 and x <= 6)):
+					c = c.darkened(0.25)
+				vb.set_v(Vector3i(x, y, z), c)
+	for x in range(1, 9):
+		for z in range(2, 12):
+			var g := Color("6f9a46") if VoxelBuilder.hash3(Vector3i(x, 1, z)) > 0.3 else Color("5e8a3a")
+			vb.set_v(Vector3i(x, 0, z), g)
+			if x >= 2 and x <= 7 and z >= 3 and z <= 10:
+				vb.set_v(Vector3i(x, 1, z), _shade(Color("7b5a3c"), Vector3i(x, 1, z), 0.1))
+	var fl := [Color("f2d04b"), Color("f28bab"), Color("ffffff"), Color("b58bf2")]
+	for k in 4:
+		var fx := 2 + k
+		vb.set_v(Vector3i(fx + (k % 2), 1, 2), Color("4f8a3a"))
+		vb.set_v(Vector3i(fx + (k % 2), 2, 2), fl[k])

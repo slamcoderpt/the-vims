@@ -8,16 +8,15 @@ const U := 1.0 / 16.0
 
 ## [x, z, banner]
 const LAMPS := [
-	[-5.0, -8.6, true],    # 0 tall lamp left of the fountain (ref: centre-left)
-	[6.6, -9.0, false],    # 1 right of the stage (r11: kept clear of the stage front)
+	[-5.0, -8.6, true],    # 0 tall banner lamp left of the fountain (ref: centre-left)
+	[6.6, -9.0, false],    # 1 right of the stage
 	[-7.2, -3.4, false],   # 2 behind the FALL TREATS stall
-	[5.6, -18.2, false],   # 3 behind the stage
-	[-5.0, -15.5, false],  # 4 back left
-	[5.4, -3.0, false],    # 5 right side, by the game booth
-	[-4.4, -19.0, false],  # 6 far back by the town hall
+	[5.4, -3.0, false],    # 3 right side, by the game booth / crafts table
+	[-7.6, 0.9, false],    # 4 bottom-left, among the barrels
+	[-0.9, -9.23, false],  # 5 right of the fountain (= z -7.2 after dz), beside the clock tower
 ]
 const FOUNTAIN := Vector3(-2.4, 0, -6.7)  # = (-2.4, K.dz(-8.27)); r12 camera: upper centre-left
-const FOUNTAIN_SCALE := 1.05
+const FOUNTAIN_SCALE := 0.84  # r13: spout stays below the clock face
 const LAMP_TOP := 4.2
 const SU := 0.06  # string-light wire cell size
 const BU := 0.08  # bulb cell size
@@ -225,21 +224,22 @@ func _strings(parent: Node3D) -> void:
 	# Round 7: fewer, cleaner runs. Nothing crosses the walkway at head
 	# height in front of the fountain / stage any more (the old web of
 	# strings + oversized bulbs read as a yellow smear over the backdrop).
+	var stage_fr := stage_pos + Vector3(2.0, 4.4, 0.0)    # front-right corner
+	# r13: runs kept out of the clock-tower window (screen x 800-950,
+	# y < 110) so the backdrop reads; garlands hang across the left of the
+	# frame, from the banner lamp over to the stage, and down the right side.
+	var low0 := Vector3(L[0].x, 2.75, L[0].z)
 	var runs := [
 		# [a, b, sag, bunting]
 		[L[2], L[0], 0.45, false],
-		[L[0], L[1], 0.3, false],
-		[L[1], stage_fl, 0.35, false],
-		[L[5], K.dv(Vector3(10.6, 3.6, -3.4)), 0.4, false],
-		[L[4], L[0], 0.4, false],
-		[L[4], L[6], 0.4, false],
-		[L[3], K.dv(Vector3(11.5, 4.6, -12.0)), 0.4, true],
-		[L[2], K.dv(Vector3(-10.0, 4.4, -7.0)), 0.4, false],
-		[K.dv(Vector3(-10.0, 4.4, -7.0)), L[4], 0.5, true],
-		# High runs from the lamps back towards the town hall: these read as
-		# the glowing bulb garlands across the top of the frame in the ref.
-		[L[0], K.dv(Vector3(-6.4, 6.2, -16.5)), 0.5, false],
-		[L[1], K.dv(Vector3(6.6, 6.0, -19.5)), 0.5, false],
+		[low0, stage_fl + Vector3(0, -1.45, 0), 0.35, true],
+		[L[1], stage_fr, 0.3, false],
+		[L[5], stage_fl, 0.3, false],
+		[L[3], stage_fr, 0.45, false],
+		[L[3], Vector3(9.4, 3.4, 0.6), 0.35, true],
+		[L[4], L[2], 0.4, false],
+		[L[2], Vector3(-11.0, 4.2, -5.2), 0.4, true],
+		[L[0], Vector3(-9.6, 4.6, -8.4), 0.45, false],
 	]
 	var bv := VoxelBuilder.new()
 	bv.jitter = 0.0
@@ -361,7 +361,6 @@ func _props(parent: Node3D) -> void:
 	for l in [[-3.55, 0.35], [2.0, -1.3], [-2.0, -4.2], [1.9, -5.6], [-4.4, -9.4], [5.2, -9.6]]:
 		_ground_lantern(near, int(l[0] * C), int(K.dz(l[1]) * C))
 	# Picnic tables.
-	_picnic_table(near, int(-5.0 * C), int(K.dz(-8.0) * C))
 	_picnic_table(near, int(6.6 * C), int(K.dz(-7.0) * C))
 	# Pumpkin piles + hay.
 	var piles := [[-0.2, -5.4], [6.2, -5.0], [-4.3, -10.6], [6.0, -11.6]]
@@ -376,6 +375,26 @@ func _props(parent: Node3D) -> void:
 	K.hay(near, int(7.6 * C), 0, int(K.dz(-5.6) * C), 16, 9, 9)
 	K.hay(near, int(-5.6 * C), 0, int(K.dz(-6.2) * C), 16, 9, 9)
 	K.hay(near, int(-3.6 * C), 0, int(K.dz(-12.4) * C), 16, 9, 9)
+	# r13: bottom-left corner cluster (below the HUD portraits): mum barrels,
+	# cider barrels, a crate of apples, pumpkins, hay and a glowing lantern.
+	for b: Array in [[-7.1, 1.7, 0, 6.5], [-6.0, 2.75, 2, 6.0], [-8.4, 0.3, 1, 6.0], [-4.9, 3.5, 1, 5.5]]:
+		_barrel_planter(near, int(b[0] * C), int(b[1] * C), b[3], b[2], i)
+		i += 1
+	_cider_barrel(near, int(-8.0 * C), int(2.5 * C))
+	_cider_barrel(near, int(-6.6 * C), int(0.4 * C))
+	_crate_box(near, int(-5.9 * C), int(1.0 * C), 10, 7, 8)
+	for k in 6:
+		_apple_pile(near, int(-5.9 * C) + 2 + (k % 3) * 3, 7, int(1.0 * C) + 2 + (k / 3) * 3)
+	K.hay(near, int(-9.2 * C), 0, int(1.6 * C), 16, 9, 9)
+	K.pumpkin(near, int(-8.6 * C), 9, int(1.9 * C), 3.4, 21, 0)
+	K.pumpkin(near, int(-5.3 * C), 0, int(2.0 * C), 3.6, 22, 1)
+	K.pumpkin(near, int(-4.7 * C), 0, int(2.5 * C), 2.6, 23, 2)
+	_ground_lantern(near, int(-6.3 * C), int(1.6 * C))
+	_ground_lantern(near, int(1.45 * C), int(1.75 * C))
+	# A bench by the fountain + mums along the walkway edges.
+	_bench(near, int(-5.6 * C), int(-4.6 * C))
+	_barrel_planter(near, int(0.9 * C), int(-2.2 * C), 5.0, 0, 41)
+	_barrel_planter(near, int(-3.2 * C), int(-4.0 * C), 5.0, 2, 42)
 	# (Round 11: dressing outside the preset frame (far left under the HUD,
 	# below the frame bottom) was dropped to stay under the triangle budget.)
 	# (Round 10: the round-9 pumpkin display / far-left hay sat outside the
@@ -411,6 +430,22 @@ func _foreground(parent: Node3D) -> void:
 	K.mums(vb, 2.55 * C, 0, 1.35 * C, 3.4, 0, 45)
 	K.pumpkin(vb, int(2.1 * C), 0, int(1.5 * C), 2.0, 7, 2)
 	K.inst(parent, vb, FV, Vector3.ZERO, 0.0, true, Vector3.ZERO, "Foreground")
+
+
+func _apple_pile(vb: VoxelBuilder, x: int, y: int, z: int) -> void:
+	var c := Color("c8281e") if posmod(x + z, 3) != 0 else Color("e8a030")
+	K.box(vb, x, y, z, 2, 2, 2, K.noisy(c, 0.1, x * 7 + z))
+
+
+func _bench(vb: VoxelBuilder, x: int, z: int) -> void:
+	var w := Color("a8743e")
+	var iron := Color("2a2622")
+	K.box(vb, x, 7, z, 24, 1, 6, K.wood(w, 0, 2))
+	K.box(vb, x, 8, z, 24, 6, 1, K.wood(w, 0, 2))
+	for lx in [x + 1, x + 21]:
+		K.box(vb, lx, 0, z, 2, 7, 1, iron)
+		K.box(vb, lx, 0, z + 5, 2, 7, 1, iron)
+		K.box(vb, lx, 7, z - 1, 2, 8, 1, iron)
 
 
 func _crate_box(vb: VoxelBuilder, x: int, z: int, w: int, h: int, d: int) -> void:

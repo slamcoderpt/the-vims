@@ -98,9 +98,10 @@ func _cobbles(w: int, h: int) -> Image:
 	var data := PackedByteArray()
 	data.resize(w * h * 3)
 	var tones := [
-		Color("b8b0a6"), Color("a39c94"), Color("c8bfb2"), Color("98918b"), Color("bba595"),
-		Color("ad9f96"), Color("cfc6ba"), Color("a69a96"), Color("b9a493"), Color("d6cdbf"),
-		Color("c2a898"), Color("9c958f"), Color("c9b5a8"), Color("b0aaa2"),
+		# r13: warm pinkish beige (ref2 paving reads rosy in the golden light).
+		Color("c4b0a6"), Color("ae9c94"), Color("d3c0b4"), Color("a2918b"), Color("c9a898"),
+		Color("b89f98"), Color("dac9bd"), Color("b09a98"), Color("c6a796"), Color("e0cec2"),
+		Color("ceaa9a"), Color("a69591"), Color("d4b6aa"), Color("bcaaa4"),
 	]
 	var grout := Color("6a625b")
 	var tile := _stone_tile()

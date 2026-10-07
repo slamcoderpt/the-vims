@@ -22,6 +22,7 @@ const Wishes := preload("res://scripts/sim/wishes.gd")
 const Careers := preload("res://scripts/sim/careers.gd")
 const Traits := preload("res://scripts/sim/traits.gd")
 const Carpool := preload("res://scripts/sim/carpool.gd")
+const LifeStages := preload("res://scripts/sim/life_stages.gd")
 ## Where sims leave the lot for work / school (walk here, then the carpool):
 ## the front door at home, the street side elsewhere.
 const EXITS := {"home": Vector3(1.0, 0.0, 4.3), "backyard": Vector3(0.0, 0.0, 8.0),
@@ -89,6 +90,10 @@ func _ready() -> void:
 	Game.skill_changed.connect(_on_skill)
 	Game.bills_changed.connect(_update_mail_flag)
 	Game.tasks_changed.connect(_on_tasks_changed)
+	Game.member_added.connect(_on_member_added)
+	Game.member_leaving.connect(_on_member_leaving)
+	Game.member_removed.connect(_on_member_removed)
+	Game.aged_up.connect(_on_aged_up)
 	overlay = SimOverlay.new()
 	overlay.name = "SimOverlay"
 	overlay.hud = main.hud if main else null
@@ -141,9 +146,9 @@ func bind_location(loc: Node3D, p_name: String) -> void:
 	nav = NavGrid.for_location(location, NavConfig.get_config(p_name, location))
 	if OS.has_environment("VIMS_STATS") or OS.has_environment("VIMS_PLAYTEST"):
 		print("SIM_NAV %s %dx%d levels=%d build_ms=%d (bind %d ms)" % [p_name, nav.w, nav.h, nav.level_y.size(), nav.build_ms, Time.get_ticks_msec() - t0])
+	_lot_factor = _measure_lot_factor()
 	for i in Game.household.size():
-		var m: Dictionary = Game.household[i]
-		var a := find_actor(m.name, m.get("look", ""))
+		var a := ensure_actor(i)
 		if a == null:
 			agents.append(null)
 			continue
@@ -156,6 +161,7 @@ func bind_location(loc: Node3D, p_name: String) -> void:
 	_setup_townies()
 	refresh_interactables()
 	build.spawn_saved()
+	_settle_life()
 	_adopt_staged()
 	# Mid-shift travel: whoever is at work stays out of sight until they're done.
 	for ag in agents:
@@ -192,7 +198,8 @@ func _setup_townies() -> void:
 		if not n is SimActor or is_household_actor(n):
 			continue
 		var info := Game.townie_by_look(str(n.get("look")))
-		if info.is_empty():
+		if info.is_empty() or Game.is_family(str(info.name)):
+			# (A townie who moved in is family now: lookalikes stay extras.)
 			continue
 		n.set_meta("townie", info.name)
 		var has_it := false
@@ -237,8 +244,8 @@ func townie_rows(ag, it: Interactable) -> Array:
 			continue
 		rows.append(a)
 	var me: String = ag.display_name()
-	var soc := SimActions.socials_by_rel(ag.kind, info.get("kind", "adult"), tname, Game.has_met(me, tname), Game.rel(me, tname), true,
-		{"romance": Game.romance(me, tname), "status": Game.rel_status(me, tname)})
+	var rom = SimActions.rom_info(me, tname, false) if Game.can_romance(me, tname) else null
+	var soc := SimActions.socials_by_rel(ag.kind, info.get("kind", "adult"), tname, Game.has_met(me, tname), Game.rel(me, tname), true, rom)
 	for a in soc:
 		if task != "" and not a.has("task") and not a.get("locked", false):
 			a["task"] = task
@@ -249,8 +256,11 @@ func townie_rows(ag, it: Interactable) -> Array:
 func _on_rel_level(a: String, b: String, level: String) -> void:
 	if Game.mode != "live" and not Game.live:
 		return
-	if level in ["Romantic Interest", "Dating", "Partners"]:
-		var rt := {"Romantic Interest": "%s has a crush on %s", "Dating": "%s and %s are going steady!", "Partners": "%s and %s are partners!"}
+	if level == "":
+		return
+	if level in ["Romantic Interest", "Dating", "Partners", "Engaged", "Married"]:
+		var rt := {"Romantic Interest": "%s has a crush on %s", "Dating": "%s and %s are going steady!", "Partners": "%s and %s are partners!",
+			"Engaged": "%s and %s are engaged!", "Married": "%s and %s got married!"}
 		Game.notify.emit(rt[level] % [a, b], "heart")
 		for nm in [a, b]:
 			var mi := Game.member_index(nm)
@@ -283,13 +293,17 @@ func _on_rel_level(a: String, b: String, level: String) -> void:
 func find_actor(member_name: String, look: String) -> Node3D:
 	if location == null:
 		return null
+	if look.begins_with("born_"):
+		look = ""   # a born sim's look is only theirs: match by name
 	if location.has_method("get_actor"):
 		for k in [member_name, look]:
+			if k == "":
+				continue
 			var a = location.get_actor(k)
 			if a is Node3D:
 				return a
 	for n in location.find_children("*", "Node3D", true, false):
-		if n is SimActor and (n.name == member_name or n.get("look") == look):
+		if n is SimActor and not n.is_queued_for_deletion() and (n.name == member_name or (look != "" and n.get("look") == look)):
 			return n
 	return null
 
@@ -560,6 +574,8 @@ func pick_agent(screen: Vector2):
 	for ag in agents:
 		if ag == null or not is_instance_valid(ag.actor) or not ag.actor.is_visible_in_tree():
 			continue
+		if ag.kind == "baby":
+			continue   # a tap on the crib means the crib (select babies by portrait)
 		var base: Vector3 = ag.actor.global_position
 		var top: Vector3 = ag.actor.head_top() if ag.actor.has_method("head_top") else base + Vector3(0, 1.7, 0)
 		if cam.is_position_behind(base) or cam.is_position_behind(top):
@@ -1235,6 +1251,7 @@ func on_action_done(ag, o: Dictionary) -> void:
 			var tn: String = str(Careers.track(ag.member.get("career", {})).get("name", "the"))
 			Game.quit_career(ag.index)
 			Game.notify.emit("%s quit the %s career" % [ag.display_name(), tn], "laptop")
+	_life_done(ag, o)
 	Wishes.on_action(ag, a, int(ag.last_pay))
 
 
@@ -1249,6 +1266,7 @@ const MEAL_SPOILS := 8 * 60.0
 func actions_for(it: Node, member: Dictionary) -> Array:
 	var out := SimActions.actions_for(it, member)
 	out.append_array(career_rows(it, member))
+	out.append_array(life_rows(it, member))
 	if not meal.is_empty() and it == meal.get("table") and member.get("kind", "adult") != "dog" and int(meal.servings) > 0:
 		out.push_front(meal_action())
 	return out
@@ -1556,3 +1574,419 @@ func home_desk(_ag) -> Node:
 
 func on_promotion(ag) -> void:
 	Wishes.on_career(ag, "promo")
+
+
+
+# =================================================================== life: stages, move-in, babies, graves
+
+## World height of this lot's household / life-size height (scales actors
+## spawned for new members and new life stages to match the lot).
+var _lot_factor := 1.0
+## uid of the birthday cake on this lot (-1 = none).
+var cake_uid := -1
+
+
+func _measure_lot_factor() -> float:
+	for m in Game.household:
+		if m.get("kind", "") == "dog":
+			continue
+		var a := find_actor(m.name, m.get("look", ""))
+		if a == null or not a is SimActor:
+			continue
+		var L := LifeStages.look_dict(m)
+		var nat := LifeStages.native_stage(L)
+		if a.look != m.get("look", ""):
+			continue
+		var h := LifeStages.actor_height(a)
+		if h > 0.2:
+			return h / float(LifeStages.HEIGHT.get(nat, 1.75))
+	return 1.0
+
+
+## Babies stay home (in the crib); everyone else goes where the family goes.
+func _member_on_lot(m: Dictionary) -> bool:
+	if m.get("kind", "") == "baby":
+		return loc_name == "home"
+	return true
+
+
+## The actor for member i on this lot, built for their life stage: the
+## location's staged actor when its body still fits, otherwise a new one
+## (grown-up kid, elder, a townie who moved in, a newborn) standing where the
+## old one stood or arriving at the lot's entrance.
+func ensure_actor(i: int) -> Node3D:
+	if i < 0 or i >= Game.household.size() or location == null:
+		return null
+	var m: Dictionary = Game.household[i]
+	if not _member_on_lot(m):
+		return null
+	var key := LifeStages.ensure_rig(m)
+	var a: Node3D = _pending_actor.get(m.name)
+	_pending_actor.erase(m.name)
+	if a == null or not is_instance_valid(a) or not a.is_inside_tree():
+		a = find_actor(m.name, m.get("look", ""))
+	var stage := str(m.get("life_stage", "adult"))
+	if a != null and a is SimActor and str(a.look) == key:
+		if m.get("kind", "") == "dog":
+			var ds: float = LifeStages.DOG_SCALE.get(stage, 1.0)
+			if not a.has_meta("dog_base"):
+				a.set_meta("dog_base", a.scale.x)
+			a.scale = Vector3.ONE * float(a.get_meta("dog_base")) * ds
+		if a.has_meta("townie"):
+			_adopt_townie(a)
+		_register_actor(m.name, a)
+		return a
+	var parent: Node = location
+	var pos: Vector3
+	var yaw := 0.0
+	if a != null:
+		parent = a.get_parent()
+		pos = a.global_position
+		yaw = a.global_rotation.y
+	else:
+		pos = _arrival_spot(m)
+		if camera_rig:
+			yaw = atan2(camera_rig.global_position.x - pos.x, camera_rig.global_position.z - pos.z) * 0.5
+	var na := SimActor.create(key)
+	na.name = str(m.name)
+	na.body_scale = LifeStages.scale_for(key, stage, _lot_factor)
+	parent.add_child(na)
+	na.global_position = pos
+	na.rotation.y = yaw
+	if a != null:
+		_retire_actor(a)
+	_register_actor(m.name, na)
+	if OS.has_environment("VIMS_PLAYTEST"):
+		print("  actor: %s as %s (%s) h=%.2f m at %s" % [m.name, key, stage, LifeStages.actor_height(na), str(pos)])
+	return na
+
+
+## A townie's actor becomes a household member's: no more "Neighbor" menu.
+func _adopt_townie(a: Node) -> void:
+	a.remove_meta("townie")
+	for c in a.get_children():
+		if c is Interactable and str(c.title) == "Neighbor":
+			release_object(c)
+			c.queue_free()
+
+
+## The location's actor lookup tables (home keeps one; the festival / BBQ
+## keep theirs on their crowd / cast helpers).
+func _actor_dicts() -> Array:
+	var out: Array = []
+	if location == null:
+		return out
+	for holder in [location, location.get("crowd"), location.get("cast")]:
+		if holder is Object and is_instance_valid(holder):
+			var d = holder.get("actors")
+			if d is Dictionary:
+				out.append(d)
+	return out
+
+
+## Actor a townie stood in when they agreed to move in (claimed by ensure_actor).
+var _pending_actor := {}
+
+
+func _register_actor(member_name: String, a: Node3D) -> void:
+	for d in _actor_dicts():
+		(d as Dictionary)[member_name] = a
+
+
+## Drop an actor that was replaced (old body) or whose sim left.
+func _retire_actor(a: Node) -> void:
+	if a == null or not is_instance_valid(a):
+		return
+	Game.clear_bubble(a, "")
+	for d in _actor_dicts():
+		for k in (d as Dictionary).keys():
+			if d[k] == a:
+				d.erase(k)
+	var aa = ActionAnims.of(a)
+	if aa:
+		aa.stop()
+	if a.get_parent():
+		a.get_parent().remove_child(a)
+	a.queue_free()
+
+
+## Where a member with no staged actor appears: babies in the crib, others
+## by the lot's entrance (as if just arrived).
+func _arrival_spot(m: Dictionary) -> Vector3:
+	if m.get("kind", "") == "baby":
+		var cr = _crib()
+		if cr != null:
+			return (cr as Node3D).get_parent().global_position
+	var p: Vector3 = EXITS.get(loc_name, Vector3(0, 0, 4))
+	var sel = selected_agent()
+	if sel != null and is_instance_valid(sel.actor):
+		p = sel.actor.global_position + Vector3(0.8, 0, 0.6)
+	return _open_spot(p)
+
+
+func _crib():
+	for it in interactables:
+		if is_instance_valid(it) and str(it.title) == "Crib":
+			return it
+	return null
+
+
+## After the lot's furniture is in: a crib for any baby (bought free at
+## birth), babies tucked into it, graves of the departed on the home lot.
+func _settle_life() -> void:
+	cake_uid = -1
+	for e in Game.placed.get(Game.location, []):
+		if str(e.get("item", "")) == "birthday_cake":
+			cake_uid = int(e.uid)
+	if loc_name != "home":
+		return
+	var has_baby := false
+	for m in Game.household:
+		if m.get("kind", "") == "baby":
+			has_baby = true
+	if has_baby and _crib() == null:
+		_place_crib(_family_center())
+	for ag in agents:
+		if ag and ag.kind == "baby":
+			tuck_in(ag)
+	_place_graves()
+
+
+## Headstones of the departed in the front yard, beside the mailbox path.
+func _place_graves() -> void:
+	for k in Game.graves.size():
+		var g: Dictionary = Game.graves[k]
+		if int(g.get("uid", -1)) >= 0 and not build._entry(int(g.uid)).is_empty():
+			continue
+		var at: Vector3 = MAILBOX.get("home", Vector3(2, 0, 7)) + Vector3(-1.8 - 1.1 * k, 0, 0.2)
+		g["uid"] = build.place_free("grave", at, {"label": "Grave of %s" % g.name})
+
+
+func _family_center() -> Vector3:
+	for ag in agents:
+		if ag and ag.kind == "adult" and is_instance_valid(ag.actor):
+			return ag.actor.global_position + Vector3(1.2, 0, 0.8)
+	return camera_rig.target if camera_rig else Vector3.ZERO
+
+
+func _place_crib(near: Vector3) -> Node:
+	var uid: int = build.place_free("crib", near)
+	if uid < 0:
+		return null
+	Game.notify.emit("A crib was set up for the baby", "teddy")
+	return _crib()
+
+
+## Put a baby actor in the crib (lying on the mattress, head at the pillow end).
+func tuck_in(ag) -> void:
+	var cr = _crib()
+	if cr == null or not is_instance_valid(ag.actor):
+		return
+	var n: Node3D = (cr as Node3D).get_parent()
+	var bx: Vector3 = n.global_transform.basis.x.normalized()
+	var c := n.global_position
+	ag.actor.global_position = Vector3(c.x, c.y, c.z) + bx * 0.05
+	ag.actor.set("lie_height", 0.42)
+	ag.actor.face(ag.actor.global_position + bx)
+	ag.actor.set_pose("sleep" if Game.household[ag.index].needs.get("energy", 1.0) < 0.5 else "lie")
+	ag.spot = ag.actor.global_position
+
+
+## Object menu rows that depend on the family's life: birthday cake rows,
+## and the crib only offers care when there is a baby.
+func life_rows(it: Node, member: Dictionary) -> Array:
+	var out: Array = []
+	var title := str(it.get("title"))
+	if title == "Birthday Cake" and member.get("kind", "") in ["adult", "child"]:
+		var st := str(member.get("life_stage", "adult"))
+		var nxt := LifeStages.next_stage(st, str(member.kind))
+		if nxt != "":
+			out.append({"id": "blow_candles", "label": "Blow Out Candles (%s)" % LifeStages.stage_name(nxt), "icon": "cake", "minutes": 8.0,
+				"pose": "idle", "anim": "blow_candles", "needs": {"fun": 0.25, "social": 0.1}})
+		for k in Game.household.size():
+			var o: Dictionary = Game.household[k]
+			if o == member or not o.get("life_stage", "") in ["baby", "toddler"]:
+				continue
+			out.append({"id": "cake_for", "label": "Celebrate %s's Birthday" % o.name, "icon": "cake", "minutes": 10.0,
+				"pose": "idle", "anim": "blow_candles", "member_name": o.name, "needs": {"fun": 0.2, "social": 0.1}, "who": ["adult"]})
+	return out
+
+
+## Completed actions that move the family's life along.
+func _life_done(ag, o: Dictionary) -> void:
+	var a: Dictionary = o.get("action", {})
+	var id := str(a.get("id", ""))
+	if a.has("baby_fx"):
+		SimActions.apply_baby_fx(a.baby_fx)
+		for b in agents:
+			if b and b.kind == "baby":
+				Game.show_bubble(b.actor, {"kind": "emote", "icon": "heart", "id": "say", "ttl": 1.6})
+	var rejected: bool = ag._rejected
+	match id:
+		"bake_cake":
+			var at: Vector3 = ag.actor.global_position + ag.actor.global_transform.basis.z * -0.2
+			if cake_uid >= 0 and not build._entry(cake_uid).is_empty():
+				build.remove_placed(cake_uid)
+			cake_uid = build.place_free("birthday_cake", _open_spot(at + Vector3(0.9, 0, 0.9)))
+			if cake_uid >= 0:
+				Game.notify.emit("The birthday cake is ready · tap it to celebrate", "cake")
+				ag._say("Happy birthday!", "cake")
+		"blow_candles":
+			_birthday(ag.index)
+		"cake_for":
+			_birthday(Game.member_index(str(a.get("member_name", ""))))
+		"mourn", "flowers":
+			Game.remove_moodlet(ag.index, "mourning")
+			Game.add_moodlet(ag.index, "paid_respects", "Paid Respects", "blossom", 6.0, 12.0, str(o.get("target").title) if o.get("target") != null and is_instance_valid(o.get("target")) else "")
+		"s_move_in":
+			if not rejected:
+				var tn: String = ag._social_partner_name()
+				var t = o.get("target")
+				if t != null and is_instance_valid(t) and t.get_parent() is SimActor:
+					_pending_actor[tn] = t.get_parent()
+				if Game.move_in(tn) < 0:
+					ag._say("Our house is full...", "home")
+		"s_try_baby":
+			if not rejected and o.get("other") != null:
+				if Game.try_for_baby(ag.display_name(), o.other.display_name(), try_baby_chance):
+					Game.show_bubble(ag.actor, {"kind": "emote", "icon": "heart", "id": "say", "ttl": 2.5})
+
+
+## Success chance of Try for Baby (playtests set 1.0).
+var try_baby_chance := 0.75
+
+
+## Candles out: the birthday sim (and everyone around) celebrate; the cake goes.
+func _birthday(i: int) -> void:
+	if i < 0:
+		return
+	Game.age_up(i, true)
+	for k in Game.household.size():
+		if k != i and Game.household[k].get("kind", "") in ["adult", "child"]:
+			Game.add_moodlet(k, "party", "Birthday Party", "cake", 8.0, 6.0, "For %s" % Game.household[i].name)
+	if cake_uid >= 0:
+		build.remove_placed(cake_uid)
+		cake_uid = -1
+
+
+func _on_member_added(i: int) -> void:
+	if location == null or not is_instance_valid(location):
+		return
+	var m: Dictionary = Game.household[i]
+	if m.get("kind", "") == "baby" and loc_name == "home" and _crib() == null:
+		var mom = null
+		for ag in agents:
+			if ag and ag.display_name() in m.get("parents", []):
+				mom = ag
+		_place_crib(mom.actor.global_position if mom else _family_center())
+	var a := ensure_actor(i)
+	var ag = null
+	if a != null:
+		ag = SimAgent.new()
+		ag.setup(self, i, a)
+	while agents.size() < i:
+		agents.append(null)
+	agents.insert(i, ag)
+	for k in agents.size():
+		if agents[k]:
+			agents[k].index = k
+	if ag:
+		if ag.kind == "baby":
+			tuck_in(ag)
+		else:
+			var aa0 = ActionAnims.of(a)
+			if aa0:
+				aa0.stop()
+			a.set_pose("idle")
+		Game.show_bubble(a, {"kind": "emote", "icon": "heart", "id": "say", "ttl": 2.5})
+		_sparkle(a.global_position + Vector3(0, 0.6, 0), Color(1.0, 0.6, 0.8))
+		ag._sync_queue()
+
+
+func _on_member_leaving(i: int, _reason: String) -> void:
+	if i < 0 or i >= agents.size() or agents[i] == null:
+		return
+	var ag = agents[i]
+	for other in agents:
+		if other == null or other == ag:
+			continue
+		if other.order.get("other") == ag:
+			other.cancel_current()
+		for k in range(other.queue.size() - 1, -1, -1):
+			if other.queue[k].get("other") == ag:
+				other.queue.remove_at(k)
+	ag.cancel_all()
+
+
+func _on_member_removed(i: int, m: Dictionary, reason: String) -> void:
+	if i < 0 or i >= agents.size():
+		return
+	var ag = agents[i]
+	agents.remove_at(i)
+	for k in agents.size():
+		if agents[k]:
+			agents[k].index = k
+	if ag == null or not is_instance_valid(ag.actor):
+		return
+	var pos: Vector3 = ag.actor.global_position
+	_retire_actor(ag.actor)
+	if reason == "died":
+		_sparkle(pos + Vector3(0, 0.8, 0), Color(0.75, 0.85, 1.0))
+		if loc_name == "home":
+			_place_graves()
+	for k in agents.size():
+		if agents[k]:
+			agents[k]._sync_queue()
+
+
+func _on_aged_up(i: int, _stage: String) -> void:
+	if i < 0 or i >= agents.size() or agents[i] == null:
+		# Not on this lot (a baby at home while the family is out): nothing to swap.
+		return
+	var ag = agents[i]
+	var was_baby: bool = ag.kind == "baby"
+	ag.cancel_all()
+	var old: Node3D = ag.actor
+	var p: Vector3 = old.global_position
+	var a := ensure_actor(i)
+	if a == null:
+		return
+	if a != old:
+		ag.rebind(a)
+	if was_baby and ag.kind != "baby":
+		# Out of the crib: on the floor in front of it.
+		a.global_position = _open_spot(p + Vector3(0, 0, 0.9))
+		a.set_pose("idle")
+	_sparkle(a.global_position + Vector3(0, 0.7, 0), Color(1.0, 0.85, 0.4))
+	Game.show_bubble(a, {"kind": "speech", "text": "I'm a %s now!" % LifeStages.stage_name(str(Game.household[i].life_stage)), "icon": "cake", "id": "say", "ttl": 3.0})
+
+
+## A short burst of glowing confetti (birthdays, arrivals, farewells).
+func _sparkle(at: Vector3, col: Color) -> void:
+	if location == null:
+		return
+	var p := CPUParticles3D.new()
+	p.name = "Sparkle"
+	p.one_shot = true
+	p.explosiveness = 0.85
+	p.amount = 28
+	p.lifetime = 1.6
+	p.direction = Vector3(0, 1, 0)
+	p.spread = 70.0
+	p.initial_velocity_min = 1.2
+	p.initial_velocity_max = 2.2
+	p.gravity = Vector3(0, -2.5, 0)
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.albedo_color = col
+	m.emission_enabled = true
+	m.emission = col
+	var bm := BoxMesh.new()
+	bm.size = Vector3(0.05, 0.05, 0.05)
+	bm.material = m
+	p.mesh = bm
+	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	location.add_child(p)
+	p.global_position = at
+	p.emitting = true
+	get_tree().create_timer(2.5).timeout.connect(p.queue_free)

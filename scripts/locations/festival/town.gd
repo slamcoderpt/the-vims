@@ -22,9 +22,13 @@ const GLASS := Color("3a5068")
 const GLASS_LIT := Color("ffc56a")
 
 const HALL_Z := -29.0
-const HALL_H := 6.6
+const HALL_H := 9.4  # r13: tall facade, clock at the roofline (ref2)
 
 var clock_center := Vector3.ZERO
+var node: Node3D   # the town root (festival.gd scales / sinks it)
+## Local height hidden under the plaza (festival.gd sinks the town root):
+## nothing below it is built.
+var cull_y := 0.0
 var window_glows: Array = []  # world positions of lit windows (for halos)
 
 var _walls := {}   # material key -> Array of [from: Vector3, size: Vector3]
@@ -33,6 +37,7 @@ var roof: VoxelBuilder
 
 
 func build(parent: Node3D) -> void:
+	node = parent
 	det = VoxelBuilder.new()
 	det.jitter = 0.0
 	roof = VoxelBuilder.new()
@@ -40,6 +45,7 @@ func build(parent: Node3D) -> void:
 	_town_hall()
 	_house_left()
 	_house_right()
+	_cull_below(cull_y)
 	_wall_meshes(parent)
 	K.inst(parent, det, VS, Vector3.ZERO, 0.0, true, Vector3.ZERO, "TownDetail")
 	K.inst(parent, roof, 1.0 / R, Vector3.ZERO, 0.0, true, Vector3.ZERO, "TownRoofs")
@@ -48,6 +54,35 @@ func build(parent: Node3D) -> void:
 
 
 # ------------------------------------------------------------------ walls
+
+func _cull_below(h: float) -> void:
+	if h <= 0.0:
+		return
+	for vb: VoxelBuilder in [det, roof]:
+		var cs := VS if vb == det else 1.0 / R
+		var lim := int(floor(h / cs))
+		for p: Vector3i in vb.vox.keys():
+			if p.y < lim:
+				vb.vox.erase(p)
+				vb.glow.erase(p)
+	for key: String in _walls:
+		var keep := []
+		for wl: Array in _walls[key]:
+			var f: Vector3 = wl[0]
+			var sz: Vector3 = wl[1]
+			if f.y + sz.y <= h:
+				continue
+			if f.y < h:
+				sz.y -= h - f.y
+				f.y = h
+			keep.append([f, sz])
+		_walls[key] = keep
+	var g := []
+	for w: Vector3 in window_glows:
+		if w.y > h:
+			g.append(w)
+	window_glows = g
+
 
 func _wall(key: String, from: Vector3, size: Vector3) -> void:
 	if not _walls.has(key):
@@ -254,16 +289,16 @@ func _town_hall() -> void:
 	_wall("brick", Vector3(-6.5, 0, z - 4.5), Vector3(13.0, h, 4.5))
 	# Stone plinth, floor band, cornice, quoins.
 	_band(-6.6, 6.6, 0.0, z - 0.1, 0.5, 0.375)
-	_band(-6.6, 6.6, 2.4, z - 0.1, 0.25, 0.375)
-	_band(-6.6, 6.6, 4.45, z - 0.1, 0.25, 0.375)
+	for by in [2.4, 4.55, 6.7]:
+		_band(-6.6, 6.6, by, z - 0.1, 0.25, 0.375)
 	_band(-6.7, 6.7, h - 0.375, z - 0.1, 0.375, 0.5)
 	for y in range(0, int(h * 2)):
 		var w := 0.625 if y % 2 == 0 else 0.375
 		_band(-6.6, -6.6 + w, y * 0.5, z - 0.1, 0.25, 0.375)
 		_band(6.6 - w, 6.6, y * 0.5, z - 0.1, 0.25, 0.375)
 	# Windows (two floors) either side of the tower.
-	for fl in 3:
-		var wy := 0.75 + fl * 2.05
+	for fl in 4:
+		var wy := 0.75 + fl * 2.15
 		for wx in [-5.5, -3.9, 2.9, 4.5]:
 			var lit := K.hs(int(wx * 4.0), fl, 21) < 0.35
 			_window(wx, wy, z, 8, 11, lit, fl != 1)
@@ -280,7 +315,7 @@ func _town_hall() -> void:
 				roof.set_v(Vector3i(rx + 6 - i, int((h + 1.5) * R) + i, zz), SLATE[1])
 	# --- Clock tower (front at z + 0.5).
 	var tz := z + 0.5
-	var th := 11.5
+	var th := 13.4
 	_wall("brick", Vector3(-1.75, 0, tz - 3.0), Vector3(3.5, th, 3.0))
 	for y in range(0, int(th * 2)):
 		var w := 0.5 if y % 2 == 0 else 0.375
@@ -346,8 +381,8 @@ func _clock(cx: int, cy: int, z: int) -> void:
 	# face at phone size). Long minute hand, short wide hour hand.
 	var am := TAU * 42.0 / 60.0
 	var ah := TAU * (4.0 + 42.0 / 60.0) / 12.0
-	_hand(cx, cy, z, am, 8.6, 1.0, Color("1e1c1a"))
-	_hand(cx, cy, z, ah, 5.6, 1.3, Color("1e1c1a"))
+	_hand(cx, cy, z, am, 8.6, 0.6, Color("2a2622"))
+	_hand(cx, cy, z, ah, 5.8, 0.9, Color("2a2622"))
 	det.set_v(Vector3i(cx, cy, z + 2), Color("d9b04a"))
 
 
@@ -367,15 +402,16 @@ func _hand(cx: int, cy: int, z: int, ang: float, length: float, width: float, co
 
 func _house_left() -> void:
 	# Brick townhouse, front gable, close to the left of the square.
-	var x0 := -14.5
-	var x1 := -5.5
-	var z := -19.0   # round 11: depth-compressed square (K.dz)
-	var h := 5.6
+	var x0 := -16.5
+	var x1 := -7.0
+	var z := -28.0   # r13: beside the hall (forced-perspective backdrop row)
+	var h := 8.4
 	_wall("brick2", Vector3(x0, 0, z - 5.0), Vector3(x1 - x0, h, 5.0))
 	_band(x0 - 0.1, x1 + 0.1, 0, z - 0.1, 0.375, 0.375)
 	_band(x0 - 0.1, x1 + 0.1, 2.75, z - 0.1, 0.25, 0.375)
+	_band(x0 - 0.1, x1 + 0.1, 5.35, z - 0.1, 0.25, 0.375)
 	var cols := [x0 + 0.9, x0 + 3.0, x0 + 5.2, x0 + 7.3]
-	for fl in 2:
+	for fl in 3:
 		for i in cols.size():
 			var lit := K.hs(i, fl, 4) < 0.45
 			if fl == 0 and i == 2:
@@ -399,14 +435,14 @@ func _house_left() -> void:
 
 
 func _house_right() -> void:
-	var x0 := 8.0
-	var x1 := 19.0
-	var z := -25.0   # behind the stage once festival.gd scales the town root
-	var h := 5.4
+	var x0 := 7.0
+	var x1 := 18.0
+	var z := -28.5   # r13: beside the hall, mostly behind the stage
+	var h := 8.0
 	_wall("grey", Vector3(x0, 0, z - 5.0), Vector3(x1 - x0, h, 5.0))
 	_band(x0 - 0.1, x1 + 0.1, 0, z - 0.1, 0.375, 0.375, GREYSTONE)
 	_band(x0 - 0.1, x1 + 0.1, h - 0.375, z - 0.1, 0.375, 0.5)
-	for fl in 2:
+	for fl in 3:
 		for i in 4:
 			_window(x0 + 1.0 + i * 2.6, 0.8 + fl * 2.4, z, 8, 12, K.hs(i, fl, 9) < 0.4)
 	_roof_x(x0 - 0.5, x1 + 0.5, z - 5.5, z + 0.5, h, ROOF_BROWN)

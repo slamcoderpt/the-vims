@@ -9,7 +9,7 @@ const M := 8    # cells per metre at 0.125
 const F := 16   # cells per metre at 0.0625
 const T := 4    # cells per metre at 0.25
 ## Height of the neighbours' lots behind the yard (they sit lower than ours).
-const LOT_Y := -3.2
+const LOT_Y := -2.6
 
 const Party := preload("res://scripts/locations/backyard/party.gd")
 
@@ -42,7 +42,7 @@ const MOUNDS := [
 	[-5.6, 3.7, 1.3, 0.6, 1.1],
 	[-0.9, 3.75, 1.5, 0.55, 1.2],    # between the table and the front fence
 	[1.3, 3.55, 0.75, 0.45, 1.1],
-	[6.9, 3.45, 1.5, 0.7, 1.2],      # right of the fire pit
+	[7.4, 3.65, 1.4, 0.65, 1.2],     # right of the fire pit
 	[8.6, 2.0, 0.9, 1.0, 1.1],
 	[-4.4, 2.35, 1.1, 0.6, 1.2],     # left of the table, in front of the patio
 	[-3.1, 3.75, 0.9, 0.4, 1.1],
@@ -670,8 +670,10 @@ func _house(vb: VoxelBuilder, hd: Array, wall: Color, roof: Color) -> void:
 		var n := maxi(1, (w - 2) / 10)
 		for i in n:
 			var wx := x0 + 3 + i * 10
-			var lit := V.hs(wx, wy, z0) < 0.8
-			var gc := Color("ffc76e") if lit else Color("4a4868")
+			# Dusk: (almost) every room is lit, in a few warm tones.
+			var hv := V.hs(wx, wy, z0)
+			var lit := hv < 0.93
+			var gc := (Color("ffc76e") if hv < 0.45 else (Color("ffb45a") if hv < 0.75 else Color("ffd98e"))) if lit else Color("4a4868")
 			# White-trimmed two-pane window (~1.5 x 1.25 m) with a sill.
 			V.b(vb, wx - 1, wy - 1, z0 + d, 8, 7, 1, trim)
 			V.b(vb, wx, wy, z0 + d, 6, 5, 1, gc, lit)

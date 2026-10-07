@@ -35,13 +35,13 @@ func keep_eyes_open(actor: Node3D) -> void:
 ## "look" (head only: lift/turn toward the camera, arms keep their pose).
 ## look: max head yaw (radians) toward the camera, so diners glance at the
 ## player in 3/4 while their body stays square to the table.
-func add(actor: Node3D, mode: String, left := false, item := "", lift := 0.0, look := 0.0) -> void:
+func add(actor: Node3D, mode: String, left := false, item := "", lift := 0.0, look := 0.0, rest := false) -> void:
 	if actor == null:
 		return
 	if item == "":
 		item = {"toast": "glass", "drink": "glass", "burger": "burger", "mug": "mug", "cheer": "glass"}.get(mode, "glass")
 	_items.append({"a": actor, "mode": mode, "left": left, "item": item, "mi": null,
-		"ph": randf_range(0.0, TAU), "lift": lift, "look": look})
+		"ph": randf_range(0.0, TAU), "lift": lift, "look": look, "rest": rest})
 
 
 func _process(delta: float) -> void:
@@ -95,6 +95,13 @@ func _process(delta: float) -> void:
 			if arm2 >= 0:
 				skel.set_bone_pose_rotation(arm2, Quaternion.from_euler(Vector3(-1.0, -0.2 * m, 0.2 * m)))
 				skel.set_bone_pose_rotation(fore2, Quaternion.from_euler(Vector3(-1.1, 0.0, 0.0)))
+		if bool(it.get("rest", false)) and String(it.mode) != "cheer":
+			# Free forearm laid forward on the table top, hand near the plate.
+			var arm2: int = a.get("b_arm_r") if left else a.get("b_arm_l")
+			var fore2: int = a.get("b_fore_r") if left else a.get("b_fore_l")
+			if arm2 >= 0 and fore2 >= 0:
+				skel.set_bone_pose_rotation(arm2, Quaternion.from_euler(Vector3(-0.55, 0.25 * m, 0.12 * m)))
+				skel.set_bone_pose_rotation(fore2, Quaternion.from_euler(Vector3(-1.05, 0.0, 0.0)))
 		# Diners lift their chins a touch so faces read from the high camera.
 		var hb: int = a.get("b_head")
 		var yaw := 0.0

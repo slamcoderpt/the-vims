@@ -167,6 +167,9 @@ func _shell(vb: VoxelBuilder) -> void:
 		var dz := WALL_Z - 1 - k - zb
 		if dz > 0:
 			V.b(vb, UX0, eave_y + k, zb, 2, 1, dz, _siding)
+	# Lit bedroom window on the upper block's side wall (faces the yard's
+	# left, so it shows over the porch roof in the bbq view, ref4 top right).
+	_side_window(vb, -74, 32, 12, 10)
 
 
 func _window(vb: VoxelBuilder, x: int, y: int, w: int, h: int) -> void:
@@ -185,6 +188,22 @@ func _window(vb: VoxelBuilder, x: int, y: int, w: int, h: int) -> void:
 	# Shutters.
 	V.b(vb, x - 4, y, WALL_Z, 3, h, 1, Color("6f7fa3"))
 	V.b(vb, x + w + 1, y, WALL_Z, 3, h, 1, Color("6f7fa3"))
+
+
+func _side_window(vb: VoxelBuilder, z: int, y: int, w: int, h: int) -> void:
+	# Same window as _window() but on the -x face of the upper block (x = UX0).
+	vb.clear_box(Vector3i(UX0, y, z), Vector3i(2, h, w))
+	V.b(vb, UX0 + 1, y, z, 1, h, w, func(q: Vector3i) -> Color:
+		var t := float(q.y - y) / float(h)
+		return V.shade(GLASS_LIT, 0.82 + t * 0.22 + V.h1(q, 8) * 0.05), true)
+	V.b(vb, UX0, y, z + w / 2, 1, h, 1, TRIM)
+	V.b(vb, UX0, y + h / 2, z, 1, 1, w, TRIM)
+	V.b(vb, UX0 - 1, y - 1, z - 1, 2, 1, w + 2, TRIM)
+	V.b(vb, UX0 - 1, y + h, z - 1, 2, 1, w + 2, TRIM)
+	V.b(vb, UX0 - 1, y, z - 1, 1, h, 1, TRIM)
+	V.b(vb, UX0 - 1, y, z + w, 1, h, 1, TRIM)
+	V.b(vb, UX0 - 1, y, z - 4, 1, h, 3, Color("6f7fa3"))
+	V.b(vb, UX0 - 1, y, z + w + 1, 1, h, 3, Color("6f7fa3"))
 
 
 func _deck(vb: VoxelBuilder) -> void:

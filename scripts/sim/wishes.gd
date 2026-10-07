@@ -7,6 +7,7 @@ extends RefCounted
 ## Pure rules: SimWorld calls roll() / on_action() / on_skill() / on_rel().
 
 const SimActions := preload("res://scripts/sim/sim_actions.gd")
+const LifeStages := preload("res://scripts/sim/life_stages.gd")
 
 const SLOTS := 3
 ## Unpromised wishes are replaced after this many in-game minutes.
@@ -122,6 +123,26 @@ static func _candidate(world, ag, have: Array) -> Dictionary:
 			"icon": "trophy", "kind": "promo", "arg": "", "n": int(c.level) + 1, "reward": 600 + int(c.level) * 100}])
 	elif ag.kind == "child" and Careers.is_school(c) and not Careers.grade(float(c.get("perf", 50.0))) in ["A", "A+"]:
 		opts.append([1.5, {"id": "grade_a", "label": "Get an A at School", "icon": "book", "kind": "grade", "arg": "", "n": 1, "reward": 500}])
+	# --- love and family (Sims 3 romance / family wishes)
+	if ag.kind == "adult":
+		var partner := Game.partner_of(me)
+		if partner == "":
+			for r in Game.rel_list(ag.index):
+				if float(r.get("romance", 0.0)) >= Game.ROMANCE_CRUSH and str(r.get("status", "")) == "":
+					opts.append([2.5, {"id": "do_s_steady", "label": "Go Steady with %s" % r.name, "icon": "heart", "kind": "do", "arg": "s_steady", "n": 1, "reward": 700}])
+					break
+		else:
+			var st := Game.rel_status(me, partner)
+			if st == "Dating":
+				opts.append([2.5, {"id": "do_s_propose", "label": "Propose to %s" % partner, "icon": "heart", "kind": "do", "arg": "s_propose", "n": 1, "reward": 900}])
+			elif st == "Engaged":
+				opts.append([2.0, {"id": "do_s_wed", "label": "Marry %s" % partner, "icon": "heart", "kind": "do", "arg": "s_wed", "n": 1, "reward": 1000}])
+			if not Game.is_family(partner):
+				opts.append([2.0, {"id": "do_s_move_in", "label": "Move In with %s" % partner, "icon": "home", "kind": "do", "arg": "s_move_in", "n": 1, "reward": 800}])
+			elif Game.baby_carrier(me, partner) != "" and st in ["Engaged", "Married"]:
+				opts.append([1.8, {"id": "do_s_try_baby", "label": "Have a Baby", "icon": "teddy", "kind": "do", "arg": "s_try_baby", "n": 1, "reward": 1200}])
+	if human and Game.days_to_birthday(ag.index) <= 1 and LifeStages.next_stage(str(m.get("life_stage", "")), ag.kind) != "":
+		opts.append([2.5, {"id": "do_blow_candles", "label": "Have a Birthday Party", "icon": "cake", "kind": "do", "arg": "blow_candles", "n": 1, "reward": 600}])
 	# --- money (grown-ups)
 	if ag.kind == "adult":
 		var amt: int = [150, 250, 400][randi() % 3]

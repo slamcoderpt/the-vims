@@ -154,11 +154,13 @@ static func _ceiling(root: Node3D, halo_pts: Array) -> void:
 	var lamps := VoxelBuilder.new()
 	lamps.jitter = 0.0
 	var pools := []
-	var rows := [[-2.3, 3.4, [-4.4, -0.3, 4.75, 6.6], true], [-5.2, 3.6, [-5.0, 1.0, 6.4], true],
+	var rows := [[-2.3, 3.4, [-4.4, -0.85, 0.95, 4.75, 6.6], true], [-5.2, 3.6, [-5.0, 1.0, 6.4], true],
 		[-7.9, 3.8, [0.6, 5.6], false]]
 	for r: Array in rows:
 		for x: float in r[2]:
 			var p := Vector3(x, r[1], r[0])
+			if is_equal_approx(x, 0.95):
+				p.y = 2.95   # hangs low so it clears the Dairy / Snacks signs
 			var cord := int((H - 0.25 - p.y) / U) - 7
 			Fx.pendant(lamps, Vector3i(int(round(p.x / U)), int(round(p.y / U)), int(round(p.z / U))), cord)
 			# warm bloom around the bulb: a wide soft amber glow + a hot core
@@ -166,16 +168,19 @@ static func _ceiling(root: Node3D, halo_pts: Array) -> void:
 			halo_pts.append([p + Vector3(0.03, 0.0, 0.03), 0.7, Color(1.0, 0.92, 0.72, 1.0)])
 			if r[3] == true:
 				# warm cone straight down: a pool on the tiles / crates below
-				Kit.spot(root, p + Vector3(0, -0.05, 0), Color(1.0, 0.84, 0.62), 2.4, 5.5, 34.0)
+				Kit.spot(root, p + Vector3(0, -0.05, 0), Color(1.0, 0.8, 0.55), 3.4, 5.5, 36.0)
 			elif r[3] == false:
 				Kit.light(root, p + Vector3(0, -0.4, 0), Color(1.0, 0.86, 0.66), 1.1, 4.0)
-			pools.append([Vector3(x, 0.012, r[0]), Vector2(2.4, 2.4), Color(1.0, 0.7, 0.4, 0.26 if r[3] == true else 0.2)])
+			pools.append([Vector3(x, 0.012, r[0] + 0.25), Vector2(3.4, 3.4), Color(1.0, 0.68, 0.36, 0.62 if r[3] == true else 0.4)])
 	Kit.add(root, lamps, U, "Pendants", false, Kit.glow_mat("warm"), Vector3.ZERO, Vector3.ZERO, true, false)
 	# Cool spill from the fridge bank + its reflection streak on the tiles.
 	for fx: float in [-4.6, -1.4, 1.8, 5.0]:
-		Kit.light(root, Vector3(fx, 1.4, -7.45), Color(0.8, 0.9, 1.0), 1.8, 5.0)
+		Kit.light(root, Vector3(fx, 1.4, -7.45), Color(0.78, 0.88, 1.0), 1.15, 5.0)
 	pools.append([Vector3(-1.0, 0.014, -7.6), Vector2(11.0, 2.6), Color(0.6, 0.8, 1.0, 0.6)])
 	pools.append([Vector3(5.2, 0.014, -7.6), Vector2(4.6, 2.2), Color(0.6, 0.8, 1.0, 0.5)])
+	# Spill pools in the front walkway (from the pendants above the camera).
+	for wp: Vector3 in [Vector3(-1.0, 0.012, 0.9), Vector3(1.3, 0.012, 0.6), Vector3(0.2, 0.012, 2.4)]:
+		pools.append([wp, Vector2(3.0, 3.0), Color(1.0, 0.7, 0.4, 0.38)])
 	root.add_child(Kit.pools(pools))
 
 
@@ -239,7 +244,7 @@ static func _signs(root: Node3D) -> void:
 	# Hanging aisle signs in a row across the store (like ref5): Dairy in
 	# front of the milk fridges, Snacks over the cereal end caps, Beverages
 	# over the drinks aisle, Bakery angled over the bread shelves.
-	var aisles := [["Dairy", Vector3(-0.4, 2.42, -6.4), 0.0, 1.5], ["Snacks", Vector3(1.3, 2.5, -4.3), -4.0, 1.55],
+	var aisles := [["Dairy", Vector3(-0.75, 2.42, -6.4), 0.0, 1.5], ["Snacks", Vector3(1.95, 2.5, -4.3), -4.0, 1.55],
 		["Beverages", Vector3(3.72, 2.32, -5.8), -6.0, 1.6], ["Bakery", Vector3(6.35, 2.25, -1.0), -18.0, 1.2]]
 	for a in aisles:
 		var bh := 0.5 if a[3] < 2.0 else 0.56

@@ -737,11 +737,12 @@ func _dog_pose() -> void:
 			var ly := _dog_lie(true)
 			var chew := sin(t * 7.0)
 			var perk := smoothstep(0.6, 1.0, sin(t * 0.7 + _phase))
-			_sb(b_head, -0.12 + 0.05 * maxf(0.0, chew) - 0.08 * perk, ly * (0.6 + 0.25 * perk), 0.12 + 0.05 * sin(t * 1.3))
+			_sb(b_head, -0.36 + 0.04 * maxf(0.0, chew) - 0.06 * perk, ly * (0.6 + 0.25 * perk), 0.12 + 0.05 * sin(t * 1.3))
 			# Curled tail held up over the back, wagging side to side.
 			_sb(b_tail, -0.42, 0.0, 0.45 * sin(t * 13.0))
-			_sb(b_ear_l, 0.05 * chew, 0.0, 0.06)
-			_sb(b_ear_r, 0.05 * chew, 0.0, -0.06)
+			# Ears swing a little off the cheeks so both eyes stay clear.
+			_sb(b_ear_l, 0.05 * chew, 0.0, 0.16)
+			_sb(b_ear_r, 0.05 * chew, 0.0, -0.16)
 		"bow":
 			var hop := absf(sin(t * 5.0))
 			_sb(b_body, 0.32)
@@ -866,7 +867,7 @@ func _make_prop(pname: String, bone: String) -> MeshInstance3D:
 		elif bone == "body":
 			# On the floor between the outstretched front paws.
 			mi.position = _meta.paws
-			mi.rotation = Vector3(0.0, 0.35, 0.0)
+			mi.rotation = Vector3(0.0, 0.12, 0.0)
 		else:
 			mi.position = _meta.mouth
 		att.add_child(mi)

@@ -11,6 +11,8 @@ const EXTRAS := {
 	],
 	"Dog Bed": [],
 	"Fridge": [
+		{"id": "bake_cake", "label": "Bake Birthday Cake", "icon": "cake", "minutes": 30.0, "pose": "idle", "anim": "cook",
+		 "money": -25, "needs": {"fun": 0.05}, "skill": "Cooking", "who": ["adult"]},
 		{"id": "dog_beg", "label": "Beg for Treats", "icon": "bone", "minutes": 5.0, "pose": "sit",
 		 "needs": {"hunger": 0.15, "fun": 0.05}, "who": ["dog"]},
 	],
@@ -33,6 +35,10 @@ const EXTRAS := {
 	"Fire Pit": [
 		{"id": "dog_nap_pit", "label": "Nap by the Fire", "icon": "zzz", "minutes": 30.0, "pose": "sleep",
 		 "needs": {"fun": 0.05}, "who": ["dog"]},
+	],
+	"Stove": [
+		{"id": "bake_cake", "label": "Bake Birthday Cake", "icon": "cake", "minutes": 30.0, "pose": "idle", "anim": "cook",
+		 "money": -25, "needs": {"fun": 0.05}, "skill": "Cooking", "who": ["adult"]},
 	],
 	"Grill": [
 		{"id": "dog_beg_grill", "label": "Beg for Scraps", "icon": "bone", "minutes": 8.0, "pose": "sit",
@@ -82,6 +88,8 @@ const DOG_POSES := ["idle", "walk", "sit", "lie", "sleep", "play", "talk"]
 
 
 static func allowed(a: Dictionary, kind: String) -> bool:
+	if kind == "baby":
+		return a.get("who", []) is Array and "baby" in a.get("who", [])
 	var who = a.get("who", null)
 	if who is Array and not (who as Array).is_empty():
 		return kind in who
@@ -157,7 +165,25 @@ const SOCIALS := [
 	{"id": "s_kiss", "label": "Kiss", "icon": "heart", "minutes": 5.0, "pose": "talk", "min": 1, "romantic": true, "rom_min": 35.0,
 	 "rel": 5.0, "rom": 14.0, "needs": {"social": 0.2, "fun": 0.15}, "social": {"social": 0.2, "fun": 0.1}, "kinds": ["adult"], "tkinds": ["adult"]},
 	{"id": "s_steady", "label": "Ask to Go Steady", "icon": "heart", "minutes": 6.0, "pose": "talk", "min": 1, "romantic": true, "rom_min": 60.0,
+	 "req_status": [""], "anim": "hug",
 	 "rel": 8.0, "rom": 10.0, "status": "Dating", "needs": {"social": 0.2}, "social": {"social": 0.2}, "kinds": ["adult"], "tkinds": ["adult"]},
+	# Sims 3 romance ladder past going steady: propose (accepted when the
+	# romance meter is high: accept_rom), a private wedding, moving in
+	# (townies only), trying for a baby (household partners only).
+	{"id": "s_propose", "label": "Propose Engagement", "icon": "heart", "minutes": 8.0, "pose": "talk", "min": 1, "romantic": true, "rom_min": 75.0,
+	 "req_status": ["Dating"], "accept_rom": 80.0, "anim": "propose",
+	 "rel": 10.0, "rom": 8.0, "status": "Engaged", "needs": {"social": 0.25, "fun": 0.1}, "social": {"social": 0.2}, "kinds": ["adult"], "tkinds": ["adult"],
+	 "moodlet": ["engaged", "Just Engaged!", "heart", 30.0, 24.0]},
+	{"id": "s_wed", "label": "Have Private Wedding", "icon": "heart", "minutes": 20.0, "pose": "talk", "min": 1, "romantic": true, "rom_min": 80.0,
+	 "req_status": ["Engaged"], "anim": "kiss",
+	 "rel": 10.0, "rom": 8.0, "status": "Married", "needs": {"social": 0.3, "fun": 0.2}, "social": {"social": 0.3, "fun": 0.2}, "kinds": ["adult"], "tkinds": ["adult"],
+	 "moodlet": ["newlywed", "Newlywed", "heart", 35.0, 48.0]},
+	{"id": "s_move_in", "label": "Ask to Move In", "icon": "home", "minutes": 8.0, "pose": "talk", "min": 1, "romantic": true, "rom_min": 50.0,
+	 "req_status": ["Dating", "Engaged", "Married"], "townie_only": true, "anim": "hug",
+	 "rel": 6.0, "rom": 4.0, "needs": {"social": 0.2}, "social": {"social": 0.2}, "kinds": ["adult"], "tkinds": ["adult"]},
+	{"id": "s_try_baby", "label": "Try for Baby", "icon": "heart", "minutes": 30.0, "pose": "talk", "min": 1, "romantic": true, "rom_min": 60.0,
+	 "req_status": ["Dating", "Engaged", "Married"], "household_only": true, "baby": true, "anim": "kiss",
+	 "rel": 6.0, "rom": 10.0, "needs": {"social": 0.35, "fun": 0.35, "energy": -0.1}, "social": {"social": 0.35, "fun": 0.35}, "kinds": ["adult"], "tkinds": ["adult"]},
 	{"id": "s_makeup", "label": "Apologize", "icon": "heart", "minutes": 8.0, "pose": "talk", "max": -1,
 	 "rel": 16.0, "needs": {"social": 0.1}, "social": {"social": 0.05}, "kinds": ["adult", "child"], "tkinds": ["adult", "child"]},
 	{"id": "s_tease", "label": "Tease", "icon": "laugh", "minutes": 4.0, "pose": "talk", "min": -2, "mean": true,
@@ -192,6 +218,14 @@ static func socials_by_rel(actor_kind: String, target_kind: String, target_name:
 			if not (rom is Dictionary) or not met or tier < int(d.get("min", 0)):
 				continue
 			if d.has("status") and str(rom.get("status", "")) == str(d.status):
+				continue
+			if d.has("req_status") and not str(rom.get("status", "")) in d.req_status:
+				continue
+			if d.get("townie_only", false) and rom.get("family", false):
+				continue
+			if d.get("household_only", false) and not rom.get("family", false):
+				continue
+			if d.get("baby", false) and not rom.get("can_baby", false):
 				continue
 			if float(rom.get("romance", 0.0)) < float(d.get("rom_min", 0.0)):
 				if with_locked and rom_locked.is_empty():
@@ -238,7 +272,33 @@ static func socials_by_rel(actor_kind: String, target_kind: String, target_name:
 static func socials_for(ag, other, with_locked := false) -> Array:
 	var a_name: String = ag.display_name()
 	var b_name: String = other.display_name()
-	return socials_by_rel(ag.kind, other.kind, b_name, Game.has_met(a_name, b_name), Game.rel(a_name, b_name), with_locked)
+	var rom = null
+	if Game.can_romance(a_name, b_name):
+		rom = rom_info(a_name, b_name, true)
+	var out := socials_by_rel(ag.kind, other.kind, b_name, Game.has_met(a_name, b_name), Game.rel(a_name, b_name), with_locked, rom)
+	if other.kind == "baby" and ag.kind != "dog":
+		out.append_array(BABY_SOCIALS.filter(func(d): return ag.kind in d.kinds).map(func(d): return _named(d, b_name)))
+	return out
+
+
+## Romance context for socials_by_rel (null when these two can't romance).
+static func rom_info(a_name: String, b_name: String, family: bool) -> Dictionary:
+	return {"romance": Game.romance(a_name, b_name), "status": Game.rel_status(a_name, b_name), "family": family,
+		"can_baby": family and Game.baby_carrier(a_name, b_name) != ""}
+
+
+static func _named(d: Dictionary, n: String) -> Dictionary:
+	var a := d.duplicate(true)
+	if "%s" in str(a.label):
+		a.label = str(a.label) % n
+	return a
+
+
+## Socials with a baby (in the crib): the crib's own actions do the care.
+const BABY_SOCIALS := [
+	{"id": "b_coo", "label": "Coo at %s", "icon": "heart", "minutes": 6.0, "pose": "talk", "anim": "rock_baby",
+	 "rel": 6.0, "needs": {"fun": 0.08, "social": 0.08}, "social": {"social": 0.3, "fun": 0.2}, "kinds": ["adult", "child"]},
+]
 
 
 ## Legacy helper (pre-relationship): socials as between acquaintances.
@@ -279,6 +339,11 @@ static func score(a: Dictionary, member: Dictionary, dist: float) -> float:
 		s += 0.04
 	if a.has("task") and Game.has_open_task(a.task):
 		s += 0.06
+	if a.has("baby_fx"):
+		# Caring for the baby: as urgent as the baby's lowest matching need.
+		s += baby_urgency(a.baby_fx) * 1.6
+		if a.has("money"):
+			s += 0.3
 	s -= dist * 0.012
 	return s
 
@@ -293,3 +358,25 @@ static func need_icon(need: String, kind := "adult") -> String:
 		"social": return "need_social"
 		"bladder": return "need_bladder"
 	return "star"
+
+
+## How badly the household's babies need what `fx` ({need: gain}) gives.
+static func baby_urgency(fx: Dictionary) -> float:
+	var best := 0.0
+	for m in Game.household:
+		if m.get("kind", "") != "baby":
+			continue
+		for k in fx:
+			var v: float = float(m.needs.get(k, 1.0))
+			best = maxf(best, pow(1.0 - v, 2.0) * minf(1.0, float(fx[k])))
+	return best
+
+
+## Apply a crib action's effect to every baby in the household.
+static func apply_baby_fx(fx: Dictionary) -> void:
+	for i in Game.household.size():
+		if Game.household[i].get("kind", "") != "baby":
+			continue
+		for k in fx:
+			Game.change_need(i, k, float(fx[k]))
+		Game.needs_changed.emit(i)

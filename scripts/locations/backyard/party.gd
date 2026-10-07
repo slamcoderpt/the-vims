@@ -71,11 +71,11 @@ const SEATS := {
 }
 ## Seats with a thick booster cushion so seated kids sit up above the table
 ## edge (their faces would otherwise drop behind the food). Seat top in m.
-const BOOSTED := {"far_1": Color("e88fb4"), "far_4": Color("a98fd8")}
+const BOOSTED := {"far_1": Color("e88fb4"), "far_4": Color("a98fd8"), "near_r": Color("8fc0e8")}
 ## Candle jars on the cloth (table-local cells), also used for the glow halos.
 const CANDLES := [Vector2i(-24, -2), Vector2i(4, -3), Vector2i(26, 1)]
 const SEAT_Y := 0.4375
-const BOOST_Y := 0.625
+const BOOST_Y := 0.5625
 
 
 static func seat_height(key: String) -> float:
@@ -101,8 +101,8 @@ func build(parent: Node3D) -> void:
 	yard.jitter = 0.05
 	_prep_table(yard, -19, -32)
 	_fire_pit(yard, int(PIT_POS.x * F), int(PIT_POS.z * F))
-	_sofa(yard, 78, 28)
-	_side_table(yard, 74, 58)
+	_sofa()
+	_side_table(yard, 66, 8)
 	for lp in LANTERNS:
 		_lantern(yard, lp.x, lp.y, lp.z, 1.0)
 		halos.add(Vector3((lp.x + 3.5) / F, (lp.y + 5.5) / F, (lp.z + 3.5) / F), 1.5, Color(1.0, 0.6, 0.24, 1.0))
@@ -117,7 +117,7 @@ func build(parent: Node3D) -> void:
 	var lmi := V.inst(lights, root, V.SIZE_FINE, Vector3.ZERO, 0.0, Vector3.ZERO, false, true, "StringLights")
 	lmi.set_surface_override_material(lmi.mesh.get_surface_count() - 1, V.glow_bulb())
 	# Light sources.
-	pit_light = V.omni(root, PIT_POS + Vector3(0, 0.75, 0), Color(1.0, 0.55, 0.22), 2.6, 5.5)
+	pit_light = V.omni(root, PIT_POS + Vector3(0, 0.6, 0), Color(1.0, 0.6, 0.3), 1.6, 4.5)
 	# Glow sprites: fire pit, grill coals, table candles, house lamps + doors.
 	halos.add(PIT_POS + Vector3(0, 0.6, 0), 1.9, Color(1.0, 0.45, 0.12, 0.85))
 	var tb := Transform3D(Basis(Vector3.UP, TABLE_ROT), TABLE_POS)
@@ -160,7 +160,7 @@ func grill_front() -> Vector3:
 
 func process(t: float) -> void:
 	if pit_light:
-		pit_light.light_energy = 2.4 + sin(t * 11.0) * 0.25 + sin(t * 23.7) * 0.15
+		pit_light.light_energy = 1.5 + sin(t * 11.0) * 0.25 + sin(t * 23.7) * 0.15
 	if coal_light:
 		coal_light.light_energy = 0.45 + sin(t * 9.0) * 0.06
 	_place_puffs(t)
@@ -306,9 +306,9 @@ func _bread(vb: VoxelBuilder, x: int, y: int, z: int) -> void:
 
 
 func _glass(vb: VoxelBuilder, x: int, y: int, z: int) -> void:
-	# Tall glass of iced tea (~19 cm): amber body, lighter rim.
+	# Tall glass of cold amber drink (~19 cm) with a white foam head.
 	V.b(vb, x, y, z, 2, 2, 2, Color("e8962e"))
-	V.b(vb, x, y + 2, z, 2, 1, 2, Color("f6c76a"))
+	V.b(vb, x, y + 2, z, 2, 1, 2, Color("fbf1dc"))
 
 
 func _plate(vb: VoxelBuilder, x: int, y: int, z: int, food: int) -> void:
@@ -353,10 +353,10 @@ func _chair(vb: VoxelBuilder, cx: int, cz: int, key: String) -> void:
 		V.b(vb, x0 + i, 6, z0, 1, 1, 8, seat if i % 3 != 2 else V.shade(WOOD_D, 1.05))
 	if BOOSTED.has(key):
 		var cc: Color = BOOSTED[key]
-		V.b(vb, x0 + 1, 7, z0 + 1, 6, 3, 6, func(q: Vector3i) -> Color:
-			return V.shade(cc, 0.92 + V.h1(q, 4) * 0.12) if q.y < 9 else V.shade(cc, 1.08))
+		V.b(vb, x0 + 1, 7, z0 + 1, 6, 2, 6, func(q: Vector3i) -> Color:
+			return V.shade(cc, 0.92 + V.h1(q, 4) * 0.12) if q.y < 8 else V.shade(cc, 1.08))
 	var back_axis_x := key.begins_with("end")
-	var top := 17
+	var top := 15
 	if back_axis_x:
 		var bx := x0 if key == "end_l" else x0 + 7
 		V.b(vb, bx, 7, z0, 1, top - 7, 1, dark); V.b(vb, bx, 7, z0 + 7, 1, top - 7, 1, dark)
@@ -611,29 +611,48 @@ func _fire_pit(vb: VoxelBuilder, cx: int, cz: int) -> void:
 		vb.set_v(Vector3i(cx - 2 + i * 2, 15 + (i * 7) % 4, cz + (i * 5) % 5 - 2), Color("ffb04a"), true)
 
 
-func _sofa(vb: VoxelBuilder, x: int, z: int) -> void:
-	# Outdoor lounge: long section along Z facing -X, plus return along X at the front.
+## Outdoor lounge sofa on the far side of the fire pit, angled so it faces
+## the pit and the camera-left in 3/4 (ref4): its two sitters spread across
+## the picture instead of stacking in depth.
+const SOFA_POS := Vector3(5.65, 0.0, 1.25)
+const SOFA_ROT := 0.7
+## Seat spots in sofa-local metres (front = -x); hip height 0.5 m.
+const SOFA_SEATS := [Vector3(-0.12, 0.0, -0.56), Vector3(-0.12, 0.0, 0.5)]
+
+
+static func sofa_seat(i: int) -> Transform3D:
+	var bs := Basis(Vector3.UP, SOFA_ROT)
+	# Sitters face the sofa's front (-x local), i.e. yaw = rot - PI/2.
+	return Transform3D(Basis(Vector3.UP, SOFA_ROT - PI * 0.5), SOFA_POS + bs * SOFA_SEATS[i])
+
+
+func _sofa() -> void:
+	# Local cells: front edge at x = -7, back at +7, long axis along z.
+	var vb := VoxelBuilder.new()
+	vb.jitter = 0.05
 	var base := Color("8f8a84")
 	var cush := Color("dcd6cc")
+	var x := -7
+	var z := 0
 	var len := 44
-	V.b(vb, x, 0, z - len / 2, 14, 5, len, base)
+	V.b(vb, x, 0, z - len / 2, 14, 5, len, func(q: Vector3i) -> Color:
+		return V.shade(base, 0.92 + V.h1(q, 2) * 0.12))
 	V.b(vb, x + 2, 5, z - len / 2 + 2, 12, 3, len - 4, cush)
 	V.b(vb, x + 9, 5, z - len / 2, 5, 13, len, base)
 	V.b(vb, x + 7, 8, z - len / 2 + 2, 3, 9, len - 4, cush)
 	V.b(vb, x, 5, z - len / 2, 14, 5, 2, base)
 	V.b(vb, x, 5, z + len / 2 - 2, 14, 5, 2, base)
-	# Seam lines between cushions.
+	# Seam lines between the three seat cushions.
 	for k in [1, 2]:
 		V.b(vb, x + 2, 7, z - len / 2 + 2 + k * 13, 8, 1, 1, V.shade(cush, 0.8))
-	# Throw pillows.
-	# Throw pillows at the ends and between the two sitters (who sit at
-	# world z ~1.3 and ~2.3 on this section).
-	V.b(vb, x + 5, 8, z - 21, 2, 6, 6, Color("6f86a8"))
-	V.b(vb, x + 5, 8, z, 2, 6, 5, Color("e2b456"))
-	V.b(vb, x + 5, 8, z + 16, 2, 6, 5, Color("e78a6f"))
+	# Throw pillows at both ends and a small one between the two sitters.
+	V.b(vb, x + 5, 8, z - 20, 2, 6, 6, Color("6f86a8"))
+	V.b(vb, x + 5, 8, z - 3, 2, 5, 5, Color("e2b456"))
+	V.b(vb, x + 5, 8, z + 14, 2, 6, 6, Color("e78a6f"))
 	# Plaid blanket folded over the back rail at the far end.
-	V.b(vb, x + 8, 18, z - 21, 6, 1, 7, func(q: Vector3i) -> Color:
+	V.b(vb, x + 8, 18, z - 20, 6, 1, 7, func(q: Vector3i) -> Color:
 		return Color("c8443c") if (q.x + q.z) % 4 < 2 else Color("f3e3c3"))
+	V.inst(vb, root, V.SIZE_FINE, SOFA_POS, SOFA_ROT, Vector3.ZERO, true, true, "Sofa")
 
 
 func _side_table(vb: VoxelBuilder, x: int, z: int) -> void:

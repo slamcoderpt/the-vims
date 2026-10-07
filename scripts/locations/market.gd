@@ -55,7 +55,7 @@ func lighting_profile() -> Dictionary:
 	# on the cream tiles and crates; the fridge cases glow cool blue-white.
 	return {
 		"sun_heading": 200.0, "sun_elev": 64.0, "sun_energy": 0.32,
-		"ambient_day": Color(1.0, 0.93, 0.84), "ambient_energy": 0.6,
+		"ambient_day": Color(1.0, 0.92, 0.82), "ambient_energy": 0.48,
 		"ambient_night": Color(0.85, 0.74, 0.62), "ambient_night_energy": 0.4,
 		"lamp_night_mult": 1.2,
 		"sky_day": Color(0.8, 0.84, 0.9), "sky_night": Color(0.2, 0.18, 0.2),
@@ -188,8 +188,8 @@ func _stage() -> void:
 	var cashier := _place("cashier", Vector3(4.4, 0, 0.9), Vector3(1.0, 0, 9.0), "idle")
 	# Background shoppers browse down the aisles, in the screen gaps between
 	# the family (never directly behind a head).
-	_place("npc_2", Vector3(-1.9, 0, -1.7), Vector3(-4.2, 0, -1.2), "idle")
-	_place("npc_1", Vector3(-0.5, 0, -4.7), Vector3(0.9, 0, -2.6), "idle")
+	_place("npc_2", Vector3(0.12, 0, -1.75), Vector3(-1.6, 0, 1.2), "idle")
+	_place("npc_1", Vector3(-0.2, 0, -4.4), Vector3(-1.2, 0, -4.2), "idle")
 	_place("npc_7", Vector3(1.5, 0, -5.0), Vector3(2.4, 0, -5.0), "stand_read")
 	_hold(actors["npc_1"], "basket")
 	_place("npc_5", Vector3(-2.6, 0, -7.2), Vector3(-2.4, 0, -8.6), "idle")

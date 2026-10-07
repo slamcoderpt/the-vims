@@ -572,7 +572,16 @@ func _draw_panel() -> void:
 		panel.draw_line(Vector2(14, y + 6), Vector2(PANEL_W - 14, y + 6), Color("e3e7ee"), 1.0)
 		_draw_mood_face(panel, Vector2(28, y + 28), 11.0, Game.MOOD_COLORS[band], band)
 		panel.draw_string(f, Vector2(48, y + 33), "%s  %+d" % [Game.mood_word(sel), roundi(Game.mood(sel))], HORIZONTAL_ALIGNMENT_LEFT, -1, 14, UI.INK)
-		panel.draw_string(f7, Vector2(PANEL_W - 170, y + 33), "Skills & pay x%.2f" % Game.mood_mult(sel), HORIZONTAL_ALIGNMENT_RIGHT, 156, 12, UI.INK_SOFT)
+		# Life stage and the next birthday (Sims 3 age readout), or the pregnancy.
+		var life := Game.age_text(sel)
+		if Game.is_pregnant(sel):
+			var p: Dictionary = m.pregnancy
+			life = "Pregnant · baby in %d day%s" % [ceili(maxf(0.0, float(p.due) - Game.total_minutes()) / 1440.0), "" if ceili(maxf(0.0, float(p.due) - Game.total_minutes()) / 1440.0) == 1 else "s"]
+		var ci := UI.icon("heart" if Game.is_pregnant(sel) else "cake")
+		var tw := f7.get_string_size(life, HORIZONTAL_ALIGNMENT_LEFT, -1, 12).x
+		if ci:
+			panel.draw_texture_rect(ci, Rect2(PANEL_W - 16 - tw - 22, y + 20, 17, 17), false)
+		panel.draw_string(f7, Vector2(PANEL_W - 190, y + 33), life, HORIZONTAL_ALIGNMENT_RIGHT, 176, 12, UI.INK_SOFT)
 	elif panel_tab == "rels":
 		_draw_rels(sel, y, row_h)
 	elif panel_tab == "wishes":

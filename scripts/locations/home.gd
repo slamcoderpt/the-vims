@@ -50,7 +50,7 @@ const TRIM := Color("fbf8f1")
 const CAP := Color("2e3450")
 const FOUND := Color("8c8378")
 const W_OFFICE := Color("f1dcc3")
-const W_PINK := Color("eaa2b6")
+const W_PINK := Color("f2bfcc")
 const W_BLUE := Color("8399d8")
 const W_HALL := Color("efe1c6")
 const W_LIVING := Color("e9dcc2")
@@ -133,7 +133,7 @@ func lighting_profile() -> Dictionary:
 			"saturation": 1.14, "contrast": 1.1, "tint": Vector3(1.02, 1.0, 0.955),
 			"vignette": 0.24},
 		"post_night": {"focus_y": 0.56, "band": 0.36, "falloff": 0.14, "blur_px": 2.8, "top_boost": 0.7,
-			"saturation": 1.12, "contrast": 1.12, "gamma": 1.08, "tint": Vector3(1.0, 0.95, 0.94), "vignette": 0.36},
+			"saturation": 1.04, "contrast": 1.12, "gamma": 1.08, "tint": Vector3(1.0, 0.95, 0.94), "vignette": 0.36},
 	}
 
 
@@ -399,7 +399,7 @@ func _floor_col(room: String) -> Callable:
 		"office": return _planks(FLOOR_WOOD)
 		"pink": return _planks(Color("ddb184"))
 		"blue": return _planks(Color("c08a58"), false)
-		"hall": return _planks(Color("c4864e"), false)
+		"hall": return _planks(Color("c99a68"), false)
 		"bath": return _tiles(Color("dfe6ea"), Color("aec3cf"))
 		"living": return _planks(Color("b9804c"))
 		_: return _tiles(Color("efe8da"), Color("d7c7a8"))
@@ -1019,26 +1019,31 @@ func _build_pink() -> void:
 	var fx := -0.75   # left wall face (divider with the office)
 	var bz := -4.75
 	var rx := 3.5     # right wall face (divider with the blue room)
-	# ref3 staging: the bunny canopy bed stands with its headboard against the
-	# back wall, so the tucked-in girl lies facing the camera (face up, propped
-	# on the pillows); dad's reading chair stands at the right side of the bed,
-	# turned 3/4 to the camera so his face and the open book both read.
-	# Every wall is dressed (ref3): bunny poster, shelves of books + plushies,
-	# bunting, warm sconces; the floor gets a tea table, rocking horse, toys.
+	# ref3 staging: the bunny canopy bed stands sideways to the camera, its
+	# headboard against the left wall, so the tucked-in girl lies across the
+	# frame (head on the pillows at the left, face turned to the player) and
+	# reads at phone size. Dad's reading chair stands on the FAR side of the
+	# bed at her chest, seat facing the camera: he sits turned toward her in
+	# 3/4, his face and the open book toward the player, with nothing between.
 	_rug(R, -0.35, y, -4.1, 3.6, 3.2, "patch_pink")
-	var ns := _put(R, "nightstand", Vector3(fx + 0.04, y, bz + 0.06), 0, 2)
-	_put(R, "lamp_table", Vector3(ns.position.x + 0.1, y + 10 * PU, ns.position.z + 0.12), 0, 1)
+	var ns := _put(R, "nightstand", Vector3(fx + 0.04, y, bz + 0.04), 0, 2)
+	_put(R, "lamp_table", Vector3(ns.position.x + 0.1, y + 10 * PU, ns.position.z + 0.1), 0, 1)
 	# Bedside lamp: the warm key light on the bedtime-story vignette (ref3).
-	_lamp(Vector3(ns.get_center().x + 0.45, y + 1.35, ns.get_center().z + 0.6), 0.95, 3.2, 0.2, Color(1.0, 0.62, 0.32), 0.5)
-	var bed := _put(R, "bed", Vector3(ns.end.x + 0.04, y, bz + 0.06), 0, 3)
-	_put(R, "plush", Vector3(bed.position.x + 0.22, y + 10 * PU, bed.position.z + 0.55), 0, 0)
-	# Dad's reading chair: beside the bed at the girl's waist, seat facing the
-	# bed (its back away from the camera, so it never hides his face).
-	var chair := _putc(R, "chair", bed.end.x + 0.52, y, bed.position.z + 1.28, 3, 0)
-	var st := _put(R, "side_table", Vector3(bed.end.x + 0.12, y, bz + 0.08), 0, 2)
+	_lamp(Vector3(ns.get_center().x + 0.5, y + 1.45, ns.get_center().z + 0.75), 1.0, 3.2, 0.2, Color(1.0, 0.62, 0.32), 0.5)
+	var bed := _put(R, "bed", Vector3(fx + 0.02, y, ns.end.z + 0.36), 1, 4)
+	_put(R, "plush", Vector3(bed.position.x + 0.3, y + 10 * PU, bed.end.z - 0.42), 1, 0)
+	# Dad's reading chair: behind the bed (back-wall side) beside her chest.
+	var chair := _putc(R, "chair", bed.position.x + 1.05, y, bz + 0.36, 0, 0)
+	var st := _put(R, "side_table", Vector3(bed.end.x + 0.3, y, bz + 0.08), 0, 2)
 	_put(R, "lamp_table", Vector3(st.position.x + 0.05, y + 11 * PU, bz + 0.12), 0, 1)
 	_lamp(Vector3(st.get_center().x - 0.1, y + 1.4, st.get_center().z + 0.7), 0.6, 2.6, 0.15, Color(1.0, 0.64, 0.34), 0.4)
 	_put(R, "book_stack", Vector3(st.end.x - 0.4, y + 11 * PU, bz + 0.2), 0, 2)
+	# Bunny poster + frames on the back wall above dad (ref3's framed bunny).
+	_wallput(R, "poster", "-z", bz, bed.position.x + 0.55, y + 1.55, 0)
+	_wallput(R, "frame", "-z", bz, bed.position.x + 1.55, y + 1.8, 2)
+	# Soft warm fill from the player's side so dad's face and the open book
+	# read under the backlight of the bedside lamp.
+	_lamp(Vector3(bed.get_center().x + 0.3, y + 1.9, bed.end.z + 0.7), 0.55, 2.8, 0.0, Color(1.0, 0.72, 0.46), 0.0)
 	_spots["pink_bed"] = bed
 	_spots["pink_chair"] = chair
 	# Back wall: window with pink curtains, dollhouse under it, bunting above.
@@ -1050,11 +1055,10 @@ func _build_pink() -> void:
 	_sconce(R, "-z", bz, 1.2, y + 1.85, 0.0, 1)
 	# Left wall: big bunny poster, warm sconce, low bookcase with plushies and
 	# a stacked shelf of books/plushies above it, small frames.
-	_wallput(R + "@bed", "poster", "-x", fx, -3.55, y + 1.25, 0)
-	_sconce(R + "@bed", "-x", fx, -3.95, y + 2.05, 0.6, 1)
-	var lsh := _wallput(R, "low_shelf", "-x", fx, -2.35, y, 0)
-	_wallput(R + "@bed", "shelf_unit", "-x", fx, -2.25, y + 1.45, 0)
-	_wallput(R + "@bed", "wall_shelf", "-x", fx, -2.1, y + 2.35, 1)
+	_sconce(R + "@bed", "-x", fx, -2.3, y + 2.1, 0.6, 1)
+	var lsh := _wallput(R, "low_shelf", "-x", fx, -1.95, y, 0)
+	_wallput(R + "@bed", "shelf_unit", "-x", fx, -1.85, y + 1.45, 0)
+	_wallput(R + "@bed", "wall_shelf", "-x", fx, -1.7, y + 2.35, 1)
 	_wallput(R + "@bed", "frame", "-x", fx, -0.62, y + 1.55, 2)
 	_wallput(R + "@bed", "frame", "-x", fx, -0.5, y + 2.2, 5)
 	_sconce(R + "@bed", "-x", fx, -0.85, y + 1.95, 0.5, 1)
@@ -1385,7 +1389,7 @@ func _build_exterior() -> void:
 		var gp := Vector3(10.15, 0, -1.2 + k * 3.4)
 		PropLib.place(_g("ext"), "lantern", Vector3i(fc(gp.x), 0, fc(gp.z)), 0)
 		_halo_pts.append({"pos": gp + Vector3(0.16, 0.25, 0.16), "size": 1.3, "color": STREET_HALO})
-	for lp: Vector3 in [Vector3(-1.2, 0, -7.4), Vector3(4.6, 0, -7.4)]:
+	for lp: Vector3 in [Vector3(-1.2, 0, -7.4), Vector3(4.6, 0, -7.4), Vector3(11.4, 0, -4.2), Vector3(11.4, 0, 2.0), Vector3(11.4, 0, 8.2)]:
 		PropLib.place(o, "street_lamp", Vector3i(cc(lp.x), 0, cc(lp.z)), 0, 1)
 		_halo_pts.append({"pos": lp + lh, "size": 2.6, "color": STREET_HALO})
 	var bushes := [Vector3(-9.8, 0, -3.0), Vector3(-9.8, 0, 1.0), Vector3(9.4, 0, -3.5), Vector3(9.4, 0, 0.5),
@@ -1524,9 +1528,12 @@ func _ensure_neighbourhood(lit: bool) -> void:
 			# fill the lawn beside the bathroom in the night shot (ref3).
 			# Next-door house on the right, lit front towards the camera (ref3:
 			# the night frame's right edge is houses, trees and lamps, not lawn).
-			Vector3(10.6, 0, -7.4)]
-		var styles := [1, 4, 2, 0, 5, 3, 2, 5, 3, 0, 4, 1, 2, 4]
-		var rots := [0, 0, 0, 0, 0, 0, 1, 3, 0, 0, 0, 0, 0, 0]
+			Vector3(10.6, 0, -7.4),
+			# Houses across the side lawn on the right, lit fronts turned to
+			# the house (ref3's right edge: homes, trees and lamps).
+			Vector3(11.6, 0, -2.6), Vector3(11.8, 0, 5.2)]
+		var styles := [1, 4, 2, 0, 5, 3, 2, 5, 3, 0, 4, 1, 2, 4, 1, 3]
+		var rots := [0, 0, 0, 0, 0, 0, 1, 3, 0, 0, 0, 0, 0, 0, 3, 3]
 		# Neighbour houses drawn a little smaller than authored (0.2 m cells):
 		# they read as a street of homes behind ours, roofs in frame (ref3).
 		var hs: float = PropLib.scale_of("house") * 0.9
@@ -1895,25 +1902,27 @@ func _stage(preset: String) -> void:
 	if preset == "home_night":
 		var bed: AABB = _spots["pink_bed"]
 		var bc := bed.get_center()
-		var hz := bed.position.z + PU          # headboard (bed model z = 0)
+		var hx := bed.position.x + 2 * PU      # headboard inner face (bed rot 1)
 		var mat_y := y + 10 * PU               # mattress top
 		# Tucked in under the gingham quilt, head on the pillows at the
-		# headboard, feet towards the camera; propped a little on the pillows
-		# (pivot at her hips) so her sleeping face reads from the high camera.
-		var lily := _place("bunny_girl", Vector3(bc.x - 0.1, y, hz + 0.86), Vector3(bc.x, y, bed.end.z + 2.0), "sleep")
+		# headboard (left), feet to the right; propped a little on the pillows
+		# and rolled toward the player so her sleeping face reads (ref3).
+		var lz := bc.z + 0.04
+		var lily := _place("bunny_girl", Vector3(hx + 0.84, y, lz), Vector3(hx + 3.0, y, lz), "sleep")
 		lily.lie_height = 10 * PU / lily.scale.y
-		lily.rotation.x = 0.0
-		var prop_up := 0.3
+		var prop_up := 0.32
+		var roll := 0.42
+		var ry := lily.rotation.y
 		var pivot := Vector3(0.0, 10 * PU + 0.1, 0.0)
-		var rb := Basis.from_euler(Vector3(prop_up, lily.rotation.y, 0.0))
-		var rb0 := Basis.from_euler(Vector3(0.0, lily.rotation.y, 0.0))
-		lily.rotation.x = prop_up
+		var rb := Basis.from_euler(Vector3(prop_up, ry, roll))
+		var rb0 := Basis.from_euler(Vector3(0.0, ry, 0.0))
+		lily.rotation = Vector3(prop_up, ry, roll)
 		lily.position += rb0 * pivot - rb * pivot
 		var ch: AABB = _spots["pink_chair"]
 		var cc3 := ch.get_center()
-		# Seated beside her, angled between the girl and the player (3/4), the
-		# open storybook held up in both hands.
-		var jack := _place("dad", Vector3(cc3.x + 0.02, y, cc3.z), Vector3(cc3.x - 1.0, y, cc3.z + 0.4), "sit_read", 7 * PU)
+		# Seated behind the bed beside her, turned toward her pillow (3/4 to
+		# the player), the open storybook held up in both hands.
+		var jack := _place("dad", Vector3(cc3.x, y, cc3.z - 0.04), Vector3(hx + 0.2, y, lz + 1.1), "sit_read", 7 * PU)
 		_big_book(jack)
 		var st: AABB = _spots["step"]
 		var maya := _place("cat_girl", Vector3(st.get_center().x, y + 6 * PU, st.get_center().z), Vector3(st.get_center().x - 0.6, y, st.get_center().z + 1.3), "brush_teeth")
@@ -1927,14 +1936,14 @@ func _stage(preset: String) -> void:
 			_blanket.scale = Vector3.ONE * (PU / PropLib.FU)
 			add_child(_blanket)
 		# Quilt top edge under her chin; drapes hang 5 cells below the top.
-		_blanket.position = Vector3(bc.x - 0.03, mat_y - 5 * PU, hz + 0.52 + 9 * PU)
-		_blanket.rotation_degrees.y = 0.0
+		_blanket.position = Vector3(hx + 0.5 + 9 * PU, mat_y - 5 * PU, lz)
+		_blanket.rotation_degrees.y = 90.0
 		_blanket.visible = true
 	else:
 		if _blanket:
 			_blanket.visible = false
 		var jack := _place("dad", _spots["dad_seat"], _spots["dad_look"], "type", 13 * MU)
-		actors["bunny_girl"].rotation.x = 0.0
+		actors["bunny_girl"].rotation = Vector3.ZERO
 		var stl: AABB = _spots["stool"]
 		var lily := _place("bunny_girl", Vector3(stl.get_center().x, y, stl.get_center().z), Vector3(-4.45, y, -3.7), "sit_paint", 6 * PU)
 		var maya := _place("cat_girl", Vector3(-2.85, y, -0.8), Vector3(-2.2, y, 0.5), "play")

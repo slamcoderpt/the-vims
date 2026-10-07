@@ -51,31 +51,36 @@ func build(parent: Node3D, party) -> void:
 	_seat("neighbor_7", party, "far_2", "sit_talk", 0.15)
 	_seat("neighbor_4", party, "far_3", "sit_talk", -0.1)
 	_seat("Maya", party, "far_4", "sit_talk", -0.25)
-	_seat("neighbor_6", party, "near_l", "sit_talk", -0.2)
+	# Near side, backs to the camera in the gaps between the far diners (ref4:
+	# a long-haired neighbour and the blond boy, shoulders over the chair backs).
+	_seat("neighbor_8", party, "near_l", "sit_talk", 0.0)
+	_seat("neighbor_6", party, "near_r", "sit_talk", 0.0)
 	gestures = Gestures.new()
 	parent.add_child(gestures)
-	gestures.add(actors.get("Lily"), "burger", false, "burger", 0.05, 0.3)
-	gestures.add(actors.get("neighbor_7"), "toast", true, "", 0.08, 0.3)
-	gestures.add(actors.get("neighbor_4"), "drink", false, "", 0.05, 0.3)
-	gestures.add(actors.get("Maya"), "toast", true, "", 0.1, 0.3)
-	gestures.add(actors.get("neighbor_6"), "drink", false, "", 0.0, 0.0)
+	# Every diner has one hand busy (burger / glass) and the other forearm
+	# resting on the cloth, so arms read on the table instead of in the air.
+	gestures.add(actors.get("Lily"), "burger", false, "burger", 0.05, 0.3, true)
+	gestures.add(actors.get("neighbor_7"), "drink", true, "", 0.08, 0.3, true)
+	gestures.add(actors.get("neighbor_4"), "toast", false, "", 0.05, 0.3, true)
+	gestures.add(actors.get("Maya"), "drink", true, "", 0.1, 0.3, true)
+	gestures.add(actors.get("neighbor_6"), "burger", false, "burger", 0.0, 0.0, true)
+	gestures.add(actors.get("neighbor_8"), "drink", true, "", 0.0, 0.0, true)
 	# Jack works the food with tongs (left hand; the pose's spatula stays in
 	# the right) and his head turns just enough for the face to read.
 	gestures.add(actors.get("Jack"), "tongs", true, "tongs", -0.02, 0.6)
 	# On the pergola deck by the lit doors, chatting with plates and drinks.
-	var a := _spawn("neighbor_1", Vector3(3.5, 0.375, -3.3), 0.0, "talk")
-	var b := _spawn("neighbor_2", Vector3(4.75, 0.375, -3.45), 0.0, "idle")
-	var e := _spawn("neighbor_8", Vector3(6.3, 0.375, -3.6), 0.0, "talk")
+	var a := _spawn("neighbor_1", Vector3(4.0, 0.375, -3.3), 0.0, "talk")
+	var b := _spawn("neighbor_2", Vector3(5.1, 0.375, -3.45), 0.0, "idle")
 	a.face(Vector3(6.5, 0, 2.5))
 	b.face(Vector3(1.5, 0, 1.0))
-	e.face(Vector3(2.0, 0, 0.5))
 	gestures.add(a, "burger", true, "burger")
 	gestures.add(b, "drink", false)
-	gestures.add(e, "drink", true)
 	# The two elders on the outdoor sofa by the fire pit, mugs in hand.
-	var c := _spawn_seated("neighbor_5", Vector3(5.17, 0, 1.25), -PI * 0.5 - 0.15, "sit_talk", 0.5)
+	var s0: Transform3D = Party.sofa_seat(0)
+	var s1: Transform3D = Party.sofa_seat(1)
+	var c := _spawn_seated("neighbor_5", s0.origin, s0.basis.get_euler().y + 0.15, "sit_talk", 0.5)
 	gestures.add(c, "mug", true, "", 0.0, 0.4)
-	var g := _spawn_seated("neighbor_3", Vector3(5.17, 0, 2.35), -PI * 0.5 - 0.35, "sit_talk", 0.5)
+	var g := _spawn_seated("neighbor_3", s1.origin, s1.basis.get_euler().y - 0.1, "sit_talk", 0.5)
 	gestures.add(g, "mug", false, "", 0.0, 0.5)
 	# Biscuit trotting across the lawn between the table and the fire pit.
 	var d := _spawn("Biscuit", DOG_POS, -1.3, "walk")
@@ -139,12 +144,12 @@ func _seat(key: String, party, seat: String, pose: String, turn := 0.0) -> Node3
 ## neck; SimActor never touches the head bone's scale) and slightly shrink the
 ## bodies so torsos + arms show above the table.
 ## Heads ~1/4 of the body (ref4 guests are less chibi than the house cast).
-const HEAD_SCALE := {"adult": 0.78, "child": 0.86, "dog": 1.0}
+const HEAD_SCALE := {"adult": 0.88, "child": 0.94, "dog": 1.0}
 ## Life-size scales for this shot (shared art rule: adult ~1.75 m, child
 ## ~70 % of that, beagle's back at a child's knee-to-hip). SimActor clamps
 ## the household to a "hero minimum" meant for the zoomed-out house view,
 ## so the resolved scale is overridden here (and seat heights compensated).
-const BODY_SCALE := {"adult": 1.0, "child": 0.86, "dog": 0.55}
+const BODY_SCALE := {"adult": 0.96, "child": 0.84, "dog": 0.55}
 const LOOK_SCALE := {"dad": 1.04}
 
 

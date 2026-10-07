@@ -272,15 +272,33 @@ static func gondola(length: int, seed: int, kinds: Array, double_sided := false,
 	# header cap
 	vb.box(Vector3i(0, H, z0), Vector3i(length, 1, D - z0), Color("7a4a26"))
 	if double_sided:
-		# Island gondola seen from above: the top is an open display shelf
-		# stocked from both sides (no bare slab), split by a low divider.
+		# Island gondola seen from above: an open display top stocked with
+		# chunky multipack cases (read as individual boxes from any angle,
+		# unlike thin facings which turn into stripes when seen edge-on).
 		vb.box(Vector3i(0, H, z0 + 1), Vector3i(length, 1, D - z0 - 2), Color("e9dcc0"))
-		var topb := VoxelBuilder.new()
-		for ri in 3:
-			stock(vb, 1, length - 2, H + 1, D - 1 - ri * 3, 5 - ri % 2, seed * 7 + 9 + ri * 5, kinds, big, lod)
-			stock(topb, 1, length - 2, H + 1, D - 1 - ri * 3, 5 - (ri + 1) % 2, seed * 11 + 13 + ri * 5, kinds, big)
-		for p: Vector3i in topb.vox:
-			vb.set_v(Vector3i(length - 1 - p.x, p.y, -p.z), topb.vox[p])
+		var cx := 1
+		var k := 0
+		while cx < length - 5:
+			var hv := Vector3i(cx, seed, 9)
+			var cw := 5 + int(Kit.h(hv, 3) * 4.0)
+			cw = mini(cw, length - 1 - cx)
+			var col: Color = BOX_COLS[(k * 3 + seed) % BOX_COLS.size()]
+			var col2: Color = BOX_COLS[(k * 7 + seed + 4) % BOX_COLS.size()]
+			if col2 == col:
+				col2 = PAPER
+			var hh := 3 + int(Kit.h(hv, 5) * 3.0)
+			var dz := z0 + 2 + int(Kit.h(hv, 7) * 2.0)
+			var dd := D - z0 - 4 - int(Kit.h(hv, 8) * 3.0)
+			var cardboard := Kit.h(hv, 11) < 0.3
+			var bc := Color("c99a62") if cardboard else col
+			vb.box(Vector3i(cx, H + 1, dz), Vector3i(cw - 1, hh, dd), func(p: Vector3i) -> Color:
+				if p.y == H + hh:
+					return Kit.shade(bc, 1.08) if (p.x + p.z) % 5 != 0 else (col2 if not cardboard else Color("e3c38f"))
+				if p.y == H + hh - 1 or p.y == H + 2:
+					return col2 if not cardboard else Color("fbf3dc")
+				return bc)
+			cx += cw + (0 if Kit.h(hv, 13) < 0.6 else 1)
+			k += 1
 		return vb
 	# overstock heaped on top: cardboard cases and spare packs, uneven
 	var ox := 1
@@ -322,7 +340,7 @@ static func fridge(width: int, seed: int, stocked := true, dairy := true) -> Vox
 	# cavity
 	vb.clear_box(Vector3i(1, 3, 2), Vector3i(width - 2, CT - 3, D - 2))
 	# glowing back + glowing ceiling strip inside
-	vb.box(Vector3i(1, 3, 1), Vector3i(width - 2, CT - 3, 1), Color("e6f3ff"), true)
+	vb.box(Vector3i(1, 3, 1), Vector3i(width - 2, CT - 3, 1), Color("a9d2f5"), true)
 	vb.box(Vector3i(1, CT - 1, 2), Vector3i(width - 2, 1, D - 3), Color("f4fbff"), true)
 	# top header light box + brand stripe
 	vb.box(Vector3i(0, CT, D - 1), Vector3i(width, 3, 1), Color("f4fbff"), true)

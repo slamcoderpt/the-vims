@@ -290,6 +290,59 @@ const ANIMS := {
 			[0.0, {"arm_r": Vector3(-0.2, 0, -0.45), "fore_r": Vector3(-0.4, 0, 0), "arm_l": Vector3(-0.2, 0, 0.45), "fore_l": Vector3(-0.4, 0, 0), "eyes": Vector3.ONE}],
 		],
 		"osc": [["torso", Vector3(0, 0.18, 0.06), 7.0, 0.0], ["head", Vector3(0, 0.25, 0), 7.0, 0.5], ["arm_r", Vector3(0, 0, 0.2), 7.0, 0.0], ["arm_l", Vector3(0, 0, 0.2), 7.0, 0.0]]},
+	# ------------------------------------------------------------ life: romance, babies, birthdays, mourning
+	"propose": {"base": "idle", "period": 3.2, "present": 0.9,
+		"keys": [
+			[0.0, {"thigh_r": Vector3(-1.45, -0.1, 0), "shin_r": Vector3(1.45, 0, 0), "thigh_l": Vector3(-0.05, 0.08, 0), "shin_l": Vector3(1.5, 0, 0),
+				"hips_pos": Vector3(0, -0.3, 0), "torso": Vector3(-0.05, 0, 0), "head": Vector3(-0.22, 0, 0),
+				"arm_r": Vector3(-1.35, 0, 0.12), "fore_r": Vector3(-0.35, 0, 0), "arm_l": Vector3(-0.45, 0, -0.32), "fore_l": Vector3(-1.8, 0, -0.5)}],
+			[0.5, {"thigh_r": Vector3(-1.45, -0.1, 0), "shin_r": Vector3(1.45, 0, 0), "thigh_l": Vector3(-0.05, 0.08, 0), "shin_l": Vector3(1.5, 0, 0),
+				"hips_pos": Vector3(0, -0.3, 0), "torso": Vector3(-0.08, 0, 0), "head": Vector3(-0.28, 0, 0),
+				"arm_r": Vector3(-1.5, 0, 0.12), "fore_r": Vector3(-0.2, 0, 0), "arm_l": Vector3(-0.45, 0, -0.32), "fore_l": Vector3(-1.8, 0, -0.5)}],
+		],
+		"props": [["ring_box", "fore_r", Vector3(0, 0.0, 0.04), Vector3(-0.2, 0, 0), true]],
+		"fx": [["hearts", "head"]]},
+	"feed_baby": {"base": "idle", "period": 3.6, "present": 0.9,
+		"keys": [
+			[0.0, {"torso": Vector3(0.28, 0, 0), "head": Vector3(0.35, 0, 0), "arm_r": Vector3(-1.15, 0, 0.18), "fore_r": Vector3(-0.75, 0, 0),
+				"arm_l": Vector3(-0.95, 0, -0.25), "fore_l": Vector3(-0.55, 0, 0)}],
+			[0.5, {"torso": Vector3(0.3, 0, 0), "head": Vector3(0.38, 0, 0), "arm_r": Vector3(-1.05, 0, 0.18), "fore_r": Vector3(-0.95, 0, 0),
+				"arm_l": Vector3(-0.95, 0, -0.25), "fore_l": Vector3(-0.55, 0, 0)}],
+		],
+		"osc": [["head", Vector3(0, 0, 0.05), 0.6, 0.0]],
+		"props": [["bottle", "fore_r", Vector3(0, 0.0, 0.05), Vector3(-1.2, 0, 0), true]]},
+	"rock_baby": {"base": "idle", "period": 2.8, "present": 0.9,
+		"keys": [
+			[0.0, {"torso": Vector3(0.32, 0, 0.06), "head": Vector3(0.32, 0, 0.05), "arm_r": Vector3(-1.05, 0, 0.32), "fore_r": Vector3(-0.5, 0, 0.5),
+				"arm_l": Vector3(-1.05, 0, -0.32), "fore_l": Vector3(-0.5, 0, -0.5)}],
+			[0.5, {"torso": Vector3(0.32, 0, -0.06), "head": Vector3(0.32, 0, -0.05), "arm_r": Vector3(-1.05, 0.2, 0.32), "fore_r": Vector3(-0.5, 0, 0.5),
+				"arm_l": Vector3(-1.05, 0.2, -0.32), "fore_l": Vector3(-0.5, 0, -0.5)}],
+		],
+		"osc": [["hips", Vector3(0, 0, 0.04), 0.36, 0.0]]},
+	"change_diaper": {"base": "idle", "period": 1.2, "present": 0.95,
+		"keys": [
+			[0.0, {"torso": Vector3(0.42, 0, 0), "head": Vector3(0.38, 0, 0), "arm_r": Vector3(-1.2, 0, 0.12), "fore_r": Vector3(-0.35, 0, 0),
+				"arm_l": Vector3(-1.0, 0, -0.12), "fore_l": Vector3(-0.8, 0, 0)}],
+			[0.5, {"torso": Vector3(0.42, 0, 0), "head": Vector3(0.4, 0, 0), "arm_r": Vector3(-1.0, 0, 0.12), "fore_r": Vector3(-0.8, 0, 0),
+				"arm_l": Vector3(-1.2, 0, -0.12), "fore_l": Vector3(-0.35, 0, 0)}],
+		],
+		"props": [["diaper", "fore_l", Vector3(0, 0.0, 0.05), Vector3.ZERO, true]]},
+	"blow_candles": {"base": "idle", "period": 2.0, "present": 0.95,
+		"keys": [
+			[0.0, {"torso": Vector3(0.35, 0, 0), "head": Vector3(0.2, 0, 0), "arm_r": Vector3(0.35, 0, 0.2), "fore_r": Vector3(-0.5, 0, 0),
+				"arm_l": Vector3(0.35, 0, -0.2), "fore_l": Vector3(-0.5, 0, 0)}],
+			[0.45, {"torso": Vector3(0.45, 0, 0), "head": Vector3(0.1, 0, 0), "arm_r": Vector3(0.35, 0, 0.2), "fore_r": Vector3(-0.5, 0, 0),
+				"arm_l": Vector3(0.35, 0, -0.2), "fore_l": Vector3(-0.5, 0, 0), "eyes": Vector3.ONE}],
+			[0.75, {"torso": Vector3(-0.1, 0, 0), "head": Vector3(-0.3, 0, 0), "arm_r": Vector3(-2.6, 0, 0.3), "fore_r": Vector3(-0.2, 0, 0),
+				"arm_l": Vector3(-2.6, 0, -0.3), "fore_l": Vector3(-0.2, 0, 0)}],
+		],
+		"fx": [["confetti", "head"]]},
+	"mourn": {"base": "idle", "period": 4.0, "present": 0.6,
+		"keys": [
+			[0.0, {"torso": Vector3(0.18, 0, 0), "head": Vector3(0.5, 0, 0), "arm_r": Vector3(-0.45, 0, 0.38), "fore_r": Vector3(-1.25, 0, 0.75),
+				"arm_l": Vector3(-0.45, 0, -0.38), "fore_l": Vector3(-1.25, 0, -0.75), "eyes": Vector3.ONE}],
+		],
+		"osc": [["torso", Vector3(0.03, 0, 0), 0.3, 0.0]]},
 	"react_relief": {"base": "idle", "period": 1.2, "present": 0.3,
 		"keys": [
 			[0.0, {"arm_r": Vector3(-1.6, 0, 0.45), "fore_r": Vector3(-1.95, 0, 0), "head": Vector3(-0.12, 0, 0), "eyes": Vector3.ONE}],
@@ -310,10 +363,13 @@ const ACTION_ANIM := {
 	"s_chat": "chat", "s_day": "chat", "s_hobbies": "chat", "s_compliment": "chat", "s_homework": "chat",
 	"s_deep": "deep_talk", "s_joke": "joke", "s_hug": "hug", "s_kiss": "kiss", "s_flirt": "flirt",
 	"s_tease": "argue", "s_argue": "argue", "s_makeup": "apologize", "s_highfive": "high_five", "s_handshake": "high_five",
+	"s_propose": "propose", "s_wed": "kiss", "s_try_baby": "kiss", "s_move_in": "hug", "s_steady": "hug",
+	"feed_baby": "feed_baby", "rock_baby": "rock_baby", "play_baby": "rock_baby", "change_diaper": "change_diaper",
+	"blow_candles": "blow_candles", "cake_for": "blow_candles", "mourn": "mourn", "flowers": "mourn", "b_coo": "rock_baby",
 	"call_friend": "phone_call", "phone": "phone_call", "drink": "drink", "coffee": "drink", "lemonade": "drink",
 }
 ## What the other sim does during a social (initiator anim -> partner anim).
-const PARTNER_ANIM := {"chat": "listen", "deep_talk": "listen", "joke": "laugh", "hug": "hug", "kiss": "kiss",
+const PARTNER_ANIM := {"chat": "listen", "deep_talk": "listen", "joke": "laugh", "hug": "hug", "kiss": "kiss", "propose": "laugh",
 	"flirt": "laugh", "argue": "upset", "apologize": "listen", "high_five": "high_five", "pet_dog": ""}
 ## End-of-action reactions by anim.
 const REACTION := {"eat": "react_satisfied", "grab_snack": "react_satisfied", "snack_eat": "react_satisfied",
@@ -768,6 +824,8 @@ func _show_fx(fx: String, _where: String) -> void:
 		"steam":
 			if _where == "head":
 				p.global_position = Vector3(actor.global_position.x, ht.y - 0.2, actor.global_position.z)
+		"hearts", "confetti":
+			p.global_position = Vector3(actor.global_position.x, ht.y + 0.1, actor.global_position.z)
 		"bubbles":
 			var c: Vector3 = ctx.get("tub_center", actor.global_position)
 			var half: Vector3 = ctx.get("tub_half", Vector3(0.6, 0.3, 0.3))
@@ -817,6 +875,25 @@ func _make_fx(fx: String) -> CPUParticles3D:
 			p.color_ramp = g
 			p.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
 			p.emission_sphere_radius = 0.06
+		"hearts", "confetti":
+			bm.size = Vector3(0.055, 0.055, 0.02) if fx == "hearts" else Vector3(0.04, 0.04, 0.01)
+			m.albedo_color = Color(1.0, 0.45, 0.65, 0.95) if fx == "hearts" else Color(1, 1, 1, 0.95)
+			p.amount = 10 if fx == "hearts" else 26
+			p.lifetime = 1.8 if fx == "hearts" else 1.2
+			p.direction = Vector3(0, 1, 0)
+			p.spread = 30.0 if fx == "hearts" else 60.0
+			p.initial_velocity_min = 0.25 if fx == "hearts" else 1.0
+			p.initial_velocity_max = 0.5 if fx == "hearts" else 1.8
+			p.gravity = Vector3(0, 0.15, 0) if fx == "hearts" else Vector3(0, -2.0, 0)
+			p.emission_shape = CPUParticles3D.EMISSION_SHAPE_SPHERE
+			p.emission_sphere_radius = 0.15
+			if fx == "confetti":
+				var gc := Gradient.new()
+				gc.set_color(0, Color(1.0, 0.55, 0.7))
+				gc.add_point(0.33, Color(0.5, 0.8, 1.0))
+				gc.add_point(0.66, Color(1.0, 0.85, 0.35))
+				gc.set_color(gc.get_point_count() - 1, Color(0.6, 0.9, 0.5))
+				p.color_initial_ramp = gc
 		"bubbles":
 			bm.size = Vector3(0.035, 0.035, 0.035)
 			m.albedo_color = Color(1, 1, 1, 0.85)
@@ -993,6 +1070,29 @@ static func prop_mesh(pname: String) -> ArrayMesh:
 			_fill(vb, -2, 2, -5, 0, -1, 1, Color(0.85, 0.4, 0.25))
 			_fill(vb, -1, 1, -3, -2, 2, 2, Color(0.98, 0.9, 0.6))
 			origin = Vector3(0.5, 0.5, 0.5)
+			size = 0.028
+		"ring_box":
+			_fill(vb, -2, 2, 0, 2, -2, 2, Color(0.75, 0.12, 0.2))
+			_fill(vb, -2, 2, 3, 5, -3, -2, Color(0.82, 0.16, 0.25))   # open lid
+			vb.set_v(Vector3i(0, 3, 0), Color(1.0, 0.82, 0.3), true)   # gold band
+			vb.set_v(Vector3i(-1, 3, 0), Color(1.0, 0.82, 0.3), true)
+			vb.set_v(Vector3i(1, 3, 0), Color(1.0, 0.82, 0.3), true)
+			vb.set_v(Vector3i(0, 4, 0), Color(0.85, 0.95, 1.0), true)  # diamond
+			origin = Vector3(0.5, 0, 0.5)
+			size = 0.026
+		"bottle":
+			_fill(vb, -1, 1, 0, 5, -1, 1, Color(0.96, 0.96, 0.98))
+			_fill(vb, -1, 1, 1, 3, -1, 1, Color(0.98, 0.95, 0.85))   # milk
+			_fill(vb, -1, 1, 6, 6, -1, 1, Color(0.55, 0.75, 0.95))   # collar
+			vb.set_v(Vector3i(0, 7, 0), Color(0.95, 0.78, 0.55))     # teat
+			vb.set_v(Vector3i(0, 8, 0), Color(0.95, 0.78, 0.55))
+			origin = Vector3(0.5, 0, 0.5)
+			size = 0.026
+		"diaper":
+			_fill(vb, -3, 3, 0, 0, -2, 2, Color(0.98, 0.98, 0.98))
+			_fill(vb, -3, -3, 1, 1, -2, 2, Color(0.7, 0.86, 0.98))
+			_fill(vb, 3, 3, 1, 1, -2, 2, Color(0.7, 0.86, 0.98))
+			origin = Vector3(0.5, 0, 0.5)
 			size = 0.028
 		"foam":
 			var pts := [Vector3i(-12, 0, -5), Vector3i(-9, 0, 4), Vector3i(-3, 0, -6), Vector3i(4, 0, 5), Vector3i(10, 0, -3), Vector3i(13, 0, 4), Vector3i(0, 0, 0)]

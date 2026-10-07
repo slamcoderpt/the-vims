@@ -18,6 +18,8 @@ var _t0 := 0
 var _notes: Array = []      # Game.notify texts
 const Careers := preload("res://scripts/sim/careers.gd")
 const ActionAnims := preload("res://scripts/world/actors/action_anims.gd")
+const LifeStages := preload("res://scripts/sim/life_stages.gd")
+const SimActions := preload("res://scripts/sim/sim_actions.gd")
 
 
 func _ready() -> void:
@@ -31,6 +33,8 @@ func _ready() -> void:
 	Game.notify.connect(func(t, _i): _notes.append(t))
 	# Shifts / school only in the career section (the others need everyone home).
 	Game.work_enabled = false
+	# Aging only in the life section (kids must stay kids for the others).
+	Game.aging_enabled = false
 	await _frames(4)
 	await _run()
 	var fails := 0
@@ -46,7 +50,7 @@ func _run() -> void:
 	var only: Array = []
 	if args.has("only"):
 		only = (args.only as String).split(",")
-	for sec in ["boot", "loop", "anims", "money", "unlocks", "mood", "queue", "autonomy", "meal", "wishes", "clock", "gohere", "build", "social", "townies", "travel", "career", "save"]:
+	for sec in ["boot", "loop", "life", "anims", "money", "unlocks", "mood", "queue", "autonomy", "meal", "wishes", "clock", "gohere", "build", "social", "townies", "travel", "career", "save"]:
 		if only.is_empty() or sec in only or sec == "boot":
 			await call("_s_" + sec)
 
@@ -872,6 +876,269 @@ func _s_townies() -> void:
 			await _frames(3)
 			await _shot("romance_kiss")
 			await _until_game(func(): return jack.phase == "idle", 60.0)
+
+
+## Sims 3 generational loop: a birthday cake ages a kid up (new body),
+## romance from flirting to a proposal, a townie moves in (new portrait),
+## Try for Baby -> 3-day pregnancy -> a baby in a crib the grown-ups care
+## for, and old age ends in a grave and mourning. The whole household is
+## saved first and restored after, so the other sections see the usual family.
+func _s_life() -> void:
+	var snap := "user://playtest_before_life.txt"
+	Game.save_game(snap)
+	Game.aging_enabled = true
+	sim.try_baby_chance = 1.0
+	_top_up()
+	var jack = _agent("Jack")
+	var lily = _agent("Lily")
+	var st0: Array = Game.household.map(func(m): return "%s:%s" % [m.name, m.life_stage])
+	var at0 := Game.age_text(lily.index)
+	_step("life_stages", Game.life_stage(jack.index) == "adult" and Game.life_stage(lily.index) == "child" and Game.life_stage(3) == "adult" and "Child" in at0,
+		"%s; Lily: %s" % [str(st0), at0])
+
+	# ---------------------------------------------------------------- birthday cake
+	Game.selected = jack.index
+	Game.speed = 2
+	var fridge = _find_it("Fridge")
+	var money0 := Game.money
+	await _open_menu_on(fridge)
+	await _choose("Bake Birthday Cake")
+	Game.speed = 3
+	await _until_game(func(): return jack.last_done == "bake_cake" and jack.phase == "idle", 240.0)
+	var cake = _find_it("Birthday Cake")
+	_step("bake_cake", cake != null and Game.money == money0 - 25, "cake=%s money %d -> %d" % [str(cake != null), money0, Game.money])
+	var h0: float = LifeStages.actor_height(lily.actor)
+	var old_actor: Node = lily.actor
+	if cake:
+		Game.selected = lily.index
+		await _frames(2)
+		await _open_menu_on(cake)
+		var rows: Array = _menus[-1][1].map(func(a): return str(a.label)) if not _menus.is_empty() else []
+		print("  cake menu: ", rows)
+		Game.speed = 1
+		await _choose("Blow Out Candles")
+		var blew := await _until_game(func(): return lily.anim == "blow_candles", 120.0)
+		if blew:
+			await _focus(lily.actor.global_position, null, 6.0)
+			await _frames(3)
+			await _shot("blow_candles")
+		Game.speed = 3
+		await _until_game(func(): return Game.life_stage(lily.index) == "teen", 120.0)
+		await _frames(4)
+	var h1: float = LifeStages.actor_height(lily.actor)
+	_step("age_up", Game.life_stage(lily.index) == "teen" and is_instance_valid(lily.actor) and lily.actor != old_actor
+		and str(lily.actor.look) == "bunny_girl@teen" and h1 > h0 + 0.2 and Game.has_moodlet(lily.index, "birthday") and _find_it("Birthday Cake") == null,
+		"Lily %s -> %s, body %s %.2f m -> %.2f m, cake gone=%s, %s" % ["child", Game.life_stage(lily.index), str(lily.actor.look), h0, h1,
+		str(_find_it("Birthday Cake") == null), Game.age_text(lily.index)])
+	if is_instance_valid(lily.actor):
+		await _focus(lily.actor.global_position, null, 6.0)
+		await _frames(3)
+		await _shot("teen_lily")
+	# Automatic birthday at the end of a stage: Maya's days run out.
+	var maya = _agent("Maya")
+	maya.member.age_days = LifeStages.days_in("child") - 1
+	Game.new_day()
+	await _frames(4)
+	_step("auto_birthday", Game.life_stage(maya.index) == "teen" and str(maya.actor.look) == "cat_girl@teen",
+		"Maya %s (%s), rig %s" % [Game.life_stage(maya.index), Game.age_text(maya.index), str(maya.actor.look)])
+
+	# ---------------------------------------------------------------- romance ladder
+	Game.speed = 1
+	_menus.clear()
+	Game.mode = "manage"
+	await _frames(3)
+	await _choose("Autumn Festival")
+	await _frames(6)
+	jack = _agent("Jack")
+	_top_up()
+	Game.selected = jack.index
+	var best = null
+	var bd := INF
+	for it in sim.interactables:
+		var tn: String = sim.townie_of(it)
+		if tn == "" or not Game.can_romance("Jack", tn) or Game.sex_of(tn) != "f" or Game.stage_of(tn) == "elder":
+			continue
+		var d := _flat(it.global_position, jack.actor.global_position)
+		if d < bd:
+			bd = d
+			best = it
+	var tname: String = sim.townie_of(best) if best else ""
+	var npc: Node = best.get_parent() if best else null
+	var ladder: Array = []
+	if best:
+		# They've known each other a while (friends with a spark).
+		Game.change_rel("Jack", tname, 58.0 - Game.rel("Jack", tname))
+		Game.change_romance("Jack", tname, 25.0 - Game.romance("Jack", tname))
+		Game.speed = 3
+		var tries := 0
+		while Game.rel_status("Jack", tname) != "Engaged" and tries < 14:
+			tries += 1
+			_top_up()
+			var rows: Array = sim.townie_rows(jack, best)
+			var pick: Dictionary = {}
+			for want in ["s_propose", "s_steady", "s_kiss", "s_flirt"]:
+				for a in rows:
+					if a.get("id", "") == want and not a.get("locked", false):
+						pick = a
+						break
+				if not pick.is_empty():
+					break
+			if pick.is_empty():
+				break
+			if pick.id == "s_propose":
+				Game.speed = 1
+				# Pop the question through the real menu, like a player.
+				_menus.clear()
+				var head: Vector3 = npc.head_top() - Vector3(0, 0.2, 0)
+				await _tap_world(head)
+				await _frames(3)
+				if _menus.is_empty() or not str(_menus[-1][0]).begins_with(tname.get_slice(" ", 0)):
+					sim.open_object_menu(best, _cam().unproject_position(head))
+					await _frames(3)
+				await _choose("Propose Engagement")
+				await _until_game(func(): return jack.anim == "propose" or jack.phase == "idle", 120.0)
+				if jack.anim == "propose":
+					var aa = ActionAnims.of(jack.actor)
+					await _frames(6)
+					ladder.append("propose[%s]" % ",".join(aa.visible_props() if aa else []))
+					await _focus(jack.actor.global_position, null, 6.0)
+					await _shot("propose")
+				Game.speed = 3
+			else:
+				jack.command({"action": pick, "target": best})
+				ladder.append(str(pick.id).trim_prefix("s_"))
+			await _until_game(func(): return jack.phase == "idle" and jack.last_done != "", 120.0)
+			await _frames(2)
+	_step("romance_to_propose", tname != "" and Game.rel_status("Jack", tname) == "Engaged" and Game.has_moodlet(jack.index, "engaged") and "propose[ring_box]" in ladder,
+		"Jack & %s: %s -> romance %.0f, friendship %.0f, status %s" % [tname, " > ".join(ladder), Game.romance("Jack", tname), Game.rel("Jack", tname), Game.rel_status("Jack", tname)])
+
+	# ---------------------------------------------------------------- move in
+	var n0 := Game.household.size()
+	if best and is_instance_valid(best):
+		var rows: Array = sim.townie_rows(jack, best)
+		var mv: Dictionary = {}
+		for a in rows:
+			if a.get("id", "") == "s_move_in":
+				mv = a
+		if not mv.is_empty():
+			jack.command({"action": mv, "target": best})
+			await _until_game(func(): return Game.member_index(tname) >= 0, 120.0)
+			await _frames(6)
+	var ri := Game.member_index(tname)
+	var ra = sim.agents[ri] if ri >= 0 and ri < sim.agents.size() else null
+	var ports: int = hud.get("_portraits").size() if hud and hud.get("_portraits") is Array else -1
+	_step("move_in", ri >= 0 and Game.household.size() == n0 + 1 and ra != null and ra.actor == npc and not npc.has_meta("townie") and ports == Game.household.size(),
+		"%s joined: household %d -> %d, agent=%s on her own actor=%s, HUD portraits=%d" % [tname, n0, Game.household.size(), str(ra != null), str(ra != null and ra.actor == npc), ports])
+	await _shot("moved_in")
+	# Home together: she arrives with the family.
+	Game.speed = 1
+	_menus.clear()
+	Game.mode = "manage"
+	await _frames(3)
+	await _choose("Go Home")
+	await _frames(6)
+	jack = _agent("Jack")
+	var rosie = _agent(tname)
+	_step("move_in_home", rosie != null and is_instance_valid(rosie.actor) and rosie.actor.get("look") == Game.household[rosie.index].look,
+		"at home: %s agent=%s actor=%s" % [tname, str(rosie != null), str(rosie.actor.get("look")) if rosie else "-"])
+
+	# ---------------------------------------------------------------- baby
+	var preg := false
+	if rosie:
+		_top_up()
+		Game.speed = 3
+		var acts: Array = SimActions.socials_for(jack, rosie, true)
+		var wed: Dictionary = {}
+		var tfb: Dictionary = {}
+		for a in acts:
+			if a.get("id", "") == "s_wed":
+				wed = a
+			if a.get("id", "") == "s_try_baby":
+				tfb = a
+		if not wed.is_empty():
+			jack.command({"action": wed, "other": rosie})
+			await _until_game(func(): return Game.rel_status("Jack", tname) == "Married" and jack.phase == "idle", 120.0)
+		acts = SimActions.socials_for(jack, rosie, true)
+		for a in acts:
+			if a.get("id", "") == "s_try_baby":
+				tfb = a
+		if not tfb.is_empty():
+			jack.command({"action": tfb, "other": rosie})
+			await _until_game(func(): return Game.is_pregnant(rosie.index) and jack.phase == "idle", 180.0)
+		preg = Game.is_pregnant(rosie.index)
+	_step("try_for_baby", preg and Game.rel_status("Jack", tname) == "Married" and Game.has_moodlet(rosie.index, "pregnant"),
+		"status %s, %s pregnant=%s, due in %.1f days" % [Game.rel_status("Jack", tname), tname, str(preg),
+		(float(Game.household[rosie.index].pregnancy.due) - Game.total_minutes()) / 1440.0 if preg else -1.0])
+	var nb := Game.household.size()
+	Game.advance_days(3)
+	await _frames(8)
+	var baby_i := -1
+	for k in Game.household.size():
+		if Game.household[k].get("kind", "") == "baby":
+			baby_i = k
+	var bag = sim.agents[baby_i] if baby_i >= 0 and baby_i < sim.agents.size() else null
+	var crib = _find_it("Crib")
+	ports = hud.get("_portraits").size() if hud and hud.get("_portraits") is Array else -1
+	var in_crib: bool = bag != null and crib != null and _flat(bag.actor.global_position, crib.get_parent().global_position) < 0.3 and bag.actor.pose in ["lie", "sleep"]
+	_step("baby_born", baby_i >= 0 and Game.household.size() == nb + 1 and in_crib and ports == Game.household.size() and not Game.is_pregnant(Game.member_index(tname)),
+		"baby %s (%s) parents=%s, in crib=%s h=%.2f m, portraits=%d" % [Game.household[baby_i].name if baby_i >= 0 else "-", Game.age_text(baby_i),
+		str(Game.household[baby_i].parents) if baby_i >= 0 else "-", str(in_crib), LifeStages.actor_height(bag.actor) if bag else 0.0, ports])
+	if bag:
+		await _frame_actor(bag.actor, 30.0)
+		await _shot("baby_crib")
+	# Crib care: the baby is hungry; feed it from the crib's menu.
+	if bag and crib:
+		Game.household[baby_i].needs.hunger = 0.15
+		_top_up()
+		Game.selected = rosie.index
+		await _frames(2)
+		await _open_menu_on(crib)
+		var crows: Array = _menus[-1][1].map(func(a): return str(a.label)) if not _menus.is_empty() else []
+		if crows.is_empty():
+			print("  (crib menu empty: selected=%d rosie=%d sel=%s acts=%s notes=%s)" % [Game.selected, rosie.index, str(sim.selected_agent().display_name() if sim.selected_agent() else null),
+				str(sim.actions_for(crib, rosie.member).map(func(a): return a.label)), str(_notes.slice(-3))])
+		Game.speed = 1
+		await _choose("Feed Baby")
+		var fed_anim := await _until_game(func(): return rosie.anim == "feed_baby", 120.0)
+		if fed_anim:
+			await _frames(6)
+			await _focus(crib.get_parent().global_position, null, 6.0)
+			await _frames(3)
+			await _shot("feed_baby")
+		Game.speed = 3
+		await _until_game(func(): return rosie.last_done == "feed_baby" and rosie.phase == "idle", 120.0)
+		_step("crib_care", Game.household[baby_i].needs.hunger > 0.8 and fed_anim, "crib menu %s; baby hunger 0.15 -> %.2f, bottle anim=%s" % [str(crows), Game.household[baby_i].needs.hunger, str(fed_anim)])
+
+	# ---------------------------------------------------------------- old age
+	jack = _agent("Jack")
+	var kids_before := Game.household.size()
+	jack.member.life_stage = "elder"
+	Game.household[jack.index]["age_days"] = LifeStages.days_in("elder") - 1
+	var jpos: Vector3 = jack.actor.global_position
+	Game.new_day()
+	await _frames(8)
+	var grave = _find_it("Grave of Jack")
+	var aligned := true
+	for k in sim.agents.size():
+		if sim.agents[k] and (sim.agents[k].index != k or sim.agents[k].member != Game.household[k]):
+			aligned = false
+	var mourning: bool = Game.has_moodlet(Game.member_index(tname), "heartbroken") and Game.has_moodlet(Game.member_index("Lily"), "mourning")
+	_step("old_age_grave", Game.member_index("Jack") < 0 and Game.household.size() == kids_before - 1 and grave != null and mourning and aligned and sim.agents.size() == Game.household.size(),
+		"Jack died of old age: grave=%s, %s heartbroken + kids mourning=%s, agents re-indexed=%s" % [str(grave != null), tname, str(mourning), str(aligned)])
+	if grave:
+		await _focus(grave.get_parent().global_position, null, 8.0)
+		await _shot("grave")
+	var sd: Dictionary = Game.save_data()
+	_step("life_saved", sd.household.all(func(m): return m.has("life_stage") and m.has("age_days")) and sd.graves.size() == 1,
+		"save has life stages for %d members, graves=%d" % [sd.household.size(), sd.graves.size()])
+
+	# ---------------------------------------------------------------- restore the usual family
+	Game.aging_enabled = false
+	Game.load_game(snap)
+	main.load_location(Game.location)
+	await _frames(6)
+	Game.speed = 1
+	print("  (restored the household from before the life section: %s at %s)" % [str(Game.household.map(func(m): return m.name)), Game.location])
 
 
 func _s_clock() -> void:

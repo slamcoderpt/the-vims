@@ -48,9 +48,22 @@ signal wishes_changed(index: int)
 signal career_changed(index: int)
 ## Bills arrived, were paid or went overdue (see bills / bills_due_total()).
 signal bills_changed
+## Life stages (see scripts/sim/life_stages.gd): member index grew up into `stage`.
+signal aged_up(index: int, stage: String)
+## A new household member (a townie moved in, a baby was born) at `index` (appended).
+signal member_added(index: int)
+## Member `index` is about to leave the household (reason: "died" | "moved_out").
+signal member_leaving(index: int, reason: String)
+## Member was removed; indices above `index` shifted down by one.
+signal member_removed(index: int, member: Dictionary, reason: String)
+## A pregnancy started / advanced / ended for member index.
+signal pregnancy_changed(index: int)
+## A baby was born (already added at `index`).
+signal baby_born(index: int)
 
 const Careers := preload("res://scripts/sim/careers.gd")
 const Traits := preload("res://scripts/sim/traits.gd")
+const LifeStages := preload("res://scripts/sim/life_stages.gd")
 
 const DAY_NAMES := ["Mon.", "Tue.", "Wed.", "Thu.", "Fri.", "Sat.", "Sun."]
 const SEASONS := ["Spring", "Summer", "Autumn", "Winter"]
@@ -116,14 +129,14 @@ var _mood_acc := 0.0
 ## Townies: non-household people the locations stage, keyed by their look.
 ## They keep their name (and your relationship with them) from lot to lot.
 const TOWNIES := {
-	"npc_0": {"name": "Rosie Maple", "kind": "adult", "trait": "Friendly"},
-	"npc_1": {"name": "Marcus Bell", "kind": "adult", "trait": "Good Sense of Humor"},
-	"npc_2": {"name": "June Harlow", "kind": "adult", "trait": "Neighborly"},
-	"npc_3": {"name": "Omar Reed", "kind": "adult", "trait": "Charismatic"},
-	"npc_4": {"name": "Toby Finch", "kind": "child", "trait": "Artistic"},
-	"npc_5": {"name": "Hana Sato", "kind": "adult", "trait": "Bookworm"},
-	"npc_6": {"name": "Walter Moss", "kind": "adult", "trait": "Grumpy"},
-	"npc_7": {"name": "Kai Ortiz", "kind": "child", "trait": "Athletic"},
+	"npc_0": {"name": "Rosie Maple", "kind": "adult", "trait": "Friendly", "sex": "f", "stage": "young_adult"},
+	"npc_1": {"name": "Marcus Bell", "kind": "adult", "trait": "Good Sense of Humor", "sex": "m", "stage": "adult"},
+	"npc_2": {"name": "June Harlow", "kind": "adult", "trait": "Neighborly", "sex": "f", "stage": "elder"},
+	"npc_3": {"name": "Omar Reed", "kind": "adult", "trait": "Charismatic", "sex": "m", "stage": "adult"},
+	"npc_4": {"name": "Toby Finch", "kind": "child", "trait": "Artistic", "sex": "m", "stage": "child"},
+	"npc_5": {"name": "Hana Sato", "kind": "adult", "trait": "Bookworm", "sex": "f", "stage": "young_adult"},
+	"npc_6": {"name": "Walter Moss", "kind": "adult", "trait": "Grumpy", "sex": "m", "stage": "elder"},
+	"npc_7": {"name": "Kai Ortiz", "kind": "child", "trait": "Athletic", "sex": "m", "stage": "teen"},
 }
 ## Relationship levels (friendship value -100..100), lowest first: [max, label].
 const REL_LEVELS := [[-60.0, "Enemy"], [-20.0, "Disliked"], [25.0, "Acquaintance"],
@@ -138,16 +151,16 @@ func _ready() -> void:
 
 func _default_household() -> void:
 	household = [
-		{"name": "Jack", "kind": "adult", "look": "dad",
+		{"name": "Jack", "kind": "adult", "look": "dad", "sex": "m", "life_stage": "adult", "age_days": 3,
 		 "needs": {"fun": 0.85, "hunger": 0.45, "hygiene": 0.6, "energy": 0.55, "social": 0.35},
 		 "skills": {"Logic": 3.4, "Cooking": 2.15, "Writing": 1.3}},
-		{"name": "Lily", "kind": "child", "look": "bunny_girl",
+		{"name": "Lily", "kind": "child", "look": "bunny_girl", "sex": "f", "life_stage": "child", "age_days": 4, "parents": ["Jack"],
 		 "needs": {"fun": 0.75, "hunger": 0.5, "hygiene": 0.55, "energy": 0.6},
 		 "skills": {"Creativity": 2.6, "Logic": 0.45}},
-		{"name": "Maya", "kind": "child", "look": "cat_girl",
+		{"name": "Maya", "kind": "child", "look": "cat_girl", "sex": "f", "life_stage": "child", "age_days": 2, "parents": ["Jack"],
 		 "needs": {"fun": 0.7, "hunger": 0.75, "energy": 0.4},
 		 "skills": {"Creativity": 0.7}},
-		{"name": "Biscuit", "kind": "dog", "look": "beagle",
+		{"name": "Biscuit", "kind": "dog", "look": "beagle", "sex": "m", "life_stage": "adult", "age_days": 5,
 		 "needs": {"fun": 0.75, "hunger": 0.4},
 		 "skills": {"Fetch": 1.2}},
 	]
@@ -190,6 +203,15 @@ func _ensure_member(m: Dictionary) -> void:
 		m["work"] = {"state": "", "until": 0.0, "start": 0.0, "late": false}
 	if not m.has("homework_day"):
 		m["homework_day"] = -10
+	if not m.has("life_stage"):
+		var k := str(m.get("kind", "adult"))
+		m["life_stage"] = {"child": "child", "baby": "baby"}.get(k, "adult")
+	if not m.has("age_days"):
+		m["age_days"] = 0
+	if not m.has("sex"):
+		m["sex"] = "f" if LifeStages.look_dict(m).get("lashes", false) else "m"
+	if not m.has("parents"):
+		m["parents"] = []
 
 
 func set_tasks(list: Array) -> void:
@@ -483,7 +505,7 @@ func romance(a: String, b: String) -> float:
 
 
 func change_romance(a: String, b: String, delta: float) -> float:
-	if a == b or a == "" or b == "" or (is_family(a) and is_family(b)):
+	if a == b or a == "" or b == "" or not can_romance(a, b):
 		return 0.0
 	var k := rel_key(a, b)
 	if not relationships.has(k):
@@ -680,12 +702,17 @@ func _process(delta: float) -> void:
 	if minutes >= 1440.0:
 		minutes -= 1440.0
 		day += 1
+		if live:
+			new_day()
 	# Needs decay (per in-game hour rates).
 	var hours := dm / 60.0
 	for s in household:
 		var dt: Dictionary = s.get("_decay", {})
+		var floor_v := 0.0
+		if s.get("kind", "") == "baby" and location != "home":
+			floor_v = 0.45   # a babysitter looks after the baby while the family is out
 		for k in s.needs:
-			s.needs[k] = clampf(s.needs[k] - hours * NEED_DECAY.get(k, NEED_DECAY_DEFAULT) * float(dt.get(k, 1.0)), 0.0, 1.0)
+			s.needs[k] = clampf(s.needs[k] - hours * NEED_DECAY.get(k, NEED_DECAY_DEFAULT) * float(dt.get(k, 1.0)), minf(floor_v, s.needs[k]), 1.0)
 	if autosave and live:
 		_save_acc += dm
 		if _save_acc >= AUTOSAVE_EVERY:
@@ -697,6 +724,7 @@ func _process(delta: float) -> void:
 		_decay_relationships(2.0 / 1440.0)
 		if live:
 			update_bills()
+			update_pregnancies()
 	time_changed.emit(day, minutes)
 
 
@@ -1038,7 +1066,8 @@ func save_data() -> Dictionary:
 	return {"version": SAVE_VERSION, "day": day, "minutes": minutes, "season": season, "money": money,
 		"location": location, "selected": selected, "household": hh, "relationships": relationships.duplicate(true),
 		"location_tasks": location_tasks.duplicate(true), "placed": placed.duplicate(true), "uid": _uid,
-		"bills": bills.duplicate(true), "next_bill_at": next_bill_at}
+		"bills": bills.duplicate(true), "next_bill_at": next_bill_at,
+		"graves": graves.duplicate(true), "aging": aging_enabled, "born": _born}
 
 
 func save_game(path := SAVE_PATH) -> bool:
@@ -1073,6 +1102,7 @@ func load_game(path := SAVE_PATH) -> bool:
 			if float(ml.expires) < 0.0:
 				ml.expires = INF
 		_ensure_member(md)
+		LifeStages.register_look(md)
 		hh.append(md)
 	household = hh
 	relationships = d.get("relationships", {})
@@ -1081,14 +1111,18 @@ func load_game(path := SAVE_PATH) -> bool:
 	_uid = int(d.get("uid", _uid))
 	bills = d.get("bills", [])
 	next_bill_at = float(d.get("next_bill_at", -1.0))
+	graves = d.get("graves", [])
+	aging_enabled = bool(d.get("aging", true))
+	_born = int(d.get("born", 0))
 	var lt: Array = location_tasks.get(location, [])
 	tasks.clear()
 	for t in lt:
 		tasks.append(t)
 	for i in household.size():
 		_recompute_mood(i, false)
-	selected = clampi(int(d.get("selected", 0)), 0, household.size() - 1)
+	# Household first (the HUD rebuilds its cards), then the selection.
 	household_changed.emit()
+	selected = clampi(int(d.get("selected", 0)), 0, household.size() - 1)
 	tasks_changed.emit()
 	time_changed.emit(day, minutes)
 	return true
@@ -1103,3 +1137,407 @@ func _notification(what: int) -> void:
 	# Phones kill backgrounded apps; browsers close tabs: save on the way out.
 	if autosave and live and what in [NOTIFICATION_APPLICATION_PAUSED, NOTIFICATION_WM_CLOSE_REQUEST, NOTIFICATION_APPLICATION_FOCUS_OUT]:
 		save_game()
+
+
+# =================================================================== life: aging, romance, babies
+
+## Sims 3 aging (Options > Aging). Off in automated playtests outside the
+## life section so kids don't grow up mid-test.
+var aging_enabled := true
+## Household members who died: [{name, look, look_def, stage, day, cause, uid}]
+## (uid = the placed grave on the home lot, -1 until it is placed).
+var graves: Array = []
+var _born := 0
+const PREGNANCY_DAYS := 3
+const MAX_HOUSEHOLD := 8
+
+
+func life_stage(i: int) -> String:
+	if i < 0 or i >= household.size():
+		return ""
+	return str(household[i].get("life_stage", "adult"))
+
+
+func age_days(i: int) -> int:
+	if i < 0 or i >= household.size():
+		return 0
+	return int(household[i].get("age_days", 0))
+
+
+## Days until member i's next birthday (or, for elders, their life expectancy).
+func days_to_birthday(i: int) -> int:
+	if i < 0 or i >= household.size():
+		return 0
+	var m: Dictionary = household[i]
+	return maxi(0, LifeStages.days_in(life_stage(i), str(m.get("kind", ""))) - age_days(i))
+
+
+## "Teen · 3 days to Young Adult" for the panels.
+func age_text(i: int) -> String:
+	if i < 0 or i >= household.size():
+		return ""
+	var m: Dictionary = household[i]
+	var st := life_stage(i)
+	var nm := LifeStages.stage_name(st)
+	if m.get("kind", "") == "dog" and st == "adult":
+		nm = "Adult Dog"
+	var nxt := LifeStages.next_stage(st, str(m.get("kind", "")))
+	var d := days_to_birthday(i)
+	if nxt == "":
+		return "%s · day %d" % [nm, age_days(i) + 1]
+	return "%s · %s to %s" % [nm, "%d day%s" % [d, "" if d == 1 else "s"] if d > 0 else "birthday today", LifeStages.stage_name(nxt)]
+
+
+## Kind (adult / child / baby / dog) of anyone: member or townie.
+func kind_of(person: String) -> String:
+	var i := member_index(person)
+	if i >= 0:
+		return str(household[i].get("kind", "adult"))
+	for k in TOWNIES:
+		if TOWNIES[k].name == person:
+			return str(TOWNIES[k].kind)
+	return "adult"
+
+
+func sex_of(person: String) -> String:
+	var i := member_index(person)
+	if i >= 0:
+		return str(household[i].get("sex", "m"))
+	for k in TOWNIES:
+		if TOWNIES[k].name == person:
+			return str(TOWNIES[k].get("sex", "m"))
+	return "m"
+
+
+func stage_of(person: String) -> String:
+	var i := member_index(person)
+	if i >= 0:
+		return life_stage(i)
+	for k in TOWNIES:
+		if TOWNIES[k].name == person:
+			return str(TOWNIES[k].get("stage", "adult"))
+	return "adult"
+
+
+func parents_of(person: String) -> Array:
+	var i := member_index(person)
+	if i >= 0:
+		return household[i].get("parents", [])
+	return []
+
+
+## Parent / child / siblings: never romance.
+func blood_related(a: String, b: String) -> bool:
+	var pa := parents_of(a)
+	var pb := parents_of(b)
+	if a in pb or b in pa:
+		return true
+	for p in pa:
+		if p in pb:
+			return true
+	return false
+
+
+## Can these two have a romance? Adults (young adult and up), not related.
+func can_romance(a: String, b: String) -> bool:
+	if a == b or kind_of(a) != "adult" or kind_of(b) != "adult":
+		return false
+	if stage_of(a) == "teen" or stage_of(b) == "teen":
+		return false
+	return not blood_related(a, b)
+
+
+## Partner name of member i ("" if single): steady / engaged / married.
+func partner_of(person: String) -> String:
+	for k in relationships:
+		var st := str(relationships[k].get("status", ""))
+		if st in ["Dating", "Engaged", "Married"]:
+			var parts: PackedStringArray = (k as String).split("|")
+			if parts.size() == 2 and person in parts:
+				return parts[1] if parts[0] == person else parts[0]
+	return ""
+
+
+## Grow member i up to the next life stage (cake or birthday). Returns the new
+## stage ("" if there is none).
+func age_up(i: int, party := false) -> String:
+	if i < 0 or i >= household.size():
+		return ""
+	var m: Dictionary = household[i]
+	var kind := str(m.get("kind", "adult"))
+	var st := life_stage(i)
+	var nxt := LifeStages.next_stage(st, kind)
+	if nxt == "":
+		return ""
+	m["life_stage"] = nxt
+	m["age_days"] = 0
+	if kind != "dog":
+		var nk: String = LifeStages.KIND.get(nxt, kind)
+		if nk != kind:
+			m["kind"] = nk
+			if nk == "adult" and not m.needs.has("social"):
+				m.needs["social"] = 0.6
+		# School from child on, none for babies / toddlers; school ends at young adult.
+		var c: Dictionary = m.get("career", {})
+		if nxt in ["child", "teen"] and c.is_empty():
+			m["career"] = Careers.new_career("school")
+		elif nxt == "young_adult" and Careers.is_school(c):
+			m["career"] = {}
+		elif nxt == "elder" and not c.is_empty() and not Careers.is_school(c):
+			# Retire with a daily pension (Sims 3: elders can retire).
+			m["pension"] = Careers.wage(c) * 3
+			m["career"] = {}
+			notify.emit("%s retired · pension $%d a day" % [m.name, int(m.pension)], "money")
+		# A new trait at some birthdays (Sims 3 picks one as kids grow up).
+		var tr: Array = m.get("traits", [])
+		if tr.size() < int(LifeStages.TRAIT_SLOTS.get(nxt, 3)):
+			var pool: Array = []
+			for t in Traits.TRAITS:
+				if not t in tr and not t in ["Loyal"]:
+					pool.append(t)
+			if not pool.is_empty():
+				var pick: String = pool[(hash(str(m.name) + nxt) & 0x7fffffff) % pool.size()]
+				tr.append(pick)
+				m["traits"] = tr
+				notify.emit("%s gained a trait: %s" % [m.name, pick], Traits.icon(pick))
+		m["_decay"] = Traits.decay_table(m)
+	if party:
+		add_moodlet(i, "birthday", "Birthday Party!", "cake", 18.0, 12.0, "Blew out the candles")
+	else:
+		add_moodlet(i, "birthday", "Had a Birthday", "cake", 8.0, 8.0, "Grew up into a %s" % LifeStages.stage_name(nxt))
+	if nxt == "elder":
+		add_moodlet(i, "old_bones", "Creaky Joints", "need_energy", -4.0, 24.0, "Getting older")
+	notify.emit("%s grew up into %s %s!" % [m.name, "an" if nxt in ["adult", "elder"] else "a", LifeStages.stage_name(nxt)], "cake")
+	aged_up.emit(i, nxt)
+	household_changed.emit()
+	return nxt
+
+
+## Midnight: everyone is a day older; birthdays and old age (live play).
+func new_day() -> void:
+	for i in household.size():
+		var pen := int(household[i].get("pension", 0))
+		if pen > 0:
+			add_money(pen)
+	if not aging_enabled:
+		return
+	for i in range(household.size() - 1, -1, -1):
+		var m: Dictionary = household[i]
+		m["age_days"] = int(m.get("age_days", 0)) + 1
+		var kind := str(m.get("kind", "adult"))
+		if int(m.age_days) < LifeStages.days_in(life_stage(i), kind):
+			if int(m.age_days) == LifeStages.days_in(life_stage(i), kind) - 1 and LifeStages.next_stage(life_stage(i), kind) != "":
+				notify.emit("%s's birthday is tomorrow · bake a cake!" % m.name, "cake")
+			continue
+		if LifeStages.next_stage(life_stage(i), kind) == "":
+			die(i, "old age")
+		else:
+			age_up(i)
+
+
+## Advance the calendar by n days at once (tests, "skip ahead").
+func advance_days(n: int) -> void:
+	for k in n:
+		day += 1
+		new_day()
+		update_pregnancies()
+	time_changed.emit(day, minutes)
+
+
+## Member i dies: a grave on the home lot, mourning for everyone who loved them.
+func die(i: int, cause := "old age") -> void:
+	if i < 0 or i >= household.size():
+		return
+	var m: Dictionary = household[i]
+	var nm: String = m.name
+	graves.append({"name": nm, "look": m.get("look", ""), "look_def": m.get("look_def", {}), "stage": life_stage(i),
+		"day": day, "cause": cause, "uid": -1, "kind": m.get("kind", "adult")})
+	var partner := partner_of(nm)
+	notify.emit("%s has passed away (%s)" % [nm, cause], "dots")
+	remove_member(i, "died")
+	for k in household.size():
+		var other: String = household[k].name
+		if other == partner:
+			add_moodlet(k, "heartbroken", "Heartbroken", "heart", -35.0, 72.0, "Lost %s" % nm)
+			set_rel_status(other, nm, "")
+		elif has_met(other, nm) and rel(other, nm) > 0.0:
+			add_moodlet(k, "mourning", "Mourning", "dots", -20.0, 48.0, "Missing %s" % nm)
+
+
+## Remove member i from the household (death, moving out). Sim layers listen
+## to member_leaving (still at index i) and member_removed (indices shifted).
+func remove_member(i: int, reason: String) -> void:
+	if i < 0 or i >= household.size():
+		return
+	member_leaving.emit(i, reason)
+	var m: Dictionary = household[i]
+	household.remove_at(i)
+	var sel := selected
+	if sel == i:
+		sel = 0
+	elif sel > i:
+		sel -= 1
+	member_removed.emit(i, m, reason)
+	household_changed.emit()
+	selected = clampi(sel, 0, maxi(0, household.size() - 1))
+
+
+## Append a member (fills defaults); returns its index.
+func add_member(m: Dictionary) -> int:
+	_ensure_member(m)
+	LifeStages.register_look(m)
+	household.append(m)
+	var i := household.size() - 1
+	_recompute_mood(i, false)
+	member_added.emit(i)
+	household_changed.emit()
+	return i
+
+
+## A townie joins the household (Ask to Move In). Returns the index or -1.
+func move_in(townie_name: String) -> int:
+	if is_family(townie_name) or household.size() >= MAX_HOUSEHOLD:
+		return -1
+	var look := ""
+	var info: Dictionary = {}
+	for k in TOWNIES:
+		if TOWNIES[k].name == townie_name:
+			look = k
+			info = TOWNIES[k]
+	if look == "":
+		return -1
+	var kind := str(info.get("kind", "adult"))
+	var tr: Array = []
+	if Traits.TRAITS.has(str(info.get("trait", ""))):
+		tr.append(info.trait)
+	else:
+		tr.append("Friendly")
+	var m := {"name": townie_name, "kind": kind, "look": look, "sex": info.get("sex", "f"),
+		"life_stage": info.get("stage", "young_adult"), "age_days": 1, "parents": [],
+		"needs": {"fun": 0.7, "hunger": 0.6, "hygiene": 0.75, "energy": 0.7, "social": 0.7} if kind == "adult" else {"fun": 0.7, "hunger": 0.6, "hygiene": 0.7, "energy": 0.7},
+		"skills": {"Charisma": 2.0, "Cooking": 1.0}, "traits": tr, "moved_in": day}
+	if kind == "child":
+		m["career"] = Careers.new_career("school")
+	var i := add_member(m)
+	# Everyone at home gets to know the newcomer.
+	for k in household.size():
+		var other: String = household[k].name
+		if other != townie_name and not has_met(other, townie_name):
+			_seed_rel(other, townie_name, 25.0)
+	add_moodlet(i, "new_home", "New Home", "home", 12.0, 24.0, "Moved in with the family")
+	var partner := partner_of(townie_name)
+	var pi := member_index(partner)
+	if pi >= 0:
+		add_moodlet(pi, "moved_in", "Moved In Together", "heart", 15.0, 24.0, "%s moved in" % townie_name)
+	add_money(1500)
+	notify.emit("%s moved in (and brought $1,500)" % townie_name, "home")
+	return i
+
+
+## Who would carry the baby of a and b ("" = they can't: same sex, too old...).
+func baby_carrier(a: String, b: String) -> String:
+	var ia := member_index(a)
+	var ib := member_index(b)
+	if ia < 0 or ib < 0 or not can_romance(a, b):
+		return ""
+	if sex_of(a) == sex_of(b) or household.size() >= MAX_HOUSEHOLD:
+		return ""
+	var mom := a if sex_of(a) == "f" else b
+	if life_stage(member_index(mom)) == "elder" or household[member_index(mom)].has("pregnancy"):
+		return ""
+	return mom
+
+
+func is_pregnant(i: int) -> bool:
+	return i >= 0 and i < household.size() and household[i].has("pregnancy")
+
+
+## Try for Baby between household members a and b. chance 0..1.
+func try_for_baby(a: String, b: String, chance := 0.8) -> bool:
+	var mom := baby_carrier(a, b)
+	if mom == "":
+		return false
+	if randf() >= chance:
+		notify.emit("No baby this time... try again later", "heart")
+		return false
+	var mi := member_index(mom)
+	var now := total_minutes()
+	household[mi]["pregnancy"] = {"partner": b if mom == a else a, "start": now, "due": now + PREGNANCY_DAYS * 1440.0, "stage": 0}
+	add_moodlet(mi, "pregnant", "Pregnant", "heart", 10.0, 0.0, "A baby is on the way")
+	var fi := member_index(b if mom == a else a)
+	add_moodlet(fi, "expecting", "Expecting a Baby", "heart", 12.0, 72.0, "%s is pregnant" % mom)
+	notify.emit("%s is pregnant!" % mom, "heart")
+	pregnancy_changed.emit(mi)
+	return true
+
+
+## Pregnancy beats: morning sickness, showing, labor, birth (2-minute tick).
+func update_pregnancies() -> void:
+	var now := total_minutes()
+	for i in range(household.size() - 1, -1, -1):
+		var p = household[i].get("pregnancy")
+		if not p is Dictionary:
+			continue
+		var frac: float = (now - float(p.start)) / maxf(1.0, float(p.due) - float(p.start))
+		var st := 0 if frac < 0.33 else (1 if frac < 0.66 else 2)
+		if st > int(p.get("stage", 0)) and frac < 1.0:
+			p.stage = st
+			if st == 1:
+				add_moodlet(i, "nauseous", "Nauseous", "need_hunger", -8.0, 6.0, "Morning sickness")
+				notify.emit("%s is showing" % household[i].name, "heart")
+			elif st == 2:
+				add_moodlet(i, "big_belly", "Uncomfortably Pregnant", "need_energy", -6.0, 0.0, "Any day now")
+			pregnancy_changed.emit(i)
+		if now >= float(p.due):
+			give_birth(i)
+
+
+## The baby arrives. Returns the baby's index (-1 if the house is full).
+func give_birth(i: int) -> int:
+	if not is_pregnant(i):
+		return -1
+	var mom: Dictionary = household[i]
+	var p: Dictionary = mom.pregnancy
+	mom.erase("pregnancy")
+	remove_moodlet(i, "pregnant")
+	remove_moodlet(i, "big_belly")
+	if household.size() >= MAX_HOUSEHOLD:
+		pregnancy_changed.emit(i)
+		return -1
+	var dad_name := str(p.get("partner", ""))
+	var di := member_index(dad_name)
+	_born += 1
+	var sex := "f" if (hash(str(mom.name) + str(_born) + str(day)) & 1) == 0 else "m"
+	var names: Array = LifeStages.GIRL_NAMES if sex == "f" else LifeStages.BOY_NAMES
+	var nm := ""
+	for k in names.size():
+		var cand: String = names[(k + _born * 3) % names.size()]
+		if member_index(cand) < 0 and not cand in townie_names():
+			nm = cand
+			break
+	if nm == "":
+		nm = "Baby %d" % _born
+	var look_def := LifeStages.baby_look(sex, LifeStages.look_dict(mom), LifeStages.look_dict(household[di]) if di >= 0 else {}, _born * 7919 + day)
+	var parents: Array = [str(mom.name)]
+	if dad_name != "":
+		parents.append(dad_name)
+	var baby := {"name": nm, "kind": "baby", "look": "born_%d" % _born, "look_def": look_def, "sex": sex,
+		"life_stage": "baby", "age_days": 0, "parents": parents,
+		"needs": {"hunger": 0.75, "energy": 0.8, "hygiene": 0.8, "social": 0.7, "fun": 0.7},
+		"skills": {}, "traits": [["Artistic", "Friendly", "Virtuoso", "Hyper", "Bookworm"][_born % 5]], "career": {}}
+	pregnancy_changed.emit(i)
+	var bi := add_member(baby)
+	for k in household.size():
+		if k == bi:
+			continue
+		var other: String = household[k].name
+		var fam: bool = other in parents
+		_seed_rel(other, nm, 60.0 if fam else 30.0)
+		if fam:
+			add_moodlet(k, "new_baby", "It's a %s!" % ("Girl" if sex == "f" else "Boy"), "heart", 25.0, 24.0, "Welcome, %s" % nm)
+		elif household[k].get("kind", "") != "dog":
+			add_moodlet(k, "new_sibling", "New Baby in the House", "heart", 10.0, 24.0, "Welcome, %s" % nm)
+	add_moodlet(i, "new_mom", "Exhausted New Parent", "need_energy", -8.0, 12.0, "Just gave birth")
+	notify.emit("%s had a baby %s: %s!" % [mom.name, "girl" if sex == "f" else "boy", nm], "heart")
+	baby_born.emit(bi)
+	return bi

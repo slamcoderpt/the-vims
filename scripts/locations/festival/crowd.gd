@@ -81,6 +81,11 @@ func build(parent: Node3D, stalls, stage) -> void:
 		# r12: a chatting pair between the game booth and the stage crowd.
 		["npc_2", Vector3(2.85, 0, -4.75), Vector3(3.6, 0, -4.2), "talk"],
 		["npc_4", Vector3(3.55, 0, -4.3), Vector3(2.8, 0, -4.9), "talk"],
+		# r13: more townsfolk on the open cobbles (fill the mid ground).
+		["npc_4", Vector3(0.45, 0, -2.75), Vector3(0.9, 0, -4.4), "wave"],
+		["npc_0", Vector3(-5.75, 0, -0.55), Vector3(-4.3, 0, -2.0), "talk"],
+		["npc_7", Vector3(-2.2, 0, -3.4), Vector3(-2.6, 0, -6.0), "walk"],
+		["npc_1", Vector3(5.7, 0, -2.0), Vector3(4.6, 0, -1.2), "talk"],
 	]
 	_far_folk(parent, stage.node.transform)
 	var i := 1
@@ -91,8 +96,8 @@ func build(parent: Node3D, stalls, stage) -> void:
 		i += 1
 	# Seated at the picnic table (bench tops at 0.5 m).
 	var seated := [
-		["npc_2", Vector3(-4.4, 0, K.dz(-8.0) - 0.25), Vector3(-4.4, 0, -4.0)],
-		["npc_6", Vector3(-3.7, 0, K.dz(-8.0) + 1.0), Vector3(-3.7, 0, -11.0)],
+		# r13: a couple on the bench by the fountain.
+		["npc_5", Vector3(-5.05, 0, -4.32), Vector3(-5.05, 0, 2.0)],
 	]
 	for s: Array in seated:
 		var key := "neighbor_%d" % i
@@ -121,7 +126,9 @@ func _far_folk(parent: Node3D, stage_xf: Transform3D) -> void:
 			[-3.9, -13.6, 30], [0.8, -14.8, 0], [-0.9, -16.5, 270],
 			[-5.8, -14.8, 90], [3.2, -16.6, 180], [-2.6, -18.6, 0], [1.6, -19.8, 90],
 			[-7.4, -17.6, 45], [5.6, -19.4, 270], [-4.4, -20.6, 0]]:
-		if not _on_stage(stage_xf, p[0], K.dz(p[1])):
+		# r13: nobody past z -9.4 (they would stand at the foot of the
+		# forced-perspective town hall and dwarf it, or hide behind it).
+		if K.dz(p[1]) > -9.4 and not _on_stage(stage_xf, p[0], K.dz(p[1])):
 			F.add(p[0], K.dz(p[1]), p[2], seed % 5 == 0, seed)
 		seed += 1
 	# Mid ground: browsing the side stalls, queueing at the game booth,
@@ -135,8 +142,13 @@ func _far_folk(parent: Node3D, stage_xf: Transform3D) -> void:
 			[8.2, -4.0, 200, false], [9.0, -4.6, 120, false],
 			[4.4, -6.4, 0, false],
 			[0.2, -13.6, 180, false],
-			[-4.6, -11.6, 220, false], [10.4, -8.0, 300, true]]:
-		if not _on_stage(stage_xf, p[0], K.dz(p[1])):
+			[-4.6, -11.6, 220, false], [10.4, -8.0, 300, true],
+			# r13: visible gaps of the standard camera: fountain rim, behind
+			# the game booth, right of the crafts table, left walkway.
+			[-1.0, -5.75, 0, false], [-3.6, -5.6, 90, true], [1.7, -6.1, 0, false],
+			[6.4, -1.0, 270, false], [6.6, -3.6, 180, true], [-3.0, -7.9, 0, false],
+			[-6.5, -2.4, 90, false], [-7.4, -1.2, 0, true]]:
+		if K.dz(p[1]) > -9.4 and not _on_stage(stage_xf, p[0], K.dz(p[1])):
 			F.add(p[0], K.dz(p[1]), p[2], p[3], seed)
 		seed += 1
 	F.build(parent, U * 1.0)

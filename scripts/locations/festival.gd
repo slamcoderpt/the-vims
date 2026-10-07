@@ -24,9 +24,20 @@ const Crowd := preload("res://scripts/locations/festival/crowd.gd")
 ## this camera: depth behind z = -5 is compressed (K.dz) so the fountain,
 ## stage and town-hall front all land in the upper third, with short-trunked
 ## trees whose canopies drop into the top band.
-const TOWN_SCALE := 0.58
+## Round 13: the backdrop is forced perspective (see TOWN_* below): a scaled,
+## camera-facing, sunk town hall whose clock sits in the top band at the
+## reference's screen position, flanked by small far crowns; near crowns
+## frame the top-left; the FALL TREATS stall is real-world height (awning
+## ~3.2 m) so it no longer walls off the top-left of the frame.
+## r13: the town hall is a forced-perspective backdrop. Scaled down, turned
+## to face the camera (yaw 12) and standing below the plaza level (the cobble
+## plane hides its ground floor), so the clock tower + upper floors fill the
+## top band of the standard 35 deg camera right behind the fountain, like
+## the reference skyline. TOWN_ANCHOR is where the tower front meets y = 0.
+const TOWN_SCALE := 0.42
+const TOWN_YAW := 12.0
+const TOWN_ANCHOR := Vector3(-2.6, -1.35, -11.4)
 const STAGE_POS := Vector3(2.7, 0, -8.5)  # r12: upper centre-right, clear of the HUD task panel
-const TOWN_POS := Vector3(0.0, -0.3, 2.75)  # hall front at z ~ -14.05 (= K.dz(-22.4))
 
 var stalls
 var stage
@@ -44,10 +55,12 @@ func build() -> void:
 	Trees.new().build(self)
 	var town_root := Node3D.new()
 	town_root.name = "Town"
-	town_root.position = TOWN_POS
-	town_root.scale = Vector3.ONE * TOWN_SCALE
+	var tb := Basis(Vector3.UP, deg_to_rad(TOWN_YAW))
+	town_root.transform = Transform3D(tb.scaled(Vector3.ONE * TOWN_SCALE),
+		TOWN_ANCHOR - tb * (Vector3(0, 0, -28.5) * TOWN_SCALE))
 	add_child(town_root)
 	town = Town.new()
+	town.cull_y = -TOWN_ANCHOR.y / TOWN_SCALE - 0.3
 	town.build(town_root)
 	stalls = Stalls.new()
 	stalls.build(self)
@@ -75,7 +88,9 @@ func _lights() -> void:
 	_add_halos(pts, stage.glow_points, 0.5)
 	_add_halos(pts, decor.glow_points, 0.55)
 	for w: Vector3 in town.window_glows:
-		pts.append([TOWN_POS + w * TOWN_SCALE, 1.0 * TOWN_SCALE, Color(0.25, 0.16, 0.08, 0.5)])
+		var wp: Vector3 = town.node.transform * w
+		if wp.y > 0.2:
+			pts.append([wp, 1.0 * TOWN_SCALE, Color(0.25, 0.16, 0.08, 0.5)])
 	halos = K.halos(pts)
 	add_child(halos)
 	# A handful of real lights (each costs an extra pass per lit mesh on GL Compatibility).
@@ -97,7 +112,7 @@ func _interactables() -> void:
 		 "money": -4, "needs": {"hunger": 0.15, "fun": 0.1}},
 		{"id": "chat_vendor", "label": "Chat", "icon": "chat", "minutes": 10.0, "pose": "talk",
 		 "needs": {"social": 0.2}, "task": "Meet 3 Neighbors", "who": ["adult", "child"]},
-	], Vector3(3.2, 3.8, 1.6), Vector3(0, 1.9, 0.1), Vector3(0.2, 0, 1.6))
+	], Vector3(3.2, 3.4, 1.6), Vector3(0, 1.7, 0.1), Vector3(0.2, 0, 1.6))
 	Interactable.attach(stalls.game, "Festival Game", [
 		{"id": "play_game", "label": "Play Game", "icon": "target", "minutes": 20.0, "pose": "play",
 		 "money": -2, "needs": {"fun": 0.35}, "task": "Play Festival Game", "who": ["adult", "child"]},
@@ -181,8 +196,8 @@ func lighting_profile() -> Dictionary:
 		"fog_day": Color(0.78, 0.8, 0.88), "fog_night": Color(0.12, 0.12, 0.26),
 		"fog_density": 0.0007, "exposure": 0.98, "shadow_distance": 45.0,
 		"lamp_night_mult": 1.6,
-		"post": {"focus_y": 0.49, "band": 0.35, "falloff": 0.15, "blur_px": 3.0, "top_boost": 0.6,
-			"saturation": 1.1, "contrast": 1.12, "tint": Vector3(1.02, 1.0, 0.96),
+		"post": {"focus_y": 0.47, "band": 0.38, "falloff": 0.15, "blur_px": 3.0, "top_boost": 0.6,
+			"saturation": 1.1, "contrast": 1.12, "tint": Vector3(1.05, 0.99, 0.94),
 			"lift": Vector3(0.0, 0.0, 0.0), "vignette": 0.22, "gamma": 1.04},
 	}
 
@@ -222,7 +237,7 @@ func _print_stats() -> void:
 				var idx = arr[Mesh.ARRAY_INDEX]
 				var n: int = (idx.size() / 3) if idx != null and idx.size() > 0 else (arr[Mesh.ARRAY_VERTEX] as PackedVector3Array).size() / 3
 				tris += n
-				if n > 2500:
+				if n > 800 and not (mi.get_parent() is Skeleton3D):
 					print("  mesh ", mi.get_parent().name, "/", mi.name, " vis=", mi.is_visible_in_tree(), " surf ", si, " tris ", n)
 	var cam := get_viewport().get_camera_3d()
 	if cam:
@@ -237,7 +252,7 @@ func _print_stats() -> void:
 			if n:
 				print("SCREEN %s %s" % [k, cam.unproject_position(n.global_position).round()])
 		print("SCREEN FountainSpot ", cam.unproject_position(Decor.FOUNTAIN).round())
-		var cw: Vector3 = TOWN_POS + town.clock_center * TOWN_SCALE
+		var cw: Vector3 = town.node.transform * town.clock_center
 		print("SCREEN Clock world=%s px=%s cam=%s" % [cw, cam.unproject_position(cw).round(), cam.global_position])
 	print("FESTIVAL_STATS meshes=%d tris=%d draws=%d prims=%d" % [meshes, tris,
 		RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME),

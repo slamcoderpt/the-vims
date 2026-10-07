@@ -203,8 +203,10 @@ static func m_nightstand(vb: VoxelBuilder, v: int) -> void:
 ## Single bed 1.12 x 2.12 m, mattress top at y=8 (0.5 m). Head at z=0.
 ## v0 pink gingham (bunny girl), v1 navy star quilt (cat girl), v2 parents' double.
 static func m_bed(vb: VoxelBuilder, v: int) -> void:
-	if v == 3:
-		_bunny_canopy_bed(vb)
+	if v == 3 or v == 4:
+		# v4: the drape on the model's -X side left off (that side faces the
+		# camera when the bed stands sideways to the wall, rot 1).
+		_bunny_canopy_bed(vb, v == 4)
 		return
 	var w := 18 if v != 2 else 28
 	var l := 28 if v != 2 else 34
@@ -272,7 +274,7 @@ static func m_bed(vb: VoxelBuilder, v: int) -> void:
 ## Raised pink bunny bed with a tall headboard, canopy crown + sheer drapes
 ## at the head end, two pillows, plaid quilt and a frilled bed skirt (ref3).
 ## 18 x 40 x 28 cells; mattress top at y = 10 (lie height 10 cells).
-static func _bunny_canopy_bed(vb: VoxelBuilder) -> void:
+static func _bunny_canopy_bed(vb: VoxelBuilder, open_side := false) -> void:
 	var w := 18
 	var l := 28
 	var pink := Color("f29ab6")
@@ -323,7 +325,7 @@ static func _bunny_canopy_bed(vb: VoxelBuilder) -> void:
 			V.p(vb, x, 30, 4, pink_l)
 	V.b(vb, -2, 30, -1, 1, 1, 6, pink_l); V.b(vb, w + 1, 30, -1, 1, 1, 6, pink_l)
 	var sheer := V.noisy(Color("fde9ef"), 0.03)
-	for side: int in [-2, w + 1]:
+	for side: int in ([w + 1] if open_side else [-2, w + 1]):
 		for y in range(12, 30):
 			var depth := 4 if y > 25 else (2 if y < 18 else 3)
 			V.b(vb, side, y, 0, 1, 1, depth, sheer)

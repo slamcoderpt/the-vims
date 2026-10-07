@@ -126,14 +126,34 @@ func setup(p_world, i: int, p_actor: Node3D) -> void:
 	index = i
 	member = Game.household[i]
 	actor = p_actor
-	kind = member.get("kind", "adult")
-	if actor.has_method("kind"):
+	_bind_body()
+
+
+## Kind and walking speed from the member (life stage) and the actor's body.
+func _bind_body() -> void:
+	kind = member.get("kind", "")
+	if kind == "" and actor.has_method("kind"):
 		kind = actor.kind()
+	autonomy = kind != "baby"
 	base_speed = actor.get("walk_speed") if actor.get("walk_speed") != null else 1.3
 	if base_speed <= 0.0:
 		base_speed = 1.3
 	# A brisk Sims walk: crossing the house shouldn't eat an hour of the day.
 	base_speed *= WALK_BOOST
+	if str(member.get("life_stage", "")) == "toddler":
+		base_speed *= 0.6
+	elif str(member.get("life_stage", "")) == "elder":
+		base_speed *= 0.85
+
+
+## The sim grew up (or otherwise got a new body): drive the new actor.
+func rebind(p_actor: Node3D) -> void:
+	actor = p_actor
+	_partner_anim_on = null
+	_bind_body()
+	phase = "idle"
+	order = {}
+	_sync_queue()
 
 
 func display_name() -> String:
@@ -432,6 +452,9 @@ func is_unreachable(t) -> bool:
 func tick(delta: float, dm: float) -> void:
 	if actor == null or not is_instance_valid(actor):
 		return
+	if kind == "baby":
+		_tick_baby(delta, dm)
+		return
 	if phase == "away":
 		_tick_away(dm)
 		return
@@ -458,6 +481,32 @@ func tick(delta: float, dm: float) -> void:
 		"act":
 			if not _tick_beat(dm):
 				_act(dm)
+
+
+## Babies stay in the crib: they sleep when tired, fuss (thought bubble +
+## a notification) when a need runs low, and the grown-ups come to care.
+var _fuss_t := 0.0
+
+
+func _tick_baby(delta: float, dm: float) -> void:
+	if dm <= 0.0:
+		return
+	_need_acc += dm
+	if _need_acc < NEED_CHECK_EVERY:
+		return
+	_need_acc = 0.0
+	check_needs()
+	var want := "sleep" if float(member.needs.get("energy", 1.0)) < 0.45 else "lie"
+	if actor.get("pose") != want:
+		actor.set_pose(want)
+	_fuss_t -= NEED_CHECK_EVERY
+	var low := lowest_need()
+	if low != "" and float(member.needs[low]) < 0.3 and _fuss_t <= 0.0:
+		_fuss_t = 45.0
+		Game.show_bubble(actor, {"kind": "thought", "icon": SimActions.need_icon(low, kind), "id": "thought", "ttl": 4.0})
+		if float(member.needs[low]) < 0.15:
+			Game.notify.emit("%s is crying: %s" % [display_name(), {"hunger": "hungry", "energy": "sleepy", "hygiene": "needs a diaper change",
+				"fun": "bored", "social": "wants a cuddle"}.get(low, "needs care")], SimActions.need_icon(low, kind))
 
 
 func _idle(delta: float, dm: float) -> void:
@@ -1010,6 +1059,15 @@ func _apply_social(a: Dictionary) -> bool:
 			reject_p = 0.3
 		elif info.get("trait", "") == "Grumpy":
 			reject_p = 0.2
+	if a.has("accept_rom") and (Game.romance(me, partner) < float(a.accept_rom) or Game.rel(me, partner) < 40.0
+			or (other != null and Game.mood_band(other.index) == "bad")):
+		# Sims 3: a proposal too early is turned down.
+		Game.change_rel(me, partner, -8.0)
+		Game.change_romance(me, partner, -10.0)
+		Game.add_moodlet(index, "proposal_rejected", "Proposal Rejected", "dots", -20.0, 12.0, "%s said no" % partner)
+		Game.notify.emit("%s turned down %s's proposal" % [partner, me], "dots")
+		_say("Oh...", "dots")
+		return true
 	if a.get("id", "") == "s_joke" and info.get("trait", "") == "Good Sense of Humor":
 		delta *= 1.5
 	if delta > 0.0:
@@ -1200,7 +1258,7 @@ func check_needs() -> void:
 			Game.show_bubble(actor, {"kind": "thought", "icon": SimActions.need_icon(k, kind), "id": "thought", "ttl": 3.0})
 		elif v > RECOVER:
 			_warned[k] = false
-	if _force_cool > 0.0:
+	if _force_cool > 0.0 or kind == "baby":
 		return
 	# Consequences at zero.
 	if needs.has("energy") and needs.energy <= 0.0 and kind != "dog" and not _doing_need("energy"):
