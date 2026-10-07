@@ -121,8 +121,8 @@ func camera_home() -> Dictionary:
 
 func lighting_profile() -> Dictionary:
 	return {
-		"sun_heading": 205.0, "sun_elev": 34.0, "sun_energy": 1.95,
-		"sun_color_day": Color(1.0, 0.87, 0.68),
+		"sun_heading": 205.0, "sun_elev": 34.0, "sun_energy": 1.75,
+		"sun_color_day": Color(1.0, 0.83, 0.6),
 		"ambient_day": Color(0.9, 0.86, 0.82), "ambient_energy": 0.52,
 		"ambient_night": Color(0.66, 0.54, 0.52), "ambient_night_energy": 0.34, "lamp_night_mult": 3.8,
 		"sky_day": Color(0.64, 0.8, 0.94), "sky_night": Color(0.07, 0.09, 0.22),
@@ -828,11 +828,11 @@ func _build_office() -> void:
 	_wallput(R, "frame", "-x", fx, -2.55, y + 1.8, 0)
 	_wallput(R, "poster", "-x", fx, -1.8, y + 1.5, 4)
 	_lamp(Vector3(fx + 1.6, y + 1.7, -2.2), 0.6, 2.6, 0.35, Color(0.75, 0.85, 1.0), 0.0)
-	var fcab := _put(R, "filing_cabinet", Vector3(fx, y, -1.25), 1)
+	var fcab := _put(R, "filing_cabinet", Vector3(fx, y, -1.25), 1, 1)
 	_putm(R, "printer_hd", Vector3(fx + 0.02, fcab.end.y, fcab.position.z - 0.05), 1)
 	_put(R, "book_stack", Vector3(fx + 0.06, fcab.end.y, fcab.end.z - 0.02), 1, 2)
 	# Reading corner by the railing: beanbag, floor lamp, a leafy plant.
-	_put(R, "plant", Vector3(fx + 0.1, y, 0.0), 0, 5)
+	_putm(R, "plant", Vector3(fx + 0.1, y, 0.0), 0, 5)
 	_put(R, "plant", Vector3(fx + 0.75, y, 0.35), 0, 3)
 	_put(R, "plant", Vector3(fx + 0.06, y, -0.7), 0, 4)
 	_put(R, "plant", Vector3(fx + 0.06, y, 1.0), 0, 1)
@@ -1028,12 +1028,16 @@ func _build_pink() -> void:
 	_rug(R, -0.35, y, -4.1, 3.6, 3.2, "patch_pink")
 	var ns := _put(R, "nightstand", Vector3(fx + 0.04, y, bz + 0.06), 0, 2)
 	_put(R, "lamp_table", Vector3(ns.position.x + 0.1, y + 10 * PU, ns.position.z + 0.12), 0, 1)
-	_lamp(Vector3(ns.get_center().x + 0.3, y + 1.2, ns.get_center().z + 0.35), 0.55, 3.0, 0.2, Color(1.0, 0.6, 0.3), 0.5)
+	# Bedside lamp: the warm key light on the bedtime-story vignette (ref3).
+	_lamp(Vector3(ns.get_center().x + 0.45, y + 1.35, ns.get_center().z + 0.6), 0.95, 3.2, 0.2, Color(1.0, 0.62, 0.32), 0.5)
 	var bed := _put(R, "bed", Vector3(ns.end.x + 0.04, y, bz + 0.06), 0, 3)
 	_put(R, "plush", Vector3(bed.position.x + 0.22, y + 10 * PU, bed.position.z + 0.55), 0, 0)
-	var chair := _putc(R, "chair", bed.end.x + 0.38, y, bed.position.z + 1.25, 0, 2)
+	# Dad's reading chair: beside the bed at the girl's waist, seat facing the
+	# bed (its back away from the camera, so it never hides his face).
+	var chair := _putc(R, "chair", bed.end.x + 0.52, y, bed.position.z + 1.28, 3, 0)
 	var st := _put(R, "side_table", Vector3(bed.end.x + 0.12, y, bz + 0.08), 0, 2)
 	_put(R, "lamp_table", Vector3(st.position.x + 0.05, y + 11 * PU, bz + 0.12), 0, 1)
+	_lamp(Vector3(st.get_center().x - 0.1, y + 1.4, st.get_center().z + 0.7), 0.6, 2.6, 0.15, Color(1.0, 0.64, 0.34), 0.4)
 	_put(R, "book_stack", Vector3(st.end.x - 0.4, y + 11 * PU, bz + 0.2), 0, 2)
 	_spots["pink_bed"] = bed
 	_spots["pink_chair"] = chair
@@ -1891,13 +1895,26 @@ func _stage(preset: String) -> void:
 	if preset == "home_night":
 		var bed: AABB = _spots["pink_bed"]
 		var bc := bed.get_center()
-		# Tucked in facing the camera: head on the pillows at the headboard
-		# (back wall), feet towards the camera; the rig lies centred on its position.
-		var lily := _place("bunny_girl", Vector3(bc.x + 0.02, y, bed.position.z + 0.98), Vector3(bc.x, y, bed.end.z + 2.0), "lie")
+		var hz := bed.position.z + PU          # headboard (bed model z = 0)
+		var mat_y := y + 10 * PU               # mattress top
+		# Tucked in under the gingham quilt, head on the pillows at the
+		# headboard, feet towards the camera; propped a little on the pillows
+		# (pivot at her hips) so her sleeping face reads from the high camera.
+		var lily := _place("bunny_girl", Vector3(bc.x - 0.1, y, hz + 0.86), Vector3(bc.x, y, bed.end.z + 2.0), "sleep")
 		lily.lie_height = 10 * PU / lily.scale.y
+		lily.rotation.x = 0.0
+		var prop_up := 0.3
+		var pivot := Vector3(0.0, 10 * PU + 0.1, 0.0)
+		var rb := Basis.from_euler(Vector3(prop_up, lily.rotation.y, 0.0))
+		var rb0 := Basis.from_euler(Vector3(0.0, lily.rotation.y, 0.0))
+		lily.rotation.x = prop_up
+		lily.position += rb0 * pivot - rb * pivot
 		var ch: AABB = _spots["pink_chair"]
 		var cc3 := ch.get_center()
-		var jack := _place("dad", Vector3(cc3.x, y, cc3.z + 0.04), Vector3(cc3.x - 0.55, y, cc3.z + 1.0), "sit_read", 7 * PU)
+		# Seated beside her, angled between the girl and the player (3/4), the
+		# open storybook held up in both hands.
+		var jack := _place("dad", Vector3(cc3.x + 0.02, y, cc3.z), Vector3(cc3.x - 1.0, y, cc3.z + 0.4), "sit_read", 7 * PU)
+		_big_book(jack)
 		var st: AABB = _spots["step"]
 		var maya := _place("cat_girl", Vector3(st.get_center().x, y + 6 * PU, st.get_center().z), Vector3(st.get_center().x - 0.6, y, st.get_center().z + 1.3), "brush_teeth")
 		var cu: AABB = _spots["dog_cushion"]
@@ -1905,14 +1922,12 @@ func _stage(preset: String) -> void:
 		Game.show_bubble(jack, {"text": "Read Story", "icon": "book_open", "kind": "action", "id": "action", "progress": -1})
 		Game.show_bubble(maya, {"text": "Brush Teeth", "icon": "brush", "kind": "action", "id": "action", "progress": -1})
 		Game.show_bubble(dog, {"icon": "zzz", "kind": "emote", "id": "action"})
-		lily.set_pose("lie")
-		# Propped up on the pillows so her face reads from the high camera.
-		lily.rotation.x = 0.42
 		if _blanket == null:
-			_blanket = PropLib.instance("blanket", 0)
+			_blanket = PropLib.instance("blanket", 2)
 			_blanket.scale = Vector3.ONE * (PU / PropLib.FU)
 			add_child(_blanket)
-		_blanket.position = Vector3(bc.x, y + 10 * PU, bed.position.z + 1.32)
+		# Quilt top edge under her chin; drapes hang 5 cells below the top.
+		_blanket.position = Vector3(bc.x - 0.03, mat_y - 5 * PU, hz + 0.52 + 9 * PU)
 		_blanket.rotation_degrees.y = 0.0
 		_blanket.visible = true
 	else:
@@ -1929,6 +1944,19 @@ func _stage(preset: String) -> void:
 		Game.show_bubble(lily, {"text": "Paint", "icon": "palette", "kind": "action", "id": "action", "progress": 0.48})
 		Game.show_bubble(maya, {"text": "Play", "icon": "toys", "kind": "action", "id": "action", "progress": 0.55})
 		Game.show_bubble(dog, {"text": "Play", "icon": "paw", "kind": "action", "id": "action", "progress": 0.6})
+
+
+## The storybook dad reads from at bedtime: the actor's own book prop shown
+## bigger and tipped up toward the player so its bright pages read (ref3).
+func _big_book(a: SimActor) -> void:
+	var props: Variant = a.get("_props")
+	if typeof(props) != TYPE_DICTIONARY:
+		return
+	for k: String in props:
+		if k.begins_with("book"):
+			var mi: Node3D = props[k]
+			mi.scale = Vector3.ONE * 2.0
+			mi.rotation = Vector3(0.4, 0.0, 0.0)
 
 
 # =================================================================== live

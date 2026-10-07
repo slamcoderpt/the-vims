@@ -266,10 +266,16 @@ static func rug(vb: VoxelBuilder, at: Vector3i, w: int, d: int, style := "check_
 					if e == 0:
 						c = Color("6f86b8") if (x + z) % 2 == 0 else Color("8298c6")
 				"blue_braid":
+					# Soft woven blue/lilac oval-ish braid (ref1's rug under the
+					# cat girl): mid tones with cream flecks, a darker rim.
 					var r := e % 4
-					c = [Color("4e6fb3"), Color("8fa6da"), Color("c9d4ee"), Color("6a86c4")][r]
-					if h > 0.8:
-						c = Color("e9eef8")
+					c = [Color("7488c4"), Color("a7b4df"), Color("d3d8ee"), Color("9a9bd2")][r]
+					if h > 0.82:
+						c = Color("eef0f8")
+					elif h < 0.08:
+						c = Color("b7a3d6")
+					if e == 0:
+						c = Color("5d6fa8")
 				"star":
 					c = Color("3d4f99")
 					if h > 0.92:

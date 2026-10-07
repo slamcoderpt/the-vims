@@ -7,9 +7,11 @@ const LOOKS := {
 		"body": "big", "skin": Color(0.98, 0.77, 0.63),
 		# r12b: warm chestnut hair, a slightly deeper (still clearly lighter
 		# than the face's shadow side) beard, so hair/beard/face separate.
-		"hair": Color(0.55, 0.32, 0.16), "hair_style": "shaggy", "beard": "full",
-		"beard_color": Color(0.47, 0.27, 0.13),
-		"brow": Color(0.30, 0.16, 0.08), "eye": Color(0.3, 0.18, 0.1),
+		# r13: flat, low-noise blocks with strong value separation: a
+		# chocolate hair cap, a slightly deeper beard mass, peach face band.
+		"hair": Color(0.42, 0.23, 0.11), "hair_style": "shaggy", "beard": "full",
+		"beard_color": Color(0.36, 0.19, 0.09),
+		"brow": Color(0.24, 0.12, 0.06), "eye": Color(0.2, 0.12, 0.08),
 		"top": "plaid", "top_color": Color(0.80, 0.13, 0.12), "top_color2": Color(0.16, 0.05, 0.06),
 		"tee": Color(0.2, 0.2, 0.23), "sleeves": "long", "untucked": true,
 		"bottom": "jeans", "bottom_color": Color(0.21, 0.31, 0.55),
@@ -39,8 +41,8 @@ const LOOKS := {
 	},
 	"beagle": {
 		"species": "dog",
-		"tan": Color(0.88, 0.56, 0.27), "saddle": Color(0.52, 0.29, 0.12),
-		"white": Color(0.99, 0.97, 0.93), "ear": Color(0.50, 0.26, 0.10),
+		"tan": Color(0.90, 0.58, 0.28), "saddle": Color(0.24, 0.15, 0.10),
+		"white": Color(1.0, 0.98, 0.94), "ear": Color(0.46, 0.23, 0.09),
 		"collar": Color(0.86, 0.18, 0.18),
 	},
 	# --- Neighbours / townsfolk -------------------------------------------

@@ -825,7 +825,7 @@ func apply_preset(preset_name: String, p: Dictionary) -> void:
 	menu.close()
 	Game.selected = int(p.get("selected", 0))
 	var spec: Dictionary = HudPresets.get_spec(preset_name)
-	clock.set_show_season(spec.get("show_season", true))
+	clock.set_show_season(spec.get("show_season", true), spec.get("season_day", false))
 	plumbob_fallback = spec.get("plumbob", Vector2.INF)
 	if spec.has("needs"):
 		var nd: Dictionary = spec.needs

@@ -48,7 +48,7 @@ void fragment() {
 	}
 	vec3 bg = mix(bg_top.rgb, bg_bottom.rgb, UV.y);
 	// soft vignette so the head pops
-	float v = 1.0 - 0.18 * length((UV - vec2(0.5, 0.42)) * vec2(1.2, 1.0));
+	float v = 1.0 - 0.1 * length((UV - vec2(0.5, 0.42)) * vec2(1.2, 1.0));
 	bg *= v;
 	// out-of-focus room behind the sim: a few soft warm bokeh blobs
 	vec2 bu = UV * vec2(rect_size.x / rect_size.y, 1.0);
@@ -72,10 +72,10 @@ void fragment() {
 	fg = clamp(mix(vec3(l), fg, mix(1.14, 0.9, smoothstep(0.35, 0.8, sat))), 0.0, 1.0);
 	fg = clamp((fg - 0.5) * 1.08 + 0.5, 0.0, 1.0);
 	// Soft studio key from the upper left: a gentle falloff across the bust.
-	fg *= mix(1.06, 0.9, clamp(dot(UV, vec2(0.4, 0.6)), 0.0, 1.0));
+	fg *= mix(1.07, 0.96, clamp(dot(UV, vec2(0.4, 0.6)), 0.0, 1.0));
 	// Studio falloff below the chin: shirt and shoulders sink a little so
 	// the face is the brightest, most contrasty part of the card.
-	fg *= 1.0 - 0.16 * smoothstep(0.66, 1.0, UV.y);
+	fg *= 1.0 - 0.07 * smoothstep(0.7, 1.0, UV.y);
 	vec3 c = mix(bg, fg, t.a);
 	vec2 p = (UV - 0.5) * rect_size;
 	vec2 q = abs(p) - (rect_size * 0.5 - vec2(radius));
@@ -122,8 +122,8 @@ const STUDIO_SHADER := """
 shader_type spatial;
 render_mode unshaded, cull_back, shadows_disabled;
 uniform vec3 key_dir = vec3(-0.42, 0.5, 0.76);
-uniform float ambient = 0.6;
-uniform float key = 0.5;
+uniform float ambient = 0.72;
+uniform float key = 0.4;
 uniform float rim = 0.16;
 void fragment() {
 	vec3 c = COLOR.rgb;
@@ -143,11 +143,11 @@ void fragment() {
 ## Portrait backdrop gradients per look (top, bottom), like the soft room
 ## blur behind each head in the refs.
 const BG_TINTS := {
-	"dad": [Color("e9cfae"), Color("b08560")],
-	"bunny_girl": [Color("c9d3e6"), Color("8e9cba")],
-	"cat_girl": [Color("d3e8e0"), Color("86ab9f")],
-	"beagle": [Color("bfd6ea"), Color("7f9fc0")],
-	"default": [Color("e9cfae"), Color("b08560")],
+	"dad": [Color("f4ece0"), Color("d9c8b2")],
+	"bunny_girl": [Color("f1e6f0"), Color("d6c2da")],
+	"cat_girl": [Color("e2ebf8"), Color("b4c6e6")],
+	"beagle": [Color("e8f0f8"), Color("bccde2")],
+	"default": [Color("f4ece0"), Color("d9c8b2")],
 }
 
 static var _shader: Shader

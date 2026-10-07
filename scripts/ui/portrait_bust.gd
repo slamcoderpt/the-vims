@@ -41,10 +41,12 @@ static func build(look_name: String) -> Dictionary:
 func _make(look: Dictionary) -> Dictionary:
 	L = look
 	b = VoxelBuilder.new()
-	b.jitter = 0.022
+	b.jitter = 0.01
 	var frame: Rect2
-	var yaw := 11.0
-	var pitch := 6.0
+	# Near-frontal (ref cards look almost straight down the lens): just
+	# enough turn that the voxel sides give the head some depth.
+	var yaw := 6.0
+	var pitch := 5.0
 	var kind := "adult"
 	if L.get("species", "") == "dog":
 		kind = "dog"
@@ -64,11 +66,17 @@ func _make(look: Dictionary) -> Dictionary:
 		if kid:
 			# Ref kid cards: hat (ears just cropped) at the top, chin ~80%
 			# down, collar and straps along the bottom.
-			frame = _frame(-0.5, 26.4, 30.5)
+			# r13: the whole hat (ear tips included) inside the card with a
+			# sliver of backdrop above, eyes ~58-60% down, collar and the
+			# top of the shoulders visible along the bottom edge.
+			if L.get("hat", "") == "bunny":
+				frame = _frame(-0.5, 29.8, 37.0)
+			else:
+				frame = _frame(-0.5, 25.4, 32.5)
 		else:
 			# Ref dad card: hair top ~9% from the top, beard ~67% down, plaid
 			# shoulders filling the bottom third.
-			frame = _frame(-0.5, 23.6, 41.0)
+			frame = _frame(-0.5, 23.0, 37.5)
 	var mesh := b.build(VS, Vector3(0.5, 0.0, 0.5))
 	return {"mesh": mesh, "frame": frame, "yaw": yaw, "pitch": pitch, "kind": kind}
 
@@ -232,10 +240,8 @@ func _beard(skin: Color) -> void:
 					continue
 				var t := _h(x, y, z)
 				var c := bc
-				if t > 0.82:
-					c = bc.lightened(0.09)
-				elif t < 0.12:
-					c = bc.darkened(0.1)
+				if t > 0.94:
+					c = bc.lightened(0.04)
 				if y < -2:
 					c = c.darkened(0.06)
 				b.set_v(Vector3i(x, y, z), c)
@@ -269,13 +275,15 @@ func _hair() -> void:
 	var col := func(x: int, y: int, z: int) -> Color:
 		var t := _h(x, y, z)
 		# Soft strand banding plus a warm sheen on the crown.
+		# Mostly flat planes with sparse darker strands (ref cards): no
+		# salt-and-pepper speckle that reads as noise at phone size.
 		var c: Color = hc
-		if (x + 64) % 3 == 0:
-			c = hd.lerp(hc, 0.5)
-		if t > 0.88:
-			c = hl
-		elif t < 0.08:
-			c = hd
+		if (x + 64) % 4 == 0 and t > 0.35:
+			c = hd.lerp(hc, 0.55)
+		if t > 0.93:
+			c = hc.lerp(hl, 0.5)
+		elif t < 0.05:
+			c = hd.lerp(hc, 0.3)
 		if y >= 15 and z >= 2:
 			c = c.lightened(0.08)
 		return c
@@ -325,7 +333,7 @@ func _hair() -> void:
 		for z in range(-9, 8):
 			var ax := absf(x + 0.5)
 			var az := absf(z + 0.5)
-			var crown := 17 + int(_h(x, 99, z) * 2.4)
+			var crown := 17 + (1 if _h(x, 99, z) > 0.8 and absf(x + 0.5) < 6.0 else 0)
 			if ax > 8.0 and az > 7.0:
 				continue
 			if ax >= 8.0 or az >= 7.5:
@@ -452,8 +460,11 @@ func _torso() -> void:
 			var ax := absf(x + 0.5)
 			# Sloped, rounded shoulders.
 			var lim := float(hw) - 0.5
-			if y >= -5:
-				lim = float(hw) - 0.5 - float(y + 6) * (2.6 if kid else 2.4)
+			if kid:
+				# Rounded child shoulders: a gentle slope over 5 rows.
+				lim = float(hw) - 0.5 - maxf(0.0, float(y + 8)) * 1.6
+			elif y >= -5:
+				lim = float(hw) - 0.5 - float(y + 6) * 2.4
 			if ax > lim:
 				continue
 			for z in range(depth_b, depth_f + 1):

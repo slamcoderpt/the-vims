@@ -159,7 +159,17 @@ static func _pot_plant(vb: VoxelBuilder, x: int, y: int, z: int, h: int, seed: i
 	V.blob(vb, Vector3(x + 2.5, y + 2.0 + h * 0.3, z + 2.5), Vector3(2.8, maxf(1.6, h * 0.45), 2.8), V.leaves(seed), 0.0, 0.5, seed)
 
 
-static func m_filing_cabinet(vb: VoxelBuilder, _v: int) -> void:
+static func m_filing_cabinet(vb: VoxelBuilder, v: int) -> void:
+	if v == 1:
+		# Wooden three-drawer pedestal (ref1: printer cabinet by the desk).
+		V.b(vb, 0, 1, 0, 7, 11, 9, V.wood(WOOD, 1, 3, 0.05))
+		V.b(vb, 0, 12, 0, 7, 1, 9, V.wood(WOOD_L, 0, 2))
+		for k in 3:
+			V.b(vb, 0, 1 + k * 4, 9, 7, 3, 1, V.shade(WOOD, 1.04 - k * 0.03))
+			V.b(vb, 2, 2 + k * 4, 10, 3, 1, 1, Color("e6d3a0"))
+		V.b(vb, 0, 0, 0, 1, 1, 1, WOOD_D); V.b(vb, 6, 0, 0, 1, 1, 1, WOOD_D)
+		V.b(vb, 0, 0, 8, 1, 1, 1, WOOD_D); V.b(vb, 6, 0, 8, 1, 1, 1, WOOD_D)
+		return
 	V.b(vb, 0, 0, 0, 7, 12, 9, V.noisy(Color("c7c9cc"), 0.03))
 	for k in 3:
 		V.b(vb, 0, 3 + k * 4, 9, 7, 1, 1, Color("9a9da3"))
@@ -339,11 +349,59 @@ static func _bunny_canopy_bed(vb: VoxelBuilder) -> void:
 
 ## Turned-down quilt to lay over a sim in bed (16 x 3 x 15), v as m_bed.
 static func m_blanket(vb: VoxelBuilder, v: int) -> void:
+	if v == 2:
+		_tucked_quilt(vb)
+		return
 	var quilt: Callable = V.plaid(Color("f7b6c8"), Color("ef8fab"), Color("e36f92"), 2) if v == 0 else V.noisy(Color("34468f"), 0.06)
 	# Low mound (a small sim under it), folded white sheet band at the top.
 	V.b(vb, 0, 0, 0, 16, 1, 15, quilt)
 	V.b(vb, 2, 1, 2, 12, 1, 11, quilt)
 	V.b(vb, 0, 1, 0, 16, 1, 2, Color("fbfbf8"))
+
+
+## Pink gingham quilt tucked over a child lying in the bunny canopy bed (ref3):
+## 18 x ~7 x 18 cells, a soft mound over the body (higher at the chest, lower
+## at the feet), draped over both sides of the mattress, with a turned-down
+## white sheet band at the top edge (z = 0, under her chin). Base y = 0 sits on
+## the mattress top; the drapes hang 4 cells below it.
+static func _tucked_quilt(vb: VoxelBuilder) -> void:
+	var w := 18
+	var l := 17
+	var c_hi := Color("e1608a")
+	var c_mid := Color("f08fae")
+	var c_lo := Color("fbd3df")
+	var gingham := func(q: Vector3i) -> Color:
+		var a := posmod(q.x, 4) < 2
+		var b := posmod(q.z + q.y, 4) < 2
+		var c := c_hi if (a and b) else (c_mid if (a or b) else c_lo)
+		return V.shade(c, 0.96 + VoxelBuilder.hash3(q) * 0.07)
+	for z in range(1, l):
+		# Mound profile: chest/tummy highest, legs lower, a dip at the knees.
+		var h := 5 if z < 7 else (4 if z < 12 else 3)
+		if z == l - 1:
+			h -= 1
+		for x in w:
+			var edge := mini(x, w - 1 - x)
+			var hh := h - (2 if edge == 0 else (1 if edge < 3 else 0))
+			hh = maxi(hh, 1)
+			V.b(vb, x, 0, z, 1, hh, 1, gingham)
+		# Draped sides down over the mattress edge.
+		V.b(vb, -1, -4, z, 1, 5, 1, gingham)
+		V.b(vb, w, -4, z, 1, 5, 1, gingham)
+	# Hem along the foot end, and a ruffle on the drapes.
+	V.b(vb, -1, -4, l, w + 2, 4, 1, gingham)
+	for z in range(1, l + 1, 2):
+		V.p(vb, -1, -5, z, c_lo)
+		V.p(vb, w, -5, z, c_lo)
+	# Turned-down white sheet band under her chin (lies over the quilt edge).
+	var white := V.noisy(Color("fdfbf7"), 0.02)
+	V.b(vb, 0, 0, 0, w, 4, 1, white)
+	V.b(vb, 1, 4, 0, w - 2, 1, 3, white)
+	V.b(vb, -1, -4, 0, 1, 5, 1, white)
+	V.b(vb, w, -4, 0, 1, 5, 1, white)
+	# A little stitched heart patch on the quilt.
+	for q in [Vector2i(12, 9), Vector2i(13, 9), Vector2i(15, 9), Vector2i(16, 9), Vector2i(12, 10), Vector2i(13, 10), Vector2i(14, 10), Vector2i(15, 10), Vector2i(16, 10), Vector2i(13, 11), Vector2i(14, 11), Vector2i(15, 11), Vector2i(14, 12)]:
+		V.p(vb, q.x - 2, 4, q.y, Color("fbf6f8"))
 
 
 static func m_sofa(vb: VoxelBuilder, v: int) -> void:

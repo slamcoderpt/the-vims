@@ -9,6 +9,8 @@ const BAND_X := 66.0
 const SEG_W := [76.0, 66.0, 62.0]
 
 var show_season := true
+## Long season line ("Summer · Day 2") instead of just the season name.
+var season_day := false
 var _card: StyleBoxFlat
 var _band: StyleBoxFlat
 var _seg_on: StyleBoxFlat
@@ -39,8 +41,10 @@ func _ready() -> void:
 	_layout()
 
 
-func set_show_season(v: bool) -> void:
+func set_show_season(v: bool, with_day := false) -> void:
 	show_season = v
+	season_day = with_day
+	_on_time(Game.day, Game.minutes)
 	_layout()
 
 
@@ -82,7 +86,11 @@ func _on_time(d: int, minutes: float) -> void:
 	if h12 == 0:
 		h12 = 12
 	var t := "%s  %d:%02d %s" % [Game.DAY_NAMES[d % 7], h12, m, "AM" if h < 12 else "PM"]
+	# Season line: "Autumn", or "Summer · Day 2" (1-based day of the
+	# season week) when the long form is on.
 	var s: String = Game.SEASONS[Game.season % 4]
+	if season_day:
+		s = "%s  ·  Day %d" % [s, d % 7 + 1]
 	var ic := _pick_icon()
 	if t != _time_text or s != _season_text or ic != _icon:
 		_time_text = t

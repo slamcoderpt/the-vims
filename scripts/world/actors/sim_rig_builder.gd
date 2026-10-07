@@ -191,7 +191,8 @@ static func _h(p: Vector3i, s := 0) -> float:
 static func _hair_fn(base: Color) -> Callable:
 	return func(p: Vector3i) -> Color:
 		var strand := _h(Vector3i(p.x * 2 + p.z, 0, p.z * 3 - p.x), 5)
-		var f := 0.78 + 0.32 * strand + 0.08 * _h(p, 9)
+		# r13: low-noise strands (flat colour blocks read at phone size).
+		var f := 0.9 + 0.14 * strand + 0.03 * _h(p, 9)
 		return _sh(base, f)
 
 
@@ -288,10 +289,11 @@ static func _build_human(L: Dictionary) -> Dictionary:
 	var hat: String = L.get("hat", "")
 	var ear_y := float(neck) + hh + 1.5
 	var ear_x := hw * 0.5 - 2.5
-	ear_y -= 0.8   # r12b: lower crown on the smaller beanie
+	# r13: ears stand on the flat crown of the box beanie (top row hh + 2),
+	# their base row buried one voxel into it.
+	ear_y = float(neck) + hh + 2.4
 	if hat == "cat":
 		ear_x = hw * 0.5 - 3.0
-		ear_y += 1.1
 	if hat == "bunny" or hat == "cat":
 		acc.bone("ear_l", "head", Vector3(ear_x, ear_y, -0.5))
 		acc.bone("ear_r", "head", Vector3(-ear_x, ear_y, -0.5))
@@ -318,9 +320,9 @@ static func _build_human(L: Dictionary) -> Dictionary:
 
 	var top_extra := 2.0
 	if hat == "bunny":
-		top_extra = 8.0
+		top_extra = 9.0
 	elif hat == "cat":
-		top_extra = 4.0
+		top_extra = 6.0
 	var meta := {
 		"species": "human",
 		"kind": "child" if child else "adult",
@@ -390,7 +392,7 @@ static func _human_head(L: Dictionary, D: Dictionary) -> Dictionary:
 	var girl: bool = L.get("lashes", false)
 	var beard: String = L.get("beard", "")
 	var vb := VoxelBuilder.new()
-	vb.jitter = 0.03
+	vb.jitter = 0.012
 	var eyes := VoxelBuilder.new()
 	eyes.jitter = 0.0
 	var hair_fn := _hair_fn(hair)
@@ -399,7 +401,7 @@ static func _human_head(L: Dictionary, D: Dictionary) -> Dictionary:
 
 	# Skull: rounded box; the lower face is a touch warmer/darker (jaw shade).
 	var skin_fn := func(p: Vector3i) -> Color:
-		var f := 1.0 + (_h(p, 2) - 0.5) * 0.035
+		var f := 1.0 + (_h(p, 2) - 0.5) * 0.012
 		if p.y <= B:
 			f *= 0.95
 		return _sh(skin, f)
@@ -439,7 +441,12 @@ static func _human_head(L: Dictionary, D: Dictionary) -> Dictionary:
 		var ex: int = exs[ei]
 		# Highlight on the same (screen-left / outer-top) corner of both eyes.
 		var hx := 0
+		# r13: grown men get small 1x2 dark eyes (no glint) so the face
+		# reads as two clean dark pixels, not googly 2x2 eyes.
+		var man := not child and not girl
 		for dx in 2:
+			if man and dx != (1 if ei == 0 else 0):
+				continue
 			for dy in eh:
 				var x := ex + dx
 				var y := E + dy
@@ -450,7 +457,9 @@ static func _human_head(L: Dictionary, D: Dictionary) -> Dictionary:
 				vb.erase(p)
 				vb.set_v(p - Vector3i(0, 0, 1), lash if dy == eh - 1 else lid)
 				var c := eye_dark
-				if dy == eh - 1 and dx == hx:
+				if man:
+					c = eye_dark if dy == eh - 1 else eye_mid.lerp(eye_dark, 0.5)
+				elif dy == eh - 1 and dx == hx:
 					c = white
 				elif dy == 0:
 					c = eye_mid.lerp(eye_dark, 0.25)
@@ -505,8 +514,10 @@ static func _human_head(L: Dictionary, D: Dictionary) -> Dictionary:
 		_paint_front(vb, cxl, E - 1, _sh(skin, 0.92), fz)
 		_paint_front(vb, cxr, E - 1, _sh(skin, 0.92), fz)
 	else:
-		_paint_front(vb, cxl, E - 1, _sh(skin, 0.94), fz, 1)
-		_paint_front(vb, cxr, E - 1, _sh(skin, 0.9), fz, 1)
+		# Proud nose a touch warmer/darker than the face so it reads.
+		var nose_c := skin.lerp(Color(0.86, 0.46, 0.40), 0.22)
+		_paint_front(vb, cxl, E - 1, _sh(nose_c, 0.98), fz, 1)
+		_paint_front(vb, cxr, E - 1, _sh(nose_c, 0.92), fz, 1)
 	# Mouth: a little smile (corners up), open + tongue on kids.
 	var mouth := Color(0.55, 0.18, 0.2)
 	var lip := Color(0.85, 0.42, 0.45)
@@ -514,12 +525,12 @@ static func _human_head(L: Dictionary, D: Dictionary) -> Dictionary:
 		# Open "D" smile: a 4-wide dark top lip line with the corners tucked
 		# up, a pink tongue below it, so it reads as one happy mouth (not
 		# two stray dots) at phone size.
+		# r13: a small "U" smile (corners up, warm open centre) instead of
+		# the wide lip + tongue that read as a duck bill from above.
 		_paint_front(vb, cxl - 1, M, mouth, fz)
-		_paint_front(vb, cxl, M, mouth, fz)
-		_paint_front(vb, cxr, M, mouth, fz)
 		_paint_front(vb, cxr + 1, M, mouth, fz)
-		_paint_front(vb, cxl, M - 1, Color(0.9, 0.4, 0.45), fz)
-		_paint_front(vb, cxr, M - 1, Color(0.9, 0.4, 0.45), fz)
+		_paint_front(vb, cxl, M - 1, Color(0.62, 0.2, 0.24), fz)
+		_paint_front(vb, cxr, M - 1, Color(0.62, 0.2, 0.24), fz)
 	elif beard != "full":
 		_paint_front(vb, cxl, M, mouth if not girl else Color(0.78, 0.3, 0.34), fz)
 		_paint_front(vb, cxr, M, mouth if not girl else Color(0.78, 0.3, 0.34), fz)
@@ -531,8 +542,8 @@ static func _human_head(L: Dictionary, D: Dictionary) -> Dictionary:
 	var bcell := func(p: Vector3i) -> Color:
 		# Curly clumps: shade varies per 2x2 cell, lighter on the cell tops.
 		var cell := Vector3i(floori(p.x / 2.0), floori(p.y / 2.0), floori(p.z / 2.0))
-		var f := 0.84 + 0.3 * _h(cell, 61) + (0.07 if posmod(p.y, 2) == 1 else -0.03)
-		return _sh(beard_c, f * (1.0 + (_h(p, 62) - 0.5) * 0.08))
+		var f := 0.94 + 0.1 * _h(cell, 61) + (0.05 if posmod(p.y, 2) == 1 else -0.02)
+		return _sh(beard_c, f * (1.0 + (_h(p, 62) - 0.5) * 0.03))
 	if beard == "full":
 		var mus := _sh(beard_c.lerp(hair, 0.45), 1.08)
 		# 1) Recolour the skull surface on the lower face / jaw / sideburns.
@@ -562,7 +573,12 @@ static func _human_head(L: Dictionary, D: Dictionary) -> Dictionary:
 				var q := p + d
 				if vb.has(q) or q == Vector3i(-1, E, ez) or q == Vector3i(W, E, ez):
 					continue
-				if d.z == 0 and (p.y > M or p.z > F - 2):
+				# r13: volume only on the jaw/chin (rows <= mouth), never in
+				# front of the cheeks, so the peach cheek band stays visible
+				# from the high house camera.
+				if p.y > M:
+					continue
+				if d.z == 0 and p.z > F - 2:
 					continue
 				vb.set_v(q, bcell.call(q))
 		if ears:
@@ -669,7 +685,7 @@ static func _human_hair(vb: VoxelBuilder, style: String, hc: Callable, W: int, H
 		var curl := func(p: Vector3i) -> Color:
 			# Curls: shade per 2x2 clump, lit on the clump top, darker in gaps.
 			var cell := Vector3i(floori((p.x + 1) / 2.0), floori(p.y / 2.0), floori((p.z + 1) / 2.0))
-			var f := 0.86 + 0.26 * _h(cell, 54) + (0.08 if posmod(p.y, 2) == 1 else -0.04)
+			var f := 0.94 + 0.1 * _h(cell, 54) + (0.07 if posmod(p.y, 2) == 1 else -0.02)
 			return _sh(hc.call(p), f)
 		var in_region := func(p: Vector3i) -> bool:
 			var front := p.z >= F - 1
@@ -678,7 +694,7 @@ static func _human_hair(vb: VoxelBuilder, style: String, hc: Callable, W: int, H
 			if p.y > T:
 				return true
 			if front and not side:
-				return p.y >= T - 1
+				return p.y >= T
 			if side:
 				if p.z >= F - 1:
 					return p.y >= T - 1
@@ -702,12 +718,13 @@ static func _human_hair(vb: VoxelBuilder, style: String, hc: Callable, W: int, H
 				vb.set_v(p, _sh(curl.call(p), 0.8))
 		for q: Vector3i in shell:
 			vb.set_v(q, curl.call(q))
-		# Fringe: ragged short locks dipping one row onto the forehead.
+		# Fringe: a few short locks dipping one row onto the forehead
+		# (r13: the hairline sits higher so a band of forehead shows).
 		for x in range(1, W - 1):
-			if _h(Vector3i(x, 2, 9), 55) > 0.45:
-				var z := _front_z(vb, x, T - 2, F + 1)
+			if _h(Vector3i(x, 2, 9), 55) > 0.62:
+				var z := _front_z(vb, x, T - 1, F + 1)
 				if z > -50:
-					vb.set_v(Vector3i(x, T - 2, z + 1), curl.call(Vector3i(x, T - 2, z + 1)))
+					vb.set_v(Vector3i(x, T - 1, z + 1), curl.call(Vector3i(x, T - 1, z + 1)))
 		# Small curls breaking the side/back outline.
 		for p: Vector3i in shell:
 			if (p.x < 0 or p.x >= W or p.z < 0) and p.y >= T - 2 and _h(p, 57) > 0.8:
@@ -862,7 +879,7 @@ static func _human_hat(vb: VoxelBuilder, L: Dictionary, W: int, H: int, Dd: int,
 		# brows, shell hugging the skull one voxel out, then a soft dome with
 		# cut corners on every row (no stacked "cake" tiers). The face stays
 		# fully exposed below the cuff.
-		var cuff_c: Color = L.get("cuff_color", _sh(hc, 1.06))
+		var cuff_c: Color = L.get("cuff_color", _sh(hc, 1.02))
 		# r10: SNUG beanie. The hat is the skull grown by one voxel on every
 		# side and two on top (same rounded superellipse), from just above
 		# the brows up; nothing stands off the head like a cake or helmet.
@@ -877,10 +894,20 @@ static func _human_hat(vb: VoxelBuilder, L: Dictionary, W: int, H: int, Dd: int,
 			# so it reads as a plush knit cap, not a flat cake.
 			# r12b: ~20% smaller (critic r11): hugs the skull closer and the
 			# crown is lower, so the face below the cuff dominates the head.
-			var dx := absf(x - hcx) / (W * 0.5 + 0.7)
-			var dz := absf(z - hcz) / ((F + 1) * 0.5 + 0.7)
-			var dy := maxf(0.0, (y - (T - 1.0)) / 3.1)
-			return pow(dx, 3.0) + pow(dz, 3.0) + pow(dy, 2.2) <= 1.0
+			# r13: a clean chamfered box beanie (ref1): straight knit sides
+			# one voxel off the skull, a flat crown two rows above it, and
+			# only the edges bevelled, so it reads as one soft block instead
+			# of a terraced "cupcake".
+			var top := T + 2
+			if y > top or x < -1 or x > W or z < -1 or z > F + 1:
+				return false
+			var ex := x == -1 or x == W
+			var ez := z == -1 or z == F + 1
+			if ex and ez:
+				return false
+			if y == top and (ex or ez):
+				return false
+			return true
 		# Hair can't poke through the hat above the cuff line.
 		for y in range(c0, T + 7):
 			for x in range(-4, W + 4):
@@ -901,10 +928,7 @@ static func _human_hat(vb: VoxelBuilder, L: Dictionary, W: int, H: int, Dd: int,
 						vb.set_v(p, _sh(cuff_c, 0.92 if posmod(u, 2) == 0 else 1.03))
 					else:
 						vb.set_v(p, knit.call(p))
-		# Fold shadow just above the cuff, all the way round.
-		for p: Vector3i in vb.vox.keys():
-			if p.y == c0 + 2 and not _in_skull(p.x, p.y, p.z, W, B, T, F):
-				vb.set_v(p, _sh(vb.vox[p], 0.88))
+		# (r13: no fold-shadow ring: it read as stacked cake tiers from above.)
 		if hat == "cat":
 			# Stitched seam dots near the front corners (like the ref hat).
 			var st := _sh(hc, 0.62)
@@ -1248,13 +1272,15 @@ static func _build_dog(L: Dictionary) -> Dictionary:
 	var earc: Color = L.get("ear", Color(0.6, 0.33, 0.14))
 	var collar: Color = L.get("collar", Color(0.85, 0.18, 0.18))
 	const LEG := 5
-	const BW := 10
+	const BW := 11
 	const BH := 8
 	# r12: chibi proportions (ref1): bigger head and ears, longer body;
 	# the back height (LEG + BH) is unchanged.
-	const BL := 19
-	const HW := 14
-	const HH := 12
+	# r13: a slightly smaller, boxier head on a longer body so the side,
+	# saddle and tail read and the head is a clean shape (not a stepped blob).
+	const BL := 21
+	const HW := 12
+	const HH := 11
 	const HD := 10
 	const MZ := 3          # muzzle depth (voxels in front of the face)
 	var head_j := Vector3(0, LEG + BH - 2, BL * 0.5 - 1.5)
@@ -1275,7 +1301,7 @@ static func _build_dog(L: Dictionary) -> Dictionary:
 
 	# Body: x 0..BW-1, y 0..BH-1, z 0..BL-1 (front = +z).
 	var body := VoxelBuilder.new()
-	body.jitter = 0.03
+	body.jitter = 0.015
 	var body_fn := func(p: Vector3i) -> Color:
 		var c := tan
 		var cx := absf(p.x - (BW - 1) * 0.5)
@@ -1286,10 +1312,10 @@ static func _build_dog(L: Dictionary) -> Dictionary:
 		elif (p.z == BL - 5 or p.z == BL - 4) and p.y >= 4:
 			c = collar
 		elif p.z >= 3 - wob and p.z <= BL - 7 + wob and (p.y >= BH - 1 or (p.y >= BH - 2 + wob and cx < 4.0) or (p.y >= BH - 3 + wob and cx < 2.5)):
-			c = saddle.lerp(tan, 0.12 * _h(p, 35))
+			c = saddle.lerp(tan, 0.06 * _h(p, 35))
 		elif p.y == 2 and _h(p, 31) > 0.55:
 			c = white.lerp(tan, 0.45)
-		return _sh(c, 1.0 + (_h(p, 32) - 0.5) * 0.09)
+		return _sh(c, 1.0 + (_h(p, 32) - 0.5) * 0.04)
 	_fill(body, 0, BW - 1, 0, BH - 1, 0, BL - 1, func(p: Vector3i) -> Color:
 		if not _in_rbox(p, Vector3(BW, BH, BL), 2.6, 0.35):
 			return Color(0, 0, 0, 0)
@@ -1309,7 +1335,7 @@ static func _build_dog(L: Dictionary) -> Dictionary:
 
 	# Head: x 0..HW-1, y 0..HH-1, z 0..HD-1, muzzle in front (z >= HD).
 	var head := VoxelBuilder.new()
-	head.jitter = 0.03
+	head.jitter = 0.015
 	var head_fn := func(p: Vector3i) -> Color:
 		var c := tan
 		var fx := float(p.x) - (HW - 1) * 0.5   # -5.5..5.5
@@ -1329,9 +1355,9 @@ static func _build_dog(L: Dictionary) -> Dictionary:
 				c = _sh(tan, 0.9)
 			elif p.z <= 2:
 				c = _sh(tan, 0.94)
-		return _sh(c, 1.0 + (_h(p, 33) - 0.5) * 0.08)
+		return _sh(c, 1.0 + (_h(p, 33) - 0.5) * 0.03)
 	_fill(head, 0, HW - 1, 0, HH - 1, 0, HD - 1, func(p: Vector3i) -> Color:
-		if not _in_rbox(p, Vector3(HW, HH, HD), 2.4, 0.55):
+		if not _in_rbox(p, Vector3(HW, HH, HD), 3.2, 0.5):
 			return Color(0, 0, 0, 0)
 		return head_fn.call(p))
 	# Muzzle: white, 6 wide, 4 tall, MZ deep, rounded front corners.
@@ -1381,7 +1407,7 @@ static func _build_dog(L: Dictionary) -> Dictionary:
 
 	# Long floppy ears: 2 thick, 6 wide flaring to 7, hanging past the jaw.
 	var ear := VoxelBuilder.new()
-	ear.jitter = 0.03
+	ear.jitter = 0.015
 	for y in range(-13, 1):
 		var z0 := 0
 		var z1 := 5
@@ -1404,25 +1430,25 @@ static func _build_dog(L: Dictionary) -> Dictionary:
 					c = _sh(earc, 0.8)
 				elif x == 0 and (z == z0 or z == z1):
 					c = _sh(earc, 0.88)
-				ear.set_v(Vector3i(x, y, z), _sh(c, 1.0 + (_h(Vector3i(x, y, z), 36) - 0.5) * 0.1))
+				ear.set_v(Vector3i(x, y, z), _sh(c, 1.0 + (_h(Vector3i(x, y, z), 36) - 0.5) * 0.04))
 	acc.part("ear_l", ear, Vector3(0.5, 0.5, 3.0))
 	var ear_r := VoxelBuilder.new()
-	ear_r.jitter = 0.03
+	ear_r.jitter = 0.015
 	for p: Vector3i in ear.vox:
 		ear_r.set_v(Vector3i(1 - p.x, p.y, p.z), ear.vox[p])
 	acc.part("ear_r", ear_r, Vector3(1.5, 0.5, 3.0))
 
 	# Tail: stands up with a forward curl, saddle base, white tip.
 	var tail := VoxelBuilder.new()
-	tail.jitter = 0.03
+	tail.jitter = 0.015
 	# r12b: a curled sickle (critic r11: no stiff stick): thick saddle base,
 	# tan shaft sweeping up, then hooking forward over the back with a
 	# white tip curling down.
 	var tz := [0, 0, 0, 1, 1, 2, 3, 4, 5, 6]
 	for y in range(0, 10):
-		var c := white if y >= 8 else (_sh(saddle, 1.05) if y < 3 else tan)
+		var c := white if y >= 7 else (_sh(saddle, 1.05) if y < 3 else tan)
 		var zz: int = tz[y] - (1 if y >= 9 else 0)
-		var x1 := 2 if y < 3 else 1
+		var x1 := 2 if y < 3 else (1 if y < 8 else 2)
 		_fill(tail, 0, x1, y, y, zz, zz + 1, _sh(c, 1.0 + (_h(Vector3i(0, y, 0), 39) - 0.5) * 0.1))
 	acc.part("tail", tail, Vector3(1, 0, 1))
 
@@ -1430,7 +1456,7 @@ static func _build_dog(L: Dictionary) -> Dictionary:
 	# a toe row that reads as a paw when stretched forward.
 	for nm in ["leg_fl", "leg_fr", "leg_bl", "leg_br"]:
 		var leg := VoxelBuilder.new()
-		leg.jitter = 0.03
+		leg.jitter = 0.015
 		var front: bool = nm.begins_with("leg_f")
 		_fill(leg, 0, 2, 0, LEG + 1, 0, 2, func(p: Vector3i) -> Color:
 			var c := white

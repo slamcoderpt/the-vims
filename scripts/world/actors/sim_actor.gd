@@ -512,7 +512,9 @@ func _human_pose() -> void:
 				_tgt_pos.z += 0.1 / ws
 				_tgt_pos.y += 0.03 / ws
 				_ab(b_torso, 0.14, 0.0, 0.0)
-				_ab(b_head, -0.12, 0.0, 0.0)
+				# Chin up to the monitor so the face plane tips toward the
+				# high house camera (r13).
+				_ab(b_head, -0.22, 0.0, 0.0)
 			# Both forearms forward and level onto the keyboard (shoulders
 			# compensate the small presentation swivel so the hands stay put).
 			_sb(b_arm_l, -1.0, -0.12 - body_yaw, -0.05)

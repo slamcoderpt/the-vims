@@ -139,7 +139,7 @@ func _interactables() -> void:
 		 "needs": {"hunger": 0.6, "social": 0.1}},
 		{"id": "chat_table", "label": "Chat at Table", "icon": "chat", "minutes": 20.0, "pose": "sit_talk",
 		 "needs": {"social": 0.25}, "task": "Talk to Neighbors"},
-	], Vector3(4.4, 0.8, 1.6), Vector3(0, 0.4, 0), Vector3(0, 0, 1.0))
+	], Vector3(5.4, 0.8, 1.6), Vector3(0, 0.4, 0), Vector3(0, 0, 1.0))
 	var pit := Node3D.new()
 	pit.name = "FirePit"
 	pit.position = Party.PIT_POS

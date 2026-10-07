@@ -72,17 +72,17 @@ const ANIMS := {
 	# ------------------------------------------------------------ cooking
 	"chop": {"base": "idle", "period": 0.55, "present": 0.95,
 		"keys": [
-			[0.0, {"arm_r": Vector3(-0.95, 0, 0.22), "fore_r": Vector3(-1.0, 0, 0), "arm_l": Vector3(-0.85, 0, -0.3), "fore_l": Vector3(-0.75, 0, 0.0), "torso": Vector3(0.2, 0, 0), "head": Vector3(0.3, 0, 0)}],
-			[0.5, {"arm_r": Vector3(-0.92, 0, 0.22), "fore_r": Vector3(-0.5, 0, 0), "arm_l": Vector3(-0.85, 0, -0.3), "fore_l": Vector3(-0.75, 0, 0.0), "torso": Vector3(0.22, 0, 0), "head": Vector3(0.3, 0, 0)}],
+			[0.0, {"arm_r": Vector3(-0.95, 0, 0.22), "fore_r": Vector3(-1.0, 0, 0), "arm_l": Vector3(-0.85, 0, -0.3), "fore_l": Vector3(-0.75, 0, 0.0), "torso": Vector3(0.2, 0, 0), "head": Vector3(0.12, 0, 0)}],
+			[0.5, {"arm_r": Vector3(-0.92, 0, 0.22), "fore_r": Vector3(-0.5, 0, 0), "arm_l": Vector3(-0.85, 0, -0.3), "fore_l": Vector3(-0.75, 0, 0.0), "torso": Vector3(0.22, 0, 0), "head": Vector3(0.12, 0, 0)}],
 		],
 		"props": [["knife", "fore_r", Vector3(0, 0, 0.02), Vector3(-1.2, 0, 0), false]],
 		"world": [["board_veg", "surface"]]},
 	"stir": {"base": "idle", "period": 1.3, "present": 0.95,
 		"keys": [
-			[0.0, {"arm_r": Vector3(-1.0, 0, 0.12), "fore_r": Vector3(-0.75, 0, 0), "arm_l": Vector3(-0.95, 0, -0.18), "fore_l": Vector3(-0.45, 0, 0), "torso": Vector3(0.14, 0, 0), "head": Vector3(0.28, 0, 0)}],
-			[0.25, {"arm_r": Vector3(-1.12, 0, 0.24), "fore_r": Vector3(-0.7, 0, 0), "arm_l": Vector3(-0.95, 0, -0.18), "fore_l": Vector3(-0.45, 0, 0), "torso": Vector3(0.14, 0, 0), "head": Vector3(0.28, 0, 0)}],
-			[0.5, {"arm_r": Vector3(-1.0, 0, 0.36), "fore_r": Vector3(-0.75, 0, 0), "arm_l": Vector3(-0.95, 0, -0.18), "fore_l": Vector3(-0.45, 0, 0), "torso": Vector3(0.14, 0, 0), "head": Vector3(0.28, 0, 0)}],
-			[0.75, {"arm_r": Vector3(-0.88, 0, 0.24), "fore_r": Vector3(-0.8, 0, 0), "arm_l": Vector3(-0.95, 0, -0.18), "fore_l": Vector3(-0.45, 0, 0), "torso": Vector3(0.14, 0, 0), "head": Vector3(0.28, 0, 0)}],
+			[0.0, {"arm_r": Vector3(-1.0, 0, 0.12), "fore_r": Vector3(-0.75, 0, 0), "arm_l": Vector3(-0.95, 0, -0.18), "fore_l": Vector3(-0.45, 0, 0), "torso": Vector3(0.14, 0, 0), "head": Vector3(0.1, 0, 0)}],
+			[0.25, {"arm_r": Vector3(-1.12, 0, 0.24), "fore_r": Vector3(-0.7, 0, 0), "arm_l": Vector3(-0.95, 0, -0.18), "fore_l": Vector3(-0.45, 0, 0), "torso": Vector3(0.14, 0, 0), "head": Vector3(0.1, 0, 0)}],
+			[0.5, {"arm_r": Vector3(-1.0, 0, 0.36), "fore_r": Vector3(-0.75, 0, 0), "arm_l": Vector3(-0.95, 0, -0.18), "fore_l": Vector3(-0.45, 0, 0), "torso": Vector3(0.14, 0, 0), "head": Vector3(0.1, 0, 0)}],
+			[0.75, {"arm_r": Vector3(-0.88, 0, 0.24), "fore_r": Vector3(-0.8, 0, 0), "arm_l": Vector3(-0.95, 0, -0.18), "fore_l": Vector3(-0.45, 0, 0), "torso": Vector3(0.14, 0, 0), "head": Vector3(0.1, 0, 0)}],
 		],
 		"osc": [["fore_l", Vector3(0.05, 0, 0), 1.1, 0.0]],
 		"props": [["spoon", "fore_r", Vector3(0, 0, 0.02), Vector3(-1.4, 0, 0), false]],

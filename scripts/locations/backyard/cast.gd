@@ -4,7 +4,7 @@ extends RefCounted
 
 const Party := preload("res://scripts/locations/backyard/party.gd")
 const Gestures := preload("res://scripts/locations/backyard/gestures.gd")
-const DOG_POS := Vector3(2.5, 0.0, 2.35)
+const DOG_POS := Vector3(2.2, 0.0, 2.6)
 
 ## key -> [look, aliases]
 const PEOPLE := {
@@ -42,41 +42,41 @@ func build(parent: Node3D, party) -> void:
 	var gf: Vector3 = Party.GRILL_POS + gb * Party.COOK_SPOT
 	var gd: Vector3 = Party.GRILL_POS + gb * Vector3(0.0, 0.0, 0.0) - gf
 	_spawn("Jack", gf, atan2(gd.x, gd.z) + 0.28, "grill")
-	# Sit-down dinner (ref4): the long table runs across the picture. Four
-	# diners on the far side face the camera in 3/4, two on the near side
-	# sit with their backs to us in the gaps between them (so no head covers
-	# a face), one at the right end; the near-middle and left-end chairs
-	# stay empty so the chairs themselves read. Everyone has a plate and a
-	# held item.
+	# Sit-down dinner (ref4): the long table runs across the picture with
+	# just five diners spaced out along it. Four on the far side face the
+	# camera in 3/4 with an empty chair-width between each; one child sits
+	# on the near side with his back to us in a gap; the other near chairs
+	# stay empty so the chairs and the cloth read.
 	_seat("Lily", party, "far_1", "sit_talk", 0.25)
-	_seat("neighbor_8", party, "far_2", "sit_talk", 0.1)
-	_seat("neighbor_3", party, "far_3", "sit_talk", -0.1)
+	_seat("neighbor_7", party, "far_2", "sit_talk", 0.15)
+	_seat("neighbor_4", party, "far_3", "sit_talk", -0.1)
 	_seat("Maya", party, "far_4", "sit_talk", -0.25)
 	_seat("neighbor_6", party, "near_l", "sit_talk", -0.2)
-	_seat("neighbor_4", party, "near_r", "sit_talk", 0.2)
-	_seat("neighbor_7", party, "end_r", "sit_talk", 0.35)
 	gestures = Gestures.new()
 	parent.add_child(gestures)
-	gestures.add(actors.get("Lily"), "toast", false, "", 0.1, 0.3)
-	gestures.add(actors.get("neighbor_8"), "toast", true, "", 0.08, 0.3)
-	gestures.add(actors.get("neighbor_3"), "drink", false, "", 0.05, 0.3)
+	gestures.add(actors.get("Lily"), "burger", false, "burger", 0.05, 0.3)
+	gestures.add(actors.get("neighbor_7"), "toast", true, "", 0.08, 0.3)
+	gestures.add(actors.get("neighbor_4"), "drink", false, "", 0.05, 0.3)
 	gestures.add(actors.get("Maya"), "toast", true, "", 0.1, 0.3)
 	gestures.add(actors.get("neighbor_6"), "drink", false, "", 0.0, 0.0)
-	gestures.add(actors.get("neighbor_4"), "toast", true, "", 0.0, 0.0)
-	gestures.add(actors.get("neighbor_7"), "drink", true, "", 0.05, 0.6)
 	# Jack works the food with tongs (left hand; the pose's spatula stays in
 	# the right) and his head turns just enough for the face to read.
 	gestures.add(actors.get("Jack"), "tongs", true, "tongs", -0.02, 0.6)
-	# On the deck, chatting with plates and drinks.
-	var a := _spawn("neighbor_1", Vector3(3.6, 0.375, -3.3), 0.0, "talk")
-	var b := _spawn("neighbor_2", Vector3(4.9, 0.375, -3.5), 0.0, "idle")
+	# On the pergola deck by the lit doors, chatting with plates and drinks.
+	var a := _spawn("neighbor_1", Vector3(3.5, 0.375, -3.3), 0.0, "talk")
+	var b := _spawn("neighbor_2", Vector3(4.75, 0.375, -3.45), 0.0, "idle")
+	var e := _spawn("neighbor_8", Vector3(6.3, 0.375, -3.6), 0.0, "talk")
 	a.face(Vector3(6.5, 0, 2.5))
 	b.face(Vector3(1.5, 0, 1.0))
+	e.face(Vector3(2.0, 0, 0.5))
 	gestures.add(a, "burger", true, "burger")
 	gestures.add(b, "drink", false)
-	# Lounge by the fire pit.
-	var c := _spawn_seated("neighbor_5", Vector3(5.17, 0, 1.3), -PI * 0.5 - 0.2, "sit_talk", 0.5)
+	gestures.add(e, "drink", true)
+	# The two elders on the outdoor sofa by the fire pit, mugs in hand.
+	var c := _spawn_seated("neighbor_5", Vector3(5.17, 0, 1.25), -PI * 0.5 - 0.15, "sit_talk", 0.5)
 	gestures.add(c, "mug", true, "", 0.0, 0.4)
+	var g := _spawn_seated("neighbor_3", Vector3(5.17, 0, 2.35), -PI * 0.5 - 0.35, "sit_talk", 0.5)
+	gestures.add(g, "mug", false, "", 0.0, 0.5)
 	# Biscuit trotting across the lawn between the table and the fire pit.
 	var d := _spawn("Biscuit", DOG_POS, -1.3, "walk")
 	d.position.y = 0.0
@@ -144,7 +144,7 @@ const HEAD_SCALE := {"adult": 0.78, "child": 0.86, "dog": 1.0}
 ## ~70 % of that, beagle's back at a child's knee-to-hip). SimActor clamps
 ## the household to a "hero minimum" meant for the zoomed-out house view,
 ## so the resolved scale is overridden here (and seat heights compensated).
-const BODY_SCALE := {"adult": 1.0, "child": 0.86, "dog": 0.6}
+const BODY_SCALE := {"adult": 1.0, "child": 0.86, "dog": 0.55}
 const LOOK_SCALE := {"dad": 1.04}
 
 
