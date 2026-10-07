@@ -25,6 +25,10 @@ const UH := 25             # upstairs wall height in structure cells (3.125 m)
 const C := 0.125           # structure grid
 const UF := 3.0            # upstairs floor height (m)
 const VIEWS := ["office", "bed"]
+const ACTOR_SCALE := {"dad": 1.0, "bunny_girl": 1.0, "cat_girl": 1.0, "beagle": 1.0}
+## Ground-floor front facade windows (x0, x1 metres), y 0.9..2.1.
+const FRONT_WINDOWS := [[-8.2, -6.8], [-5.6, -4.2], [-3.0, -1.6], [2.0, 3.0], [5.9, 7.3], [7.6, 8.5]]
+const HALO_NIGHT := 0.55
 const ShotPresets := preload("res://scripts/core/shot_presets.gd")
 const PropLib := preload("res://scripts/props/prop_lib.gd")
 const Mesher := preload("res://scripts/props/mesher.gd")
@@ -54,6 +58,8 @@ var _hood_day: MeshInstance3D
 var _hood_night: MeshInstance3D
 var _glass_day: MeshInstance3D
 var _glass_night: MeshInstance3D
+var _front_glass_day: MeshInstance3D
+var _front_glass_night: MeshInstance3D
 var _glass_up_day: MeshInstance3D
 var _glass_up_night: MeshInstance3D
 var _moon: MeshInstance3D
@@ -85,7 +91,7 @@ func build() -> void:
 		_halo_pts.append({"pos": Vector3(-4.6, 4.5, -0.7), "size": 3.0, "color": Color(1, 0, 0)})
 	_halos = PropLib.halos(_halo_pts)
 	add_child(_halos)
-	PropLib.set_halo_strength(_halos, 1.0 if _is_night else 0.0)
+	PropLib.set_halo_strength(_halos, HALO_NIGHT if _is_night else 0.0)
 	_spawn_household()
 	_stage("home_night" if _is_night else "home_day")
 	set_wall_view("bed" if _is_night else "office")
@@ -105,7 +111,7 @@ func lighting_profile() -> Dictionary:
 		"ambient_night": Color(0.5, 0.48, 0.62), "ambient_night_energy": 0.3, "lamp_night_mult": 3.8,
 		"sky_day": Color(0.64, 0.8, 0.94), "sky_night": Color(0.07, 0.09, 0.22),
 		"fog_day": Color(0.9, 0.9, 0.88), "fog_night": Color(0.12, 0.15, 0.32), "fog_density": 0.004,
-		"moon_heading": 150.0, "moon_energy": 0.42,
+		"moon_heading": 40.0, "moon_energy": 0.36, "glow_boost_night": 1.2,
 		"shadow_distance": 40.0,
 		"post_day": {"focus_y": 0.5, "band": 0.3, "falloff": 0.24, "blur_px": 4.5, "top_boost": 1.0,
 			"saturation": 1.16, "contrast": 1.12, "tint": Vector3(1.02, 1.0, 0.96), "vignette": 0.22},
@@ -125,6 +131,7 @@ func apply_preset(preset: String) -> void:
 
 func set_wall_view(view: String) -> void:
 	wall_view = view
+	_sync_front_glass()
 	for vm in _view_meshes:
 		vm[0].visible = vm[1] == view
 	for sig: String in _wall_nodes:
@@ -138,6 +145,12 @@ func set_wall_view(view: String) -> void:
 				"upper": vis = mode == "tall"
 			for mi: MeshInstance3D in parts[part]:
 				mi.visible = vis
+
+
+func _sync_front_glass() -> void:
+	if _front_glass_day:
+		_front_glass_day.visible = wall_view == "bed" and not _is_night
+		_front_glass_night.visible = wall_view == "bed" and _is_night
 
 
 # =================================================================== helpers
@@ -255,7 +268,7 @@ func _lamp(pos: Vector3, energy := 1.0, rng := 3.5, day_factor := 0.25, col := C
 		l.shadow_normal_bias = 1.5
 		l.set_meta("night_shadow", true)
 	if halo > 0.0:
-		_halo_pts.append({"pos": pos, "size": halo * 1.4, "color": Color(1.25, 0.8, 0.4, 1.0)})
+		_halo_pts.append({"pos": pos, "size": halo * 1.1, "color": Color(1.0, 0.62, 0.3, 1.0)})
 
 
 static func _act(id: String, label: String, icon: String, minutes: float, needs := {}, extra := {}) -> Dictionary:
@@ -301,7 +314,7 @@ func _floor_col(room: String) -> Callable:
 		"pink": return _planks(Color("ddb184"))
 		"blue": return _planks(Color("c08a58"), false)
 		"hall": return _planks(Color("c4864e"), false)
-		"bath": return _tiles(Color("eef2f4"), Color("c9d9e4"))
+		"bath": return _tiles(Color("dfe6ea"), Color("aec3cf"))
 		"living": return _planks(Color("b9804c"))
 		_: return _tiles(Color("efe8da"), Color("d7c7a8"))
 
@@ -319,8 +332,8 @@ func _wall_col(room: String) -> Variant:
 		"bath":
 			return func(q: Vector3i) -> Color:
 				if posmod(q.y, 24) < 9:
-					return Color("dfe9ec") if posmod(q.x + q.z + q.y, 2) == 0 else Color("cbdde3")
-				return Color("f2e8d6") if posmod(q.y, 24) != 9 else Color("c9b48f")
+					return Color("cfe0e6") if posmod(q.x + q.z + q.y, 2) == 0 else Color("b5ccd6")
+				return Color("e6d7bd") if posmod(q.y, 24) != 9 else Color("b89a6e")
 		"living": return W_LIVING
 		"kitchen": return W_KITCHEN
 		"ext":
@@ -472,8 +485,13 @@ func _build_structure() -> void:
 	_wall(2, 8.75, -5, 5, 0, "kitchen", "ext", both_tall, [[-3.5, -1.5, 1.0, 2.2], [1.0, 3.0, 1.0, 2.2]])
 	# Front ground-floor walls are always cut (dollhouse view into the ground
 	# floor under the upstairs slab, like the lower level in ref1/ref3).
-	_wall(0, 4.75, -9, -1, 0, "living", "ext", both_low)
-	_wall(0, 4.75, -1, 8.75, 0, "kitchen", "ext", both_low, [[0.5, 1.6, 0.0, 2.1]])
+	# Night (bed view) shows them as a lit facade below the cut-away upstairs (ref3).
+	var front_modes := {"office": "low", "bed": "tall"}
+	var fh := []
+	for w: Array in FRONT_WINDOWS:
+		fh.append([w[0], w[1], 0.9, 2.1])
+	_wall(0, 4.75, -9, -1, 0, "living", "ext", front_modes, fh)
+	_wall(0, 4.75, -1, 8.75, 0, "kitchen", "ext", front_modes, fh + [[0.5, 1.6, 0.0, 2.1]])
 	_wall(2, -1.0, -5, 5, 0, "living", "kitchen", both_tall, [[-1.0, 1.5, 0.0, 2.2]])
 	# ---- Upstairs walls.
 	# Back exterior wall: big office windows, bedroom windows.
@@ -896,28 +914,28 @@ func _build_bath() -> void:
 	glass.scale = Vector3.ONE * (PU / PropLib.FU)
 	glass.position = Vector3(lx + PU + gs.x * PU * 0.5, y + PU, bz + PU + gs.z * PU * 0.5)
 	add_child(glass)
-	_put(R, "bath_mat", Vector3(lx + 0.15, y, shower.end.z + 0.08), 0, 0)
-	# Vanity with mirror on the right wall (ref3: kid on a step stool).
-	var vanity := _wallput(R, "vanity", "+x", rx, 1.7, y)
+	_put(R, "bath_mat", Vector3(shower.end.x + 0.08, y, bz + 0.35), 1, 0)
+	# Vanity with mirror on the left wall (faces the night camera; ref3: kid on
+	# a step stool brushing her teeth), right next to the glass shower.
+	var vanity := _wallput(R, "vanity", "-x", lx, shower.end.z + 0.12, y)
 	_spots["vanity"] = vanity
-	var step := _wallput(R, "step_stool", "+x", vanity.position.x, vanity.get_center().z - 0.35, y)
+	var step := _wallput(R, "step_stool", "-x", vanity.end.x, vanity.get_center().z - 0.3, y)
 	_spots["step"] = step
-	_sconce(R + "@bed", "+x", rx, 1.05, y + 1.85, 0.6, 1)
+	_wallput(R + "@bed", "towel_rack", "-x", lx, vanity.end.z + 0.08, y + 0.75, 1)
+	_sconce(R + "@bed", "-x", lx, vanity.end.z + 0.05, y + 1.95, 0.5, 1)
+	_put(R, "plant", Vector3(lx + 0.05, y + 13 * PU, vanity.end.z - 0.42), 0, 6)
+	_wallput(R + "@bed", "frame", "-x", lx, vanity.end.z + 0.75, y + 1.55, 7)
+	# Right wall: toilet, towel rack, shelves, laundry basket.
+	var toilet := _wallput(R, "toilet", "+x", rx, 1.0, y)
+	_wallput(R + "@bed", "towel_rack", "+x", rx, 1.9, y + 0.55, 2)
+	_wallput(R + "@bed", "shelf_unit", "+x", rx, 0.75, y + 1.4, 2)
 	_put(R, "plant", Vector3(rx - 0.5, y, 0.35), 0, 4)
-	_wallput(R + "@bed", "shelf_unit", "+x", rx, 3.05, y + 1.25, 2)
-	_put(R, "basket", Vector3(rx - 0.7, y, 4.05), 1, 2)
-	# Left wall: toilet, towel rack, shelf, frame.
-	var toilet := _wallput(R, "toilet", "-x", lx, 2.1, y)
-	_wallput(R + "@bed", "towel_rack", "-x", lx, 2.95, y + 0.55, 1)
-	_wallput(R + "@bed", "towel_rack", "-x", lx, 3.7, y + 0.55, 2)
-	_wallput(R + "@bed", "shelf_unit", "-x", lx, 2.05, y + 1.35, 2)
-	_wallput(R + "@bed", "frame", "-x", lx, 3.6, y + 1.7, 7)
-	_sconce(R + "@bed", "-x", lx, 3.05, y + 1.8, 0.7)
+	_put(R, "basket", Vector3(rx - 0.7, y, 2.35), 1, 2)
+	_sconce(R + "@bed", "+x", rx, 2.12, y + 1.95, 0.4, 1)
 	# Tub along the front (low) wall, rugs, plants.
 	var tub := _put(R, "bathtub", Vector3(6.35, y, fz - 14 * PU - 0.02), 2)
 	_put(R, "plant", Vector3(lx + 0.05, y, 4.2), 0, 2)
-	_put(R, "bath_mat", Vector3(7.0, y, 2.6), 0, 1)
-	_rug(R, 6.55, y, 1.6, 1.0, 0.75, "round_blue")
+	_rug(R, 6.75, y, 1.9, 1.2, 0.85, "round_blue")
 	_put(R, "plant", Vector3(rx - 0.55, y + 0.95, 4.35), 0, 3)
 	_lamp(Vector3(7.2, y + 2.6, 2.4), 0.35, 3.5, 0.0, Color(1.0, 0.7, 0.45), 0.0)
 	_use(shower, "Shower", [_act("shower", "Take Shower", "shower", 20, {"hygiene": 0.8}, {"pose": "idle"})])
@@ -1055,6 +1073,52 @@ func _build_exterior() -> void:
 				else:
 					gd.set_v(q, Color("9cc4dc").lerp(Color("e8f4fa"), float(yy - fc(1.0)) / 20.0))
 					gn.set_v(q, Color("ffc874").lerp(Color("ffe6a8"), VoxelBuilder.hash3(q) * 0.5), true)
+	# Front facade (only standing in the "bed" view): frames, door, lit glass.
+	var fd := VoxelBuilder.new()
+	var fn := VoxelBuilder.new()
+	fd.jitter = 0.0
+	fn.jitter = 0.0
+	for wdef: Array in FRONT_WINDOWS:
+		var x0 := fc(wdef[0])
+		var w := fc(wdef[1]) - x0
+		PropLib.window_frame(_g("front@bed"), Vector3i(x0, fc(0.9), fc(4.75)), w, fc(1.2), 4, 0, 2, -1)
+		var fr := _g("front@bed")
+		# Flower box under the window (outside).
+		for a in range(x0 + 1, x0 + w - 1):
+			for k in range(4, 7):
+				fr.set_v(Vector3i(a, fc(0.9) - 2, fc(4.75) + k), Color("8a5a36"))
+				fr.set_v(Vector3i(a, fc(0.9) - 1, fc(4.75) + k), Color("9c6a40") if k == 6 else Color("5b3a22"))
+				var fh := VoxelBuilder.hash3(Vector3i(a, 7, k))
+				if fh > 0.35:
+					fr.set_v(Vector3i(a, fc(0.9), fc(4.75) + k), Color("4f8a3a") if fh < 0.7 else Color("63a046"))
+				if fh > 0.82:
+					fr.set_v(Vector3i(a, fc(0.9) + 1, fc(4.75) + k), [Color("f28fb0"), Color("ffd45a"), Color("ffffff")][int(fh * 97.0) % 3])
+		for a in range(x0 + 1, x0 + w - 1):
+			for yy in range(fc(0.9) + 1, fc(2.1) - 1):
+				var q := Vector3i(a, yy, fc(4.75) + 2)
+				if fr.has(q):
+					continue
+				var tt := float(yy - fc(0.9)) / 19.0
+				fd.set_v(q, Color("9cc4dc").lerp(Color("e8f4fa"), tt))
+				var warm := Color("ffbf66").lerp(Color("ffe2a0"), tt * 0.6 + VoxelBuilder.hash3(q) * 0.25)
+				fn.set_v(q, warm, true)
+	# Front door with a porch lantern.
+	var door := _g("front@bed")
+	for a in range(fc(0.55), fc(1.55)):
+		for yy in range(0, fc(2.05)):
+			var edge := a == fc(0.55) or a == fc(1.55) - 1 or yy == fc(2.05) - 1
+			var c := TRIM if edge else (Color("2f5a7a") if posmod(a - fc(0.55), 5) != 0 else Color("284e6a"))
+			if not edge and yy > fc(1.3) and yy < fc(1.85) and a > fc(0.7) and a < fc(1.4):
+				fn.set_v(Vector3i(a, yy, fc(4.75) + 3), Color("ffd68a"), true)
+				fd.set_v(Vector3i(a, yy, fc(4.75) + 3), Color("b9d6e6"))
+				continue
+			door.set_v(Vector3i(a, yy, fc(4.75) + 3), c)
+	door.set_v(Vector3i(fc(1.4), fc(1.0), fc(4.75) + 4), Color("d8b46a"))
+	_put("front@bed", "sconce", Vector3(1.7, 1.75, 5.0), 0, 1)
+	_lamp(Vector3(1.9, 2.0, 5.45), 0.5, 2.6, 0.0, Color(1.0, 0.7, 0.4), 0.5)
+	_front_glass_day = _add_mesh(Mesher.build(fd, U, Vector3.ZERO, true, true), "FrontGlassDay", false)
+	_front_glass_night = _add_mesh(Mesher.build(fn, U, Vector3.ZERO, true, true), "FrontGlassNight", false)
+	_front_glass_night.material_override = PropLib.lit_window_material(1.25)
 	_glass_day = _add_mesh(Mesher.build(gd, U, Vector3.ZERO, true, true), "GlassDay", false)
 	_glass_night = _add_mesh(Mesher.build(gn, U, Vector3.ZERO, true, true), "GlassNight", false)
 	_upg_day.jitter = 0.0
@@ -1255,7 +1319,9 @@ func _bake() -> void:
 			_view_meshes.append([mi, room.split("@")[1]])
 	for room: String in _gb:
 		var vb: VoxelBuilder = _gb[room]
-		_add_mesh(Mesher.build(vb, U), "Fine_" + room, true)
+		var fmi := _add_mesh(Mesher.build(vb, U), "Fine_" + room.replace("@", "_"), true)
+		if "@" in room:
+			_view_meshes.append([fmi, room.split("@")[1]])
 	_sb.clear()
 	_fb.clear()
 	_gb.clear()
@@ -1266,6 +1332,9 @@ func _bake() -> void:
 func _spawn_household() -> void:
 	for look: String in ["dad", "bunny_girl", "cat_girl", "beagle"]:
 		var a := SimActor.create(look)
+		# Household at house scale (~1/3 - 1/2 of the 3.1 m walls), not the
+		# chunkier street-scene scale.
+		a.body_scale = ACTOR_SCALE.get(look, 1.0)
 		add_child(a)
 		actors[look] = a
 	for m in Game.household:
@@ -1294,9 +1363,9 @@ func _stage(preset: String) -> void:
 		lily.lie_height = 8 * PU
 		var ch: AABB = _spots["pink_chair"]
 		var jack := _place("dad", Vector3(ch.get_center().x, y, ch.get_center().z), Vector3(bed.position.x + 0.5, y, bc.z - 0.2), "sit_read", 7 * PU)
-		jack.face(Vector3(bed.position.x, y, ch.get_center().z + 0.35))
+		jack.face(Vector3(ch.get_center().x - 1.0, y, ch.get_center().z + 1.5))
 		var st: AABB = _spots["step"]
-		var maya := _place("cat_girl", Vector3(st.get_center().x, y + 6 * PU, st.get_center().z), Vector3(st.get_center().x + 3.0, y, st.get_center().z), "brush_teeth")
+		var maya := _place("cat_girl", Vector3(st.get_center().x, y + 6 * PU, st.get_center().z), Vector3(st.get_center().x - 3.0, y, st.get_center().z + 0.6), "brush_teeth")
 		var cu: AABB = _spots["dog_cushion"]
 		var dog := _place("beagle", Vector3(cu.get_center().x, y + 3 * PU, cu.get_center().z), Vector3(cu.get_center().x + 1.0, y, cu.get_center().z + 1.2), "sleep")
 		Game.show_bubble(jack, {"text": "Read Story", "icon": "book_open", "kind": "action", "id": "action", "progress": -1})
@@ -1337,13 +1406,14 @@ func _on_time(_d: int, _m: float) -> void:
 	if _glass_day:
 		_glass_day.visible = not n
 		_glass_night.visible = n
+	_sync_front_glass()
 	if _glass_up_day:
 		_glass_up_day.visible = not n
 		_glass_up_night.visible = n
 	if _moon:
 		_moon.visible = n
 	if _halos:
-		PropLib.set_halo_strength(_halos, 1.0 if n else 0.0)
+		PropLib.set_halo_strength(_halos, HALO_NIGHT if n else 0.0)
 
 
 var _frames := 0

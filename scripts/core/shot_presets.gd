@@ -33,7 +33,7 @@ const PRESETS := {
 	"home_night": {
 		"ref": "refs/ref3_home_night_cutaway.png",
 		"location": "home", "day": 0, "hour": 21, "minute": 18, "season": 1,
-		"camera": {"target": Vector3(4.1, 2.7, -1.0), "yaw": -10.0, "pitch": 36.0, "distance": 17.5, "fov": 33.0},
+		"camera": {"target": Vector3(2.5, 2.7, 0.0), "yaw": 14.0, "pitch": 42.0, "distance": 22.5, "fov": 33.0},
 		"tasks": [
 			{"title": "Take Bath", "icon": "bath"},
 			{"title": "Brush Teeth", "icon": "brush", "done": true},

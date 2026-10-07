@@ -10,6 +10,7 @@ const GREEN := Color("55c449")
 
 const SPECS := {
 	"home_day": {
+		"show_season": false,
 		"plumbob": Vector2(655, 240),
 		"needs": {
 			"Jack": {"fun": 0.82, "hunger": 0.38, "hygiene": 0.55, "energy": 0.45, "social": 0.3},

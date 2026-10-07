@@ -181,7 +181,7 @@ func _apply_scale() -> void:
 	walk_speed = (1.5 if _dog else (1.1 if _meta.kind == "child" else 1.3)) * sqrt(_s)
 
 
-const AUTO_SCALE := {"adult": 1.2, "child": 1.15, "dog": 1.4}
+const AUTO_SCALE := {"adult": 1.35, "child": 1.35, "dog": 1.45}
 
 
 func kind() -> String:
@@ -502,13 +502,13 @@ func _human_pose() -> void:
 			# low in the other hand; the head turns part way to the player.
 			var dab := sin(t * 3.2)
 			var dab2 := sin(t * 1.3 + _phase)
-			_sb(b_arm_r, -1.6 + 0.1 * dab, 0.1 * dab2, 0.1)
-			_sb(b_fore_r, -0.45 - 0.2 * dab)
-			_sb(b_arm_l, -0.55, 0.0, 0.32)
-			_sb(b_fore_l, -1.0)
+			_sb(b_arm_r, -2.05 + 0.1 * dab, 0.12 * dab2, -0.12)
+			_sb(b_fore_r, -0.25 - 0.2 * dab)
+			_sb(b_arm_l, -0.4, 0.0, 0.28)
+			_sb(b_fore_l, -1.05)
 			_ab(b_head, 0.02, 0.05 * dab2, 0.06 * sin(t * 0.7))
 			_ab(b_torso, 0.08, 0.0, 0.0)
-			var py := _glance(0.55, 0.05, 0.15)
+			var py := _glance(1.15, 0.04, 0.12)
 			_ab(b_arm_r, 0.0, -py, 0.0)
 			_ab(b_arm_l, 0.0, -py, 0.0)
 		"talk":
@@ -649,10 +649,10 @@ func _dog_pose() -> void:
 			# Lying on the rug gnawing a chew toy held across the mouth.
 			var ly := _dog_lie()
 			var chew := sin(t * 7.0)
-			_sb(b_head, 0.02 + 0.05 * maxf(0.0, chew), ly + 0.12 * sin(t * 0.9 + _phase), 0.1 * sin(t * 1.7))
+			_sb(b_head, 0.16 + 0.05 * maxf(0.0, chew), ly + 0.12 * sin(t * 0.9 + _phase), 0.1 * sin(t * 1.7))
 			_sb(b_tail, -0.9, 0.0, 0.55 * sin(t * 14.0))
-			_sb(b_ear_l, 0.05 * chew, 0.0, 0.4)
-			_sb(b_ear_r, 0.05 * chew, 0.0, -0.4)
+			_sb(b_ear_l, 0.05 * chew, 0.0, 0.1)
+			_sb(b_ear_r, 0.05 * chew, 0.0, -0.1)
 		"bow":
 			var hop := absf(sin(t * 5.0))
 			_sb(b_body, 0.32)
@@ -679,14 +679,26 @@ func _dog_lie() -> float:
 	# Present the long side to the camera (a lying dog seen head-on is a
 	# shapeless blob): swivel so the camera sits ~65-95 degrees off the nose,
 	# then the head looks back toward the player.
+	# Present the long side: nose toward screen-right and a little toward
+	# the viewer, the body + upright tail trailing off to the left, head
+	# turned toward the player so both eyes and the white blaze read.
 	if camera_cheat and is_inside_tree():
-		var a := _cam_a
-		# Nearly head-on: swing the head to the camera's right (reads like the
-		# ref's dog stretched along the rug); otherwise take the short way.
-		var sg := (1.0 if a >= 0.0 else -1.0) if absf(a) > 0.5 else -1.0
-		var after := clampf(absf(a), 1.15, 1.65) * sg
-		_tgt_root_rot.y = a - after
-		look_yaw = 0.45 * sg
+		var cam := get_viewport().get_camera_3d()
+		if cam:
+			var r := cam.global_transform.basis.x
+			r.y = 0.0
+			var c := cam.global_position - global_position
+			c.y = 0.0
+			if r.length() > 0.01 and c.length() > 0.01:
+				r = r.normalized()
+				c = c.normalized()
+				var want := (r * 0.95 + c * 0.3).normalized()
+				var want_yaw := atan2(want.x, want.z)
+				_tgt_root_rot.y = wrapf(want_yaw - global_rotation.y, -PI, PI)
+				look_yaw = clampf(wrapf(atan2(c.x, c.z) - want_yaw, -PI, PI), -0.6, 0.6)
+	# A lying dog's anchor sits at its haunches: the chest, paws and head
+	# reach forward (toward the toy) instead of centring on the spot.
+	_tgt_root_pos = Basis(Vector3.UP, _tgt_root_rot.y) * Vector3(0.0, 0.0, 6.0 * vs)
 	_tgt_pos.y = -float(_meta.leg) + 0.3 * vs
 	_sb(b_leg_fl, -1.5, 0.1, 0.0)
 	_sb(b_leg_fr, -1.5, -0.1, 0.0)

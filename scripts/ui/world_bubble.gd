@@ -36,6 +36,11 @@ var selected_side := false
 var offset := Vector2.ZERO
 ## Horizontal lean of the tail tip (px) so it can point toward the head.
 var tail_lean := 0.0
+## Layout state owned by hud.gd: projected head point / size, desired top-left.
+var head := Vector2.INF
+var head_px := 60.0
+var target := Vector2.ZERO
+var placed := false
 var _shown_progress := -1.0
 var _body: StyleBoxFlat
 var _age := 0.0
@@ -99,6 +104,10 @@ func place() -> void:
 		position = (tip - Vector2(size.x * tail_frac + tail_lean, size.y + TAIL_H)).round()
 
 
+func _tail_base_x() -> float:
+	return clampf(tip.x - position.x, 17.0, size.x - 17.0)
+
+
 func tick(delta: float) -> bool:
 	_age += delta
 	if progress >= 0.0 and absf(_shown_progress - progress) > 0.001:
@@ -109,7 +118,7 @@ func tick(delta: float) -> bool:
 	# pop-in
 	var k := 1.0 if Game.frozen else clampf(_age / 0.2, 0.0, 1.0)
 	var sc := 1.0 - 0.4 * pow(1.0 - k, 3.0)
-	pivot_offset = Vector2(size.x * tail_frac, size.y + TAIL_H)
+	pivot_offset = Vector2(_tail_base_x(), size.y + TAIL_H)
 	scale = Vector2(sc, sc)
 	return true
 
@@ -117,14 +126,18 @@ func tick(delta: float) -> bool:
 func _draw() -> void:
 	var r := Rect2(Vector2.ZERO, size)
 	draw_style_box(_body, r)
-	# tail
-	var tx := size.x * tail_frac
+	# tail: base under the tip (kept inside the rounded body), short point
+	# leaning toward the sim so it reads as "this one" even after nudging
 	var tail := PackedVector2Array()
+	var lt := tip - position
 	if kind == "skill":
 		# chip sits beside the head: short tail pointing down-left at it
-		tail = PackedVector2Array([Vector2(tx - 3, size.y - 1), Vector2(tx + 9, size.y - 1), Vector2(tx - 7, size.y + 8.0)])
+		var cx := clampf(lt.x + 4.0, 12.0, size.x - 14.0)
+		tail = PackedVector2Array([Vector2(cx - 3, size.y - 1), Vector2(cx + 9, size.y - 1), Vector2(cx - 7, size.y + 8.0)])
 	else:
-		tail = PackedVector2Array([Vector2(tx - 10, size.y - 1), Vector2(tx + 10, size.y - 1), Vector2(tx + tail_lean, size.y + TAIL_H)])
+		var tx := _tail_base_x()
+		var lean := clampf((lt.x - tx) * 0.5, -9.0, 9.0)
+		tail = PackedVector2Array([Vector2(tx - 11, size.y - 1), Vector2(tx + 11, size.y - 1), Vector2(tx + lean, size.y + TAIL_H)])
 	draw_colored_polygon(tail, UI.WHITE)
 	var f := UI.font(800)
 	match kind:

@@ -43,7 +43,7 @@ func _ready() -> void:
 				var a := SimActor.create(s[0])
 				add_child(a)
 				a.position = s[1]
-			rig.apply({"target": Vector3(0.2, 0.75, 0), "yaw": 15.0, "pitch": 14.0, "distance": 5.0, "fov": 30.0})
+			rig.apply({"target": Vector3(0.2, 0.95, 0), "yaw": 15.0, "pitch": 14.0, "distance": 6.8, "fov": 30.0})
 		"kidsit":
 			var x := -2.4
 			for yy in [0.0, 90.0, 45.0, 180.0]:

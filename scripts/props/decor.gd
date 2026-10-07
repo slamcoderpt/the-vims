@@ -120,15 +120,15 @@ static func m_lamp_floor(vb: VoxelBuilder, _v: int) -> void:
 
 ## Wall sconce / lantern, back on the wall at z=0.
 static func m_sconce(vb: VoxelBuilder, v: int) -> void:
-	var metal := Color("3c3633") if v == 0 else Color("c99a4a")
-	V.b(vb, 1, 2, 0, 3, 5, 1, WOOD_D)
-	V.b(vb, 2, 4, 1, 1, 1, 1, metal)
-	V.b(vb, 0, 1, 2, 5, 1, 4, metal)
-	V.b(vb, 0, 7, 2, 5, 1, 4, metal)
-	V.b(vb, 1, 8, 3, 3, 1, 2, metal)
-	V.b(vb, 1, 2, 3, 3, 5, 2, LAMP, true)
-	for q in [Vector2i(0, 2), Vector2i(4, 2), Vector2i(0, 5), Vector2i(4, 5)]:
-		V.b(vb, q.x, 2, q.y, 1, 5, 1, metal)
+	# Small brass/iron wall sconce: back plate, arm, warm amber shade.
+	var metal := Color("3c3633") if v == 0 else Color("b8893f")
+	V.b(vb, 1, 0, 0, 2, 5, 1, WOOD_D)
+	V.b(vb, 1, 2, 1, 2, 1, 1, metal)
+	V.b(vb, 0, 1, 2, 4, 1, 3, metal)
+	V.b(vb, 0, 2, 2, 4, 3, 3, Color("ffb45c"), true)
+	V.b(vb, 1, 3, 3, 2, 1, 1, Color("ffd890"), true)
+	V.b(vb, 0, 5, 2, 4, 1, 3, metal)
+	V.b(vb, 1, 6, 3, 2, 1, 1, metal)
 
 
 static func m_desk_lamp(vb: VoxelBuilder, _v: int) -> void:

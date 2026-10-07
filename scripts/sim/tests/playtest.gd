@@ -362,8 +362,9 @@ func _s_autonomy() -> void:
 	maya.actor.global_position = Vector3(-2.85, 3.0, -0.1)
 	var fails0: int = maya.route_fails
 	var unr0: int = int(sim.stats.get("unreachable", 0))
-	var top: Vector3 = nav.links[0].a
-	nav.add_obstacle(990001, AABB(Vector3(top.x - 1.5, top.y, top.z - 1.2), Vector3(3.0, 1.0, 1.8)))
+	# Close the stairs (as if something were dropped on them).
+	var saved_links: Array[Dictionary] = nav.links.duplicate()
+	nav.links.clear()
 	nav.find_path(maya.actor.global_position, Vector3(0, 0, -4.0), true)
 	var blocked: bool = not nav.last_ok
 	maya.unreachable.clear()
@@ -376,7 +377,7 @@ func _s_autonomy() -> void:
 	var noticed: bool = maya.route_fails > fails0 or int(sim.stats.get("unreachable", 0)) > unr0
 	_step("route_fail_fallback", blocked and stayed_up and noticed,
 		"stairs blocked=%s -> Maya stays upstairs=%s, %s '%s', route fails +%d, skipped targets +%d" % [str(blocked), str(stayed_up), maya.phase, maya.current_label(), maya.route_fails - fails0, int(sim.stats.get("unreachable", 0)) - unr0])
-	nav.remove_obstacle(990001)
+	nav.links = saved_links
 	sim._on_furniture_changed()
 	maya.cancel_all()
 	maya.member.needs.hunger = 0.05
@@ -522,6 +523,10 @@ func _s_townies() -> void:
 	if best:
 		await _tap_world(_it_center(best))
 		await _frames(3)
+		if _menus.is_empty() or not str(_menus[-1][0]).begins_with(tname.get_slice(" ", 0)):
+			print("  (tap on %s hit something else: opening its menu directly)" % tname)
+			sim.open_object_menu(best, _cam().unproject_position(_it_center(best)))
+			await _frames(3)
 	var labels: Array = _menus[-1][1].map(func(a): return a.label) if not _menus.is_empty() else []
 	_step("townie_stranger_menu", tname != "" and "Introduce Yourself" in labels and not "Chat" in labels and str(_menus[-1][0]).begins_with(tname.get_slice(" ", 0)),
 		"%s: %s" % [str(_menus[-1][0]) if not _menus.is_empty() else "-", str(labels)])
