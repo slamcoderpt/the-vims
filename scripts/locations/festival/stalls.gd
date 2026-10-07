@@ -35,9 +35,9 @@ func build(parent: Node3D) -> void:
 	_place(parent, "RedStall", _side_stall(RED, CREAM, 0), Vector3(6.9, 0, -2.6), -38.0)
 	_place(parent, "BlueStall", _side_stall(BLUE, CREAM, 1), Vector3(9.2, 0, -7.4), -60.0)
 	# Chalkboards.
-	var menu := _chalkboard(parent, Vector3(-2.5, 0, 3.1), 18.0, 0.9)
+	var menu := _chalkboard(parent, Vector3(-3.35, 0, 3.15), 22.0, 0.9)
 	K.label(menu, "Apple Cider\n· Pumpkin Pie\n· Pretzels\nCandy Apples", Vector3(-0.1, 0.86, 0.13), 0.00155, Color("f4f1e6"), 0.0, Color(0, 0, 0, 0), 64, HORIZONTAL_ALIGNMENT_LEFT)
-	var hm := _chalkboard(parent, Vector3(4.5, 0, 4.0), -25.0, 0.8)
+	var hm := _chalkboard(parent, Vector3(5.0, 0, 4.45), -25.0, 0.8)
 	K.label(hm, "HANDMADE", Vector3(0, 0.95, 0.13), 0.0021, Color("f4f1e6"))
 	var gm := _chalkboard(parent, Vector3(3.4, 0, -0.5), -20.0, 0.6)
 	K.label(gm, "3 TRIES", Vector3(-0.02, 0.62, 0.13), 0.0015, Color("f8e9a0"))
@@ -128,8 +128,8 @@ func _lantern(vb: VoxelBuilder, x: int, y: int, z: int) -> void:
 
 const TW := 50   # treats stall width (cells)
 const TD := 24   # treats stall depth (cells)
-const SIGN_Y0 := 36
-const SIGN_Y1 := 47
+const SIGN_Y0 := 43
+const SIGN_Y1 := 55
 
 
 func _candy_apple(vb: VoxelBuilder, x: int, y: int, z: int, c := Color("b8141c")) -> void:
@@ -226,10 +226,11 @@ func _treats_stall() -> VoxelBuilder:
 					x += 5
 	# Posts.
 	for px in [0, W - 2]:
-		_post(vb, px, 0, 61)
-		_post(vb, px, D - 4, 54)
-	# Striped awning high above the sign.
-	_awning(vb, -2, W + 2, -1, D + 3, 62, 54, RED, CREAM, 4)
+		_post(vb, px, 0, 69)
+		_post(vb, px, D - 4, 63)
+	# Striped awning high above the sign (sign sits fully clear below it,
+	# above the selected sim's bubble).
+	_awning(vb, -2, W + 2, -1, D + 3, 70, 63, RED, CREAM, 4)
 	# Carved hanging sign below the awning, in front of the posts, on two
 	# short chains (text = Label3D added in build()).
 	var sz := D - 1
@@ -242,7 +243,7 @@ func _treats_stall() -> VoxelBuilder:
 	K.maple(vb, 5, SIGN_Y0 + 2, sz + 2, Color("c8301a"))
 	vb.set_v(Vector3i(8, SIGN_Y0 + 1, sz + 2), Color("7a3a1a"))
 	for cx in [8, W - 9]:
-		for y in range(SIGN_Y1, 54):
+		for y in range(SIGN_Y1, 63):
 			vb.set_v(Vector3i(cx, y, sz), Color("2c2622") if posmod(y, 2) == 0 else Color("4a423a"))
 	# --- Food on the counter: two tiers so everything reads from the plaza.
 	var top := 17
@@ -271,10 +272,10 @@ func _treats_stall() -> VoxelBuilder:
 		vb.set_v(Vector3i(W - 5 - i * 3, top + 5, cz), Color("6a4a2a"))
 	# Festoon bulbs under the awning's front edge.
 	for x in range(3, W - 2, 6):
-		vb.set_v(Vector3i(x, 52, D - 3), Color("2c2622"))
-		vb.set_v(Vector3i(x, 51, D - 3), Color("ffd070"), true)
+		vb.set_v(Vector3i(x, 60, D - 3), Color("2c2622"))
+		vb.set_v(Vector3i(x, 59, D - 3), Color("ffd070"), true)
 	for x in range(0, W):
-		vb.set_v(Vector3i(x, 53, D - 3), Color("3a3530"))
+		vb.set_v(Vector3i(x, 61, D - 3), Color("3a3530"))
 	# Hanging lanterns on the outside of the front posts.
 	_lantern(vb, -5, 26, D - 4)
 	_lantern(vb, W + 1, 26, D - 4)

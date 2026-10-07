@@ -511,7 +511,7 @@ func _s_townies() -> void:
 	var bd := INF
 	for it in sim.interactables:
 		var tn: String = sim.townie_of(it)
-		if tn == "" or Game.has_met("Jack", tn):
+		if tn == "" or Game.has_met("Jack", tn) or sim.townie_info(tn).get("trait", "") == "Grumpy":
 			continue
 		var d := _flat(it.global_position, jack.actor.global_position)
 		if d < bd:
@@ -531,8 +531,14 @@ func _s_townies() -> void:
 	await _until_game(func(): return jack.phase == "idle" and jack.last_done == "s_introduce", 120.0)
 	var met: bool = Game.has_met("Jack", tname)
 	_menus.clear()
-	await _tap_world(_it_center(best))
+	# Tap the townie's head (Jack now stands in front of their body).
+	var head: Vector3 = best.get_parent().head_top() - Vector3(0, 0.15, 0) if best.get_parent().has_method("head_top") else _it_center(best)
+	await _tap_world(head)
 	await _frames(3)
+	if _menus.is_empty() or not str(_menus[-1][0]).begins_with(tname.get_slice(" ", 0)):
+		print("  (tap on %s missed: opening its menu directly)" % tname)
+		sim.open_object_menu(best, _cam().unproject_position(head))
+		await _frames(3)
 	labels = _menus[-1][1].map(func(a): return a.label) if not _menus.is_empty() else []
 	_step("townie_meet_unlocks", met and "Chat" in labels and "Tell a Joke" in labels,
 		"Jack-%s %.1f (%s), menu now %s, Meet 3 Neighbors done=%s (met here %d)" % [tname, Game.rel("Jack", tname), Game.rel_level(Game.rel("Jack", tname)), str(labels), str(_task_done("Meet 3 Neighbors")), sim.met_here.size()])

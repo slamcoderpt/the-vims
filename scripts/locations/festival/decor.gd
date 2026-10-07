@@ -204,7 +204,6 @@ func _strings(parent: Node3D) -> void:
 		[L[0], L[1], 0.5, false],
 		[L[0], L[2], 0.45, false],
 		[L[0], Vector3(5.6, 2.7, 0.0), 0.6, false],
-		[L[1], Vector3(7.0, 2.7, -4.0), 0.4, false],
 		[L[1], L[3], 0.4, true],
 		[L[2], L[4], 0.5, false],
 		[L[4], L[1], 0.6, false],
@@ -237,9 +236,9 @@ func _ground_lantern(vb: VoxelBuilder, x: int, z: int) -> void:
 	K.box(vb, x - 3, 0, z - 3, 6, 1, 6, iron)
 	for c in [Vector2i(-3, -3), Vector2i(2, -3), Vector2i(-3, 2), Vector2i(2, 2)]:
 		K.box(vb, x + c.x, 1, z + c.y, 1, 9, 1, iron)
-	K.box(vb, x - 2, 1, z - 2, 4, 9, 4, Color("ffb850"), true)
-	K.box(vb, x - 3, 1, z - 2, 6, 9, 4, Color("ffc868"), true)
-	K.box(vb, x - 2, 1, z - 3, 4, 9, 6, Color("ffc060"), true)
+	K.box(vb, x - 2, 1, z - 2, 4, 9, 4, Color("ffa040"), true)
+	K.box(vb, x - 3, 1, z - 2, 6, 9, 4, Color("ffb450"), true)
+	K.box(vb, x - 2, 1, z - 3, 4, 9, 6, Color("ffa848"), true)
 	K.box(vb, x - 3, 5, z - 3, 6, 1, 6, iron)
 	K.box(vb, x - 4, 10, z - 4, 8, 1, 8, iron)
 	K.box(vb, x - 3, 11, z - 3, 6, 1, 6, iron)
@@ -272,20 +271,20 @@ func _props(parent: Node3D) -> void:
 	var barrels := [
 		[-5.0, 3.9, 0], [-4.1, 4.9, 1], [-6.3, 1.4, 1],
 		[-2.6, -4.6, 2], [2.2, -10.4, 0], [-4.0, -8.6, 1], [4.8, -6.4, 3], [8.0, -1.0, 2],
-		[-3.0, 4.1, 0], [3.9, 4.5, 0],
+		[4.4, 5.3, 1], [2.1, 5.4, 0],
 	]
 	var i := 0
 	for b: Array in barrels:
 		_barrel_planter(near, int(b[0] * C), int(b[1] * C), 5.0, b[2], i)
 		i += 1
 	# Ground lanterns.
-	for l in [[-6.0, 4.6], [6.6, 1.6], [1.0, -4.6], [4.7, 2.5], [-4.7, 2.3]]:
+	for l in [[-6.0, 4.6], [6.6, 1.6], [1.0, -4.6], [4.7, 2.5], [-4.7, 2.3], [1.45, 4.7], [3.0, 5.9]]:
 		_ground_lantern(near, int(l[0] * C), int(l[1] * C))
 	# Picnic tables.
 	_picnic_table(near, int(2.4 * C), int(-3.2 * C))
 	_picnic_table(near, int(-4.8 * C), int(-9.6 * C))
 	# Pumpkin piles + hay.
-	var piles := [[-2.0, 3.9], [0.4, -5.2], [3.8, -5.6], [-7.4, -1.0], [8.6, 2.4]]
+	var piles := [[-2.75, 4.35], [0.4, -5.2], [3.8, -5.6], [-7.4, -1.0], [8.6, 2.4]]
 	var j := 0
 	for p: Array in piles:
 		var px := int(p[0] * C)

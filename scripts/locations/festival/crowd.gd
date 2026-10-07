@@ -26,12 +26,14 @@ func spawn(parent: Node3D, key: String, look: String, pos: Vector3, face_to: Vec
 func build(parent: Node3D, stalls, stage) -> void:
 	# --- Family (positions match the reference composition).
 	var vendor_pos: Vector3 = stalls.vendor_spot
-	var jack := spawn(parent, "Jack", "dad", Vector3(-1.1, 0, 2.3), Vector3(-3.4, 0, 5.4), "talk")
-	var lily := spawn(parent, "Lily", "bunny_girl", Vector3(0.2, 0, 1.65), Vector3(-0.5, 0, 8.0), "talk")
+	# Heroes ~1/4 screen tall and spaced apart so faces never overlap:
+	# Jack at the treats counter, Biscuit in front of him, Lily centre, Maya right.
+	var jack := spawn(parent, "Jack", "dad", Vector3(-1.25, 0, 2.45), Vector3(-2.9, 0, 5.6), "talk")
+	var lily := spawn(parent, "Lily", "bunny_girl", Vector3(0.95, 0, 2.0), Vector3(0.2, 0, 12.0), "talk")
 	_hold(lily, "candy_apple", "fore_r")
-	var dog := spawn(parent, "Biscuit", "beagle", Vector3(-0.5, 0, 2.7), Vector3(0.6, 0, 3.0), "idle")
+	var dog := spawn(parent, "Biscuit", "beagle", Vector3(-0.1, 0, 3.25), Vector3(3.6, 0, 6.2), "idle")
 	dog.rotation.y += 0.0
-	var maya := spawn(parent, "Maya", "cat_girl", Vector3(3.0, 0, 2.7), Vector3(2.0, 0, 9.0), "stand_type")
+	var maya := spawn(parent, "Maya", "cat_girl", Vector3(3.45, 0, 3.45), Vector3(1.0, 0, 12.0), "stand_type")
 	_hold(maya, "fox_plush", "torso")
 	# --- Stall keepers.
 	spawn(parent, "vendor", "npc_6", vendor_pos, jack.position, "talk")
@@ -40,18 +42,17 @@ func build(parent: Node3D, stalls, stage) -> void:
 	var cr: Node3D = stalls.crafts
 	spawn(parent, "crafter", "npc_6", cr.transform * Vector3(0.1, 0, -0.85), cr.transform * Vector3(0, 0, 3.0), "talk")
 	# --- Guitarist on stage.
-	var gt := spawn(parent, "guitarist", "npc_1", stage.performer_spot, Vector3(0.5, 0, 8.0), "stand_type")
+	# Faces the camera (front-on, guitar across the body), lit by the stage wash.
+	var gt := spawn(parent, "guitarist", "npc_1", stage.performer_spot, Vector3(0.0, 0, 14.0), "stand_type")
 	_hold(gt, "guitar", "torso")
 	# --- Townsfolk.
 	var folk := [
 		["npc_7", Vector3(-0.9, 0, -4.8), Vector3(-0.4, 0, 6.0), "walk"],
 		["npc_5", Vector3(-2.6, 0, -1.6), Vector3(-2.8, 0, 6.0), "walk"],
 		["npc_5", Vector3(5.6, 0, -1.4), Vector3(4.0, 0, 1.0), "talk"],
-		["npc_1", Vector3(7.8, 0, -5.8), Vector3(9.2, 0, -7.4), "talk"],
 		["npc_3", Vector3(-1.7, 0, -2.5), Vector3(-0.8, 0, -2.9), "talk"],
 		["npc_0", Vector3(-0.8, 0, -2.9), Vector3(-1.7, 0, -2.5), "idle"],
 		["npc_4", Vector3(2.6, 0, -5.4), Vector3(2.0, 0, 6.0), "walk"],
-		["npc_3", Vector3(-4.6, 0, -3.8), Vector3(-5.8, 0, -5.4), "idle"],
 	]
 	_far_folk(parent)
 	var i := 1
@@ -72,15 +73,17 @@ func build(parent: Node3D, stalls, stage) -> void:
 		i += 1
 
 
-## Far crowd (static, one mesh): stage audience, fountain loiterers, people
-## strolling in front of the town hall.
+## Static crowd (one mesh, one draw call): stage audience, fountain
+## loiterers, people strolling between the stalls (mid ground) and in front
+## of the town hall (far). Gives the square three depth layers of people.
 func _far_folk(parent: Node3D) -> void:
 	var F := preload("res://scripts/locations/festival/folk.gd").new()
 	var seed := 1
 	# Stage audience (backs to the camera, some turned).
-	for p in [[3.4, -9.6, 180], [4.3, -9.9, 160], [5.2, -9.5, 200], [6.1, -9.8, 180], [7.0, -9.4, 220],
-			[7.9, -9.9, 180], [4.8, -8.7, 150], [6.6, -8.6, 190], [8.6, -8.9, 240], [3.0, -8.4, 120]]:
-		F.add(p[0] - 0.3, p[1] + 1.9, p[2], seed % 4 == 0, seed)
+	# Kept clear of the sight line to the guitarist (world x ~4.8).
+	for p in [[2.4, -9.6, 180], [3.2, -10.0, 160], [6.5, -9.5, 200], [7.3, -9.8, 180], [8.1, -9.4, 220],
+			[9.0, -9.9, 180], [3.7, -8.9, 150], [7.0, -8.6, 190], [9.4, -8.6, 240], [2.6, -8.4, 120]]:
+		F.add(p[0], p[1] + 1.9, p[2], seed % 4 == 0, seed)
 		seed += 1
 	# Around the fountain and across the back of the square.
 	for p in [[-2.2, -9.4, 60], [1.9, -9.0, 300], [-1.4, -11.2, 0], [1.0, -12.0, 90], [-3.2, -12.6, 30],
@@ -89,6 +92,16 @@ func _far_folk(parent: Node3D) -> void:
 			[-8.4, -6.2, 30], [5.0, -6.8, 330],
 			[-2.6, -7.2, 45], [-1.9, -6.3, 225], [-3.6, -6.4, 120], [1.6, -6.6, 200]]:
 		F.add(p[0], p[1], p[2], seed % 5 == 0, seed)
+		seed += 1
+	# Mid ground: strolling between the stalls, queueing at the game booth,
+	# chatting in pairs on the open cobbles.
+	for p in [[-0.3, -1.2, 180, false], [0.9, -3.5, 0, false], [1.5, -3.7, 270, true],
+			[-3.7, -5.3, 90, false], [-5.3, -4.2, 0, false], [-5.0, -6.6, 270, true],
+			[4.7, -4.4, 0, false], [5.5, -4.8, 270, false], [8.4, -3.6, 180, false],
+			[6.1, -0.2, 0, true], [-0.6, -6.9, 180, false], [0.2, -6.3, 90, true],
+			[-6.4, -2.0, 90, false], [7.8, -5.8, 270, false], [-4.6, -3.8, 180, false], [3.4, -7.2, 180, false],
+			[-5.4, -0.1, 0, true], [2.8, 0.4, 180, true]]:
+		F.add(p[0], p[1], p[2], p[3], seed)
 		seed += 1
 	F.build(parent)
 

@@ -7,6 +7,7 @@ extends RefCounted
 ##   links:     [{a: Vector3, b: Vector3}] straight walkable connections between
 ##              levels (stairs). Endpoints snap to the nearest open cell.
 ##   carve:     [{level, rect: Rect2 (xz)}] forced-walkable areas (doorways).
+##   auto_connect: false to skip joining regions cut off by furniture.
 
 const CONFIGS := {
 	"home": {
@@ -17,15 +18,8 @@ const CONFIGS := {
 		# top in the upstairs hall, bottom step steps off west into the kitchen.
 		"links": [{"a": Vector3(3.75, 3.0, 1.2), "b": Vector3(2.55, 0.0, 4.45),
 			"via": [Vector3(3.75, 3.0, 1.75), Vector3(3.75, 0.19, 4.62)]}],
-		# Upstairs doorways (wall holes in home.gd) crowded by furniture:
-		# office|hall (x=-1), pink|hall and blue|hall (z=0), hall|bath (x=5.5).
-		"carve": [
-			{"level": 1, "rect": Rect2(-2.6, 1.3, 2.35, 1.2)},
-			{"level": 1, "rect": Rect2(2.4, -0.75, 0.7, 1.5)},
-			{"level": 1, "rect": Rect2(4.3, -0.75, 0.8, 1.5)},
-			{"level": 1, "rect": Rect2(5.2, 1.0, 0.35, 3.4)},
-			{"level": 1, "rect": Rect2(5.2, 3.5, 1.1, 0.8)},
-		],
+		# Doorways crowded by furniture are joined automatically
+		# (NavGrid.auto_connect); add "carve" rects here only for odd cases.
 	},
 	"backyard": {
 		"levels": [0.0],

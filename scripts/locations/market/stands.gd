@@ -165,6 +165,11 @@ static func _produce_island(root: Node3D, fix: VoxelBuilder, prod: VoxelBuilder)
 	# front-left extra crates on the floor (foreground spill)
 	_crate(fix, prod, Vector3(-4.9, 0.0, 1.9), Vector3(1.0, 0.3, 0.8), "orange", 77, 3)
 	_crate(fix, prod, Vector3(-4.75, 0.0, 0.9), Vector3(0.95, 0.5, 0.85), "pepper_mix", 78, 3)
+	# near-camera crates (lower-left foreground, softened by the DOF)
+	_crate(fix, prod, Vector3(-3.9, 0.0, 5.4), Vector3(1.0, 0.45, 0.8), "banana", 81, 3)
+	_crate(fix, prod, Vector3(-2.85, 0.0, 5.7), Vector3(0.9, 0.38, 0.8), "apple", 82, 3)
+	_crate(fix, prod, Vector3(-4.2, 0.0, 6.4), Vector3(1.1, 0.5, 0.85), "greens", 83, 3)
+	_tag(root, Vector3(-3.4, 0.5, 6.25), "$0.60", 6.0)
 
 
 ## Mid-store produce table (background left of the aisle).
@@ -284,9 +289,9 @@ static func _checkout(root: Node3D, _halo_pts: Array) -> void:
 	var vb := VoxelBuilder.new()
 	vb.jitter = 0.035
 	var x0 := u(1.6)
-	var z0 := u(1.5)
+	var z0 := u(3.0)
 	var W := u(0.85)
-	var L := u(3.4)
+	var L := u(4.2)
 	var Hc := u(0.92)
 	# body: wood front panels (facing -x)
 	vb.box(Vector3i(x0, 0, z0), Vector3i(W, Hc, L), func(p: Vector3i) -> Color:
@@ -362,7 +367,7 @@ static func _checkout(root: Node3D, _halo_pts: Array) -> void:
 				vb.set_v(Vector3i(x0 - 3, u(0.1) + 1 + p.y / 2, tz + 1 + p.x / 2), lv.vox[p])
 	# back counter behind the cashier
 	var bx := u(3.55)
-	var bz := u(1.25)
+	var bz := u(2.9)
 	var bh := u(0.9)
 	vb.box(Vector3i(bx, 0, bz), Vector3i(u(0.6), bh, u(2.2)), Kit.wood(Fx.WOOD_D, 2))
 	vb.box(Vector3i(bx - 1, bh, bz - 1), Vector3i(u(0.6) + 1, 1, u(2.2) + 2), Color("e8ddc8"))
@@ -405,7 +410,7 @@ static func _checkout(root: Node3D, _halo_pts: Array) -> void:
 	Interactable.attach(root, "Checkout", [
 		_act("pay", "Pay", "register", 3.0, {"task": "Pay at Checkout"}),
 		_act("bag", "Bag Groceries", "bag", 2.0),
-	], Vector3(0.85, 1.0, 3.4), Vector3(2.02, 0.5, 3.2), Vector3(1.2, 0, 2.4))
+	], Vector3(0.85, 1.0, 4.2), Vector3(2.02, 0.5, 5.1), Vector3(1.2, 0, 4.4))
 
 
 # ------------------------------------------------------------------ foreground dressing
@@ -416,7 +421,7 @@ static func _foreground(root: Node3D) -> void:
 	var vb := VoxelBuilder.new()
 	vb.jitter = 0.05
 	# Flower stand: low wooden crate with three buckets of flowers.
-	var fo := Vector3i(int(round(-2.55 / P)), 0, int(round(2.2 / P)))
+	var fo := Vector3i(int(round(-3.3 / P)), 0, int(round(2.6 / P)))
 	Fx.crate(vb, fo, 30, 18, 10, Color("a8703f"))
 	vb.box(fo + Vector3i(1, 1, 1), Vector3i(28, 8, 16), Color("6a4528"))
 	var fcols := [[Color("f06a9a"), Color("f9a8c8")], [Color("fdf6ea"), Color("f5d03b")], [Color("ef5a5a"), Color("f7a14a")]]
@@ -448,7 +453,7 @@ static func _foreground(root: Node3D) -> void:
 			var lp := bo + Vector3i(int(Kit.h(Vector3i(i, b, 7), 1) * 7.0), 6, int(Kit.h(Vector3i(i, b, 8), 2) * 9.0))
 			vb.set_v(lp, Color("4f9e34"))
 	# Stack of red shopping baskets.
-	var so := Vector3i(int(round(-1.2 / P)), 0, int(round(2.35 / P)))
+	var so := Vector3i(int(round(-4.3 / P)), 0, int(round(3.4 / P)))
 	for k in 4:
 		_basket(vb, so + Vector3i(0, k * 3, 0), Color("d8322c") if k % 2 == 0 else Color("c42a25"), k == 3)
 	# A loose basket of apples next to the stack.

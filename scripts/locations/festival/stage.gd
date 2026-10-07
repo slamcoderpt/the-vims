@@ -23,19 +23,27 @@ func build(parent: Node3D, pos: Vector3, rot: float) -> void:
 	parent.add_child(node)
 	var vb := VoxelBuilder.new()
 	vb.jitter = 0.0
-	_deck(vb)
+	# Deck + skirt at 1/8 m cells (big flat areas; halves their triangle cost).
+	var deck := VoxelBuilder.new()
+	deck.jitter = 0.0
+	_deck(deck)
+	_steps(vb)
 	_truss(vb)
 	_backdrop(vb)
 	_gear(vb)
 	_front(vb)
 	var origin := Vector3(W * 0.5, 0, D * 0.5)
 	K.inst(node, vb, U, Vector3.ZERO, 0.0, true, origin)
+	K.inst(node, deck, U * 2.0, Vector3.ZERO, 0.0, true, origin * 0.5, "Deck")
 	var xf := node.transform
 	for p: Vector3i in vb.glow:
 		if p.y > 70 and posmod(p.x, 2) == 0:
 			glow_points.append([xf * ((Vector3(p) + Vector3(0.5, 0.5, 0.5) - origin) * U), 0.45, Color(1.0, 0.75, 0.4)])
-	performer_spot = xf * Vector3(-0.2, DECK * U, 0.35)
+	performer_spot = xf * Vector3(-0.85, DECK * U, 0.45)
 	_notes(node)
+	# Stage wash: a warm key light in front of the performer so he reads
+	# front-lit against the backdrop (round 3: guitarist was a dark blob).
+	K.light(node, Vector3(-0.6, DECK * U + 1.7, 2.0), Color(1.0, 0.82, 0.6), 2.6, 3.6, 1.0)
 
 
 ## Little floating music notes beside the guitarist.
@@ -44,21 +52,27 @@ func _notes(n: Node3D) -> void:
 	vb.jitter = 0.0
 	var note := ["..##", "..#.", "..#.", "###.", "###."]
 	var dbl := ["#####", "#...#", "#...#", "#..##", "##.##", "##..."]
-	K.pattern(vb, note, 0, 0, 0, {"#": Color("fff8ea")})
-	K.pattern(vb, dbl, 7, 6, 0, {"#": Color("fff8ea")})
-	K.pattern(vb, note, 14, 2, 0, {"#": Color("fff8ea")})
-	var mi := K.inst(n, vb, 0.05, Vector3(-1.6, DECK * U + 1.5, 0.9), 0.0, false)
+	K.pattern(vb, note, 0, 0, 0, {"#": Color("fffaf0")}, true)
+	K.pattern(vb, dbl, 6, 7, 0, {"#": Color("fffaf0")}, true)
+	K.pattern(vb, note, 13, 3, 0, {"#": Color("fffaf0")}, true)
+	var mi := K.inst(n, vb, 0.07, Vector3(-2.75, DECK * U + 1.55, 1.2), 0.0, false)
 	mi.name = "MusicNotes"
 
 
 func _deck(vb: VoxelBuilder) -> void:
-	# Skirt (dark wood) + deck planks running along X.
-	K.box(vb, 0, 0, 0, W, DECK - 1, D, func(q: Vector3i) -> Color:
-		if q.z < D - 1 and q.x > 0 and q.x < W - 1:
+	# Coarse cells (2x): skirt (dark wood) + deck planks running along X.
+	var w := W / 2
+	var d := D / 2
+	var h := DECK / 2
+	K.box(vb, 0, 0, 0, w, h - 1, d, func(q: Vector3i) -> Color:
+		if q.z < d - 1 and q.x > 0 and q.x < w - 1:
 			return Color("3a2a20")
-		var f := 0.85 + K.hs(q.x / 3, 2, 9) * 0.2
-		return K.shade(Color("6a4228"), f if posmod(q.x, 3) != 0 else f * 0.8))
-	K.box(vb, -1, DECK - 1, 0, W + 2, 1, D + 1, K.wood(Color("b07a48"), 0, 3))
+		var f := 0.85 + K.hs(q.x / 2, 2, 9) * 0.2
+		return K.shade(Color("6a4228"), f if posmod(q.x, 2) != 0 else f * 0.8))
+	K.box(vb, 0, h - 1, 0, w, 1, d + 1, K.wood(Color("b07a48"), 0, 2))
+
+
+func _steps(vb: VoxelBuilder) -> void:
 	# Front steps.
 	for st in 5:
 		K.box(vb, W / 2 - 10, st * 3, D + 4 - st * 2, 20, 3, 2 + st * 0, K.wood(Color("9a6a40"), 0, 2))
@@ -113,7 +127,7 @@ func _backdrop(vb: VoxelBuilder) -> void:
 	var bx0 := W / 2 - 22
 	var bx1 := W / 2 + 22
 	for x in range(bx0, bx1):
-		for y in range(DECK + 18, 76):
+		for y in range(DECK + 7, 76):
 			var c := Color("f4e6c8")
 			if x < bx0 + 2 or x >= bx1 - 2 or y >= 74:
 				c = Color("d2541e")
@@ -125,8 +139,8 @@ func _backdrop(vb: VoxelBuilder) -> void:
 		var k := posmod(x - bx0, 8)
 		var drop := 3 - absi(k - 4) if absi(k - 4) < 3 else 0
 		for d in drop:
-			vb.set_v(Vector3i(x, DECK + 17 - d, 3), Color("d2541e"))
-	K.maple(vb, W / 2 - 14, 38, 4, Color("c8301a"), 4)
+			vb.set_v(Vector3i(x, DECK + 6 - d, 3), Color("d2541e"))
+	K.maple(vb, W / 2 - 1, 38, 4, Color("c8301a"), 3)
 	# Side drapes.
 	for x in [3, W - 9]:
 		K.box(vb, x, DECK, 3, 6, 68, 2, func(q: Vector3i) -> Color:

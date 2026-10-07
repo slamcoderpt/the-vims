@@ -10,7 +10,7 @@ const U := 0.0625
 const X0 := -6.75
 const X1 := 7.75
 const Z0 := -8.25
-const ZF := 8.0
+const ZF := 17.0
 const H := 5.0
 
 const WALL := Color("d6a46c")
@@ -108,7 +108,7 @@ static func _ceiling(root: Node3D, halo_pts: Array) -> void:
 		var k := p.z / 3
 		return Kit.shade(CEIL, 0.85 + 0.25 * Kit.h(Vector3i(0, 0, k), 4)))
 	# beams across x
-	for bz in [-6.0, -3.0, 0.0, 3.0, 6.0]:
+	for bz in [-6.0, -3.0, 0.0, 3.0, 6.0, 9.0, 12.0, 15.0]:
 		vb.box(Vector3i(x0, hh - 3, cc(bz)), Vector3i(x1 - x0, 3, 2), BEAM)
 	# two long beams along z
 	for bx in [-2.25, 3.25]:
@@ -120,7 +120,7 @@ static func _ceiling(root: Node3D, halo_pts: Array) -> void:
 	var lamps := VoxelBuilder.new()
 	lamps.jitter = 0.02
 	var pools := []
-	var rows := [[1.2, 3.85, [-4.3, -1.5, 1.5, 4.5], true], [-1.8, 3.7, [-4.4, -1.6, 1.3, 4.3], true],
+	var rows := [[4.4, 3.95, [-4.0, -1.3, 1.6, 4.4], true], [1.2, 3.85, [-4.3, -1.5, 1.5, 4.5], true], [-1.8, 3.7, [-4.4, -1.6, 1.3, 4.3], true],
 		[-4.6, 3.6, [-4.1, -1.3, 1.6, 4.5], true], [-7.0, 3.55, [-2.8, 0.1, 3.0], false]]
 	for r: Array in rows:
 		for x: float in r[2]:
@@ -198,7 +198,7 @@ static func _signs(root: Node3D) -> void:
 	Fx.leaf_icon(lv2, Vector3i(0, 0, 0), Color("6cbf45"), Color("2f7a2a"))
 	Kit.add(mk, lv2, U * 0.7, "Leaf", false, null, Vector3(1.03, 0.0, 0.11), Vector3(3.5, 4, 0))
 	# Aisle signs
-	var aisles := [["Dairy", Vector3(-0.35, 2.62, -5.4), 6.0, 1.0], ["Snacks", Vector3(1.0, 2.62, -5.4), 0.0, 1.1],
+	var aisles := [["Dairy", Vector3(-0.05, 2.5, -5.4), 6.0, 1.0], ["Snacks", Vector3(1.0, 2.62, -5.4), 0.0, 1.1],
 		["Beverages", Vector3(2.55, 2.68, -5.4), -6.0, 1.45], ["Bakery", Vector3(4.75, 2.8, -4.2), -22.0, 1.2]]
 	for a in aisles:
 		var b := _board(root, "Sign" + a[0], a[1], a[2], a[3], 0.4, Color("3b2a1f"), Color("7a5130"))

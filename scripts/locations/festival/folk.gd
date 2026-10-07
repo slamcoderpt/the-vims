@@ -31,14 +31,15 @@ func add(x: float, z: float, yaw_deg: float, kid := false, seed := 0) -> void:
 	people.append([x, z, yaw_deg, kid, seed])
 
 
-func build(parent: Node3D) -> MeshInstance3D:
+## vs: cell size; 1.18/16 m puts adults at ~1.9 m, in scale with SimActors.
+func build(parent: Node3D, vs := U * 1.18, nm := "FarFolk") -> MeshInstance3D:
 	_vb = VoxelBuilder.new()
 	_vb.jitter = 0.0
 	for p: Array in people:
-		_o = Vector3i(roundi(p[0] / U), 0, roundi(p[1] / U))
+		_o = Vector3i(roundi(p[0] / vs), 0, roundi(p[1] / vs))
 		_f = posmod(roundi(p[2] / 90.0), 4)
 		_person(p[3], p[4])
-	return K.inst(parent, _vb, U, Vector3.ZERO, 0.0, true, Vector3.ZERO, "FarFolk")
+	return K.inst(parent, _vb, vs, Vector3.ZERO, 0.0, true, Vector3.ZERO, nm)
 
 
 ## Set a voxel in figure-local coords (x right, y up, z towards the face).

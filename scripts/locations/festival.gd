@@ -14,7 +14,7 @@ const Stage := preload("res://scripts/locations/festival/stage.gd")
 const Decor := preload("res://scripts/locations/festival/decor.gd")
 const Crowd := preload("res://scripts/locations/festival/crowd.gd")
 
-const CAMERA := {"target": Vector3(0.5, 1.2, -3.2), "yaw": 0.0, "pitch": 15.0, "distance": 17.5, "fov": 40.0}
+const CAMERA := {"target": Vector3(0.5, 1.5, -3.0), "yaw": 0.0, "pitch": 13.0, "distance": 17.0, "fov": 42.0}
 
 var stalls
 var stage
@@ -119,7 +119,7 @@ func _interactables() -> void:
 
 
 ## Resolve actors by household name ("Jack"), look ("dad"), or NPC key
-## ("vendor", "game_host", "crafter", "guitarist", "neighbor_1".."neighbor_17").
+## ("vendor", "game_host", "crafter", "guitarist", "neighbor_1".."neighbor_8").
 func get_actor(actor_name: String) -> Node3D:
 	return crowd.get_actor(actor_name) if crowd else null
 
@@ -185,7 +185,7 @@ func _print_stats() -> void:
 				var n: int = (idx.size() / 3) if idx != null and idx.size() > 0 else (arr[Mesh.ARRAY_VERTEX] as PackedVector3Array).size() / 3
 				tris += n
 				if n > 4000:
-					print("  mesh ", mi.name, " surf ", si, " tris ", n)
+					print("  mesh ", mi.get_parent().name, "/", mi.name, " surf ", si, " tris ", n)
 	var cam := get_viewport().get_camera_3d()
 	if cam:
 		for k: String in ["Jack", "Lily", "Maya", "Biscuit", "vendor", "guitarist", "game_host"]:

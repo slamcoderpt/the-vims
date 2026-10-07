@@ -14,6 +14,10 @@ const STEP := 0.16        # anything lower than this above the floor is walkable
 const HEAD := 1.55        # clearance needed above the floor
 const SEAT_MIN := 0.25
 const SEAT_MAX := 0.85
+## Geometry reaching this high above the floor (from near the floor) is a wall.
+const TALL := 2.0
+## Auto-connect: max tunnel cost (4 per furniture cell) to join a region.
+const CONNECT_MAX := 28
 ## A* cost of walking through the clearance margin (dilated cells).
 const MARGIN_COST := 4.0
 
@@ -30,6 +34,9 @@ var floor_tol := 0.25
 var floors: Array[PackedFloat32Array] = []
 var seats: Array[PackedFloat32Array] = []
 var raw_block: Array[PackedByteArray] = []   # geometry only
+## 1 where blocking geometry runs from the floor to above TALL (walls, tall
+## cabinets): auto-connect never tunnels through those.
+var tall: Array[PackedByteArray] = []
 var block: Array[PackedByteArray] = []       # dilated + dynamic (what A* sees)
 var dyn: Array[PackedInt32Array] = []
 var astars: Array[AStarGrid2D] = []
@@ -89,6 +96,9 @@ func build(root: Node3D, cfg: Dictionary) -> void:
 		var rb := PackedByteArray()
 		rb.resize(w * h)
 		raw_block.append(rb)
+		var tb := PackedByteArray()
+		tb.resize(w * h)
+		tall.append(tb)
 		var d := PackedInt32Array()
 		d.resize(w * h)
 		dyn.append(d)
@@ -99,6 +109,8 @@ func build(root: Node3D, cfg: Dictionary) -> void:
 	for i in level_y.size():
 		block.append(PackedByteArray())
 		_rebuild_level(i)
+		if cfg.get("auto_connect", true):
+			auto_connect(i)
 	for l: Dictionary in cfg.get("links", []):
 		add_link(l.a, l.b, l.get("via", []))
 	build_ms = Time.get_ticks_msec() - t0
@@ -243,6 +255,7 @@ func _rasterize(tris: PackedFloat32Array) -> void:
 				continue
 			var f := floors[li]
 			var rb := raw_block[li]
+			var tl := tall[li]
 			var st := seats[li]
 			for z in range(z0, z1 + 1):
 				var row := z * w
@@ -255,8 +268,91 @@ func _rasterize(tris: PackedFloat32Array) -> void:
 						if kind == 1.0 and miny <= fy + STEP:
 							continue
 						rb[c] = 1
+						if maxy > fy + TALL and miny < fy + 0.6:
+							tl[c] = 1
 						if kind == 1.0 and miny >= fy + SEAT_MIN and miny <= fy + SEAT_MAX and miny < st[c]:
 							st[c] = miny
+
+
+## Join walkable regions the set dressing cut off (a bath right behind the
+## bathroom door, a dresser in a doorway): from every region but the biggest,
+## find the cheapest tunnel through furniture (never through walls / tall
+## cabinets or floor holes) to any other region and clear it. Repeats until
+## nothing more can be joined.
+func auto_connect(li: int) -> void:
+	for _iter in 24:
+		var cm := comps[li]
+		var sizes := {}
+		for c in w * h:
+			if cm[c] >= 0:
+				sizes[cm[c]] = int(sizes.get(cm[c], 0)) + 1
+		if sizes.size() <= 1:
+			return
+		var main_r := -1
+		var main_n := 0
+		for r in sizes:
+			if sizes[r] > main_n:
+				main_n = sizes[r]
+				main_r = r
+		var joined := false
+		for r in sizes:
+			if r == main_r or sizes[r] < 6:
+				continue
+			if _tunnel(li, r):
+				joined = true
+				break
+		if not joined:
+			return
+		_rebuild_level(li)
+
+
+## Cheapest tunnel out of region r; clears it and returns true if found.
+func _tunnel(li: int, r: int) -> bool:
+	var cm := comps[li]
+	var bl := block[li]
+	var rb := raw_block[li]
+	var tl := tall[li]
+	var dist := {}
+	var prev := {}
+	var buckets: Array[PackedInt32Array] = []
+	buckets.resize(CONNECT_MAX + 5)
+	for k in buckets.size():
+		buckets[k] = PackedInt32Array()
+	for c in w * h:
+		if cm[c] == r:
+			dist[c] = 0
+			buckets[0].append(c)
+	for cost in CONNECT_MAX + 1:
+		var bk: PackedInt32Array = buckets[cost]
+		var i := 0
+		while i < bk.size():
+			var cur: int = bk[i]
+			i += 1
+			if int(dist.get(cur, 1 << 30)) < cost:
+				continue
+			if cm[cur] >= 0 and cm[cur] != r:
+				# Reached another region: clear the blocked cells on the way.
+				var p := cur
+				while prev.has(p):
+					p = prev[p]
+					if cm[p] < 0:
+						rb[p] = 0
+				return true
+			var x := cur % w
+			for n in [cur - 1 if x > 0 else -1, cur + 1 if x < w - 1 else -1, cur - w, cur + w]:
+				if n < 0 or n >= w * h or bl[n] == 2 or tl[n] != 0 or cm[n] == r:
+					continue
+				var step := 0 if _walk_v(bl[n]) else 4
+				if step == 0:
+					step = 1
+				var nc := cost + step
+				if nc > CONNECT_MAX or int(dist.get(n, 1 << 30)) <= nc:
+					continue
+				dist[n] = nc
+				prev[n] = cur
+				buckets[nc].append(n)
+			bk = buckets[cost]
+	return false
 
 
 ## Force a rectangle (xz) walkable where it has floor: doorways that the
