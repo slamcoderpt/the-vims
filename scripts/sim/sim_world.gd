@@ -16,6 +16,18 @@ const BuildMode := preload("res://scripts/sim/build_mode.gd")
 const ShotPresets := preload("res://scripts/core/shot_presets.gd")
 const SimOverlay := preload("res://scripts/sim/ui/sim_overlay.gd")
 const Wishes := preload("res://scripts/sim/wishes.gd")
+const Careers := preload("res://scripts/sim/careers.gd")
+const Traits := preload("res://scripts/sim/traits.gd")
+const Carpool := preload("res://scripts/sim/carpool.gd")
+## Where sims leave the lot for work / school (walk here, then the carpool):
+## the front door at home, the street side elsewhere.
+const EXITS := {"home": Vector3(1.0, 0.0, 4.3), "backyard": Vector3(0.0, 0.0, 8.0),
+	"festival": Vector3(0.0, 0.0, 9.0), "market": Vector3(0.0, 0.0, 6.0)}
+## Where the carpool stops, relative to the exit (street side).
+const CURB := {"home": Vector3(0.0, 0.0, 4.4), "backyard": Vector3(0.0, 0.0, 1.6),
+	"festival": Vector3(0.0, 0.0, 1.6), "market": Vector3(0.0, 0.0, 1.6)}
+## The home mailbox (bills arrive here).
+const MAILBOX := {"home": Vector3(2.4, 0.0, 7.5)}
 ## In-game minutes between wish top-ups.
 const WISH_EVERY := 60.0
 
@@ -72,6 +84,7 @@ func _ready() -> void:
 	Game.queue_cancel_requested.connect(_on_queue_cancel)
 	Game.relationship_level_changed.connect(_on_rel_level)
 	Game.skill_changed.connect(_on_skill)
+	Game.bills_changed.connect(_update_mail_flag)
 	overlay = SimOverlay.new()
 	overlay.name = "SimOverlay"
 	overlay.hud = main.hud if main else null
@@ -122,11 +135,21 @@ func bind_location(loc: Node3D, p_name: String) -> void:
 		ag.setup(self, i, a)
 		agents.append(ag)
 	_init_tasks()
+	_add_mailbox()
 	met_here.clear()
 	_setup_townies()
 	refresh_interactables()
 	build.spawn_saved()
 	_adopt_staged()
+	# Mid-shift travel: whoever is at work stays out of sight until they're done.
+	for ag in agents:
+		if ag == null:
+			continue
+		var w: Dictionary = ag.member.get("work", {})
+		if str(w.get("state", "")) == "away":
+			ag.set_away()
+		elif str(w.get("state", "")) == "going":
+			w.state = ""
 	roll_wishes()
 
 
@@ -161,10 +184,13 @@ func _setup_townies() -> void:
 
 
 ## Townie name of an Interactable that sits on a townie ("" otherwise).
-func townie_of(it: Node) -> String:
+func townie_of(it) -> String:
+	# Untyped on purpose: callers may hold an Interactable that was freed
+	# (sold furniture, a lot being rebuilt); a typed Node parameter would fail
+	# before this check could run.
 	if it == null or not is_instance_valid(it):
 		return ""
-	var p := it.get_parent()
+	var p: Node = (it as Node).get_parent()
 	if p != null and p.has_meta("townie"):
 		return str(p.get_meta("townie"))
 	return ""
@@ -475,7 +501,7 @@ func _open_self_menu(ag, screen: Vector2) -> void:
 	# Tapping the selected sim: socials with family members + cancel.
 	var rows: Array = []
 	for other in agents:
-		if other == null or other == ag:
+		if other == null or other == ag or other.phase == "away":
 			continue
 		var acts := SimActions.socials_for(ag, other)
 		if not acts.is_empty():
@@ -644,6 +670,24 @@ func _on_action_chosen(title: String, action: Dictionary) -> void:
 		return
 	if t == "" and title == "Travel":
 		t = "travel"
+	if t == "object" and action.get("id", "") == "find_job":
+		# Second step: the job listings (Sims 3 newspaper / computer).
+		var it = ctx.get("target")
+		var sel0 = selected_agent()
+		if sel0 != null:
+			# Deferred: the HUD closes its menu right after reporting the pick.
+			open_menu.call_deferred("Job Listings", Careers.job_rows(sel0.member), {"type": "jobs", "target": it}, Vector2(520, 300))
+		return
+	if t == "jobs":
+		var sel1 = selected_agent()
+		var it1 = ctx.get("target")
+		if sel1 != null and it1 != null and is_instance_valid(it1):
+			var tr: Dictionary = Careers.TRACKS.get(str(action.get("track", "")), {})
+			var apply := {"id": "apply_job", "label": "Apply: %s" % tr.get("name", "Job"), "icon": tr.get("icon", "laptop"),
+				"minutes": 20.0, "pose": "type", "track": action.get("track", ""), "who": ["adult"]}
+			if sel1.command({"action": apply, "target": it1}):
+				stats.orders += 1
+		return
 	match t:
 		"object":
 			var sel = selected_agent()
@@ -774,7 +818,7 @@ func release_object(it: Node) -> void:
 ## Where an agent should stand for an order: {spot: Vector3, face: Vector3} or {}.
 func approach(ag, o: Dictionary) -> Dictionary:
 	var a: Dictionary = o.get("action", {})
-	if a.get("id", "") == "go_here":
+	if a.get("id", "") == "go_here" or o.get("work", false):
 		return {"spot": _open_spot(o.point)}
 	var other = o.get("other")
 	if other != null:
@@ -956,6 +1000,7 @@ func choose_autonomous(ag) -> Dictionary:
 				if not Game.can_afford(cost) or not _desperate_fix(ag, a):
 					continue
 			var s := SimActions.score(a, ag.member, dist) + randf() * 0.05 - busy_pen + Wishes.bias(ag, a)
+			s += Traits.bias(ag.member, a, a.has("rel"), false)
 			if not meal.is_empty():
 				if a.get("id", "") == "meal":
 					s += 0.15   # food's on the table: eat it before it goes cold
@@ -976,6 +1021,7 @@ func choose_autonomous(ag) -> Dictionary:
 					continue
 				var s := SimActions.score(a, ag.member, _flat(other.actor.global_position, p)) + randf() * 0.04
 				s += SimActions.social_bias(ag.index, other.index)
+				s += Traits.bias(ag.member, a, true, true)
 				if s > 0.1:
 					cands.append([s, {"action": a, "other": other}])
 	var best := _first_reachable(ag, cands)
@@ -1061,6 +1107,18 @@ func on_action_done(ag, o: Dictionary) -> void:
 		eat_serving()
 	elif is_meal_cook(it, a):
 		serve_meal(ag, a)
+	match a.get("id", ""):
+		"apply_job":
+			if Game.join_career(ag.index, str(a.get("track", ""))):
+				var c: Dictionary = ag.member.career
+				Game.notify.emit("%s got a job: %s · $%d/h · %s" % [ag.display_name(), Careers.title(c), Careers.wage(c), Careers.schedule_text(c)], "laptop")
+				Game.add_moodlet(ag.index, "new_job", "New Job", "laptop", 10.0, 8.0, Careers.title(c))
+				ag._say("I got the job!", "star")
+				Wishes.on_career(ag, "job")
+		"quit_job":
+			var tn: String = str(Careers.track(ag.member.get("career", {})).get("name", "the"))
+			Game.quit_career(ag.index)
+			Game.notify.emit("%s quit the %s career" % [ag.display_name(), tn], "laptop")
 	Wishes.on_action(ag, a, int(ag.last_pay))
 
 
@@ -1074,6 +1132,7 @@ const MEAL_SPOILS := 8 * 60.0
 ## Object actions for a member, plus "Eat Family Meal" on the table that has one.
 func actions_for(it: Node, member: Dictionary) -> Array:
 	var out := SimActions.actions_for(it, member)
+	out.append_array(career_rows(it, member))
 	if not meal.is_empty() and it == meal.get("table") and member.get("kind", "adult") != "dog" and int(meal.servings) > 0:
 		out.push_front(meal_action())
 	return out
@@ -1255,3 +1314,113 @@ func _spawn_plates(table: Node, n: int) -> void:
 		pl.add_child(fi)
 		plates.append(pl)
 	meal.plates = plates
+
+
+# =================================================================== careers, bills, carpool
+
+## Job / bill rows the sim layer adds to objects: Find a Job / Quit Job on
+## the computer, Pay Bills on the computer and the mailbox.
+func career_rows(it: Node, member: Dictionary) -> Array:
+	var out: Array = []
+	var title := str(it.get("title"))
+	var kind: String = member.get("kind", "adult")
+	if kind != "adult":
+		return out
+	if title == "Computer":
+		var c: Dictionary = member.get("career", {})
+		if c.is_empty():
+			out.push_front({"id": "find_job", "label": "Find a Job", "icon": "laptop", "minutes": 0.0, "pose": "type"})
+		else:
+			out.append({"id": "find_job", "label": "Change Jobs", "icon": "laptop", "minutes": 0.0, "pose": "type"})
+			out.append({"id": "quit_job", "label": "Quit Job", "icon": "dots", "minutes": 5.0, "pose": "type", "who": ["adult"]})
+		if Game.has_bills():
+			out.append({"id": "bills", "label": "Pay Bills Online ($%d)" % Game.bills_due_total(), "icon": "bill", "minutes": 15.0,
+				"pose": "type", "money": -Game.bills_due_total(), "task": "Pay Bills", "who": ["adult"]})
+	elif title == "Mailbox":
+		if Game.has_bills():
+			out.append({"id": "bills", "label": "Pay Bills ($%d)" % Game.bills_due_total(), "icon": "bill", "minutes": 8.0,
+				"pose": "idle", "money": -Game.bills_due_total(), "task": "Pay Bills", "who": ["adult"]})
+	return out
+
+
+## The home mailbox becomes tappable (it's part of the lot's merged mesh).
+func _add_mailbox() -> void:
+	if not MAILBOX.has(loc_name) or location == null:
+		return
+	var p: Vector3 = MAILBOX[loc_name]
+	var holder := Node3D.new()
+	holder.name = "MailboxSpot"
+	location.add_child(holder)
+	holder.position = p
+	var spot := Vector3(0, 0, -0.55)
+	if nav:
+		# Stand on the nearest reachable floor on the house side.
+		var c := nav.nearest_open(0, nav.cell_of(p + spot), 10)
+		if c.x >= 0:
+			spot = nav.center_of(0, c) - p
+	var it := Interactable.attach(holder, "Mailbox", [
+		{"id": "check_mail", "label": "Check Mail", "icon": "email", "minutes": 4.0, "pose": "idle", "needs": {"fun": 0.02}, "who": ["adult", "child"]},
+	], Vector3(0.5, 1.25, 0.6), Vector3(0.19, 0.62, 0.25), spot)
+	it.name = "Mailbox"
+	# Red flag up while bills wait in the mailbox.
+	var vb := VoxelBuilder.new()
+	vb.box(Vector3i(0, 0, 0), Vector3i(1, 5, 1), Color("3a3f4a"))
+	vb.box(Vector3i(0, 3, 1), Vector3i(1, 2, 3), Color("e2412f"))
+	_mail_flag = MeshInstance3D.new()
+	_mail_flag.name = "MailFlag"
+	_mail_flag.mesh = vb.build(0.0625)
+	_mail_flag.position = Vector3(0.38, 0.86, 0.1)
+	holder.add_child(_mail_flag)
+	_update_mail_flag()
+
+
+var _mail_flag: MeshInstance3D
+
+
+func _update_mail_flag() -> void:
+	if _mail_flag != null and is_instance_valid(_mail_flag):
+		_mail_flag.visible = Game.has_bills()
+
+
+## Floor spot to leave the lot from (front door / street side), reachable
+## from `from` if possible.
+func exit_spot(from: Vector3) -> Vector3:
+	var p: Vector3 = EXITS.get(loc_name, Vector3(0, 0, 6))
+	if nav == null:
+		return p
+	if not nav.in_bounds(p):
+		var m := nav.cs * 0.5
+		p.x = clampf(p.x, nav.ox + m, nav.ox + nav.w * nav.cs - m)
+		p.z = clampf(p.z, nav.oz + m, nav.oz + nav.h * nav.cs - m)
+	var c := nav.approach_cell(0, nav.cell_of(p), -1, 96)
+	if c.x < 0:
+		c = nav.nearest_open(0, nav.cell_of(p), 40)
+	if c.x < 0:
+		return from
+	return nav.center_of(0, c)
+
+
+## A carpool (or school bus) pulls up at the curb by `at`, waits and leaves.
+func carpool(at: Vector3, kind: String, wait: float) -> void:
+	if location == null:
+		return
+	var car = Carpool.new()
+	car.kind = kind
+	var curb: Vector3 = at + CURB.get(loc_name, Vector3(0, 0, 1.6))
+	curb.y = 0.0
+	car.stop = curb
+	car.dir = Vector3(1, 0, 0)
+	car.wait = wait
+	location.add_child(car)
+	stats["carpools"] = int(stats.get("carpools", 0)) + 1
+
+
+func on_shift_done(ag, pay: int) -> void:
+	if pay > 0:
+		Wishes.on_action(ag, {"id": "work_shift"}, pay)
+	if Careers.is_school(ag.member.get("career", {})) and Careers.grade(float(ag.member.career.perf)) in ["A", "A+"]:
+		Wishes.on_career(ag, "grade")
+
+
+func on_promotion(ag) -> void:
+	Wishes.on_career(ag, "promo")

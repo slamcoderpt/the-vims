@@ -114,29 +114,58 @@ func _person(kid: bool, seed: int) -> void:
 	var hy := y0 + body
 	var hx := -head / 2
 	_b(hx, hy, -head / 2, head, head, head - 1, skin)
-	# Face: eyes + mouth on the front (z = head/2 - 1 + 1).
+	# Face (round 7 critic: clean flat skin, big friendly eyes, smile):
+	# 2x2 dark eyes with a white catch-light, thick brows, a smile line.
 	var fz := head / 2 - 1
-	_s(hx + 2, hy + 3, fz, Color("1e1612"))
-	_s(hx + head - 3, hy + 3, fz, Color("1e1612"))
-	_s(hx + 2, hy + 4, fz, Color("1e1612"))
-	_s(hx + head - 3, hy + 4, fz, Color("1e1612"))
-	_s(hx + head / 2, hy + 1, fz, K.shade(skin, 0.7))
+	var ink := Color("1a1210")
+	var ey := hy + 3
+	var exl := hx + 1 if kid else hx + 2
+	var exr := hx + head - 3 if kid else hx + head - 4
+	for ex: int in [exl, exr]:
+		_s(ex, ey, fz, ink)
+		_s(ex + 1, ey, fz, ink)
+		_s(ex, ey + 1, fz, ink)
+		_s(ex + 1, ey + 1, fz, Color("fbf6ee"))
+	var brow := K.shade(hair, 0.75)
+	if not kid:
+		_s(exl, ey + 3, fz, brow)
+		_s(exl + 1, ey + 3, fz, brow)
+		_s(exr, ey + 3, fz, brow)
+		_s(exr + 1, ey + 3, fz, brow)
+	# Smile: a dark line with upturned corners.
+	var mc := Color("7a2a22")
+	var mx := hx + head / 2
+	_s(mx - 1, hy + 1, fz, mc)
+	_s(mx, hy + 1, fz, mc)
+	if head % 2 == 1:
+		_s(mx + 1, hy + 1, fz, mc)
+		_s(mx + 2, hy + 2, fz, mc)
+	else:
+		_s(mx + 1, hy + 2, fz, mc)
+	_s(mx - 2, hy + 2, fz, mc)
 	# Cheeks.
-	_s(hx + 1, hy + 2, fz, Color("e88a7a"))
-	_s(hx + head - 2, hy + 2, fz, Color("e88a7a"))
+	_s(exl - 1 if kid else exl, hy + 2, fz, Color("f09a8a"))
+	_s(exr + 2 if kid else exr + 1, hy + 2, fz, Color("f09a8a"))
 	# Hair cap + back.
 	var hair_style: int = int(_h(11) * 4)
 	_b(hx - 0 , hy + head, -head / 2, head, 2, head - 1, hair)
 	_b(hx, hy + head - 2, -head / 2, head, 2, 1, hair)
 	_b(hx, hy + 2, -head / 2 - 1, head, head, 1, hair)
+	# Fringe + side locks framing the face (clean, single colour).
+	_b(hx, hy + head - 1, fz, head, 1, 1, hair)
+	_b(hx, hy + 4, fz, 1, head - 4, 1, hair)
+	_b(hx + head - 1, hy + 4, fz, 1, head - 4, 1, hair)
 	_b(hx - 1, hy + 3, -head / 2, 1, head - 2, head - 3, hair)
 	_b(hx + head, hy + 3, -head / 2, 1, head - 2, head - 3, hair)
 	if hair_style == 1:
 		# Long hair down the back.
 		_b(hx, hy - 3, -head / 2 - 1, head, 5, 2, hair)
 	elif hair_style == 2 and not kid:
-		# Beard.
-		_b(hx + 1, hy, fz, head - 2, 2, 1, hair)
+		# Beard round the chin with the smile left open; moustache above.
+		_b(hx, hy, fz, 1, 3, 1, hair)
+		_b(hx + head - 1, hy, fz, 1, 3, 1, hair)
+		_b(hx + 1, hy, fz, head - 2, 1, 1, hair)
+		_b(hx + head / 2 - 1, hy + 2, fz, 3, 1, 1, K.shade(hair, 1.1))
 	# Hat sometimes (beanie / cowboy / cap).
 	var hat_roll := _h(12)
 	if hat_roll < 0.3:

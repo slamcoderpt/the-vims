@@ -651,10 +651,15 @@ static func _shower_cubicle(vb: VoxelBuilder) -> void:
 ## v1 matches the cubicle: light-blue panes, a frosted band at mid height.
 static func m_shower_glass(vb: VoxelBuilder, v: int) -> void:
 	if v == 1:
+		# Clear light-blue panes with two soft diagonal glints and a frosted
+		# privacy band (reads as glass, not as a tiled grid).
 		var gb := func(q: Vector3i) -> Color:
-			if q.y >= 10 and q.y <= 15:
-				return Color("e6f4fa")
-			return Color("9fd3ea") if posmod(q.x + q.y + q.z, 9) != 0 else Color("c9ebf7")
+			if q.y >= 11 and q.y <= 14:
+				return Color("e2f2f8")
+			var d := posmod(q.x + q.z - q.y, 22)
+			if d == 3 or d == 4 or d == 9:
+				return Color("e8f7fc")
+			return Color("a8d8ec")
 		V.b(vb, 2, 2, 15, 13, 24, 1, gb)
 		V.b(vb, 15, 2, 2, 1, 24, 13, gb)
 		return

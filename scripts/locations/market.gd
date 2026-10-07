@@ -46,20 +46,34 @@ func camera_home() -> Dictionary:
 
 
 func lighting_profile() -> Dictionary:
-	# Indoors: a weak, high "skylight" sun for soft shadow direction; the
-	# store is lit mostly by warm pendant omnis + bright neutral ambient.
+	# Indoors, bright and neutral: a soft white "skylight" key for shadow
+	# direction plus a strong neutral-cool ambient fill, so the tiles read
+	# cream-white and the fridges read cold. Warmth lives only in the pendant
+	# lamps and their light pools.
 	return {
-		"sun_heading": 200.0, "sun_elev": 62.0, "sun_energy": 0.55,
-		"ambient_day": Color(1.0, 0.95, 0.88), "ambient_energy": 0.62,
-		"ambient_night": Color(0.8, 0.7, 0.6), "ambient_night_energy": 0.6,
+		"sun_heading": 200.0, "sun_elev": 64.0, "sun_energy": 0.5,
+		"ambient_day": Color(0.97, 0.98, 1.0), "ambient_energy": 0.9,
+		"ambient_night": Color(0.85, 0.82, 0.8), "ambient_night_energy": 0.7,
 		"lamp_night_mult": 1.2,
-		"sky_day": Color(0.36, 0.27, 0.2), "sky_night": Color(0.2, 0.14, 0.1),
-		"fog_day": Color(0.98, 0.94, 0.88), "fog_night": Color(0.4, 0.3, 0.22), "fog_density": 0.0022,
-		"exposure": 1.05,
+		"sky_day": Color(0.86, 0.9, 0.94), "sky_night": Color(0.2, 0.18, 0.2),
+		"fog_day": Color(0.94, 0.96, 0.98), "fog_night": Color(0.4, 0.36, 0.34), "fog_density": 0.0018,
+		"exposure": 1.04,
 		"shadow_distance": 18.0,
-		"post": {"focus_y": 0.53, "band": 0.29, "falloff": 0.3, "blur_px": 3.6, "top_boost": 0.2,
-			"saturation": 1.16, "contrast": 1.1, "tint": Vector3(1.0, 1.0, 0.98), "vignette": 0.16},
+		"post": {"focus_y": 0.53, "band": 0.3, "falloff": 0.28, "blur_px": 3.4, "top_boost": 0.2,
+			"saturation": 1.14, "contrast": 1.08, "tint": Vector3(0.985, 1.0, 1.025),
+			"lift": Vector3(0.006, 0.006, 0.01), "vignette": 0.12},
 	}
+
+
+## lighting.gd tints the sun warm in the morning (it is an outdoor sun); in
+## here it stands in for neutral skylight, so re-colour it after each update.
+func _fix_sun(_a = null, _b = null) -> void:
+	var lt := get_parent().get_node_or_null("Lighting") if get_parent() else null
+	if lt == null:
+		return
+	var sun = lt.get("sun")
+	if sun is DirectionalLight3D:
+		sun.light_color = Color(1.0, 0.98, 0.95)
 
 
 func get_actor(key: String) -> SimActor:
@@ -68,6 +82,13 @@ func get_actor(key: String) -> SimActor:
 
 func apply_preset(_preset: String) -> void:
 	_stage()
+	_fix_sun()
+
+
+func _ready() -> void:
+	if not Game.time_changed.is_connected(_fix_sun):
+		Game.time_changed.connect(_fix_sun)
+	_fix_sun.call_deferred()
 
 
 # =================================================================== people
@@ -138,7 +159,7 @@ func _stage() -> void:
 	dog.rotation.y = lerp_angle(cart_yaw, dog.rotation.y, 0.6)
 	# The "type" pose turns the head ~0.9 rad to the sim's left, so the
 	# girls' bodies are turned the other way to keep their faces on camera.
-	var lily := _place("bunny_girl", Vector3(-2.05, 0, 2.55), cam, "stand_type")
+	var lily := _place("bunny_girl", Vector3(-1.45, 0, 3.2), cam, "stand_type")
 	lily.rotation.y -= 0.75
 	var maya := _place("cat_girl", Vector3(2.2, 0, 2.75), cam, "stand_type")
 	maya.rotation.y -= 0.8

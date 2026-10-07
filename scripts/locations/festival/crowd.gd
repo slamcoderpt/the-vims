@@ -28,12 +28,12 @@ func build(parent: Node3D, stalls, stage) -> void:
 	var vendor_pos: Vector3 = stalls.vendor_spot
 	# Heroes ~1/4 screen tall and spaced apart so faces never overlap:
 	# Jack at the treats counter, Biscuit in front of him, Lily centre, Maya right.
-	var jack := spawn(parent, "Jack", "dad", Vector3(-2.75, 0, 0.75), Vector3(-5.6, 0, 6.5), "talk")
-	var lily := spawn(parent, "Lily", "bunny_girl", Vector3(0.05, 0, 0.2), Vector3(0.6, 0, 12.0), "talk")
+	var jack := spawn(parent, "Jack", "dad", Vector3(-2.75, 0, 0.75), Vector3(-2.9, 0, 6.0), "talk")
+	var lily := spawn(parent, "Lily", "bunny_girl", Vector3(-0.45, 0, 0.2), Vector3(-3.1, 0, 11.0), "talk")
 	_hold(lily, "candy_apple", "fore_r")
-	var dog := spawn(parent, "Biscuit", "beagle", Vector3(-1.55, 0, 1.95), Vector3(4.0, 0, 3.8), "idle")
+	var dog := spawn(parent, "Biscuit", "beagle", Vector3(-1.8, 0, 1.95), Vector3(1.5, 0, 7.0), "idle")
 	dog.scale = Vector3.ONE * 0.85
-	var maya := spawn(parent, "Maya", "cat_girl", Vector3(3.85, 0, 2.45), Vector3(1.6, 0, 12.0), "stand_type")
+	var maya := spawn(parent, "Maya", "cat_girl", Vector3(3.2, 0, 2.35), Vector3(1.0, 0, 12.0), "stand_type")
 	_hold(maya, "fox_plush", "torso")
 	# --- Stall keepers.
 	spawn(parent, "vendor", "npc_6", vendor_pos, jack.position, "talk")
@@ -97,7 +97,7 @@ func _far_folk(parent: Node3D) -> void:
 	# Mid ground: browsing the side stalls, queueing at the game booth,
 	# chatting in pairs at the edges of the walkway.
 	for p in [[-6.4, -5.6, 90, false], [-7.0, -7.4, 0, false], [-6.7, -6.6, 270, true],
-			[2.3, -1.4, 180, true], [3.6, -5.2, 0, false], [7.2, -4.0, 270, false],
+			[3.6, -5.2, 0, false], [7.2, -4.0, 270, false],
 			[9.4, -6.0, 300, false], [9.8, -9.6, 270, false], [-8.0, -3.8, 90, false],
 			[-2.2, -8.0, 135, true], [6.3, -8.4, 200, false], [7.0, -9.0, 30, true]]:
 		F.add(p[0], p[1], p[2], p[3], seed)

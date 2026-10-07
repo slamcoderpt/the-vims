@@ -5,6 +5,9 @@ extends Node
 ##     Garden); pick an item and a ghost appears on the floor grid in the
 ##     middle of the screen. Drag the ghost (or tap the floor) to move it; tap
 ##     the ghost for Place / Rotate / Cancel.
+##   Build > Walls is a wall tool (Sims 3): drag a finger across the floor to
+##     lay a straight run of wall sections (each 1 m, snapped to the grid,
+##     paid per section); a tap still moves the single ghost.
 ##   Any mode: tap a bought item for Move / Rotate / Sell. Walls block paths;
 ##     floor tiles and rugs are walked over.
 ## The clock pauses while a build mode is open (as in The Sims).
@@ -32,6 +35,14 @@ var _saved_speed := 1
 var _mat_ok: StandardMaterial3D
 var _mat_bad: StandardMaterial3D
 var _last_menu_pos := Vector2(170, 260)
+## Wall tool drag: where the finger went down (INF = none), whether it has
+## become a run, and the sections the run would build [{pos, rot, ok}].
+var _run_start := Vector3.INF
+var _run_active := false
+var run_segs: Array = []
+var _run_pool: Array = []   # Node3D previews, reused
+const RUN_MAX := 24
+const RUN_START_M := 0.35
 
 
 func _ready() -> void:
@@ -123,6 +134,14 @@ func tap(screen: Vector2) -> void:
 func press(screen: Vector2) -> bool:
 	if ghost == null:
 		return false
+	if is_wall_tool():
+		var g: Dictionary = world.ground_point(screen)
+		if not g.is_empty():
+			_run_start = g.pos
+			_run_active = false
+			dragging = true
+			_lock_camera(true)
+			return true
 	var gp := _ghost_screen()
 	if gp != Vector2.INF and gp.distance_to(screen) < _ghost_radius_px():
 		dragging = true
@@ -135,14 +154,123 @@ func drag(screen: Vector2) -> void:
 	if not dragging or ghost == null:
 		return
 	var g: Dictionary = world.ground_point(screen)
+	if _run_start != Vector3.INF:
+		if g.is_empty():
+			return
+		var d := Vector2(g.pos.x - _run_start.x, g.pos.z - _run_start.z).length()
+		if not _run_active and d > RUN_START_M:
+			_run_active = true
+			ghost.visible = false
+		if _run_active:
+			update_run(g.pos)
+		return
 	if not g.is_empty():
 		_move_ghost(g.pos)
 
 
 func release() -> void:
+	if _run_active:
+		commit_run()
+	_run_start = Vector3.INF
+	_run_active = false
 	if dragging:
 		dragging = false
 		_lock_camera(false)
+
+
+# =================================================================== wall tool (drag to build)
+
+func is_wall_tool() -> bool:
+	return ghost != null and moving_uid < 0 and ghost_item.get("sub", "") == "walls"
+
+
+## Lay out a straight run of wall sections from the press point to p (the
+## longer axis wins, like the Sims wall tool), previewed green / red.
+func update_run(p: Vector3) -> void:
+	var s := _run_start
+	s.x = roundf(s.x / 0.5) * 0.5
+	s.z = roundf(s.z / 0.5) * 0.5
+	var dx := p.x - s.x
+	var dz := p.z - s.z
+	var along_x := absf(dx) >= absf(dz)
+	var ln := absf(dx) if along_x else absf(dz)
+	var n := clampi(int(roundf(ln)), 1, RUN_MAX)
+	var sg := signf(dx if along_x else dz)
+	if sg == 0.0:
+		sg = 1.0
+	var rot := 0 if along_x else 1
+	run_segs.clear()
+	for k in n:
+		var off := (k + 0.5) * sg
+		var c := s + (Vector3(off, 0, 0) if along_x else Vector3(0, 0, off))
+		var q := _snap(ghost_item, rot, c)
+		var box := _box(ghost_item, rot, q)
+		run_segs.append({"pos": q, "rot": rot, "ok": _can_place(ghost_item, box) and not _covers_sim(box)})
+	while _run_pool.size() < run_segs.size():
+		var h := Node3D.new()
+		h.name = "WallRun%d" % _run_pool.size()
+		var mi: MeshInstance3D = ghost_mesh.duplicate()
+		h.add_child(mi)
+		world.location.add_child(h)
+		_run_pool.append(h)
+	for k in _run_pool.size():
+		var h: Node3D = _run_pool[k]
+		if k >= run_segs.size():
+			h.visible = false
+			continue
+		var sgm: Dictionary = run_segs[k]
+		h.visible = true
+		h.global_position = sgm.pos + Vector3(0, 0.02, 0)
+		h.rotation.y = sgm.rot * PI * 0.5
+		(h.get_child(0) as MeshInstance3D).material_override = _mat_ok if sgm.ok else _mat_bad
+	if grid:
+		grid.global_position = Vector3(s.x, s.y + 0.015, s.z)
+
+
+## Build every placeable section of the run (paid per section; stops when
+## the money runs out; skips sections that would trap someone).
+func commit_run() -> int:
+	var price: int = ghost_item.get("price", 0)
+	var built := 0
+	var trapped := ""
+	var broke := false
+	for sgm in run_segs:
+		if not sgm.ok:
+			continue
+		var box := _box(ghost_item, sgm.rot, sgm.pos)
+		var who := _blocks_route(box)
+		if who != "":
+			trapped = who
+			continue
+		if not Game.add_money(-price):
+			broke = true
+			break
+		var entry := {"uid": Game.next_uid(), "item": ghost_item.id, "pos": sgm.pos, "rot": sgm.rot}
+		_entries().append(entry)
+		_spawn(entry)
+		_push_sims(box)
+		built += 1
+	_clear_run()
+	if ghost:
+		ghost.visible = true
+	if built > 0:
+		Game.notify.emit("Built %d wall section%s · $%d" % [built, "" if built == 1 else "s", built * price], "hammer")
+		Game.furniture_changed.emit()
+	if broke:
+		Game.notify.emit("Not enough money for the rest of the wall", "money")
+	elif trapped != "":
+		Game.notify.emit("Left a gap so %s isn't trapped" % trapped, "dots")
+	elif built == 0:
+		Game.notify.emit("Can't build a wall there", "dots")
+	return built
+
+
+func _clear_run() -> void:
+	run_segs.clear()
+	for h in _run_pool:
+		if is_instance_valid(h):
+			h.queue_free()
+	_run_pool.clear()
 
 
 func _lock_camera(v: bool) -> void:
@@ -207,10 +335,15 @@ func start_ghost(item_id: String, at := Vector3.INF) -> bool:
 		var g: Dictionary = world.ground_point(vs * Vector2(0.5, 0.55))
 		p = g.get("pos", world.camera_rig.target if world.camera_rig else Vector3.ZERO)
 	_move_ghost(p, true)
+	if item.get("sub", "") == "walls":
+		Game.notify.emit("Drag across the floor to build a wall · tap the ghost for options", "hammer")
 	return true
 
 
 func cancel_ghost() -> void:
+	_clear_run()
+	_run_start = Vector3.INF
+	_run_active = false
 	if ghost:
 		ghost.queue_free()
 		ghost = null

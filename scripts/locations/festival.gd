@@ -14,7 +14,7 @@ const Stage := preload("res://scripts/locations/festival/stage.gd")
 const Decor := preload("res://scripts/locations/festival/decor.gd")
 const Crowd := preload("res://scripts/locations/festival/crowd.gd")
 
-const CAMERA := {"target": Vector3(0.3, 1.2, -4.0), "yaw": 0.0, "pitch": 20.0, "distance": 18.0, "fov": 40.0}
+const CAMERA := {"target": Vector3(-0.5, 1.3, -4.0), "yaw": 0.0, "pitch": 15.0, "distance": 17.5, "fov": 34.0}
 ## Town backdrop is scaled down so the clock tower stays in frame under the
 ## steeper (ref-like) camera; hall front lands at z ~ -26.
 const TOWN_SCALE := 0.64
@@ -138,6 +138,16 @@ func apply_preset(preset: String) -> void:
 	if preset != "festival" or crowd == null:
 		return
 	# Staged poses for the reference screenshot are set at spawn already.
+	# Debug: VIMS_FCAM="x,y,z,yaw,pitch,dist,fov" overrides the shot camera.
+	if OS.has_environment("VIMS_FCAM"):
+		_debug_cam.call_deferred(OS.get_environment("VIMS_FCAM"))
+
+
+func _debug_cam(s: String) -> void:
+	var v := s.split_floats(",")
+	var rig := get_parent().get_node_or_null("CameraRig")
+	if rig and v.size() >= 7:
+		rig.apply({"target": Vector3(v[0], v[1], v[2]), "yaw": v[3], "pitch": v[4], "distance": v[5], "fov": v[6]})
 
 
 func camera_home() -> Dictionary:

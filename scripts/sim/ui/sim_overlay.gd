@@ -12,6 +12,8 @@ extends CanvasLayer
 ## besides the throttled redraws).
 
 const UI := preload("res://scripts/ui/ui_kit.gd")
+const Careers := preload("res://scripts/sim/careers.gd")
+const Traits := preload("res://scripts/sim/traits.gd")
 
 const TILE := 56.0
 ## Height of the strip (queue row + mood row).
@@ -19,10 +21,12 @@ const STRIP_H := TILE + 9.0 + 34.0
 const TILE_SMALL := 44.0
 const GAP := 7.0
 const CHIP := 34.0
-const PANEL_W := 318.0
+const PANEL_W := 362.0
 const TOAST_TTL := 3.2
-const TAB_W := 64.0
-const TABS := [["mood", "Mood", 10.0], ["skills", "Skills", 77.0], ["rels", "Friends", 144.0], ["wishes", "Wishes", 211.0]]
+const TAB_W := 58.0
+const TABS := [["mood", "Mood", 10.0], ["skills", "Skills", 71.0], ["rels", "Friends", 132.0], ["wishes", "Wishes", 193.0], ["career", "Job", 254.0]]
+## Career tab: rows (in panel rows of 44 px) and the tendency buttons' y.
+const CAREER_ROWS := 5
 const REL_ROWS := 7
 const HUE_SHADER := """
 shader_type canvas_item;
@@ -59,7 +63,7 @@ var root: Control
 var strip: Control
 var panel: Control
 var toasts: Control
-var panel_tab := "mood"   # "mood" | "skills" | "rels" | "wishes"
+var panel_tab := "mood"   # "mood" | "skills" | "rels" | "wishes" | "career"
 var panel_open := false
 
 var _hits: Array = []        # [Rect2 (global), kind, arg]
@@ -122,6 +126,8 @@ func _ready() -> void:
 	Game.relationship_changed.connect(func(_a, _b, _v): _dirty())
 	Game.household_changed.connect(_dirty)
 	Game.wishes_changed.connect(func(_i): _dirty())
+	Game.career_changed.connect(func(_i): _dirty())
+	Game.bills_changed.connect(_dirty)
 	Game.mode_changed.connect(_on_mode)
 	Game.notify.connect(toast)
 	get_viewport().size_changed.connect(_layout)
@@ -286,6 +292,10 @@ func _on_hit(kind: String, arg) -> void:
 			open_panel("rels")
 		"wishes":
 			open_panel("wishes")
+		"career":
+			open_panel("career")
+		"tendency":
+			Game.set_tendency(Game.selected, str(arg))
 		"wish":
 			var ws: Array = Game.wishes(Game.selected)
 			if int(arg) < ws.size():
@@ -432,6 +442,18 @@ func _draw_strip() -> void:
 		strip.draw_circle(bc, 8.0, Color("f0a43a"))
 		strip.draw_string(UI.font(800), bc + Vector2(-4, 4.5), str(np), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color.WHITE)
 	_add_hit(strip, wb, "wishes")
+	# job / school button (laptop or book), with a red dot when bills are overdue
+	var jb := Rect2(wb.end.x + 6, y, 34, 34)
+	strip.draw_style_box(_card_dark, jb)
+	var cm: Dictionary = Game.career(sel)
+	var jic := UI.icon("book" if Careers.is_school(cm) else "laptop")
+	if jic:
+		strip.draw_texture_rect(jic, Rect2(jb.position + Vector2(6, 6), Vector2(22, 22)), false)
+	if Game.is_at_work(sel):
+		strip.draw_circle(jb.position + Vector2(jb.size.x - 3, 3), 6.0, Color("4fd34a"))
+	elif Game.bills_overdue():
+		strip.draw_circle(jb.position + Vector2(jb.size.x - 3, 3), 6.0, Color("ee4a3c"))
+	_add_hit(strip, jb, "career")
 	if panel.visible:
 		_panel_hits()
 		_add_hit(panel, Rect2(Vector2.ZERO, panel.size), "panel")
@@ -484,6 +506,8 @@ func _panel_rows() -> int:
 		return clampi(Game.rel_list(sel).size(), 1, REL_ROWS)
 	if panel_tab == "wishes":
 		return maxi(1, Game.wishes(sel).size())
+	if panel_tab == "career":
+		return CAREER_ROWS
 	return maxi(1, Game.moodlets(sel).size())
 
 
@@ -494,6 +518,9 @@ func _panel_hits() -> void:
 	if panel_tab == "wishes":
 		for k in Game.wishes(Game.selected).size():
 			_add_hit(panel, Rect2(8, 56 + k * 44.0, PANEL_W - 16, 44.0), "wish", k)
+	if panel_tab == "career" and Game.has_job(Game.selected):
+		for k in Careers.TENDENCIES.size():
+			_add_hit(panel, _tendency_rect(k), "tendency", Careers.TENDENCIES[k])
 
 
 func _draw_panel() -> void:
@@ -550,6 +577,8 @@ func _draw_panel() -> void:
 		_draw_rels(sel, y, row_h)
 	elif panel_tab == "wishes":
 		_draw_wishes(sel, y, row_h)
+	elif panel_tab == "career":
+		_draw_career(sel, y, row_h)
 	else:
 		var sk: Array = Game.skills_list(sel)
 		if sk.is_empty():
@@ -645,6 +674,129 @@ func _draw_wishes(sel: int, y: float, row_h: float) -> void:
 	if st:
 		panel.draw_texture_rect(st, Rect2(16, y + 16, 22, 22), false)
 	panel.draw_string(f, Vector2(44, y + 33), "Lifetime Happiness  %s" % _thousands(Game.lth(sel)), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, UI.INK)
+
+
+func _tendency_rect(k: int) -> Rect2:
+	var w := (PANEL_W - 32.0 - 2 * 6.0) / 3.0
+	return Rect2(16 + k * (w + 6.0), 56 + 3 * 44.0 + 4.0, w, 32)
+
+
+## Career tab (Sims 3 career panel): job title and level, wage and schedule,
+## performance bar, what the next promotion needs, the work tendency
+## (Work Hard / Normal / Take It Easy), traits and the household's bills.
+func _draw_career(sel: int, y: float, row_h: float) -> void:
+	var f := UI.font(800)
+	var f7 := UI.font(700)
+	var m: Dictionary = Game.household[sel]
+	var c: Dictionary = Game.career(sel)
+	var school := Careers.is_school(c)
+	var gold := Color("f0a43a")
+	# --- row 1: title
+	var ic := UI.icon(str(Careers.track(c).get("icon", "laptop")) if not c.is_empty() else "laptop")
+	panel.draw_circle(Vector2(30, y + row_h * 0.5), 16.0, UI.BLUE if not c.is_empty() else Color("b8c2d3"))
+	panel.draw_circle(Vector2(30, y + row_h * 0.5), 13.0, Color(1, 1, 1, 0.96))
+	if ic:
+		panel.draw_texture_rect(ic, Rect2(Vector2(20, y + row_h * 0.5 - 10), Vector2(20, 20)), false)
+	if c.is_empty():
+		var who: String = m.name
+		if m.get("kind", "") == "dog":
+			panel.draw_string(f, Vector2(54, y + 20), "%s is a good dog" % who, HORIZONTAL_ALIGNMENT_LEFT, PANEL_W - 70, 14, UI.INK)
+			panel.draw_string(f7, Vector2(54, y + 37), "No job needed: just walks and belly rubs", HORIZONTAL_ALIGNMENT_LEFT, PANEL_W - 70, 11, UI.INK_SOFT)
+		else:
+			panel.draw_string(f, Vector2(54, y + 20), "Unemployed", HORIZONTAL_ALIGNMENT_LEFT, PANEL_W - 70, 14, UI.INK)
+			panel.draw_string(f7, Vector2(54, y + 37), "Tap the Computer → Find a Job", HORIZONTAL_ALIGNMENT_LEFT, PANEL_W - 70, 11, UI.INK_SOFT)
+	else:
+		var t: Dictionary = Careers.track(c)
+		var head: String = ("School · %s" % Careers.title(c)) if school else "%s · Lv %d %s" % [t.name, int(c.level), Careers.title(c)]
+		panel.draw_string(f, Vector2(54, y + 20), head, HORIZONTAL_ALIGNMENT_LEFT, PANEL_W - 70, 14, UI.INK)
+		var sub := Careers.schedule_text(c)
+		if not school:
+			sub = "$%d/h · %s" % [Careers.wage(c), sub]
+		panel.draw_string(f7, Vector2(54, y + 37), sub, HORIZONTAL_ALIGNMENT_LEFT, PANEL_W - 70, 11, UI.INK_SOFT)
+	y += row_h
+	# --- row 2: performance / grade bar
+	if not c.is_empty():
+		var perf: float = float(c.get("perf", 0.0))
+		var label := ("Grade %s" % Careers.grade(perf)) if school else "Performance"
+		panel.draw_string(f, Vector2(16, y + 18), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, UI.INK)
+		var tr: float = float(c.get("trend", 0.0))
+		if int(c.get("shifts", 0)) > 0:
+			var tc := Color("3aa532") if tr >= 0.0 else Color("e04436")
+			panel.draw_string(f, Vector2(PANEL_W - 116, y + 18), ("▲ %+d" if tr >= 0.0 else "▼ %+d") % roundi(tr), HORIZONTAL_ALIGNMENT_RIGHT, 100, 12, tc)
+		var bar := Rect2(16, y + 26, PANEL_W - 32, 11)
+		panel.draw_rect(bar, UI.TRACK)
+		var pc := Color("e5544a") if perf < 25.0 else (Color("f2c230") if perf < 60.0 else UI.GREEN)
+		panel.draw_rect(Rect2(bar.position, Vector2(bar.size.x * clampf(perf / 100.0, 0.0, 1.0), bar.size.y)), pc)
+		# promotion mark at the end of the bar + the number
+		panel.draw_rect(Rect2(bar.end.x - 2, bar.position.y - 3, 2, bar.size.y + 6), gold)
+		panel.draw_string(f, Vector2(110, y + 18), "%d / 100" % roundi(perf), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, UI.INK_SOFT)
+	else:
+		panel.draw_string(f7, Vector2(16, y + 26), "Jobs: Business · Culinary · Journalism · Music", HORIZONTAL_ALIGNMENT_LEFT, PANEL_W - 32, 12, UI.INK_SOFT)
+	y += row_h
+	# --- row 3: status + next promotion
+	var status := ""
+	if Game.is_at_work(sel):
+		var w: Dictionary = m.work
+		status = "%s until %s" % ["At school" if school else "At work", Game.when_text(float(w.until)).substr(5)]
+	elif not c.is_empty():
+		var ns := Game.next_shift(sel)
+		if ns >= 0.0:
+			status = "Next %s: %s" % ["school day" if school else "shift", Game.when_text(ns)]
+	var need := ""
+	if not c.is_empty() and not school:
+		var req := Careers.next_req(c)
+		var sk: String = Careers.track(c).get("skill", "")
+		var nxt := c.duplicate()
+		nxt.level = int(c.level) + 1
+		if req < 0:
+			need = "Top of the career!"
+		elif req > 0:
+			var have := int(Game.skill_level(sel, sk))
+			need = "Next: %s · needs %s %d (has %d)" % [Careers.title(nxt), sk, req, have]
+		else:
+			need = "Next: %s · $%d/h" % [Careers.title(nxt), Careers.wage(nxt)]
+	elif school:
+		need = "Homework done today ✓" if int(m.get("homework_day", -10)) >= Game.day else "Do homework to raise the grade"
+	panel.draw_string(f, Vector2(16, y + 18), status, HORIZONTAL_ALIGNMENT_LEFT, PANEL_W - 32, 13, UI.INK)
+	panel.draw_string(f7, Vector2(16, y + 36), need, HORIZONTAL_ALIGNMENT_LEFT, PANEL_W - 32, 12, UI.INK_SOFT)
+	y += row_h
+	# --- row 4: work tendency (adults with a job)
+	if Game.has_job(sel):
+		var cur: String = c.get("tendency", "normal")
+		for k in Careers.TENDENCIES.size():
+			var tk: String = Careers.TENDENCIES[k]
+			var r := _tendency_rect(k)
+			panel.draw_style_box(_tab_on if tk == cur else _tab_off, r)
+			panel.draw_string(f, r.position + Vector2(0, 21), Careers.TENDENCY_LABEL[tk], HORIZONTAL_ALIGNMENT_CENTER, r.size.x, 12, UI.WHITE if tk == cur else UI.INK_SOFT)
+	y += row_h
+	# --- row 5: traits (chips, wrapping onto a second line)
+	var tx := 16.0
+	var ty := y + 1.0
+	panel.draw_string(f7, Vector2(tx, ty + 15), "Traits", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, UI.INK_SOFT)
+	tx += 46.0
+	for tn in Traits.of(m):
+		var tw := f.get_string_size(tn, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
+		var r := Rect2(tx, ty, tw + 28, 20)
+		if r.end.x > PANEL_W - 10:
+			tx = 62.0
+			ty += 22.0
+			r.position = Vector2(tx, ty)
+		panel.draw_style_box(_tab_off, r)
+		var ti := UI.icon(Traits.icon(tn))
+		if ti:
+			panel.draw_texture_rect(ti, Rect2(r.position + Vector2(4, 2), Vector2(16, 16)), false)
+		panel.draw_string(f, r.position + Vector2(23, 14.5), tn, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, UI.INK)
+		tx = r.end.x + 5.0
+	y += row_h
+	# --- footer: household bills
+	panel.draw_line(Vector2(14, y + 6), Vector2(PANEL_W - 14, y + 6), Color("e3e7ee"), 1.0)
+	var bi := UI.icon("bill")
+	if bi:
+		panel.draw_texture_rect(bi, Rect2(16, y + 16, 22, 22), false)
+	var nd := maxi(1, ceili((Game.next_bill_at - Game.total_minutes()) / 1440.0))
+	var bt := ("No bills due · next in %d day%s" % [nd, "" if nd == 1 else "s"]) if not Game.has_bills() else \
+		("Bills $%d OVERDUE · pay at the mailbox" % Game.bills_due_total() if Game.bills_overdue() else "Bills $%d due %s" % [Game.bills_due_total(), Game.when_text(Game.bills_due_at()).get_slice(" ", 0)])
+	panel.draw_string(f, Vector2(44, y + 33), bt, HORIZONTAL_ALIGNMENT_LEFT, PANEL_W - 60, 13, Color("e04436") if Game.bills_overdue() else UI.INK)
 
 
 static func _thousands(n: int) -> String:

@@ -142,9 +142,19 @@ func apply_preset(preset: String) -> void:
 	_auto_view = false
 
 
+## Interior groups closed off under the office roof / ground-floor facade in
+## the "bed" view: hidden there (nothing to see, saves draws + triangles).
+const CLOSED_IN_BED := ["Furniture_office", "Fine_office", "Micro_office", "Workstation", "Easel",
+	"Furniture_living", "Fine_living", "Micro_living", "Furniture_kitchen"]
+
+
 func set_wall_view(view: String) -> void:
 	wall_view = view
 	_sync_front_glass()
+	for n: String in CLOSED_IN_BED:
+		var c := get_node_or_null(n)
+		if c is Node3D:
+			c.visible = view != "bed"
 	for vm in _view_meshes:
 		vm[0].visible = vm[1] == view
 	for sig: String in _wall_nodes:
@@ -774,7 +784,11 @@ func _build_office() -> void:
 	var fcab := _put(R, "filing_cabinet", Vector3(fx, y, -1.25), 1)
 	_putm(R, "printer_hd", Vector3(fx + 0.02, fcab.end.y, fcab.position.z - 0.05), 1)
 	_put(R, "book_stack", Vector3(fx + 0.06, fcab.end.y, fcab.end.z - 0.02), 1, 2)
-	_put(R, "plant", Vector3(fx + 0.04, y, -0.55), 0, 5)
+	# Reading corner by the railing: beanbag, floor lamp, a leafy plant.
+	_put(R, "beanbag", Vector3(fx + 0.15, y, 0.05), 1, 0)
+	_put(R, "lamp_floor", Vector3(fx + 0.05, y, -0.55))
+	_lamp(Vector3(fx + 0.35, y + 1.95, -0.3), 0.5, 2.6, 0.5, Color(1.0, 0.7, 0.4), 0.5)
+	_put(R, "plant", Vector3(fx + 0.06, y, 1.0), 0, 1)
 	_sconce(R, "-x", fx, -0.45, y + 2.2, 1.0)
 	# Corner bookshelves on the back wall (globe, trophies, books, plants).
 	var bs1 := _wallput(R, "bookshelf", "-z", bz, fx + 0.04, y, 4)
@@ -1055,7 +1069,12 @@ func _build_hall() -> void:
 		for x in range(fc(3.1), fc(4.4)):
 			for yy in range(maxi(top - 3, 0), top):
 				for zz in 3:
-					st.set_v(Vector3i(x, yy, z0 + zz), Color("b07a46") if yy == top - 1 else Color("efe7da"))
+					var runner := x >= fc(3.4) and x < fc(4.1)
+					var sc := Color("b07a46") if yy == top - 1 else Color("efe7da")
+					if runner and yy >= top - 2:
+						# Stair runner: deep blue with a cream border stripe.
+						sc = Color("e9dcc0") if (x == fc(3.4) or x == fc(4.1) - 1) else Color("3d5590").lerp(Color("4a64a4"), VoxelBuilder.hash3(Vector3i(x, yy, zz)) * 0.5)
+					st.set_v(Vector3i(x, yy, z0 + zz), sc)
 	PropLib.railing(st, Vector3i(fc(3.0), fc(y), fc(1.75) - 2), fc(2.25), 0, 16)
 	PropLib.railing(st, Vector3i(fc(5.25) - 2, fc(y), fc(1.75) - 2), fc(3.0), 2, 16)
 	PropLib.railing(st, Vector3i(fc(3.0) - 2, fc(y), fc(1.75)), fc(3.0), 2, 16)
@@ -1069,7 +1088,7 @@ func _build_hall() -> void:
 	_wallput(R, "bookshelf", "-x", lx, 0.4, y, 1)
 	_put(R, "lamp_table", Vector3(lx + 0.12, y + 12 * PU, 0.55), 0, 0)
 	_put(R, "plant", Vector3(lx + 0.12, y + 12 * PU, 1.0), 0, 6)
-	_lamp(Vector3(lx + 0.5, y + 1.25, 0.8), 1.4, 3.2, 0.2)
+	_lamp(Vector3(lx + 0.5, y + 1.25, 0.8), 0.8, 3.0, 0.2)
 	_wallput(R + "@bed", "frame", "-x", lx, 1.75, y + 1.45, 7)
 	_wallput(R + "@bed", "frame", "-x", lx, 2.75, y + 1.55, 1)
 	_wallput(R + "@bed", "frame", "-x", lx, 3.35, y + 1.3, 6)
@@ -1268,8 +1287,8 @@ func _build_exterior() -> void:
 	_night_tint.append(_add_mesh(Mesher.build(o, 0.125), "Garden", true))
 	# Picket fence (fine grid) along the front garden.
 	var fz := fc(8.2)
-	for k in 30:
-		var fx0 := fc(-15.0) + k * 16
+	for k in 22:
+		var fx0 := fc(-11.0) + k * 16
 		if fx0 > fc(0.2) and fx0 < fc(1.9):
 			continue
 		PropLib.place(_g("ext"), "fence", Vector3i(fx0, 0, fz), 0)
@@ -1379,15 +1398,23 @@ func _ensure_neighbourhood(lit: bool) -> void:
 		# All neighbour houses merged into ONE mesh (one draw call).
 		var vb := VoxelBuilder.new()
 		vb.jitter = 0.0
-		var spots := [Vector3(-25, 0, -20.0), Vector3(-15, 0, -19.5), Vector3(-5, 0, -20.0), Vector3(5, 0, -19.5), Vector3(15, 0, -20.0), Vector3(25, 0, -19.5),
-			Vector3(-26, 0, -5.0), Vector3(23, 0, -4.0)]
-		var styles := [1, 4, 2, 0, 5, 3, 2, 5]
+		var spots := [Vector3(-25, 0, -20.5), Vector3(-15, 0, -20.0), Vector3(-5, 0, -20.5), Vector3(5, 0, -20.0), Vector3(15, 0, -20.5), Vector3(25, 0, -20.0),
+			Vector3(-26, 0, -5.0), Vector3(23, 0, -4.0),
+			# Second row across the back gardens (their roofs + lit upstairs
+			# windows fill the top band of the night shot, ref3).
+			Vector3(-20, 0, -33.0), Vector3(-9, 0, -32.0), Vector3(2, 0, -33.0), Vector3(13, 0, -32.5), Vector3(24, 0, -33.0)]
+		var styles := [1, 4, 2, 0, 5, 3, 2, 5, 3, 0, 4, 1, 2]
 		# Neighbour houses drawn a little smaller than authored (0.2 m cells):
 		# they read as a street of homes behind ours, roofs in frame (ref3).
-		var hs: float = PropLib.scale_of("house") * 0.8
+		var hs: float = PropLib.scale_of("house") * 0.85
+		# Mobile budget: the lit (night) street keeps only the houses the
+		# bedroom camera can see.
+		var night_skip := [0, 6, 7, 8, 12]
 		for i in spots.size():
+			if lit and i in night_skip:
+				continue
 			var c: Vector3 = spots[i] + Vector3(4.0, 0, 3.25)
-			var rot := 0 if i < 6 else (1 if i == 6 else 3)
+			var rot := 0 if (i < 6 or i > 7) else (1 if i == 6 else 3)
 			var rs := PropLib.rotated_size("house", rot, styles[i] + (8 if lit else 0))
 			PropLib.place(vb, "house", Vector3i(roundi(c.x / hs) - rs.x / 2, 0, roundi(c.z / hs) - rs.z / 2), rot, styles[i] + (8 if lit else 0))
 		var mi := MeshInstance3D.new()

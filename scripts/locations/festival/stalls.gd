@@ -35,13 +35,13 @@ func build(parent: Node3D) -> void:
 	_sign(treats, "FALL TREATS", _lp(sc), 0.0031, 0.0)
 	vendor_spot = treats.transform * _lp(Vector3(16.0, 0.0, TD - 14.0))
 	game = _place(parent, "GameStall", _game_stall(), Vector3(2.6, 0, -3.4), -14.0)
-	crafts = _place(parent, "CraftsStall", _crafts_table(), Vector3(6.4, 0, 1.6), -30.0)
+	crafts = _place(parent, "CraftsStall", _crafts_table(), Vector3(5.8, 0, 1.6), -30.0)
 	_place(parent, "RedStall", _side_stall(RED, CREAM, 0), Vector3(8.4, 0, -7.6), -42.0)
 	_place(parent, "BlueStall", _side_stall(BLUE, CREAM, 1), Vector3(11.6, 0, -12.0), -55.0)
 	# Chalkboards.
 	var menu := _chalkboard(parent, Vector3(-4.3, 0, 2.0), 20.0, 1.25)
 	K.label(menu, "Apple Cider\n· Pumpkin Pie\n· Pretzels\nCandy Apples", Vector3(-0.12, 1.2, 0.13), 0.0021, Color("f4f1e6"), 0.0, Color(0, 0, 0, 0), 64, HORIZONTAL_ALIGNMENT_LEFT)
-	var hm := _chalkboard(parent, Vector3(5.3, 0, 4.0), -25.0, 1.0)
+	var hm := _chalkboard(parent, Vector3(4.45, 0, 3.5), -22.0, 1.0, "fox")
 	K.label(hm, "HANDMADE", Vector3(0, 1.18, 0.13), 0.0025, Color("f4f1e6"))
 	var gm := _chalkboard(parent, Vector3(3.9, 0, -2.2), -20.0, 0.6)
 	K.label(gm, "3 TRIES", Vector3(-0.02, 0.62, 0.13), 0.0015, Color("f8e9a0"))
@@ -451,7 +451,7 @@ func _side_stall(a: Color, b: Color, variant: int) -> VoxelBuilder:
 # ------------------------------------------------------------------ CHALKBOARD
 
 ## A-frame chalkboard sign; returns the tilted pivot (labels go on it, +Z face).
-func _chalkboard(parent: Node3D, pos: Vector3, rot: float, scale: float) -> Node3D:
+func _chalkboard(parent: Node3D, pos: Vector3, rot: float, scale: float, doodle := "pumpkin") -> Node3D:
 	var root := Node3D.new()
 	root.position = pos
 	root.rotation.y = deg_to_rad(rot)
@@ -467,11 +467,40 @@ func _chalkboard(parent: Node3D, pos: Vector3, rot: float, scale: float) -> Node
 	K.box(vb, 0, 0, 0, w + 2, h + 2, 1, K.wood(WOOD, 0, 2))
 	K.box(vb, 1, 1, 1, w, h, 1, func(q: Vector3i) -> Color:
 		return K.shade(Color("2e3432"), 0.92 + K.hs(q.x, q.y, 2) * 0.16))
+	if doodle == "fox":
+		# Chalk fox face (ref2 HANDMADE board): orange head, white cheeks,
+		# pointy ears, dark eyes + nose.
+		var fo := Color("f08a3a")
+		var fw := Color("f4f1e6")
+		var fk := Color("1e2220")
+		var fx := w / 2 - 4
+		var rows := [
+			"o......o",
+			"oo....oo",
+			"oooooooo",
+			"okooooko",
+			"wwooooww",
+			".wwkkww.",
+			"..wwww..",
+		]
+		for r in rows.size():
+			var line: String = rows[r]
+			for c in line.length():
+				var ch := line[c]
+				if ch == ".":
+					continue
+				var col := fo if ch == "o" else (fw if ch == "w" else fk)
+				vb.set_v(Vector3i(fx + c + 1, 15 - r, 2), col)
+		return _chalk_finish(parent, root, pivot, vb, w, h, scale)
 	# Little chalk doodle: a pumpkin in the bottom corner.
 	var dc := Color("f08a3a")
 	for p in [Vector2i(w - 4, 2), Vector2i(w - 3, 2), Vector2i(w - 5, 3), Vector2i(w - 2, 3), Vector2i(w - 5, 4), Vector2i(w - 2, 4), Vector2i(w - 4, 5), Vector2i(w - 3, 5)]:
 		vb.set_v(Vector3i(p.x - 1, p.y, 2), dc)
 	vb.set_v(Vector3i(w - 4, 6, 2), Color("8ac06a"))
+	return _chalk_finish(parent, root, pivot, vb, w, h, scale)
+
+
+func _chalk_finish(_parent: Node3D, root: Node3D, pivot: Node3D, vb: VoxelBuilder, w: int, h: int, scale: float) -> Node3D:
 	# Legs (back strut).
 	var mi := K.inst(pivot, vb, U, Vector3(0, 0, 0), 0.0, true, Vector3((w + 2) * 0.5, -1.0, 0.5))
 	mi.name = "Board"

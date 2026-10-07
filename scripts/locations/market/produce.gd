@@ -550,3 +550,42 @@ static func heap2(vb: VoxelBuilder, kind: String, from: Vector3i, size: Vector3i
 				continue
 			var sx := from.x + int(Kit.h(Vector3i(i, seed, 1), 43) * (size.x - pitch.x))
 			big_item(vb, kind, Vector3i(sx, from.y - 1, from.z + size.z - pitch.z / 2), seed + 90 + i, 0.5)
+
+
+## Heap chunky items on a sloped bin floor (all args in cells of the target
+## grid, floats ok). The bin front edge is at z = zf and it runs back to
+## zf - d (towards -z) while its floor rises from yf (front) to yb (back).
+## Layer 0 covers the whole floor; upper layers are staggered by half a pitch
+## and dome in the middle so the bin reads as overflowing; the front row
+## hangs over the lip.
+static func slope_heap(vb: VoxelBuilder, kind: String, x0: float, w: float, zf: float, d: float, yf: float, yb: float, seed := 0, layers := 2) -> void:
+	var probe := VoxelBuilder.new()
+	var pitch := big_item(probe, kind, Vector3i.ZERO, 0, 0.0)
+	var px := pitch.x
+	var pz := pitch.z
+	if kind == "carrot":
+		px = 3
+	var nx := maxi(1, int(w) / px)
+	var nz := maxi(1, int(d) / pz)
+	if kind == "banana" or kind == "carrot":
+		layers = mini(layers, 2)
+	for L in layers:
+		var odd := L % 2
+		var cnx := maxi(1, nx - odd)
+		var cnz := maxi(1, nz - odd)
+		var ox := (w - cnx * px) * 0.5 + odd * px * 0.5
+		for iz in cnz:
+			for ix in cnx:
+				var u := ((float(ix) + 0.5) / cnx - 0.5) * 2.0
+				if L >= 2 and absf(u) > 0.75 - 0.2 * (L - 2):
+					continue
+				var zc := zf - (float(iz) + 0.5 + odd * 0.5) * pz
+				var frac := clampf((zf - zc) / maxf(d, 1.0), 0.0, 1.0)
+				var fy := yf + (yb - yf) * frac
+				var key := Vector3i(ix, L, iz + seed * 31)
+				var jx := int(Kit.h(key, 17 + seed) * 3.0) - 1
+				var jz := int(Kit.h(key, 19) * 3.0) - 1
+				var jy := 1 if Kit.h(key, 29) > 0.7 else 0
+				var o := Vector3i(int(round(x0 + ox + ix * px)) + jx, int(round(fy)) - 1 + L * pitch.y + jy,
+					int(round(zc - pz * 0.5)) + jz + (1 if iz == 0 and L == 0 else 0))
+				big_item(vb, kind, o, seed + ix * 3 + iz * 7 + L * 11, Kit.h(key, 23))

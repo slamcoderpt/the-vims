@@ -208,7 +208,7 @@ func _lawn() -> void:
 			var q := Vector3i(ix, 1, iz)
 			fimg.set_pixel(ix, iz, V.shade(GRASS[int(V.h1(q, 2) * GRASS.size()) % GRASS.size()], 0.62 + V.h1(q, 3) * 0.1))
 	# One mesh / one draw call for all the surrounding ground (texture repeats).
-	_ground_quad(fimg, Vector3(-30.0, -0.02, -40.0), Vector2(60, 60), "OuterGround", Vector2(60.0 / 44.0, 60.0 / 40.0))
+	_ground_quad(fimg, Vector3(-50.0, -0.02, -80.0), Vector2(90, 100), "OuterGround", Vector2(90.0 / 44.0, 100.0 / 40.0))
 	# Bed edging: stone border (voxels, perimeter only).
 	var vb := FastBuilder.new()
 	vb.jitter = 0.0
@@ -262,13 +262,13 @@ func set_lamp_glow(k: float) -> void:
 func _species(wx: float, wz: float) -> int:
 	# Flowers grow in clumps: species picked per ~0.7 m patch.
 	var r := V.hs(floori(wx / 0.7), 3, floori(wz / 0.7))
-	if r < 0.36:
+	if r < 0.27:
 		return 0          # lavender spikes
-	elif r < 0.6:
+	elif r < 0.5:
 		return 1          # pink cosmos
-	elif r < 0.78:
+	elif r < 0.73:
 		return 2          # white daisies
-	elif r < 0.92:
+	elif r < 0.9:
 		return 3          # yellow
 	return 4              # pink pom-pom
 
@@ -583,7 +583,7 @@ func _neighbours() -> void:
 	# Sunk a little so the low bbq camera sees a band of sunset sky above
 	# the roofline (the lots behind sit lower than ours).
 	nmi.position.y = -3.6
-	nmi.position.z = -14.0
+	nmi.position.z = -24.0
 	if not vb.glow.is_empty():
 		nmi.set_surface_override_material(nmi.mesh.get_surface_count() - 1, V.glow_soft())
 	root.add_child(nmi)
@@ -594,13 +594,13 @@ func _neighbours() -> void:
 	near.jitter = 0.0
 	near.skip_down_below = 0
 	near.skip_normals = [Vector3i(0, 0, -1)]
-	for hd in [[-22.0, -36.0, 9.0, 7.0, 6.0, 1], [-10.5, -38.0, 10.0, 7.0, 6.5, 2], [0.5, -40.0, 9.0, 7.0, 6.0, 3]]:
+	for hd in [[-31.0, -52.0, 9.0, 7.0, 6.0, 1], [-16.0, -55.0, 10.0, 7.0, 6.5, 2], [-2.0, -54.0, 9.0, 7.0, 6.0, 4]]:
 		_house(near, hd, V.shade(walls[hd[5] % walls.size()], 1.12), roofs[hd[5] % roofs.size()])
 	var nmi2 := MeshInstance3D.new()
 	nmi2.name = "NeighboursNear"
 	nmi2.mesh = near.build(V.SIZE_BIG, Vector3.ZERO, false)
 	nmi2.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	nmi2.position.y = -0.4
+	nmi2.position.y = -0.8
 	if not near.glow.is_empty():
 		nmi2.set_surface_override_material(nmi2.mesh.get_surface_count() - 1, V.glow_soft())
 	root.add_child(nmi2)
@@ -612,16 +612,17 @@ func _neighbours() -> void:
 		return V.shade(c, 0.9 + clampf(float(q.y) * 0.015, 0.0, 0.25))
 	for i in 12:
 		var tx := -54.0 + i * 6.6 + _rng.randf_range(-1.2, 1.2)
-		var tz := -50.0 + _rng.randf_range(-3.0, 2.0)
+		var tz := -62.0 + _rng.randf_range(-3.0, 2.0)
 		var r := _rng.randf_range(1.6, 2.6)
 		var hgt := _rng.randf_range(4.0, 7.5)
 		# Trunk + layered crown (rounder tops read as deciduous silhouettes).
 		V.b(tl, int(tx * 2), 0, int(tz * 2), 1, int(hgt * 2 * 0.6), 1, Color("2a2224"))
 		V.blob(tl, Vector3(tx * 2, hgt * 2, tz * 2), Vector3(r * 2, r * 2 * 1.1, r * 2), dark, 0.32, i)
-		V.blob(tl, Vector3(tx * 2 + r, hgt * 2 - r * 0.8, tz * 2), Vector3(r * 1.3, r * 1.2, r * 1.3), dark, 0.32, i + 40, true)
+		if i % 3 == 0:
+			V.blob(tl, Vector3(tx * 2 + r, hgt * 2 - r * 0.8, tz * 2), Vector3(r * 1.3, r * 1.2, r * 1.3), dark, 0.32, i + 40, true)
 	# A couple of tall conifers for variety in the skyline.
 	for cx in [-29.0, 12.0]:
-		var cz := -47.0
+		var cz := -60.0
 		for k in 10:
 			var rr := maxf(0.5, 3.4 - k * 0.32)
 			V.blob(tl, Vector3(cx * 2, 2.0 + k * 1.6, cz * 2), Vector3(rr, 1.0, rr), dark, 0.25, k)
@@ -655,9 +656,11 @@ func _house(vb: VoxelBuilder, hd: Array, wall: Color, roof: Color) -> void:
 		# Attic window.
 		V.b(vb, x0 + w / 2 - 1, h + 1, z0 + d, 2, 2, 1, Color("ffc76e"), true)
 	# Lit windows on the front (+z) face.
+	# Window rows hang from the eaves down, so the top row still shows over
+	# the hedges when a house sits low behind the yard.
 	var floors := 2 if h >= 18 else 1
 	for f in floors:
-		var wy := 3 + f * 9
+		var wy := h - 6 - f * 9
 		var n := w / 6
 		for i in n:
 			var wx := x0 + 2 + i * 6

@@ -20,7 +20,7 @@ const PRESETS := {
 	"festival": {
 		"ref": "refs/ref2_autumn_festival.png",
 		"location": "festival", "day": 5, "hour": 16, "minute": 42, "season": 2,
-		"camera": {"target": Vector3(0.3, 1.2, -4.0), "yaw": 0.0, "pitch": 20.0, "distance": 18.0, "fov": 40.0},
+		"camera": {"target": Vector3(-0.5, 1.3, -4.0), "yaw": 0.0, "pitch": 15.0, "distance": 17.5, "fov": 34.0},
 		"tasks": [
 			{"title": "Buy Festival Snack", "icon": "apple", "done": true},
 			{"title": "Meet 3 Neighbors", "icon": "chat"},
@@ -33,7 +33,7 @@ const PRESETS := {
 	"home_night": {
 		"ref": "refs/ref3_home_night_cutaway.png",
 		"location": "home", "day": 0, "hour": 21, "minute": 18, "season": 1,
-		"camera": {"target": Vector3(2.9, 2.6, -0.2), "yaw": 16.0, "pitch": 44.0, "distance": 17.0, "fov": 40.0},
+		"camera": {"target": Vector3(3.3, 3.2, -0.7), "yaw": 16.0, "pitch": 40.0, "distance": 18.0, "fov": 37.0},
 		"tasks": [
 			{"title": "Take Bath", "icon": "bath"},
 			{"title": "Brush Teeth", "icon": "brush", "done": true},
@@ -46,7 +46,7 @@ const PRESETS := {
 	"bbq": {
 		"ref": "refs/ref4_backyard_bbq_sunset.png",
 		"location": "backyard", "day": 0, "hour": 19, "minute": 36, "season": 1,
-		"camera": {"target": Vector3(0.9, 1.3, -1.2), "yaw": -14.0, "pitch": 15.0, "distance": 10.5, "fov": 48.0},
+		"camera": {"target": Vector3(0.9, 1.3, -1.2), "yaw": -14.0, "pitch": 13.5, "distance": 10.5, "fov": 48.0},
 		"tasks": [
 			{"title": "Grill Dinner", "icon": "burger", "done": true},
 			{"title": "Talk to Neighbors", "icon": "people"},

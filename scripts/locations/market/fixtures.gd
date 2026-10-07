@@ -43,32 +43,35 @@ static func put(dst: VoxelBuilder, src: VoxelBuilder, at: Vector3i, q := 0) -> v
 static func product(vb: VoxelBuilder, o: Vector3i, kind: String, col: Color, col2: Color, max_h: int) -> int:
 	match kind:
 		"cereal":
-			# 4 wide box: coloured top band, white brand strip, mascot patch.
+			# 5 wide box: coloured body, contrasting top band, a big white
+			# label panel with a mascot blob and a brand stripe.
 			var hh := mini(max_h, 7)
-			for x in 4:
+			for x in 5:
 				for y in hh:
 					for z in 2:
 						var p := o + Vector3i(x, y, z)
 						var cc := col
 						if z == 1:
-							if y == hh - 1:
-								cc = Kit.shade(col2, 0.95)
-							elif y == hh - 2:
-								cc = Color("fdf8ec") if (x + y) % 3 != 0 else Kit.shade(col2, 1.1)
-							elif y >= 1 and y <= 3 and (x == 1 or x == 2):
-								cc = Color("f6d7a8") if y == 3 else (Color("fbf3e4") if y == 1 else col2)
+							if y >= hh - 2:
+								cc = col2 if y == hh - 1 else Kit.shade(col2, 0.9)
+							elif y >= 2 and y <= hh - 3 and x >= 1 and x <= 3:
+								cc = Color("fdf8ec")
+								if y == 3 and (x == 2 or x == 3):
+									cc = Kit.shade(col2, 1.05)
+								elif y == 2 and x == 2:
+									cc = Color("f6d7a8")
 							elif y == 0:
-								cc = Kit.shade(col, 0.82)
+								cc = Kit.shade(col, 0.8)
 							if x == 0:
-								cc = Kit.shade(cc, 0.72)
-						elif x == 0 or x == 3:
+								cc = Kit.shade(cc, 0.78)
+						else:
 							cc = Kit.shade(col, 0.85)
 						vb.set_v(p, cc)
-			return 4
+			return 5
 		"box":
-			# snack / cracker box: 3 wide, 5 tall, white window + logo dot.
+			# snack / cracker box: 4 wide, 5 tall, white window band + logo.
 			var hh := mini(max_h, 5)
-			for x in 3:
+			for x in 4:
 				for y in hh:
 					for z in 2:
 						var cc := col
@@ -76,27 +79,29 @@ static func product(vb: VoxelBuilder, o: Vector3i, kind: String, col: Color, col
 							if y == hh - 1:
 								cc = Kit.shade(col, 1.12)
 							elif y == 2:
-								cc = Color("fdf8ec") if x != 1 else col2
+								cc = Color("fdf8ec") if x == 0 or x == 3 else col2
+							elif y == 1 and (x == 1 or x == 2):
+								cc = Color("fdf8ec")
 							elif y == 0:
 								cc = Kit.shade(col, 0.8)
 							if x == 0:
-								cc = Kit.shade(cc, 0.8)
+								cc = Kit.shade(cc, 0.82)
 						else:
 							cc = Kit.shade(col, 0.85)
 						vb.set_v(o + Vector3i(x, y, z), cc)
-			return 3
+			return 4
 		"bag":
-			var hh := mini(max_h, 5)
-			for x in 3:
+			var hh := mini(max_h, 6)
+			for x in 4:
 				for y in hh:
 					var p := o + Vector3i(x, y, 0)
 					var cc := col if y < hh - 1 else Kit.shade(col, 1.15)
-					if y == 2 and x == 1:
+					if (y == 2 or y == 3) and (x == 1 or x == 2):
 						cc = col2
 					vb.set_v(p, cc)
 					if y < hh - 1:
-						vb.set_v(p + Vector3i(0, 0, 1), Kit.shade(cc, 1.05) if y != 2 else Color("fff4d6"))
-			return 3
+						vb.set_v(p + Vector3i(0, 0, 1), Kit.shade(cc, 1.05) if y != 1 else Color("fff4d6"))
+			return 4
 		"can":
 			for x in 2:
 				for k in mini(2, max_h / 3):
@@ -130,22 +135,30 @@ static func product(vb: VoxelBuilder, o: Vector3i, kind: String, col: Color, col
 
 
 ## Fill a shelf run [x0, x0+w) at height y (bottom), depth front cell zf.
+## Each shelf is themed (one main product kind) and stocked in blocks of
+## 3-5 identical facings with a small gap between brands, so a shelf reads
+## as rows of labelled packages rather than a stripe barcode.
 static func stock(vb: VoxelBuilder, x0: int, w: int, y: int, zf: int, max_h: int, seed: int, kinds: Array) -> void:
 	var x := x0
-	var i := 0
-	while x < x0 + w - 1:
-		var r := Kit.h(Vector3i(x, y, seed), 41)
-		var kind: String = kinds[int(r * kinds.size()) % kinds.size()]
-		var col: Color = BOX_COLS[int(Kit.h(Vector3i(x, y, seed), 43) * BOX_COLS.size()) % BOX_COLS.size()]
-		var col2: Color = BOX_COLS[int(Kit.h(Vector3i(x, y, seed), 47) * BOX_COLS.size()) % BOX_COLS.size()]
-		var facings := 2 + int(Kit.h(Vector3i(x, y, seed), 53) * 3.0)
+	var main: String = kinds[seed % kinds.size()]
+	var alt: String = kinds[(seed * 7 + 3) % kinds.size()]
+	var g := 0
+	while x < x0 + w - 2:
+		var r := Kit.h(Vector3i(g, y, seed), 41)
+		var kind := main if r < 0.72 else alt
+		var col: Color = BOX_COLS[int(Kit.h(Vector3i(g, y, seed), 43) * BOX_COLS.size()) % BOX_COLS.size()]
+		var col2: Color = BOX_COLS[int(Kit.h(Vector3i(g, y, seed), 47) * BOX_COLS.size()) % BOX_COLS.size()]
+		if col2 == col:
+			col2 = Color("fdf8ec")
+		var facings := 3 + int(Kit.h(Vector3i(g, y, seed), 53) * 3.0)
 		for f in facings:
-			if x >= x0 + w - 1:
+			var need := 5 if kind == "cereal" else (4 if kind in ["box", "bag"] else 2)
+			if x + need > x0 + w:
 				break
 			var used := product(vb, Vector3i(x, y, zf - 1), kind, col, col2, max_h)
-			x += used + (1 if kind == "cereal" or (f % 2 == 1) else 0)
-		x += 0 if Kit.h(Vector3i(x, y, seed), 59) > 0.3 else 1
-		i += 1
+			x += used + (1 if kind in ["bottle", "can", "jar"] else 0)
+		x += 1
+		g += 1
 
 
 ## Gondola shelf, local facing +z, length `len` cells, depth 8, height 30.
@@ -400,25 +413,38 @@ static func cart() -> VoxelBuilder:
 	for y in range(y0 + Hb - 3, y0 + Hb + 1):
 		vb.set_v(Vector3i(0, y, -2), wire)
 		vb.set_v(Vector3i(W - 1, y, -2), wire)
-	# contents: milk, bread, greens, carrots, banana, box
+	# contents, heaped above the rim so the cart reads full from the side:
+	# milk jug + cereal by the handle, bread, greens, bananas, tomatoes and
+	# a juice carton up front; the dog sits in the middle.
 	var by := y0 + 1
-	vb.box(Vector3i(2, by, 3), Vector3i(4, 9, 4), Color("fbfbf8"))
-	vb.box(Vector3i(3, by + 9, 4), Vector3i(2, 1, 2), Color("2e7de0"))
-	vb.box(Vector3i(2, by + 5, 7), Vector3i(4, 2, 1), Color("2e7de0"))
-	vb.box(Vector3i(7, by, 2), Vector3i(8, 6, 5), Color("c98a43"))
-	vb.box(Vector3i(7, by + 6, 3), Vector3i(8, 1, 3), Color("e2a95c"))
+	# milk jug (white, blue cap + label)
+	vb.box(Vector3i(2, by, 2), Vector3i(5, 13, 5), Color("fbfbf8"))
+	vb.box(Vector3i(2, by + 6, 6), Vector3i(5, 3, 1), Color("2e7de0"))
+	vb.box(Vector3i(3, by + 13, 3), Vector3i(3, 2, 3), Color("2e7de0"))
+	# cereal box (red, yellow band) standing tall
+	vb.box(Vector3i(8, by, 2), Vector3i(7, 15, 3), Color("e8402f"))
+	vb.box(Vector3i(8, by + 12, 5), Vector3i(7, 2, 1), Color("f6c22c"))
+	vb.box(Vector3i(9, by + 4, 5), Vector3i(5, 6, 1), Color("fdf3d4"))
+	vb.box(Vector3i(10, by + 6, 6), Vector3i(3, 2, 1), Color("f3b25a"))
+	# bread loaf lying across the top by the handle
+	vb.box(Vector3i(1, by + 13, 5), Vector3i(13, 4, 4), Color("d39a52"))
+	vb.box(Vector3i(1, by + 17, 6), Vector3i(13, 1, 2), Color("e4b56e"))
+	for k in 4:
+		vb.set_v(Vector3i(3 + k * 3, by + 17, 5), Color("b8763a"))
+	# front: juice carton, greens, bananas, tomatoes
+	vb.box(Vector3i(11, by, 19), Vector3i(4, 12, 4), Color("f7a21c"))
+	vb.box(Vector3i(11, by + 8, 23), Vector3i(4, 2, 1), Color("ffffff"))
+	vb.box(Vector3i(12, by + 12, 20), Vector3i(2, 2, 2), Color("43a447"))
+	vb.box(Vector3i(2, by, 18), Vector3i(8, 8, 7), Color("c98a43"))
 	var pv := VoxelBuilder.new()
-	Produce.lettuce(pv, Vector3i(2, by + 2, 15))
-	Produce.broccoli(pv, Vector3i(9, by + 3, 18))
-	Produce.carrot(pv, Vector3i(3, by + 9, 11), 0)
-	Produce.carrot(pv, Vector3i(4, by + 10, 9), 0)
-	Produce.bananas(pv, Vector3i(7, by + 8, 10), 3)
-	Produce.tomato(pv, Vector3i(11, by + 6, 13))
-	Produce.apple(pv, Vector3i(12, by + 4, 20))
+	Produce.big_lettuce(pv, Vector3i(2, by + 7, 17), 3)
+	Produce.big_bananas(pv, Vector3i(3, by + 11, 13), 4, 3)
+	Produce.big_tomato(pv, Vector3i(9, by + 9, 15), 2)
+	Produce.big_tomato(pv, Vector3i(6, by + 12, 21), 5)
+	Produce.big_carrot(pv, Vector3i(12, by + 13, 11), 1, 9)
+	Produce.big_carrot(pv, Vector3i(14, by + 12, 12), 2, 9)
 	for p: Vector3i in pv.vox:
 		vb.set_v(p, pv.vox[p])
-	vb.box(Vector3i(10, by, 8), Vector3i(5, 8, 3), Color("e8402f"))
-	vb.box(Vector3i(10, by + 4, 10), Vector3i(5, 2, 1), Color("fdf3d4"))
 	return vb
 
 

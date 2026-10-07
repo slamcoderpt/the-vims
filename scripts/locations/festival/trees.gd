@@ -5,7 +5,7 @@ extends RefCounted
 ## Merged per group into one mesh.
 
 const K := preload("res://scripts/locations/festival/kit.gd")
-const VS := [0.21, 0.21, 0.32]
+const VS := [0.24, 0.24, 0.35]
 
 ## [x, z, height_m, crown_radius_m, palette (0 orange, 1 red, 2 yellow, 3 mixed), group]
 const TREES := [
@@ -123,7 +123,7 @@ func _tree(vb: VoxelBuilder, occ: Dictionary, vs: float, x: float, z: float, h: 
 			var depth := rel.length()
 			# Leafy texture: knock holes in the outer shell so the darker
 			# inner layer shows through (reads as leaf clusters, not a cube).
-			if depth > 0.78 and hq < 0.16 and rel.y > -0.5:
+			if depth > 0.8 and hq < 0.09 and rel.y > -0.5:
 				return Color(0, 0, 0, 0)
 			var c: Color = cols[(base_idx + (1 if hq > 0.82 else 0)) % cols.size()]
 			var ky := clampf((q.y - lo) / maxf(hi - lo, 1.0), 0.0, 1.0)

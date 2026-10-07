@@ -44,6 +44,13 @@ signal relationship_changed(a: String, b: String, value: float)
 signal relationship_level_changed(a: String, b: String, level: String)
 ## A member's wishes (Sims 3 wishes / promises) or lifetime happiness changed.
 signal wishes_changed(index: int)
+## A member's job / school state changed (hired, promoted, left for / back from work...).
+signal career_changed(index: int)
+## Bills arrived, were paid or went overdue (see bills / bills_due_total()).
+signal bills_changed
+
+const Careers := preload("res://scripts/sim/careers.gd")
+const Traits := preload("res://scripts/sim/traits.gd")
 
 const DAY_NAMES := ["Mon.", "Tue.", "Wed.", "Thu.", "Fri.", "Sat.", "Sun."]
 const SEASONS := ["Spring", "Summer", "Autumn", "Winter"]
@@ -173,6 +180,16 @@ func _ensure_member(m: Dictionary) -> void:
 		m["wishes"] = []
 	if not m.has("lth"):
 		m["lth"] = 0
+	if not m.has("traits"):
+		m["traits"] = Traits.DEFAULT.get(str(m.get("look", "")), []).duplicate()
+	# Need decay multipliers from traits (looked up every frame: cached here).
+	m["_decay"] = Traits.decay_table(m)
+	if not m.has("career"):
+		m["career"] = Careers.new_career("school") if m.get("kind", "") == "child" else {}
+	if not m.has("work"):
+		m["work"] = {"state": "", "until": 0.0, "start": 0.0, "late": false}
+	if not m.has("homework_day"):
+		m["homework_day"] = -10
 
 
 func set_tasks(list: Array) -> void:
@@ -627,8 +644,9 @@ func _process(delta: float) -> void:
 	# Needs decay (per in-game hour rates).
 	var hours := dm / 60.0
 	for s in household:
+		var dt: Dictionary = s.get("_decay", {})
 		for k in s.needs:
-			s.needs[k] = clampf(s.needs[k] - hours * NEED_DECAY.get(k, NEED_DECAY_DEFAULT), 0.0, 1.0)
+			s.needs[k] = clampf(s.needs[k] - hours * NEED_DECAY.get(k, NEED_DECAY_DEFAULT) * float(dt.get(k, 1.0)), 0.0, 1.0)
 	if autosave and live:
 		_save_acc += dm
 		if _save_acc >= AUTOSAVE_EVERY:
@@ -638,6 +656,8 @@ func _process(delta: float) -> void:
 		_mood_acc = 0.0
 		update_moods()
 		_decay_relationships(2.0 / 1440.0)
+		if live:
+			update_bills()
 	time_changed.emit(day, minutes)
 
 
@@ -733,6 +753,221 @@ func fulfil_wish(i: int, id: String) -> int:
 	return 0
 
 
+# =================================================================== careers
+
+## Shifts only happen while this is true (automated playtests switch it off
+## for the sections that need the whole family at home).
+var work_enabled := true
+
+
+func career(i: int) -> Dictionary:
+	if i < 0 or i >= household.size():
+		return {}
+	return household[i].get("career", {})
+
+
+func has_job(i: int) -> bool:
+	var c := career(i)
+	return not c.is_empty() and not Careers.is_school(c)
+
+
+## Hire member i into a career track (level 1). Returns false if not allowed.
+func join_career(i: int, track_id: String) -> bool:
+	if i < 0 or i >= household.size() or not Careers.TRACKS.has(track_id):
+		return false
+	var t: Dictionary = Careers.TRACKS[track_id]
+	if not str(household[i].get("kind", "adult")) in t.kinds:
+		return false
+	var old: Dictionary = household[i].get("career", {})
+	var c := Careers.new_career(track_id)
+	if not old.is_empty():
+		c.tendency = old.get("tendency", "normal")
+	household[i]["career"] = c
+	household[i]["work"] = {"state": "", "until": 0.0, "start": 0.0, "late": false}
+	career_changed.emit(i)
+	return true
+
+
+func quit_career(i: int) -> void:
+	if i < 0 or i >= household.size():
+		return
+	household[i]["career"] = {}
+	career_changed.emit(i)
+
+
+func set_tendency(i: int, t: String) -> void:
+	var c := career(i)
+	if c.is_empty() or not t in Careers.TENDENCIES:
+		return
+	c.tendency = t
+	career_changed.emit(i)
+
+
+func is_at_work(i: int) -> bool:
+	if i < 0 or i >= household.size():
+		return false
+	return str(household[i].get("work", {}).get("state", "")) == "away"
+
+
+## Next shift start (absolute minutes) of member i, or -1 when none.
+func next_shift(i: int) -> float:
+	var c := career(i)
+	if c.is_empty():
+		return -1.0
+	var now := total_minutes()
+	for d in range(day, day + 8):
+		if not Careers.works_on(c, d):
+			continue
+		if int(c.get("last_day", -1)) == d:
+			continue
+		var st := Careers.shift_start(c, d)
+		if st + Careers.MISS_AFTER > now:
+			return st
+	return -1.0
+
+
+## "Mon. 9:00 AM" for an absolute minute.
+func when_text(abs_min: float) -> String:
+	var d := int(abs_min / 1440.0)
+	var m := fmod(abs_min, 1440.0)
+	var h := int(m / 60.0)
+	var h12 := h % 12
+	if h12 == 0:
+		h12 = 12
+	return "%s %d:%02d %s" % [DAY_NAMES[d % 7], h12, int(m) % 60, "AM" if h < 12 else "PM"]
+
+
+# =================================================================== bills
+
+## Bills arrive every BILL_EVERY in-game days and are due BILL_DUE days later.
+## Paid late they cost BILL_LATE_FEE more; REPO_AFTER days past due the
+## repo-man collects (1.5x).
+const BILL_EVERY := 3
+const BILL_DUE := 3
+const BILL_LATE_FEE := 0.2
+const REPO_AFTER := 3
+const HOME_BASE_VALUE := 30000
+## [{id, amount, arrived, due, late: bool}]
+var bills: Array = []
+## Absolute minute the next bill arrives (-1 = schedule from now).
+var next_bill_at := -1.0
+
+
+## What the household is worth: the home plus everything bought for it.
+func household_value() -> int:
+	var v := HOME_BASE_VALUE
+	var Catalog = load("res://scripts/sim/catalog.gd")
+	for loc in placed:
+		for e in placed[loc]:
+			var it: Dictionary = Catalog.get_item(str(e.get("item", "")))
+			v += int(it.get("price", 0))
+	return v
+
+
+## A bill's size: a base plus 0.4% of the household value.
+func bill_amount() -> int:
+	return 60 + roundi(household_value() * 0.004)
+
+
+func bills_due_total() -> int:
+	var t := 0
+	for b in bills:
+		t += int(b.amount)
+	return t
+
+
+func has_bills() -> bool:
+	return not bills.is_empty()
+
+
+func bills_overdue() -> bool:
+	for b in bills:
+		if b.get("late", false):
+			return true
+	return false
+
+
+## Earliest due date of unpaid bills (-1 if none).
+func bills_due_at() -> float:
+	var d := -1.0
+	for b in bills:
+		if d < 0.0 or float(b.due) < d:
+			d = float(b.due)
+	return d
+
+
+## Deliver a new bill to the mailbox now.
+func deliver_bill() -> void:
+	var amt := bill_amount()
+	var now := total_minutes()
+	bills.append({"id": next_uid(), "amount": amt, "arrived": now, "due": now + BILL_DUE * 1440.0, "late": false})
+	notify.emit("Bills arrived: $%d · due %s" % [amt, DAY_NAMES[int((now + BILL_DUE * 1440.0) / 1440.0) % 7]], "bill")
+	bills_changed.emit()
+
+
+## Pay everything that's due. False when the household can't afford it.
+func pay_bills() -> bool:
+	var t := bills_due_total()
+	if t <= 0:
+		return true
+	if not add_money(-t):
+		return false
+	bills.clear()
+	for i in household.size():
+		remove_moodlet(i, "overdue_bills")
+	bills_changed.emit()
+	return true
+
+
+## Mail delivery, late fees and the repo-man (live play only; called from _process).
+func update_bills() -> void:
+	var now := total_minutes()
+	if next_bill_at < 0.0:
+		next_bill_at = now + BILL_EVERY * 1440.0
+	if now >= next_bill_at:
+		next_bill_at += BILL_EVERY * 1440.0
+		if next_bill_at <= now:
+			next_bill_at = now + BILL_EVERY * 1440.0
+		deliver_bill()
+	var changed := false
+	for k in range(bills.size() - 1, -1, -1):
+		var b: Dictionary = bills[k]
+		if not b.late and now > float(b.due):
+			b.late = true
+			var fee := roundi(int(b.amount) * BILL_LATE_FEE)
+			b.amount = int(b.amount) + fee
+			changed = true
+			notify.emit("Bills overdue! Late fee $%d" % fee, "bill")
+			for i in household.size():
+				if household[i].get("kind", "") == "adult":
+					add_moodlet(i, "overdue_bills", "Overdue Bills", "bill", -12.0, 0.0, "Pay them at the mailbox or computer")
+		elif b.late and now > float(b.due) + REPO_AFTER * 1440.0:
+			var take := mini(money, roundi(int(b.amount) * 1.5))
+			money -= take
+			bills.remove_at(k)
+			changed = true
+			notify.emit("The Repo-Man collected $%d!" % take, "bill")
+			for i in household.size():
+				if household[i].get("kind", "") == "adult":
+					add_moodlet(i, "repo", "Repo-Man Visit", "bill", -20.0, 12.0, "Should have paid the bills")
+	if changed:
+		if bills.is_empty() or not bills_overdue():
+			for i in household.size():
+				remove_moodlet(i, "overdue_bills")
+		bills_changed.emit()
+
+
+## A fresh game in live play: Saturday morning, the first bill already in the
+## mailbox (so there's something to pay), the next one in BILL_EVERY days.
+func new_game() -> void:
+	day = 5
+	minutes = 8 * 60.0
+	bills.clear()
+	next_bill_at = total_minutes() + BILL_EVERY * 1440.0
+	time_changed.emit(day, minutes)
+	deliver_bill()
+
+
 # =================================================================== save / load
 
 const SAVE_PATH := "user://vims_save.txt"
@@ -761,7 +996,8 @@ func save_data() -> Dictionary:
 		hh.append(d)
 	return {"version": SAVE_VERSION, "day": day, "minutes": minutes, "season": season, "money": money,
 		"location": location, "selected": selected, "household": hh, "relationships": relationships.duplicate(true),
-		"location_tasks": location_tasks.duplicate(true), "placed": placed.duplicate(true), "uid": _uid}
+		"location_tasks": location_tasks.duplicate(true), "placed": placed.duplicate(true), "uid": _uid,
+		"bills": bills.duplicate(true), "next_bill_at": next_bill_at}
 
 
 func save_game(path := SAVE_PATH) -> bool:
@@ -802,6 +1038,8 @@ func load_game(path := SAVE_PATH) -> bool:
 	location_tasks = d.get("location_tasks", {})
 	placed = d.get("placed", {})
 	_uid = int(d.get("uid", _uid))
+	bills = d.get("bills", [])
+	next_bill_at = float(d.get("next_bill_at", -1.0))
 	var lt: Array = location_tasks.get(location, [])
 	tasks.clear()
 	for t in lt:

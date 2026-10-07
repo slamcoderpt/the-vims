@@ -9,6 +9,8 @@ extends RefCounted
 ##   point: Vector3 (for "Go Here"), other: agent (household social), auto: bool
 
 const SimActions := preload("res://scripts/sim/sim_actions.gd")
+const Careers := preload("res://scripts/sim/careers.gd")
+const Traits := preload("res://scripts/sim/traits.gd")
 
 ## Idle in-game minutes before free will kicks in.
 const AUTONOMY_AFTER := 8.0
@@ -131,6 +133,11 @@ func is_busy() -> bool:
 func command(o: Dictionary, replace := false) -> bool:
 	var a: Dictionary = o.get("action", {})
 	var auto: bool = o.get("auto", false)
+	if phase == "away":
+		if not auto:
+			Game.notify.emit("%s is at %s until %s" % [display_name(), "school" if Careers.is_school(member.get("career", {})) else "work",
+				Game.when_text(float(member.work.until)).substr(5)], "laptop")
+		return false
 	if not auto:
 		var why := refuse_reason(a)
 		if why != "":
@@ -161,7 +168,7 @@ func command(o: Dictionary, replace := false) -> bool:
 
 
 func cancel_current() -> void:
-	if phase == "idle":
+	if phase == "idle" or phase == "away":
 		return
 	_end(false)
 
@@ -174,6 +181,8 @@ func cancel_all() -> void:
 
 ## Cancel one slot of the queue strip (0 = the action in progress).
 func cancel_slot(slot: int) -> void:
+	if phase == "away":
+		return
 	var has_cur := not order.is_empty() and phase != "idle"
 	if has_cur and slot == 0:
 		if order.get("forced", false):
@@ -219,6 +228,15 @@ func _critical_need() -> String:
 ## What the queue strip shows (slot 0 = current action).
 func _sync_queue() -> void:
 	var view: Array = []
+	if phase == "away":
+		var w: Dictionary = member.work
+		var school := Careers.is_school(member.get("career", {}))
+		var span := maxf(1.0, float(w.until) - float(w.start))
+		view.append({"label": "At School" if school else "At Work", "icon": "book" if school else "laptop",
+			"progress": clampf((Game.total_minutes() - float(w.start)) / span, 0.0, 1.0),
+			"auto": false, "current": true, "forced": true})
+		Game.set_queue_view(index, view)
+		return
 	if not order.is_empty() and phase != "idle":
 		var a: Dictionary = order.get("action", {})
 		view.append({"label": a.get("label", ""), "icon": _queue_icon(a), "progress": _progress(),
@@ -275,6 +293,9 @@ func _start(o: Dictionary) -> bool:
 	spot = r.spot
 	face_point = r.get("face", Vector3.INF)
 	if not _plan_path():
+		if o.get("work", false):
+			_leave_for_work()
+			return true
 		_route_fail(o)
 		order = {}
 		return false
@@ -390,12 +411,16 @@ func is_unreachable(t) -> bool:
 func tick(delta: float, dm: float) -> void:
 	if actor == null or not is_instance_valid(actor):
 		return
+	if phase == "away":
+		_tick_away(dm)
+		return
 	if dm > 0.0:
 		_need_acc += dm
 		_force_cool = maxf(0.0, _force_cool - dm)
 		if _need_acc >= NEED_CHECK_EVERY:
 			_need_acc = 0.0
 			check_needs()
+			check_career()
 	match phase:
 		"idle":
 			_idle(delta, dm)
@@ -564,6 +589,9 @@ func _on_floor() -> bool:
 
 ## Abandon the current walk: route-fail it and (for free will) move on.
 func _give_up() -> void:
+	if order.get("work", false):
+		_leave_for_work()
+		return
 	var o := order
 	fallbacks += 1
 	_route_fail(o)
@@ -581,6 +609,9 @@ func _arrive() -> void:
 	if a.get("id", "") == "go_here":
 		actor.set_pose("idle")
 		_end(true)
+		return
+	if order.get("work", false):
+		_leave_for_work()
 		return
 	var t = order.get("target")
 	if t != null and is_instance_valid(t):
@@ -650,7 +681,7 @@ func _act(dm: float) -> void:
 		Game.change_need(index, k, float(eff[k]) * step / mins)
 	if a.has("skill"):
 		# A good mood makes practice count for more (0.6x .. 1.4x).
-		var lvl: int = Game.add_skill_xp(index, a.skill, step / 60.0 * Game.mood_mult(index))
+		var lvl: int = Game.add_skill_xp(index, a.skill, step / 60.0 * Game.mood_mult(index) * Traits.skill_mult(member, a.skill))
 		_skill_t += step
 		if lvl > 0:
 			_skill_t = 0.0
@@ -670,6 +701,12 @@ func _act(dm: float) -> void:
 func _complete() -> void:
 	var a: Dictionary = order.get("action", {})
 	var m := int(a.get("money", 0))
+	if a.get("id", "") == "bills":
+		m = -Game.bills_due_total()
+	if a.get("id", "") in ["homework", "s_homework"]:
+		member["homework_day"] = Game.day
+	if a.get("id", "") == "s_homework" and order.get("other") != null:
+		order.other.member["homework_day"] = Game.day
 	if a.has("money_per_level") and a.has("skill"):
 		m += int(floorf(Game.skill_level(index, a.skill))) * int(a.money_per_level)
 	if m > 0:
@@ -681,6 +718,12 @@ func _complete() -> void:
 			print("  money: %s %s %+d (%s)" % [display_name(), a.get("id", ""), m, "auto" if order.get("auto", false) else "player"])
 		if Game.add_money(m):
 			_say(("+$%d" if m > 0 else "-$%d") % absi(m), "money")
+			if a.get("id", "") == "bills":
+				# add_money already took it: just clear the stack of bills.
+				Game.bills.clear()
+				for i in Game.household.size():
+					Game.remove_moodlet(i, "overdue_bills")
+				Game.bills_changed.emit()
 		else:
 			_say("Can't afford it", "money")
 	# Relationships: socials change friendship (and may be rejected).
@@ -754,6 +797,8 @@ func _apply_social(a: Dictionary) -> bool:
 	if delta > 0.0:
 		# A good mood makes you better company (x0.75 .. x1.25).
 		delta *= clampf(0.75 + (Game.mood_mult(index) - 0.6) / 0.8 * 0.5, 0.75, 1.25)
+		# Friendly / Family-Oriented / Loyal sims bond faster.
+		delta *= Traits.rel_mult(member, other != null)
 	if reject_p > 0.0 and randf() < reject_p:
 		Game.change_rel(me, partner, -absf(delta) * 0.5)
 		Game.add_moodlet(index, "rejected", "Rejected", "dots", -10.0, 2.0, "%s wasn't in the mood" % partner)
@@ -783,6 +828,8 @@ func _meet_task_ok(task: String) -> bool:
 
 
 func _end(_ok: bool) -> void:
+	if order.get("work", false) and phase != "away":
+		member.work.state = ""
 	if _reserved != null:
 		world.release(_reserved, self)
 		_reserved = null
@@ -981,3 +1028,230 @@ func _force_need(need: String) -> void:
 	Game.notify.emit(WARN_TEXT.get(need, "%s needs attention") % display_name() + "!", SimActions.need_icon(need, kind))
 	if phase == "idle":
 		_next()
+
+
+# =================================================================== work / school (rabbit hole)
+
+var _away_acc := 0.0
+## Shifts finished / missed (playtest diagnostics).
+var shifts_done := 0
+var shifts_missed := 0
+
+
+## Every few minutes: is it time to leave for work / school?
+func check_career() -> void:
+	var c: Dictionary = member.get("career", {})
+	if c.is_empty() or not Game.work_enabled:
+		return
+	var w: Dictionary = member.work
+	if w.state != "":
+		return
+	var d := Game.day
+	if int(c.get("last_day", -1)) == d or not Careers.works_on(c, d):
+		return
+	var now := Game.total_minutes()
+	var st := Careers.shift_start(c, d)
+	if now < st - Careers.LEAVE_BEFORE or now >= Careers.shift_end(c, d):
+		return
+	if now > st + Careers.MISS_AFTER:
+		miss_shift()
+		return
+	# Out cold: the carpool waits a little, then leaves without them.
+	if order.get("action", {}).get("id", "") == "pass_out":
+		return
+	go_to_work()
+
+
+## Forced "Go to Work": drop what we're doing (player orders wait for the
+## evening), walk to the door / lot edge, get into the carpool.
+func go_to_work() -> void:
+	var c: Dictionary = member.career
+	var school := Careers.is_school(c)
+	member.work.state = "going"
+	var exit: Vector3 = world.exit_spot(actor.global_position)
+	var a := {"id": "go_to_work", "label": "Go to School" if school else "Go to Work", "icon": "book" if school else "laptop",
+		"minutes": 0.0, "pose": "idle"}
+	var o := {"action": a, "point": exit, "auto": true, "forced": true, "work": true}
+	forced += 1
+	queue.clear()
+	if phase != "idle":
+		_end(false)
+		member.work.state = "going"
+	queue.clear()
+	queue.push_front(o)
+	_say("Off to school!" if school else "Off to work!", "book" if school else "laptop")
+	Game.notify.emit(("The school bus is here for %s" if school else "The carpool is here for %s") % display_name(), "book" if school else "laptop")
+	world.carpool(exit, "bus" if school else "car", 6.0)
+	if OS.has_environment("VIMS_PLAYTEST"):
+		print("  work: %s leaves for %s (%s) at %s" % [display_name(), Careers.track(c).name, Game.clock_text(), str(exit)])
+	if phase == "idle":
+		_next()
+
+
+## Into the carpool: hidden until the shift ends.
+func _leave_for_work() -> void:
+	var c: Dictionary = member.career
+	var w: Dictionary = member.work
+	var now := Game.total_minutes()
+	var st := Careers.shift_start(c, Game.day)
+	w.state = "away"
+	w.start = now
+	w.until = Careers.shift_end(c, Game.day)
+	w.late = now > st + 5.0
+	c.last_day = Game.day
+	if _reserved != null:
+		world.release(_reserved, self)
+		_reserved = null
+	Game.clear_bubble(actor, "")
+	order = {}
+	queue.clear()
+	path = PackedVector3Array()
+	phase = "away"
+	_away_acc = 0.0
+	actor.set("walk_speed", base_speed)
+	actor.set_pose("idle")
+	actor.visible = false
+	var school := Careers.is_school(c)
+	if w.late:
+		Game.add_moodlet(index, "late_work", "Late for School" if school else "Late for Work", "dots", -8.0, 3.0, "Missed the start of the shift")
+		Game.notify.emit("%s is late for %s!" % [display_name(), "school" if school else "work"], "dots")
+	Game.career_changed.emit(index)
+	_sync_queue()
+
+
+## Hidden at work: count down, keep the queue strip's progress moving.
+func _tick_away(dm: float) -> void:
+	if dm <= 0.0:
+		return
+	# Lunch, coffee and the restroom at work: those needs don't drain.
+	var hours := dm / 60.0
+	for k in ["bladder", "hunger", "hygiene"]:
+		if member.needs.has(k):
+			var keep := 1.0 if k == "bladder" else 0.6
+			Game.change_need(index, k, hours * float(Game.NEED_DECAY.get(k, 0.04)) * keep)
+	_away_acc += dm
+	if _away_acc >= 5.0:
+		_away_acc = 0.0
+		_sync_queue()
+	if Game.total_minutes() >= float(member.work.until):
+		come_home()
+
+
+## Restore the away state on a freshly built lot (traveling mid-shift).
+func set_away() -> void:
+	phase = "away"
+	order = {}
+	queue.clear()
+	actor.visible = false
+	_sync_queue()
+
+
+## Shift over: dropped off at the door, paycheck, performance, promotion.
+func come_home() -> void:
+	var c: Dictionary = member.career
+	var w: Dictionary = member.work
+	var school := Careers.is_school(c)
+	var drop: Vector3 = world.exit_spot(actor.global_position)
+	actor.global_position = drop
+	actor.visible = true
+	actor.set_pose("idle")
+	world.carpool(drop, "bus" if school else "car", 1.5)
+	w.state = ""
+	phase = "idle"
+	order = {}
+	idle_minutes = 0.0
+	shifts_done += 1
+	var sn: Dictionary = Careers.shift_needs(c)
+	for k in sn:
+		Game.change_need(index, k, float(sn[k]))
+	# Performance: tendency, mood, skill, lateness, traits, homework.
+	var t: Dictionary = Careers.track(c)
+	var sk := Game.skill_level(index, str(t.get("skill", ""))) if str(t.get("skill", "")) != "" else 0.0
+	var hw := int(member.get("homework_day", -10)) >= Game.day - 1
+	var d := Careers.perf_delta(c, Game.mood(index), sk, bool(w.late), Traits.work_bonus(member), hw)
+	c.perf = clampf(float(c.perf) + d, 0.0, 100.0)
+	c.trend = d
+	c.shifts = int(c.get("shifts", 0)) + 1
+	var pay := Careers.paycheck(c)
+	last_pay = pay
+	if pay > 0:
+		Game.add_money(pay)
+	var arrow := "▲" if d >= 0.0 else "▼"
+	if school:
+		var g := Careers.grade(float(c.perf))
+		Game.notify.emit("%s is home from school · Grade %s %s" % [display_name(), g, arrow], "book")
+		Game.show_bubble(actor, {"kind": "skill", "text": "Grade %s" % g, "icon": "book", "id": "skill", "ttl": 3.5})
+		if g in ["A", "A+"]:
+			Game.add_moodlet(index, "honor_roll", "Honor Roll", "trophy", 12.0, 12.0, "Grade %s at school" % g)
+		elif g in ["D", "F"]:
+			Game.add_moodlet(index, "bad_grades", "Bad Grades", "book", -10.0, 12.0, "Do homework to bring it up")
+		if not hw:
+			Game.notify.emit("%s has homework to do" % display_name(), "book")
+	else:
+		Game.notify.emit("%s is home from work · Paycheck +$%d · Performance %s%d" % [display_name(), pay, arrow, absi(roundi(d))], "money")
+		Game.show_bubble(actor, {"kind": "skill", "text": "+$%d" % pay, "icon": "money", "id": "skill", "ttl": 3.5})
+		match str(c.get("tendency", "normal")):
+			"hard":
+				if not Traits.has(member, "Workaholic"):
+					Game.add_moodlet(index, "long_day", "Long Day at Work", "laptop", -10.0, 4.0, "Worked hard")
+				else:
+					Game.add_moodlet(index, "good_day", "Great Day at Work", "laptop", 10.0, 4.0, "Workaholics love working hard")
+			"easy":
+				Game.add_moodlet(index, "easy_day", "Easy Day at Work", "smile", 6.0, 4.0, "Took it easy")
+		_review(c, sk)
+	if OS.has_environment("VIMS_PLAYTEST"):
+		print("  work: %s home from %s, pay %d, perf %+.1f -> %.1f, level %d (%s)" % [display_name(), t.get("name", "?"), pay, d, float(c.perf), int(c.get("level", 0)), Game.clock_text()])
+	world.on_shift_done(self, pay)
+	Game.career_changed.emit(index)
+	Game.needs_changed.emit(index)
+	check_needs()
+	_sync_queue()
+
+
+## Promotion / demotion / firing after a shift.
+func _review(c: Dictionary, sk: float) -> void:
+	var t: Dictionary = Careers.track(c)
+	if float(c.perf) >= Careers.PROMOTE_AT:
+		var need := Careers.next_req(c)
+		if need < 0:
+			var bonus := Careers.paycheck(c)
+			Game.add_money(bonus)
+			c.perf = 80.0
+			Game.notify.emit("%s got a top-of-the-career bonus: $%d" % [display_name(), bonus], "trophy")
+		elif sk >= need:
+			c.level = int(c.level) + 1
+			c.perf = Careers.PERF_AFTER_PROMO
+			var bonus := Careers.paycheck(c) / 2
+			Game.add_money(bonus)
+			Game.add_moodlet(index, "promoted", "Promoted!", "trophy", 25.0, 12.0, "Now %s" % Careers.title(c))
+			Game.notify.emit("%s was promoted to %s! Bonus $%d" % [display_name(), Careers.title(c), bonus], "trophy")
+			Game.show_bubble(actor, {"kind": "skill", "text": "Promoted!", "icon": "trophy", "id": "skill", "ttl": 4.0})
+			world.on_promotion(self)
+		else:
+			c.perf = 99.0
+			Game.notify.emit("%s needs %s level %d for a promotion" % [display_name(), t.get("skill", ""), need], "chart")
+	elif float(c.perf) <= Careers.DEMOTE_AT:
+		if int(c.level) > 1:
+			c.level = int(c.level) - 1
+			c.perf = Careers.PERF_AFTER_DEMO
+			Game.add_moodlet(index, "demoted", "Demoted", "dots", -20.0, 12.0, "Now %s" % Careers.title(c))
+			Game.notify.emit("%s was demoted to %s" % [display_name(), Careers.title(c)], "dots")
+		else:
+			member["career"] = {}
+			Game.add_moodlet(index, "fired", "Fired!", "dots", -25.0, 24.0, "Lost the %s job" % t.get("name", ""))
+			Game.notify.emit("%s was fired from the %s career!" % [display_name(), t.get("name", "")], "dots")
+
+
+## Never made it to the shift (passed out, playing elsewhere...).
+func miss_shift() -> void:
+	var c: Dictionary = member.career
+	var school := Careers.is_school(c)
+	c.last_day = Game.day
+	c.perf = maxf(0.0, float(c.perf) - 20.0)
+	c.trend = -20.0
+	shifts_missed += 1
+	Game.notify.emit("%s missed %s! Performance -20" % [display_name(), "school" if school else "work"], "dots")
+	Game.add_moodlet(index, "skipped", "Skipped School" if school else "Missed Work", "dots", -8.0, 6.0, "")
+	if not school:
+		_review(c, Game.skill_level(index, str(Careers.track(c).get("skill", ""))))
+	Game.career_changed.emit(index)

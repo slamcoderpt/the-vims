@@ -65,12 +65,17 @@ func _ready() -> void:
 	# Real play keeps a save (continue where you left off; autosave hourly,
 	# on travel and when the app is backgrounded). Playtests start fresh.
 	# --new=1 starts a new game.
+	var loaded := false
 	if not args.has("playtest"):
 		Game.autosave = true
 		if args.has("new"):
 			Game.delete_save()
 		elif Game.has_save() and Game.load_game():
+			loaded = true
 			print("Loaded save: day %d %s, $%d at %s" % [Game.day, Game.clock_text(), Game.money, Game.location])
+	if not loaded:
+		# A new game: Saturday morning, the first bill in the mailbox.
+		Game.new_game()
 	if args.has("location"):
 		Game.location = args.location
 	load_location(Game.location)

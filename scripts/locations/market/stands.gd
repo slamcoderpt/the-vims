@@ -6,6 +6,7 @@ extends RefCounted
 const Kit := preload("res://scripts/locations/market/kit.gd")
 const Fx := preload("res://scripts/locations/market/fixtures.gd")
 const Produce := preload("res://scripts/locations/market/produce.gd")
+const Stand := preload("res://scripts/locations/market/produce_stand.gd")
 
 const U := 0.0625
 const P := 0.03125
@@ -25,7 +26,6 @@ static func build(root: Node3D, halo_pts: Array) -> void:
 	_produce_table(root, fix, prod)
 	Kit.add(root, fix, U, "ProduceFixtures", true, null, Vector3.ZERO, Vector3.ZERO, true)
 	Kit.add(root, prod, P, "Produce", false)
-	_chalkboard(root)
 	_fridges(root, halo_pts)
 	_aisles(root)
 	_checkout(root, halo_pts)
@@ -132,41 +132,15 @@ static func _produce_wall(root: Node3D, fix: VoxelBuilder, prod: VoxelBuilder) -
 	Interactable.attach(root, "Produce Wall", _produce_actions("Apples", 0.8), Vector3(1.6, 1.4, 6.2), Vector3(-5.9, 0.7, -4.5), Vector3(-4.6, 0, -4.5))
 
 
-## Foreground island of crates (tiered, spilling towards the camera).
+## Hero produce stand (tiered, angled crates) + floor crates around it.
 static func _produce_island(root: Node3D, fix: VoxelBuilder, prod: VoxelBuilder) -> void:
-	var x0 := -3.4
 	var wood := Kit.wood(Color("8f5a31"), 2)
-	# rows: [base y, z, depth, crate h, [[kind, width]...]] back (high) -> front (low)
-	var rows := [
-		[0.78, -0.95, 0.85, 0.24, [["broccoli", 0.95], ["lettuce", 0.95], ["apple", 1.0]], 2],
-		[0.5, -0.05, 0.9, 0.26, [["greens", 0.95], ["tomato", 0.95]], 3],
-		[0.22, 0.9, 0.9, 0.28, [["carrot", 0.9], ["banana", 0.9]], 3],
-	]
-	var names := {"broccoli": "Broccoli", "lettuce": "Lettuce", "apple": "Apples", "greens": "Greens", "tomato": "Tomatoes",
-		"pepper_red": "Peppers", "carrot": "Carrots", "banana": "Bananas", "pepper_mix": "Peppers"}
-	var prices := {"broccoli": 1.8, "lettuce": 1.5, "apple": 0.8, "greens": 1.5, "tomato": 1.2,
-		"pepper_red": 2.3, "carrot": 0.9, "banana": 0.6, "pepper_mix": 2.3}
-	for ri in rows.size():
-		var r: Array = rows[ri]
-		var total := 0.0
-		for e: Array in r[4]:
-			total += e[1] + 0.02
-		fix.box(Vector3i(u(x0), 0, u(r[1])), Vector3i(u(total), u(r[0]), u(r[2] + 0.05)), wood)
-		var xs := x0 + 0.01
-		for e: Array in r[4]:
-			var w: float = e[1]
-			var kind: String = e[0]
-			_crate(fix, prod, Vector3(xs, r[0], r[1]), Vector3(w, r[3], r[2]), kind, 40 + ri * 5 + int(xs * 3.0), r[5])
-			Interactable.attach(root, names[kind], _produce_actions(names[kind], prices[kind]), Vector3(w, 0.5, r[2]),
-				Vector3(xs + w * 0.5, r[0] + 0.25, r[1] + r[2] * 0.5), Vector3(xs + w * 0.5, 0, 2.2))
-			xs += w + 0.02
-	_tag(root, Vector3(-2.95, 0.42, 1.83), "$0.90", 6.0)
-	_tag(root, Vector3(-2.02, 0.42, 1.83), "$2.30", 6.0)
-	_tag(root, Vector3(-1.98, 0.7, 0.88), "$1.20", 6.0)
-	_tag(root, Vector3(-0.98, 0.98, -0.07), "$0.80", 6.0)
-	# front-left extra crates on the floor (foreground spill)
-	_crate(fix, prod, Vector3(-4.9, 0.0, 1.9), Vector3(1.0, 0.3, 0.8), "orange", 77, 3, Fx.WOOD, false)
-	_crate(fix, prod, Vector3(-4.75, 0.0, 0.9), Vector3(0.95, 0.5, 0.85), "pepper_mix", 78, 3, Fx.WOOD, false)
+	var stand := Stand.build(root, Vector3(-4.1, 0.0, 1.3), 18.0, [
+		[["tomato", 3], ["pepper_mix", 3], ["banana", 2, 1.25]],
+		[["carrot", 2], ["apple", 3], ["lettuce", 2]],
+		[["broccoli", 2], ["orange", 3], ["greens", 2]],
+	])
+	_chalkboard(stand)
 	# near-camera crates (lower-left foreground, softened by the DOF)
 	# Low foreground display (bottom-left of the shot, soft in the DOF).
 	fix.box(Vector3i(u(-3.3), 0, u(5.2)), Vector3i(u(2.75), u(0.38), u(0.95)), wood)
@@ -205,9 +179,9 @@ static func _chalkboard(root: Node3D) -> void:
 	Fx.leaf_icon(lv, Vector3i(6, 11, 1), Color("6cbf45"), Color("2f7a2a"))
 	for p: Vector3i in lv.vox:
 		vb.set_v(p, lv.vox[p])
-	var mi := Kit.add(root, vb, U, "Chalkboard", true, null, Vector3(-3.55, 0.0, -1.75), Vector3(W * 0.5, 0, 0))
-	mi.rotation.y = deg_to_rad(32)
-	mi.rotation.x = deg_to_rad(-8)
+	# Mounted on the produce stand's back board, top right, above the tiers.
+	var mi := Kit.add(root, vb, U, "Chalkboard", true, null,
+		Vector3(8 * U, 0.95, -(3 * Stand.T + 1) * U + 0.24), Vector3(W * 0.5, 0, 0))
 	var l := Kit.label(mi, "Local\nFresh\nToday!", Vector3(-0.04, 1.52, 0.075), 0.0024, Color("f4f1e6"), 0.0, 96)
 	l.rotation.z = deg_to_rad(4)
 	l.line_spacing = -18.0
@@ -258,10 +232,10 @@ static func _aisles(root: Node3D) -> void:
 	# Low display of cereal boxes with a pot of flowers (centre-right).
 	var d := Vector3i(u(1.75), 0, u(-0.35))
 	vb.box(d, Vector3i(u(1.0), u(0.55), u(0.7)), Kit.wood(Fx.WOOD, 2))
-	for i in 4:
+	for i in 3:
 		var col: Color = Fx.BOX_COLS[(i * 3 + 1) % Fx.BOX_COLS.size()]
-		Fx.product(vb, d + Vector3i(i * 4, u(0.55), 8), "cereal", col, Fx.BOX_COLS[(i * 7 + 2) % 10], 7)
-		Fx.product(vb, d + Vector3i(i * 4, u(0.55), 4), "cereal", Kit.shade(col, 0.85), Fx.BOX_COLS[(i * 5) % 10], 7)
+		Fx.product(vb, d + Vector3i(i * 5, u(0.55), 8), "cereal", col, Fx.BOX_COLS[(i * 7 + 2) % 10], 7)
+		Fx.product(vb, d + Vector3i(i * 5, u(0.55), 4), "cereal", Kit.shade(col, 0.85), Fx.BOX_COLS[(i * 5) % 10], 7)
 	# Flower bucket on top.
 	var fpos := d + Vector3i(6, u(0.55) + 6, 2)
 	vb.box(fpos, Vector3i(4, 3, 4), Color("c96f3e"))
@@ -270,17 +244,41 @@ static func _aisles(root: Node3D) -> void:
 		var fc: Color = [Color("f06a9a"), Color("f9a8c8"), Color("ffffff"), Color("f5d03b")][i % 4]
 		vb.set_v(fp, fc)
 		vb.set_v(fp - Vector3i(0, 1, 0), Color("3f8a2e"))
-	# Bakery corner (right-front wall): bread shelves.
-	var bk := Vector3i(u(6.6), 0, u(-3.4))
-	vb.box(bk, Vector3i(u(1.1), u(1.5), u(2.4)), Kit.wood(Fx.WOOD_D, 3))
-	for s in 3:
-		var y := u(0.45 + s * 0.42)
-		vb.box(bk + Vector3i(-2, y, 0), Vector3i(3, 1, u(2.4)), Kit.wood(Fx.WOOD_L, 1, 1))
-		for b in 9:
-			var bp := bk + Vector3i(-2 + (b % 2), y + 1, 1 + b * 4)
-			var bc: Color = [Color("d39a52"), Color("b8763a"), Color("e4b56e")][(b + s) % 3]
-			vb.box(bp, Vector3i(3, 2, 3), bc)
-			vb.set_v(bp + Vector3i(1, 2, 1), Kit.shade(bc, 1.15))
+	# Bakery corner (right-front wall): open bread shelves with baskets of
+	# chunky loaves, baguettes and boules, under a warm lamp.
+	var bk := Vector3i(u(6.6), 0, u(-3.6))
+	var bl := u(2.8)
+	vb.box(bk, Vector3i(u(1.1), u(1.75), bl), Kit.wood(Fx.WOOD_D, 3))
+	vb.box(bk + Vector3i(-3, u(1.75), -1), Vector3i(u(1.1) + 3, 2, bl + 2), Kit.wood(Color("6e4428"), 1))
+	var crust: Array[Color] = [Color("c98a42"), Color("b06f32"), Color("dba65e"), Color("9c5f2a")]
+	for sh in 3:
+		var y := u(0.32 + sh * 0.48)
+		vb.box(bk + Vector3i(-4, y, 0), Vector3i(5, 1, bl), Kit.wood(Fx.WOOD_L, 1, 1))
+		var zc := 1
+		var item := 0
+		while zc < bl - 6:
+			var kind := (item + sh * 2) % 3
+			var cc: Color = crust[(item + sh) % 4]
+			var bp := bk + Vector3i(-4, y + 1, zc)
+			match kind:
+				0: # wicker basket of baguettes leaning back
+					vb.box(bp, Vector3i(4, 2, 6), Color("b98a4e"))
+					for k in 3:
+						for t in 6:
+							vb.set_v(bp + Vector3i(1 + k, 2 + t, 1 + k * 2), Kit.shade(cc, 1.0 + 0.1 * (t % 2)))
+							vb.set_v(bp + Vector3i(2 + k / 2, 2 + t, 1 + k * 2), Kit.shade(cc, 0.9))
+					zc += 7
+				1: # round boule with a scored top
+					vb.box(bp + Vector3i(0, 0, 0), Vector3i(4, 3, 5), cc)
+					vb.box(bp + Vector3i(1, 3, 1), Vector3i(2, 1, 3), Kit.shade(cc, 1.15))
+					vb.set_v(bp + Vector3i(0, 2, 2), Color("f0d29a"))
+					zc += 6
+				_: # sandwich loaves, two side by side
+					for k in 2:
+						vb.box(bp + Vector3i(0, 0, k * 4), Vector3i(4, 3, 3), cc)
+						vb.box(bp + Vector3i(0, 3, k * 4), Vector3i(4, 1, 3), Kit.shade(cc, 1.18))
+					zc += 9
+			item += 1
 	Kit.add(root, vb, U, "Aisles", false, null, Vector3.ZERO, Vector3.ZERO, true)
 	Interactable.attach(root, "Cereal Shelf", [
 		_act("buy", "Buy Cereal", "cereal", 2.0, {"money": -4, "item": "Cereal"}),
@@ -427,7 +425,7 @@ static func _foreground(root: Node3D) -> void:
 	var vb := VoxelBuilder.new()
 	vb.jitter = 0.05
 	# Flower stand: low wooden crate with three buckets of flowers.
-	var fo := Vector3i(int(round(-3.3 / P)), 0, int(round(2.6 / P)))
+	var fo := Vector3i(int(round(-6.2 / P)), 0, int(round(1.6 / P)))
 	Fx.crate(vb, fo, 30, 18, 10, Color("a8703f"))
 	vb.box(fo + Vector3i(1, 1, 1), Vector3i(28, 8, 16), Color("6a4528"))
 	var fcols := [[Color("f06a9a"), Color("f9a8c8")], [Color("fdf6ea"), Color("f5d03b")], [Color("ef5a5a"), Color("f7a14a")]]

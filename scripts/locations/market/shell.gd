@@ -13,8 +13,9 @@ const Z0 := -11.75
 const ZF := 17.0
 const H := 5.0
 
-const WALL := Color("d6a46c")
-const WAINSCOT := Color("a8693a")
+const WALL := Color("dcb88e")
+const PLASTER := Color("f2ebde")
+const WAINSCOT := Color("b07a4a")
 const CEIL := Color("7b5232")
 const BEAM := Color("5e3c22")
 
@@ -58,6 +59,9 @@ static func _walls(root: Node3D) -> void:
 		var f := 0.88 + 0.2 * Kit.h(Vector3i(k, p.y / 2, 3), 2)
 		if p.y % 2 == 0:
 			f *= 0.92
+		# back wall above the fridges: bright cream plaster (daylight wall)
+		if p.z <= z0:
+			return Kit.shade(PLASTER, 0.97 + 0.04 * Kit.h(Vector3i(p.x / 8, p.y / 4, 1), 2))
 		return Kit.shade(WALL, f)
 	# left / right / back
 	vb.box(Vector3i(x0, 0, z0), Vector3i(1, hh, zf - z0), wall_fn)
@@ -133,15 +137,16 @@ static func _ceiling(root: Node3D, halo_pts: Array) -> void:
 			halo_pts.append([p + Vector3(0.03, -0.1, 0.03), 1.7, Color(1.0, 0.7, 0.38, 1.0)])
 			halo_pts.append([p + Vector3(0.03, -0.12, 0.03), 0.45, Color(1.0, 0.92, 0.75, 1.0)])
 			if r[3] and absf(x - 3.5) > 0.1:
-				Kit.light(root, p + Vector3(0, -0.35, 0), Color(1.0, 0.8, 0.55), 1.15, 4.6)
-			pools.append([Vector3(x, 0.012, r[0]), Vector2(2.6, 2.6), Color(1.0, 0.7, 0.4, 0.55 if r[3] else 0.4)])
+				Kit.light(root, p + Vector3(0, -0.35, 0), Color(1.0, 0.86, 0.66), 1.0, 4.4)
+			pools.append([Vector3(x, 0.012, r[0]), Vector2(2.1, 2.1), Color(1.0, 0.8, 0.5, 0.4 if r[3] else 0.28)])
 	Kit.add(root, lamps, U, "Pendants", false, Kit.glow_mat("warm"), Vector3.ZERO, Vector3.ZERO, false, false)
 	# Cool spill from the fridge bank + its reflection streak on the tiles.
-	Kit.light(root, Vector3(-1.4, 1.4, -10.4), Color(0.8, 0.9, 1.0), 1.4, 4.5)
-	Kit.light(root, Vector3(2.0, 1.4, -10.4), Color(0.8, 0.9, 1.0), 1.4, 4.5)
-	Kit.light(root, Vector3(5.6, 1.4, -10.4), Color(0.8, 0.9, 1.0), 1.0, 3.5)
-	pools.append([Vector3(0.4, 0.014, -10.4), Vector2(9.0, 1.8), Color(0.62, 0.8, 1.0, 0.55)])
-	pools.append([Vector3(5.6, 0.014, -10.4), Vector2(3.6, 1.6), Color(0.62, 0.8, 1.0, 0.45)])
+	Kit.light(root, Vector3(-2.8, 1.4, -10.3), Color(0.78, 0.9, 1.0), 1.6, 4.5)
+	Kit.light(root, Vector3(0.4, 1.4, -10.3), Color(0.78, 0.9, 1.0), 1.6, 4.5)
+	Kit.light(root, Vector3(3.6, 1.4, -10.3), Color(0.78, 0.9, 1.0), 1.6, 4.5)
+	Kit.light(root, Vector3(6.4, 1.4, -10.3), Color(0.78, 0.9, 1.0), 1.2, 3.5)
+	pools.append([Vector3(0.4, 0.014, -10.5), Vector2(10.5, 2.2), Color(0.6, 0.8, 1.0, 0.6)])
+	pools.append([Vector3(5.6, 0.014, -10.5), Vector2(3.6, 1.8), Color(0.6, 0.8, 1.0, 0.5)])
 	root.add_child(Kit.pools(pools))
 
 
@@ -190,7 +195,7 @@ static func _signs(root: Node3D) -> void:
 	Fx.leaf_icon(lv, Vector3i(0, 0, 0), Color("8fd14f"), Color("3d8a2a"))
 	Kit.add(fresh, lv, U * 1.3, "Leaf", false, null, Vector3(1.55, -0.02, 0.11), Vector3(3.5, 4, 0))
 	# Produce
-	var prod := _board(root, "SignProduce", Vector3(-3.95, 2.7, -2.6), 28.0, 1.2, 0.38, Color("3a2a20"), Color("7a5130"), true, 2.9)
+	var prod := _board(root, "SignProduce", Vector3(-4.2, 3.0, -2.4), 24.0, 1.3, 0.4, Color("3a2a20"), Color("7a5130"), true, 3.6)
 	_text(prod, "Produce", Vector3(0, 0.0, z), 0.95, 0.24, Color("f6efe0"))
 	# MARKET (over the grocery aisles, right)
 	var mk := _board(root, "SignMarket", Vector3(3.5, 4.25, -2.0), -14.0, 3.1, 0.9, Color("34302d"), Color("8a5a31"))

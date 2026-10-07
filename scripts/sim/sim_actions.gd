@@ -64,6 +64,11 @@ const SKILL_UNLOCKS := {
 		"moodlet": ["gourmet", "Gourmet Meal", "cook", 16.0, 5.0]}],
 }
 
+## Location actions the sim layer replaces (by Interactable title): the old
+## on-demand "Work" shift and flat "Pay Bills" gave way to careers
+## (careers.gd) and real bills (Game.bills, SimWorld.career_rows).
+const REPLACED := {"Computer": ["work", "bills"]}
+
 ## Side effects on OTHER household members when an action completes.
 ## action id -> {kind: need delta}
 const EFFECT_ON_KIND := {
@@ -95,8 +100,9 @@ static func actions_for(it: Node, member: Dictionary) -> Array:
 	var out: Array = []
 	var kind: String = member.get("kind", "adult")
 	var src: Array = it.get("actions") if it.get("actions") is Array else []
+	var gone: Array = REPLACED.get(str(it.get("title")), [])
 	for a in src:
-		if a is Dictionary and allowed(a, kind):
+		if a is Dictionary and allowed(a, kind) and not str(a.get("id", "")) in gone:
 			out.append(a)
 	for a in EXTRAS.get(str(it.get("title")), []):
 		if allowed(a, kind):

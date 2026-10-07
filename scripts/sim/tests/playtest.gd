@@ -15,6 +15,8 @@ var _shot_n := 0
 var _menus: Array = []      # [title, actions]
 var _bubbles: Array = []    # data dicts
 var _t0 := 0
+var _notes: Array = []      # Game.notify texts
+const Careers := preload("res://scripts/sim/careers.gd")
 
 
 func _ready() -> void:
@@ -25,6 +27,9 @@ func _ready() -> void:
 	DirAccess.make_dir_recursive_absolute(shot_dir)
 	Game.menu_requested.connect(func(t, a, _p): _menus.append([t, a]))
 	Game.bubble_requested.connect(func(_an, d): _bubbles.append(d))
+	Game.notify.connect(func(t, _i): _notes.append(t))
+	# Shifts / school only in the career section (the others need everyone home).
+	Game.work_enabled = false
 	await _frames(4)
 	await _run()
 	var fails := 0
@@ -40,7 +45,7 @@ func _run() -> void:
 	var only: Array = []
 	if args.has("only"):
 		only = (args.only as String).split(",")
-	for sec in ["boot", "loop", "money", "unlocks", "mood", "queue", "autonomy", "meal", "wishes", "clock", "gohere", "build", "social", "townies", "travel", "save"]:
+	for sec in ["boot", "loop", "money", "unlocks", "mood", "queue", "autonomy", "meal", "wishes", "clock", "gohere", "build", "social", "townies", "travel", "career", "save"]:
 		if only.is_empty() or sec in only or sec == "boot":
 			await call("_s_" + sec)
 
@@ -119,17 +124,33 @@ func _s_money() -> void:
 	var money0 := Game.money
 	var comp = _find_it("Computer")
 	jack.cancel_all()
+	# A new game starts with the first bill in the mailbox, sized to the household's value.
+	var bill0 := Game.bills_due_total()
+	var bill_ok := bill0 == Game.bill_amount() and bill0 >= 60 + roundi(Game.HOME_BASE_VALUE * 0.004)
 	await _open_menu_on(comp)
-	await _choose("Pay Bills")
+	var flat_work: bool = _menus[-1][1].any(func(a): return a.get("id", "") == "work")
+	await _choose("Pay Bills Online")
 	Game.speed = 3
 	await _until_game(func(): return jack.last_done == "bills", 240.0)
-	_step("money_spent", Game.money == money0 - 120 and _task_done("Pay Bills"), "money %d -> %d, Pay Bills done=%s" % [money0, Game.money, str(_task_done("Pay Bills"))])
+	_step("money_spent", bill_ok and not flat_work and Game.money == money0 - bill0 and _task_done("Pay Bills") and not Game.has_bills(),
+		"bill $%d (household value $%d), money %d -> %d, Pay Bills done=%s, flat Work row gone=%s" % [bill0, Game.household_value(), money0, Game.money, str(_task_done("Pay Bills")), str(not flat_work)])
+	# Bills arrive every few days; unpaid past the due date they get a late fee.
+	Game.deliver_bill()
+	var amt: int = Game.bills[0].amount
+	Game.bills[0].due = Game.total_minutes() - 1.0
+	Game.update_bills()
+	var late_ok: bool = Game.bills_overdue() and Game.bills_due_total() == amt + roundi(amt * Game.BILL_LATE_FEE) and Game.has_moodlet(jack.index, "overdue_bills")
+	_step("bills_overdue", late_ok, "bill $%d -> $%d with late fee, Overdue Bills moodlet=%s" % [amt, Game.bills_due_total(), str(Game.has_moodlet(jack.index, "overdue_bills"))])
+	# Pay at the mailbox (the lot's own mailbox becomes tappable).
+	var mb = _find_it("Mailbox")
 	var money1 := Game.money
-	await _open_menu_on(comp)
-	await _choose("Work")
-	await _until_game(func(): return jack.last_done == "work", 400.0)
-	_step("money_earned", Game.money == money1 + jack.last_pay and jack.last_pay >= 108 and jack.last_pay <= 252,
-		"money %d -> %d (base pay 180, mood-scaled = %d, mood now %s), Logic=%.2f [Jack %s '%s' refused=%d speed=%d]" % [money1, Game.money, jack.last_pay, Game.mood_word(jack.index), Game.skill_level(jack.index, "Logic"), jack.phase, jack.current_label(), jack.refused, Game.speed])
+	var due := Game.bills_due_total()
+	if mb:
+		await _open_menu_on(mb)
+		await _choose("Pay Bills")
+		await _until_game(func(): return not Game.has_bills(), 240.0)
+	_step("mailbox_pay", mb != null and not Game.has_bills() and Game.money == money1 - due and not Game.has_moodlet(jack.index, "overdue_bills"),
+		"mailbox=%s paid $%d, money %d -> %d [Jack %s '%s', fails=%d]" % [str(mb != null), due, money1, Game.money, jack.phase, jack.current_label(), jack.route_fails])
 
 
 
@@ -197,9 +218,9 @@ func _s_mood() -> void:
 	jack.member.needs.energy = 0.05
 	var ref0: int = jack.refused
 	await _open_menu_on(comp)
-	await _choose("Work")
+	await _choose("Play Games")
 	await _frames(2)
-	_step("refuses_when_exhausted", jack.refused == ref0 + 1 and jack.current_label() != "Work", "Jack energy=0.05 -> refused=%d, action='%s'" % [jack.refused - ref0, jack.current_label()])
+	_step("refuses_when_exhausted", jack.refused == ref0 + 1 and jack.current_label() != "Play Games", "Jack energy=0.05 -> refused=%d, action='%s'" % [jack.refused - ref0, jack.current_label()])
 
 	# --- energy 0 -> passes out on the spot with a strong negative moodlet
 	# (free will would already have sent him to bed: switch it off for this check)
@@ -257,7 +278,7 @@ func _s_queue() -> void:
 	await _frames(2)
 	# Queue three orders through the real menu.
 	var comp = _find_it("Computer")
-	for lab in ["Answer Emails", "Play Games", "Work"]:
+	for lab in ["Answer Emails", "Play Games", "Write Blog Post"]:
 		await _open_menu_on(comp)
 		await _choose(lab)
 		await _frames(2)
@@ -265,7 +286,7 @@ func _s_queue() -> void:
 	var v: Array = Game.queue_view(jack.index)
 	_step("queue_strip", v.size() == 3 and v[0].current, "queue=%s" % str(v.map(func(q): return q.label)))
 	await _shot("queue")
-	# Tap the 3rd tile (Work) to cancel it.
+	# Tap the 3rd tile (Write Blog Post) to cancel it.
 	var hit_rect := Rect2()
 	for h in ov._hits:
 		if h[1] == "queue" and int(h[2]) == 2:
@@ -274,7 +295,7 @@ func _s_queue() -> void:
 		_touch(hit_rect.get_center())
 	await _frames(3)
 	v = Game.queue_view(jack.index)
-	_step("queue_tap_cancel", v.size() == 2 and not v.any(func(q): return q.label == "Work"), "after tap: %s" % str(v.map(func(q): return q.label)))
+	_step("queue_tap_cancel", v.size() == 2 and not v.any(func(q): return q.label == "Write Blog Post"), "after tap: %s" % str(v.map(func(q): return q.label)))
 	# Tap the current tile: it stops and the next one starts.
 	for h in ov._hits:
 		if h[1] == "queue" and int(h[2]) == 0:
@@ -864,6 +885,52 @@ func _s_build() -> void:
 	await _frames(2)
 	_step("build_wall_floor", wall_ok and tiles == 2 and "Walls  (5)" in build_cats,
 		"Build categories %s, wall placed=%s (nav obstacles %d -> %d), floor tiles placed=%d" % [str(build_cats), str(wall_ok), obst0, sim.nav.obstacles.size(), tiles])
+	# ---------------------------------------------------------------- build: drag a 3 m wall
+	_menus.clear()
+	b.open_catalog(Vector2(300, 300), "walls")
+	await _frames(2)
+	await _choose("Wall · Cream Panel")
+	await _frames(2)
+	var run_ok := false
+	var run_n := 0
+	var money_r := Game.money
+	var obst_r: int = sim.nav.obstacles.size()
+	if b.ghost and b.is_wall_tool():
+		# Find a free 3 m strip near Lily (on her storey) for the run.
+		var li: int = sim.nav.level_of(lily.actor.global_position)
+		var item: Dictionary = b.ghost_item
+		var a0 := Vector3.INF
+		for r in range(0, 9):
+			for k in 12:
+				var ang := TAU * k / 12.0
+				var cand: Vector3 = lily.actor.global_position + Vector3(cos(ang), 0, sin(ang)) * (1.5 + r * 0.5)
+				cand.x = roundf(cand.x / 0.5) * 0.5
+				cand.z = roundf(cand.z / 0.5) * 0.5
+				if not sim.nav.in_bounds(cand) or sim.nav.level_of(cand + Vector3(0, 0.1, 0)) != li:
+					continue
+				var all_ok := true
+				for s2 in 3:
+					var q: Vector3 = b._snap(item, 0, cand + Vector3(s2 + 0.5, 0, 0))
+					var bx: AABB = b._box(item, 0, q)
+					if not b._can_place(item, bx) or b._covers_sim(bx) or b._blocks_route(bx) != "":
+						all_ok = false
+						break
+				if all_ok:
+					a0 = cand
+					break
+			if a0 != Vector3.INF:
+				break
+		if a0 != Vector3.INF:
+			a0.y = sim.nav.floor_y(a0 + Vector3(0, 0.1, 0))
+			var a1 := a0 + Vector3(3.0, 0, 0.1)
+			await _focus((a0 + a1) * 0.5)
+			await _drag_touch(_cam().unproject_position(a0 + Vector3(0.05, 0, 0.05)), _cam().unproject_position(a1), 8)
+			await _frames(3)
+			run_n = sim.nav.obstacles.size() - obst_r
+			run_ok = run_n == 3 and Game.money == money_r - 3 * int(item.price)
+	_step("build_wall_drag", run_ok, "dragged a wall run: %d sections, money %d -> %d, ghost still active=%s" % [run_n, money_r, Game.money, str(b.ghost != null)])
+	await _shot("build_wall_drag")
+	b.cancel_ghost()
 	lily.autonomy = true
 	await _focus(lily.actor.global_position)
 	await _shot("build_wall_floor")
@@ -957,6 +1024,126 @@ func _s_travel() -> void:
 	await _shot("home_again")
 
 
+## Sims 3 career loop: find a job on the computer, the carpool at shift start,
+## away as a rabbit hole, paycheck + performance on return, promotion,
+## work tendency, demotion; children go to school.
+func _s_career() -> void:
+	var jack = _agent("Jack")
+	var lily = _agent("Lily")
+	var ov = sim.overlay
+	_top_up()
+	Game.work_enabled = false
+	Game.speed = 1
+	await _tap_portrait(jack.index)
+	await _frames(2)
+	var comp = _find_it("Computer")
+	await _open_menu_on(comp)
+	var rows: Array = _menus[-1][1].map(func(a): return a.get("label", ""))
+	await _choose("Find a Job")
+	await _frames(4)
+	var listing: bool = not _menus.is_empty() and _menus[-1][0] == "Job Listings" and _menus[-1][1].size() == 4
+	await _shot("job_listings")
+	await _choose("Business")
+	Game.speed = 3
+	await _until_game(func(): return Game.has_job(jack.index), 120.0)
+	var c: Dictionary = Game.career(jack.index)
+	_step("find_job", "Find a Job" in rows and listing and c.get("track", "") == "business" and int(c.get("level", 0)) == 1 and Game.has_moodlet(jack.index, "new_job"),
+		"computer rows %s -> %s, Jack: %s" % [str(rows), str(_menus[-1][1].map(func(a): return a.label)) if not _menus.is_empty() else "-", Careers.title(c)])
+
+	# --- shift start: the next Monday, 8:35 (Business starts at 9; school started at 8)
+	_top_up()
+	var mon: int = Game.day + (7 - Game.day % 7)
+	Game.set_time(mon, 8, 35)
+	var money0 := Game.money
+	var perf0: float = float(c.perf)
+	Game.work_enabled = true
+	Game.speed = 1
+	await _until_game(func(): return jack.order.get("work", false) or jack.phase == "away", 10.0)
+	var going: bool = jack.order.get("work", false) and jack.current_label() == "Go to Work"
+	var notified: bool = _notes.any(func(t): return "carpool is here for Jack" in t)
+	await _focus(jack.actor.global_position)
+	await _wait(0.3)
+	await _shot("go_to_work")
+	Game.speed = 3
+	await _until_game(func(): return jack.phase == "away", 120.0)
+	_step("go_to_work", going and notified and jack.phase == "away" and not jack.actor.visible and Game.is_at_work(jack.index) and int(sim.stats.get("carpools", 0)) >= 1,
+		"walked to the door (%s), carpool x%d, Jack %s visible=%s" % [str(going), int(sim.stats.get("carpools", 0)), jack.phase, str(jack.actor.visible)])
+	await _until_game(func(): return lily.phase == "away", 60.0)
+	_step("school_bus", Careers.is_school(Game.career(lily.index)) and lily.phase == "away" and not lily.actor.visible and Game.has_moodlet(lily.index, "late_work"),
+		"Lily %s at %s (late=%s)" % [lily.phase, Careers.track(Game.career(lily.index)).get("name", "-"), str(lily.member.work.get("late", false))])
+	var v: Array = Game.queue_view(jack.index)
+	_step("at_work_queue", v.size() == 1 and v[0].label == "At Work" and v[0].forced, "queue strip %s" % str(v.map(func(q): return "%s %.0f%%" % [q.label, q.progress * 100.0])))
+	# Orders are refused while at work.
+	var ref_n := _notes.size()
+	jack.command({"action": {"id": "emails", "label": "Answer Emails", "minutes": 30.0}, "target": comp})
+	_step("away_refuses_orders", jack.phase == "away" and _notes.size() > ref_n and "at work until" in str(_notes[-1]), "notice: %s" % (str(_notes[-1]) if _notes.size() > ref_n else "-"))
+	# Career tab: tap the job button, then "Work Hard".
+	for h in ov._hits:
+		if h[1] == "career":
+			_touch((h[0] as Rect2).get_center())
+			break
+	await _frames(3)
+	for h in ov._hits:
+		if h[1] == "tendency" and h[2] == "hard":
+			_touch((h[0] as Rect2).get_center())
+			break
+	await _frames(3)
+	await _shot("career_tab")
+	_step("career_tab", ov.panel.visible and ov.panel_tab == "career" and Game.career(jack.index).tendency == "hard",
+		"panel=%s tab=%s tendency=%s" % [str(ov.panel.visible), ov.panel_tab, Game.career(jack.index).get("tendency", "-")])
+	ov.panel.visible = false
+	# --- end of the shift: home with a paycheck and a performance change
+	Game.set_time(Game.day, 16, 58)
+	await _until_game(func(): return jack.phase != "away", 30.0)
+	c = Game.career(jack.index)
+	var paid := Careers.paycheck(c)
+	_step("work_returns", jack.actor.visible and jack.phase != "away" and Game.money == money0 + paid and paid == 14 * 8 and absf(float(c.perf) - perf0) > 0.5
+		and _notes.any(func(t): return "Paycheck +$%d" % paid in t),
+		"Jack home: paycheck $%d, money %d -> %d, perf %.1f -> %.1f (%s, mood %s)" % [paid, money0, Game.money, perf0, float(c.perf), c.tendency, Game.mood_word(jack.index)])
+	await _until_game(func(): return lily.phase != "away", 10.0)
+	_step("school_returns", lily.actor.visible and int(Game.career(lily.index).get("shifts", 0)) >= 1 and _notes.any(func(t): return "home from school" in t),
+		"Lily grade %s (perf %.0f)" % [Careers.grade(float(Game.career(lily.index).perf)), float(Game.career(lily.index).perf)])
+	await _focus(jack.actor.global_position)
+	await _shot("home_from_work")
+	# --- promotion: a strong shift on Tuesday
+	_top_up()
+	c.perf = 97.0
+	Game.set_time(Game.day + 1, 8, 40)
+	await _until_game(func(): return jack.phase == "away", 120.0)
+	Game.set_time(Game.day, 16, 58)
+	await _until_game(func(): return jack.phase != "away" and int(Game.career(jack.index).get("last_day", -1)) == Game.day, 30.0)
+	c = Game.career(jack.index)
+	_step("promotion", int(c.level) == 2 and Game.has_moodlet(jack.index, "promoted") and Careers.title(c) == "Office Assistant",
+		"Jack now Lv %d %s, perf %.0f, promoted moodlet=%s" % [int(c.level), Careers.title(c), float(c.perf), str(Game.has_moodlet(jack.index, "promoted"))])
+	# --- demotion: miserable and slacking on Wednesday
+	_top_up()
+	c.perf = 2.0
+	Game.set_tendency(jack.index, "easy")
+	Game.add_moodlet(jack.index, "t_misery", "Miserable", "dots", -90.0, 0.0)
+	# ...and half an hour late.
+	Game.set_time(Game.day + 1, 9, 30)
+	await _until_game(func(): return jack.phase == "away", 120.0)
+	Game.set_time(Game.day, 16, 58)
+	await _until_game(func(): return jack.phase != "away" and int(Game.career(jack.index).get("last_day", -1)) == Game.day, 30.0)
+	c = Game.career(jack.index)
+	_step("demotion", int(c.level) == 1 and Game.has_moodlet(jack.index, "demoted"), "Jack back to Lv %d %s, perf %.0f" % [int(c.level), Careers.title(c), float(c.perf)])
+	Game.remove_moodlet(jack.index, "t_misery")
+	Game.set_tendency(jack.index, "normal")
+	# --- traits: different sims, different free will / skill gain
+	var ja: float = Game.Traits.skill_mult(jack.member, "Cooking")
+	var la: float = Game.Traits.skill_mult(lily.member, "Creativity")
+	_step("traits", ja > 1.0 and la > 1.0 and Game.Traits.skill_mult(lily.member, "Cooking") == 1.0 and "Workaholic" in jack.member.traits,
+		"Jack %s, Lily %s" % [str(jack.member.traits), str(lily.member.traits)])
+	# Back to the weekend so later sections have everyone home.
+	Game.work_enabled = false
+	for ag in sim.agents:
+		if ag and ag.phase == "away":
+			ag.come_home()
+	Game.set_time(Game.day + (5 - Game.day % 7 + 7) % 7, 10, 0)
+	_top_up()
+	await _frames(3)
+
+
 func _s_save() -> void:
 	var path := "user://vims_playtest_save.txt"
 	var lily = _agent("Lily")
@@ -968,6 +1155,7 @@ func _s_save() -> void:
 	var nw0 := Game.wishes(lily.index).size()
 	var day0 := Game.day
 	var min0 := Game.minutes
+	var jack_c: Dictionary = Game.career(_agent("Jack").index).duplicate()
 	var ok_save := Game.save_game(path)
 	# Mess everything up, then load.
 	Game.money = 1
@@ -978,7 +1166,7 @@ func _s_save() -> void:
 	var ml: bool = Game.has_moodlet(lily.index, "t_save") and Game.moodlets(lily.index).any(func(m): return m.id == "t_save" and m.expires == INF)
 	_step("save_load", ok_save and ok_load and Game.money == money0 and absf(Game.skill_level(lily.index, "Music") - music0) < 0.001
 		and absf(Game.rel("Jack", "Lily") - rel0) < 0.01 and Game.lth(lily.index) == lth0 and Game.wishes(lily.index).size() == nw0
-		and Game.day == day0 and absf(Game.minutes - min0) < 0.01 and ml,
+		and Game.day == day0 and absf(Game.minutes - min0) < 0.01 and ml and Game.career(0).get("track", "") == jack_c.get("track", "-") and Game.career(0).get("level", 0) == jack_c.get("level", -1),
 		"saved + reloaded: money $%d, Music %.2f, Jack-Lily %.0f, LTH %d, %d wishes, moodlet kept=%s" % [Game.money, Game.skill_level(lily.index, "Music"), Game.rel("Jack", "Lily"), Game.lth(lily.index), Game.wishes(lily.index).size(), str(ml)])
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 	# The agents hold the old member dicts: rebind the lot like a real load does.
@@ -1117,6 +1305,29 @@ func _touch(sp: Vector2) -> void:
 	up.position = sp
 	up.pressed = false
 	get_viewport().push_input(up)
+
+
+## One finger down at a, dragged to b in `steps`, then lifted.
+func _drag_touch(a: Vector2, b: Vector2, steps: int) -> void:
+	var down := InputEventScreenTouch.new()
+	down.index = 0
+	down.position = a
+	down.pressed = true
+	get_viewport().push_input(down)
+	await _frames(1)
+	for k in range(1, steps + 1):
+		var dr := InputEventScreenDrag.new()
+		dr.index = 0
+		dr.position = a.lerp(b, float(k) / steps)
+		dr.relative = (b - a) / steps
+		get_viewport().push_input(dr)
+		await _frames(1)
+	var up := InputEventScreenTouch.new()
+	up.index = 0
+	up.position = b
+	up.pressed = false
+	get_viewport().push_input(up)
+	await _frames(1)
 
 
 func _tap_portrait(i: int) -> void:

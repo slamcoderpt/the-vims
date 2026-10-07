@@ -337,7 +337,7 @@ func _props(parent: Node3D) -> void:
 	var barrels := [
 		[-6.9, 2.6, 0], [-6.0, 3.5, 1], [-7.6, 0.4, 1],
 		[-2.2, -6.2, 2], [2.0, -7.6, 0], [7.4, -2.0, 2],
-		[7.6, 3.4, 1], [2.6, 3.6, 0],
+		[7.6, 3.4, 1], [-5.2, 4.6, 0],
 		[-2.7, -11.6, 1], [3.1, -12.2, 2],
 	]
 	var i := 0
@@ -345,7 +345,7 @@ func _props(parent: Node3D) -> void:
 		_barrel_planter(near, int(b[0] * C), int(b[1] * C), 5.0, b[2], i)
 		i += 1
 	# Ground lanterns (small, along the walkway edges).
-	for l in [[-7.0, 3.6], [-3.3, 2.9], [1.9, 3.1], [6.9, 0.2], [-2.0, -4.2], [1.9, -5.6], [-2.5, -9.0], [2.9, -9.3]]:
+	for l in [[-7.0, 3.6], [-3.3, 2.9], [1.1, 3.9], [6.9, 0.2], [-2.0, -4.2], [1.9, -5.6], [-2.5, -9.0], [2.9, -9.3]]:
 		_ground_lantern(near, int(l[0] * C), int(l[1] * C))
 	# Picnic tables.
 	_picnic_table(near, int(-5.0 * C), int(-8.0 * C))

@@ -343,13 +343,13 @@ static func tile_floor(parent: Node3D, size: Vector2, center: Vector3, tile := 0
 	var img := Image.create(px * n, px * n, true, Image.FORMAT_RGB8)
 	for ty in n:
 		for tx in n:
-			var base := Color("efe5d2") if (tx + ty) % 2 == 0 else Color("d9c9ad")
+			var base := Color("fbf6ec") if (tx + ty) % 2 == 0 else Color("eee3cf")
 			var f := 0.97 + 0.06 * h(Vector3i(tx, ty, 5))
 			for y in px:
 				for x in px:
 					var c := shade(base, f * (0.985 + 0.03 * h(Vector3i(tx * px + x, ty * px + y, 1))))
 					if x < 1 or y < 1:
-						c = Color("9c8a70")
+						c = Color("c4baa9")
 					elif x < 2 or y < 2:
 						c = shade(base, 0.92)
 					img.set_pixel(tx * px + x, ty * px + y, c)
@@ -357,8 +357,8 @@ static func tile_floor(parent: Node3D, size: Vector2, center: Vector3, tile := 0
 	var tex := ImageTexture.create_from_image(img)
 	var mat := StandardMaterial3D.new()
 	mat.albedo_texture = tex
-	mat.roughness = 0.22
-	mat.metallic_specular = 0.75
+	mat.roughness = 0.28
+	mat.metallic_specular = 0.55
 	mat.uv1_triplanar = true
 	mat.uv1_world_triplanar = true
 	mat.uv1_scale = Vector3.ONE / (tile * n)

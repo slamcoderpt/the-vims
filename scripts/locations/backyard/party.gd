@@ -216,13 +216,14 @@ func _table() -> void:
 	_bowl(vb, -33, y, 1, Color("6cb04a"), [Color("e2513f"), Color("8fd05a"), Color("fbf3ec")])
 	_candle(vb, -27, y, -3)
 	_burger_board(vb, -21, y, 1)
-	_pitcher(vb, -14, y, -5)
-	_melon(vb, -13, y, 1)
-	_corn_platter(vb, -6, y, -5)
-	# Flower vase centrepiece.
-	V.b(vb, -1, y, -1, 3, 5, 3, Color("8fb7d9"))
-	V.b(vb, -1, y + 5, -1, 3, 1, 3, Color("a8cbe6"))
-	V.blob(vb, Vector3(0.5, y + 8, 0.5), Vector3(3.0, 2.4, 3.0), V.mix([Color("f59cc6"), Color("fbf7f0"), Color("ee7fb4"), Color("e2513f"), Color("5f9e3a")], 3), 0.4, 3)
+	_pitcher(vb, -3, y, 2)
+	_melon(vb, 7, y, -5)
+	_corn_platter(vb, -4, y, -5)
+	# Low flower vase centrepiece, set where it lines up with the empty
+	# near-middle chair from the camera (never in front of a diner's face).
+	V.b(vb, -11, y, -1, 3, 4, 3, Color("8fb7d9"))
+	V.b(vb, -11, y + 4, -1, 3, 1, 3, Color("a8cbe6"))
+	V.blob(vb, Vector3(-9.5, y + 7, 0.5), Vector3(2.6, 2.0, 2.6), V.mix([Color("f59cc6"), Color("fbf7f0"), Color("ee7fb4"), Color("e2513f"), Color("5f9e3a")], 3), 0.4, 3)
 	_candle(vb, 4, y, -3)
 	# Ketchup + mustard.
 	V.b(vb, 3, y, 4, 1, 4, 1, Color("d02a24")); V.p(vb, 3, y + 4, 4, Color("f2f2f2"))
@@ -443,7 +444,7 @@ func _grill() -> void:
 	smoke.emission_box_extents = Vector3(0.3, 0.02, 0.12)
 	smoke.direction = Vector3(0, 1, 0)
 	smoke.spread = 12.0
-	smoke.gravity = Vector3(-0.16, 0.24, -0.04)
+	smoke.gravity = Vector3(0.03, 0.26, -0.1)
 	smoke.initial_velocity_min = 0.25
 	smoke.initial_velocity_max = 0.45
 	smoke.scale_amount_min = 1.0

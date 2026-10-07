@@ -24,6 +24,9 @@ const DO_LABELS := {
 	"pay": "Pay at the Checkout", "s_fetch": "Play Fetch", "s_play": "Play with the Kids", "relax": "Relax on the Sofa",
 }
 const TIER_GOAL := {1: "Friends", 2: "Good Friends", 3: "Best Friends"}
+## Menu-only rows that never make a "do" wish.
+const NO_WISH := ["find_job", "quit_job", "apply_job", "bills", "check_mail", "go_to_work"]
+const Careers := preload("res://scripts/sim/careers.gd")
 ## Same as SimWorld.MEAL_TABLES / MEAL_COOKS.
 const MEAL_TABLES := ["Dining Table", "Dinner Table"]
 const MEAL_COOKS := ["Fridge", "Stove", "Grill"]
@@ -79,7 +82,7 @@ static func _candidate(world, ag, have: Array) -> Dictionary:
 			continue
 		for a in world.actions_for(it, m):
 			var id: String = a.get("id", "")
-			if id == "" or seen.has(id) or a.get("locked", false) or int(a.get("money", 0)) < 0 or id.begins_with("locked_"):
+			if id == "" or id in NO_WISH or seen.has(id) or a.get("locked", false) or int(a.get("money", 0)) < 0 or id.begins_with("locked_"):
 				continue
 			seen[id] = true
 			var lab: String = DO_LABELS.get(id, "%s · %s" % [a.get("label", id), it.title])
@@ -103,11 +106,22 @@ static func _candidate(world, ag, have: Array) -> Dictionary:
 	if human:
 		var strangers := 0
 		for it in world.interactables:
+			if not is_instance_valid(it):
+				continue
 			var tn: String = world.townie_of(it)
 			if tn != "" and not Game.has_met(me, tn):
 				strangers += 1
 		if strangers > 0:
 			opts.append([2.0, {"id": "meet_new", "label": "Meet Someone New", "icon": "people", "kind": "meet", "arg": "", "n": 1, "reward": 300}])
+	# --- career / school
+	var c: Dictionary = m.get("career", {})
+	if ag.kind == "adult" and c.is_empty():
+		opts.append([3.0, {"id": "find_job", "label": "Find a Job", "icon": "laptop", "kind": "job", "arg": "", "n": 1, "reward": 500}])
+	elif ag.kind == "adult" and Careers.next_req(c) >= 0:
+		opts.append([2.0, {"id": "promo_%d" % (int(c.level) + 1), "label": "Get Promoted to %s" % Careers.TRACKS[c.track].titles[mini(int(c.level), 9)],
+			"icon": "trophy", "kind": "promo", "arg": "", "n": int(c.level) + 1, "reward": 600 + int(c.level) * 100}])
+	elif ag.kind == "child" and Careers.is_school(c) and not Careers.grade(float(c.get("perf", 50.0))) in ["A", "A+"]:
+		opts.append([1.5, {"id": "grade_a", "label": "Get an A at School", "icon": "book", "kind": "grade", "arg": "", "n": 1, "reward": 500}])
 	# --- money (grown-ups)
 	if ag.kind == "adult":
 		var amt: int = [150, 250, 400][randi() % 3]
@@ -208,3 +222,10 @@ static func bias(ag, a: Dictionary) -> float:
 				if int(a.get("money", 0)) > 0:
 					b += 0.03 * k
 	return b
+
+
+## Career events: "job" (hired), "promo" (promoted), "grade" (A at school).
+static func on_career(ag, event: String) -> void:
+	for w in Game.wishes(ag.index).duplicate():
+		if w.kind == event:
+			_fulfil(ag, w)
