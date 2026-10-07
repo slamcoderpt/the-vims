@@ -225,20 +225,28 @@ static func hay(vb: VoxelBuilder, x: int, y: int, z: int, w: int, h: int, d: int
 
 ## Flowering mum cluster (bush of small flowers), radius r cells, at top y.
 static func mums(vb: VoxelBuilder, cx: float, y: int, cz: float, r: float, palette := 0, seed := 0) -> void:
+	# r15: flower heads are 2-cell clusters in 3 flat tones (sunlit / mid /
+	# shade) with dark-green leaves only peeking out low down: reads as a
+	# rounded bush of blooms, not per-voxel confetti.
 	var sets := [
-		[Color("f08a1c"), Color("f5a524"), Color("e2661a"), Color("fbc542")],
-		[Color("e04a2a"), Color("f07a2a"), Color("c8321e"), Color("f5a030")],
-		[Color("f6c63a"), Color("fbd85a"), Color("eaa52a"), Color("f08a24")],
-		[Color("c23a5a"), Color("e06a8a"), Color("a82a48"), Color("f2a0b0")],
+		[Color("fbb23e"), Color("ee8020"), Color("c95a18")],
+		[Color("f2703a"), Color("d6401f"), Color("9c2818")],
+		[Color("fde27a"), Color("f5bd38"), Color("d58e22")],
+		[Color("f2a0b8"), Color("d65a80"), Color("a02c4c")],
 	]
 	var cols: Array = sets[palette % sets.size()]
-	var leaf := [Color("4e7a2c"), Color("3e6a24"), Color("5f8c34")]
-	blob(vb, Vector3(cx, y + r * 0.55, cz), Vector3(r, r * 0.75, r), func(q: Vector3i) -> Color:
-		var h := hs(q.x + seed, q.y, q.z)
-		if h < 0.18:
-			return pick(leaf, hs(q.z, q.x, q.y))
-		var c: Color = pick(cols, hs(q.x, q.y + seed, q.z))
-		return shade(c, 0.95 + float(q.y - y) * 0.02), 0.45, seed)
+	var leaf := [Color("5a8a34"), Color("40692a")]
+	var ctr := Vector3(cx, y + r * 0.55, cz)
+	var rad := Vector3(r, r * 0.75, r)
+	var ld := Vector3(-0.45, 0.8, 0.4).normalized()
+	blob(vb, ctr, rad, func(q: Vector3i) -> Color:
+		var rel := (Vector3(q) + Vector3(0.5, 0.5, 0.5) - ctr) / rad
+		var cell := Vector3i(floori(q.x / 2.0), floori(q.y / 2.0), floori(q.z / 2.0))
+		var h := hs(cell.x + seed, cell.y, cell.z)
+		if rel.y < -0.25 and h < 0.4:
+			return leaf[0] if rel.dot(ld) > -0.2 else leaf[1]
+		var d := rel.normalized().dot(ld) + (h - 0.5) * 0.5
+		return cols[0] if d > 0.35 else (cols[1] if d > -0.25 else cols[2]), 0.3, seed)
 
 
 # ------------------------------------------------------------------ meshing

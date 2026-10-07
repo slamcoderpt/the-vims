@@ -11,7 +11,7 @@ const VS := 0.125
 const C := 8  # detail cells per metre
 const R := 4  # roof cells per metre
 
-const BRICK := [Color("b4583c"), Color("a54d34"), Color("bf6446"), Color("9c4630"), Color("c46e4e"), Color("ab5238")]
+const BRICK := [Color("a04a32"), Color("923f2c"), Color("ac553c"), Color("883a28"), Color("b05c42"), Color("98452e")]
 const BRICK2 := [Color("c98258"), Color("b8704a"), Color("d39066"), Color("ad6442"), Color("c27a50")]
 const STONE := [Color("e2d6bf"), Color("d6c8ae"), Color("ebe0cb"), Color("cbbb9f")]
 const GREYSTONE := [Color("b4b4b0"), Color("a6a6a2"), Color("c0c0bb"), Color("9a9a96")]
@@ -22,7 +22,7 @@ const GLASS := Color("3a5068")
 const GLASS_LIT := Color("ffc56a")
 
 const HALL_Z := -29.0
-const HALL_H := 9.4  # r13: tall facade, clock at the roofline (ref2)
+const HALL_H := 9.6  # r13: tall facade, clock at the roofline (ref2)
 
 var clock_center := Vector3.ZERO
 var node: Node3D   # the town root (festival.gd scales / sinks it)
@@ -44,8 +44,10 @@ func build(parent: Node3D) -> void:
 	roof.jitter = 0.0
 	_town_hall()
 	_house_left()
-	_house_right()
+	# (r15: the right-hand house sits fully behind the stage from the
+	# festival camera; skipped to save triangles on phones.)
 	_cull_below(cull_y)
+	_haze()
 	_wall_meshes(parent)
 	K.inst(parent, det, VS, Vector3.ZERO, 0.0, true, Vector3.ZERO, "TownDetail")
 	K.inst(parent, roof, 1.0 / R, Vector3.ZERO, 0.0, true, Vector3.ZERO, "TownRoofs")
@@ -54,6 +56,22 @@ func build(parent: Node3D) -> void:
 
 
 # ------------------------------------------------------------------ walls
+
+## r15: light warm distance haze on the backdrop (critic r14: everything
+## competed at equal contrast). Lit windows and the clock face stay clean.
+const HAZE := Color(0.96, 0.86, 0.74)
+const HAZE_K := 0.12
+
+func _haze() -> void:
+	for vb: VoxelBuilder in [det, roof]:
+		for p: Vector3i in vb.vox:
+			if vb.glow.has(p):
+				continue
+			var c: Color = vb.vox[p]
+			if c.get_luminance() > 0.85:
+				continue
+			vb.vox[p] = c.lerp(HAZE, HAZE_K)
+
 
 func _cull_below(h: float) -> void:
 	if h <= 0.0:
@@ -133,6 +151,9 @@ func _wall_material(key: String) -> StandardMaterial3D:
 		"brick2": img = _brick_tex(BRICK2, Color("e2d4bc"))
 		"grey": img = _ashlar_tex(GREYSTONE, Color("7e7e7a"))
 		_: img = _ashlar_tex(STONE, Color("b0a088"))
+	for y in img.get_height():
+		for x in img.get_width():
+			img.set_pixel(x, y, img.get_pixel(x, y).lerp(HAZE, HAZE_K))
 	img.generate_mipmaps()
 	var mat := StandardMaterial3D.new()
 	mat.albedo_texture = ImageTexture.create_from_image(img)
@@ -284,28 +305,31 @@ func _roof_z(x0: float, x1: float, zb: float, zf: float, h: float, pal: Array, w
 # ------------------------------------------------------------------ buildings
 
 func _town_hall() -> void:
+	# r15 layout (forced-perspective backdrop, ~0.26 scale, sunk so the
+	# plaza hides everything below ~local 5.8 m): two rows of windows under
+	# a slate roof, 20 m wide, with a clock tower rising above the ridge.
 	var z := HALL_Z
 	var h := HALL_H
-	_wall("brick", Vector3(-6.5, 0, z - 4.5), Vector3(13.0, h, 4.5))
-	# Stone plinth, floor band, cornice, quoins.
-	_band(-6.6, 6.6, 0.0, z - 0.1, 0.5, 0.375)
-	for by in [2.4, 4.55, 6.7]:
-		_band(-6.6, 6.6, by, z - 0.1, 0.25, 0.375)
-	_band(-6.7, 6.7, h - 0.375, z - 0.1, 0.375, 0.5)
+	var hx := 10.0
+	_wall("brick", Vector3(-hx, 0, z - 4.5), Vector3(hx * 2.0, h, 4.5))
+	# Floor bands, cornice, quoins.
+	for by in [5.75, 7.6]:
+		_band(-hx - 0.1, hx + 0.1, by, z - 0.1, 0.25, 0.375)
+	_band(-hx - 0.2, hx + 0.2, h - 0.375, z - 0.1, 0.375, 0.5)
 	for y in range(0, int(h * 2)):
 		var w := 0.625 if y % 2 == 0 else 0.375
-		_band(-6.6, -6.6 + w, y * 0.5, z - 0.1, 0.25, 0.375)
-		_band(6.6 - w, 6.6, y * 0.5, z - 0.1, 0.25, 0.375)
-	# Windows (two floors) either side of the tower.
-	for fl in 4:
-		var wy := 0.75 + fl * 2.15
-		for wx in [-5.5, -3.9, 2.9, 4.5]:
-			var lit := K.hs(int(wx * 4.0), fl, 21) < 0.35
-			_window(wx, wy, z, 8, 11, lit, fl != 1)
-	# Roof.
-	_roof_x(-7.0, 7.0, z - 5.0, z + 0.5, h, SLATE)
-	# Dormers on the roof.
-	for dx in [-4.8, 3.4]:
+		_band(-hx - 0.1, -hx - 0.1 + w, y * 0.5, z - 0.1, 0.25, 0.375)
+		_band(hx + 0.1 - w, hx + 0.1, y * 0.5, z - 0.1, 0.25, 0.375)
+	# Two visible floors of tall white-framed windows, warm-lit at random.
+	var cols := [-9.0, -7.3, -5.6, -4.0, 3.0, 4.6, 6.3, 8.0]
+	for fl in 2:
+		var wy := 6.1 + fl * 1.85
+		for wx: float in cols:
+			var lit := K.hs(int(wx * 4.0), fl, 21) < 0.4
+			_window(wx, wy, z, 8, 10, lit, fl == 0)
+	# Roof + dormers.
+	_roof_x(-hx - 0.5, hx + 0.5, z - 5.0, z + 0.5, h, SLATE)
+	for dx in [-7.6, -4.6, 3.2, 6.2]:
 		_wall("stone", Vector3(dx, h + 0.25, z - 1.4), Vector3(1.5, 1.3, 1.0))
 		_window(dx + 0.25, h + 0.45, z - 0.4, 7, 7, dx > 0, false)
 		var rx := int(dx * R)
@@ -313,57 +337,57 @@ func _town_hall() -> void:
 			for zz in range(int((z - 1.6) * R), int((z - 0.25) * R)):
 				roof.set_v(Vector3i(rx - 1 + i, int((h + 1.5) * R) + i, zz), SLATE[0])
 				roof.set_v(Vector3i(rx + 6 - i, int((h + 1.5) * R) + i, zz), SLATE[1])
-	# --- Clock tower (front at z + 0.5).
+	# --- Clock tower (front at z + 0.5): red brick with white stone quoins,
+	# a big white clock face above the roof ridge and a squat slate cap.
 	var tz := z + 0.5
-	var th := 13.4
-	_wall("brick", Vector3(-1.75, 0, tz - 3.0), Vector3(3.5, th, 3.0))
+	var th := 16.6
+	var hw := 2.5
+	_wall("brick", Vector3(-hw, 0, tz - 3.5), Vector3(hw * 2.0, th, 3.5))
 	for y in range(0, int(th * 2)):
 		var w := 0.5 if y % 2 == 0 else 0.375
-		_band(-1.85, -1.85 + w, y * 0.5, tz - 0.1, 0.25, 0.375)
-		_band(1.85 - w, 1.85, y * 0.5, tz - 0.1, 0.25, 0.375)
-	_band(-1.9, 1.9, h - 0.375, tz - 0.1, 0.375, 0.5)
-	_band(-2.0, 2.0, th - 0.25, tz - 3.1, 0.375, 3.25)
-	_band(-1.9, 1.9, 0, tz - 0.1, 0.5, 0.375)
-	# Door + steps.
-	K.box(det, -7, 4, int(tz * C), 14, 18, 1, K.wood(Color("5a3520"), 2, 2))
-	for y in 17:
-		det.set_v(Vector3i(0, 4 + y, int(tz * C) + 1), Color("3e2414"))
-	K.box(det, -9, 4, int(tz * C), 2, 20, 2, K.mix(STONE, 7))
-	K.box(det, 7, 4, int(tz * C), 2, 20, 2, K.mix(STONE, 8))
-	K.box(det, -9, 22, int(tz * C), 18, 3, 2, K.mix(STONE, 9))
-	det.set_v(Vector3i(-2, 12, int(tz * C) + 1), Color("d9b45a"))
-	det.set_v(Vector3i(1, 12, int(tz * C) + 1), Color("d9b45a"))
-	K.box(det, -14, 0, int(tz * C), 28, 2, 6, K.mix(STONE, 9))
-	K.box(det, -11, 2, int(tz * C), 22, 2, 3, K.mix(STONE, 10))
-	# Window above the door.
-	_window(-0.5, 3.35, tz, 8, 9, true, true)
-	_window(-0.5, 5.6, tz, 8, 10, false, true)
-	_band(-1.9, 1.9, 7.1, tz - 0.1, 0.25, 0.375)
+		_band(-hw - 0.1, -hw - 0.1 + w, y * 0.5, tz - 0.1, 0.25, 0.375)
+		_band(hw + 0.1 - w, hw + 0.1, y * 0.5, tz - 0.1, 0.25, 0.375)
+	_band(-hw - 0.15, hw + 0.15, h - 0.375, tz - 0.1, 0.375, 0.5)
+	_band(-hw - 0.15, hw + 0.15, 10.9, tz - 0.1, 0.375, 0.5)
+	_band(-hw - 0.3, hw + 0.3, th - 0.5, tz - 3.6, 0.625, 3.85)
+	# Arched windows on the tower below the clock.
+	_window(-0.5, 6.2, tz, 8, 12, true, true)
+	_window(-0.5, 8.9, tz, 8, 11, false, true)
 	# Clock face.
-	var cy := int(8.5 * C)
+	var cy := int(13.6 * C)
 	clock_center = Vector3(0.0, (cy + 0.5) * VS, tz + 0.15)
-	_clock(0, cy, int(tz * C))
-	# Belfry openings with a bell.
-	for bx in [-10, 3]:
-		K.box(det, bx, int(10.15 * C), int(tz * C), 7, 7, 1, Color("2a2420"))
-	K.box(det, -1, int(10.2 * C), int(tz * C) - 1, 3, 4, 1, Color("c9a040"))
-	# Spire (roof cells).
+	_clock(0, cy, int(tz * C), 17.0)
+	# The hall roof must not run across the tower front.
+	for p: Vector3i in roof.vox.keys():
+		if p.x >= int(-hw * R) and p.x < int(hw * R) and p.z >= int((tz - 3.5) * R) and p.y < int(th * R):
+			roof.vox.erase(p)
+	# Squat stepped slate cap with a gold finial.
+	var x0 := int((-hw - 0.3) * R)
+	var x1 := int((hw + 0.3) * R)
+	var z0 := int((tz - 3.8) * R)
+	var z1 := int((tz + 0.3) * R)
+	var y := int(th * R)
 	var sp := 0
-	var w := 16
-	while w - 2 * sp > 1:
-		var y := int(th * R) + sp * 2
-		K.box(roof, -8 + sp, y, int((tz - 3.25) * R) + sp, w - 2 * sp, 2, 14 - 2 * sp, K.mix(SLATE, sp))
+	while x1 - x0 - 2 * sp > 2 and z1 - z0 - 2 * sp > 2:
+		K.box(roof, x0 + sp, y + sp, z0 + sp, x1 - x0 - 2 * sp, 1, z1 - z0 - 2 * sp, K.mix(SLATE, sp))
 		sp += 1
-	var top := int(th * R) + sp * 2
-	var mz := int((tz - 3.25) * R) + 7
-	K.box(roof, -1, top, mz - 1, 1, 4, 1, Color("d9b04a"))
-	roof.set_v(Vector3i(-1, top + 4, mz - 1), Color("f0c85a"))
+	var mx := (x0 + x1) / 2
+	var mz := (z0 + z1) / 2
+	K.box(roof, mx - 1, y + sp, mz - 1, 2, 2, 2, Color("d9b04a"))
+	roof.set_v(Vector3i(mx - 1, y + sp + 2, mz - 1), Color("f0c85a"))
 
 
-func _clock(cx: int, cy: int, z: int) -> void:
-	var r := 11.0
-	for x in range(-12, 13):
-		for y in range(-12, 13):
+func _clock(cx: int, cy: int, z: int, r := 12.5) -> void:
+	# Stone surround (square) behind the face.
+	var ri := int(ceil(r))
+	# Round stone surround behind the face.
+	for x in range(-ri - 2, ri + 2):
+		for y in range(-ri - 2, ri + 2):
+			if Vector2(x + 0.5, y + 0.5).length() <= r + 1.6:
+				det.set_v(Vector3i(cx + x, cy + y, z), Color("e6dccb"))
+	z += 1
+	for x in range(-ri, ri + 1):
+		for y in range(-ri, ri + 1):
 			var d := sqrt((x + 0.5) * (x + 0.5) + (y + 0.5) * (y + 0.5))
 			if d > r:
 				continue
@@ -375,14 +399,20 @@ func _clock(cx: int, cy: int, z: int) -> void:
 			det.set_v(Vector3i(cx + x, cy + y, z), c)
 	for i in 12:
 		var a := TAU * i / 12.0
-		var p := Vector2(sin(a), cos(a)) * (r - 4.0)
-		det.set_v(Vector3i(cx + roundi(p.x - 0.5), cy + roundi(p.y - 0.5), z + 1), Color("2d2a28"))
+		var p := Vector2(sin(a), cos(a)) * (r - 4.2)
+		var q := Vector3i(cx + roundi(p.x - 0.5), cy + roundi(p.y - 0.5), z + 1)
+		det.set_v(q, Color("2d2a28"))
+		if i % 3 == 0:
+			# Quarter marks are 2x2 so 12/3/6/9 read at phone size.
+			var o := Vector2i(signi(roundi(-p.x)), signi(roundi(-p.y)))
+			det.set_v(q + Vector3i(o.x if o.x != 0 else 1, 0, 0), Color("2d2a28"))
+			det.set_v(q + Vector3i(0, o.y if o.y != 0 else 1, 0), Color("2d2a28"))
 	# Hands: chunky 2-cell strokes (thin 1-cell hands read as a frowning
 	# face at phone size). Long minute hand, short wide hour hand.
 	var am := TAU * 42.0 / 60.0
 	var ah := TAU * (4.0 + 42.0 / 60.0) / 12.0
-	_hand(cx, cy, z, am, 8.6, 0.6, Color("2a2622"))
-	_hand(cx, cy, z, ah, 5.8, 0.9, Color("2a2622"))
+	_hand(cx, cy, z, am, r * 0.74, r / 13.0, Color("2a2622"))
+	_hand(cx, cy, z, ah, r * 0.5, r / 10.0, Color("2a2622"))
 	det.set_v(Vector3i(cx, cy, z + 2), Color("d9b04a"))
 
 
@@ -402,8 +432,8 @@ func _hand(cx: int, cy: int, z: int, ang: float, length: float, width: float, co
 
 func _house_left() -> void:
 	# Brick townhouse, front gable, close to the left of the square.
-	var x0 := -16.5
-	var x1 := -7.0
+	var x0 := -22.0
+	var x1 := -11.0
 	var z := -28.0   # r13: beside the hall (forced-perspective backdrop row)
 	var h := 8.4
 	_wall("brick2", Vector3(x0, 0, z - 5.0), Vector3(x1 - x0, h, 5.0))
@@ -435,8 +465,8 @@ func _house_left() -> void:
 
 
 func _house_right() -> void:
-	var x0 := 7.0
-	var x1 := 18.0
+	var x0 := 11.0
+	var x1 := 22.0
 	var z := -28.5   # r13: beside the hall, mostly behind the stage
 	var h := 8.0
 	_wall("grey", Vector3(x0, 0, z - 5.0), Vector3(x1 - x0, h, 5.0))

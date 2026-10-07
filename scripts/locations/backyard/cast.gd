@@ -4,7 +4,7 @@ extends RefCounted
 
 const Party := preload("res://scripts/locations/backyard/party.gd")
 const Gestures := preload("res://scripts/locations/backyard/gestures.gd")
-const DOG_POS := Vector3(2.55, 0.0, 2.05)
+const DOG_POS := Vector3(2.4, 0.0, 2.6)
 
 ## key -> [look, aliases]
 const PEOPLE := {
@@ -42,28 +42,26 @@ func build(parent: Node3D, party) -> void:
 	var gf: Vector3 = Party.GRILL_POS + gb * Party.COOK_SPOT
 	var gd: Vector3 = Party.GRILL_POS + gb * Vector3(0.0, 0.0, 0.0) - gf
 	_spawn("Jack", gf, atan2(gd.x, gd.z) + 0.28, "grill")
-	# Sit-down dinner (ref4): the long table runs across the picture with
-	# just five diners spaced out along it. Four on the far side face the
-	# camera in 3/4 with an empty chair-width between each; one child sits
-	# on the near side with his back to us in a gap; the other near chairs
-	# stay empty so the chairs and the cloth read.
-	_seat("Lily", party, "far_1", "sit_talk", 0.25)
-	_seat("neighbor_7", party, "far_2", "sit_talk", 0.15)
-	_seat("neighbor_4", party, "far_3", "sit_talk", -0.1)
-	_seat("Maya", party, "far_4", "sit_talk", -0.25)
-	# A fifth diner at the head of the table, side-on, turned 3/4 to us.
-	# (Near-side diners only show the backs of big hair blocks from this
-	# camera and cover the cloth, so those chairs stay empty.)
-	_seat("neighbor_8", party, "end_r", "sit_talk", 0.35)
+	# Sit-down dinner (ref4): a compact table with six diners on chairs all
+	# round it. Far side faces the camera in 3/4, the near pair sit with
+	# their backs to us turned toward each other, the girls sit at the ends
+	# side-on with their faces turned to the player.
+	_seat("Lily", party, "end_l", "sit_talk", -0.5)
+	_seat("neighbor_7", party, "far_l", "sit_talk", 0.25)
+	_seat("neighbor_4", party, "far_r", "sit_talk", -0.3)
+	_seat("Maya", party, "end_r", "sit_talk", 0.45)
+	_seat("neighbor_6", party, "near_l", "sit_talk", -0.55)
+	_seat("neighbor_8", party, "near_r", "sit_talk", 0.3)
 	gestures = Gestures.new()
 	parent.add_child(gestures)
 	# Every diner has one hand busy (burger / glass) and the other forearm
-	# resting on the cloth, so arms read on the table instead of in the air.
-	gestures.add(actors.get("Lily"), "burger", false, "burger", 0.05, 0.3, true)
-	gestures.add(actors.get("neighbor_7"), "drink", true, "", 0.08, 0.3, true)
-	gestures.add(actors.get("neighbor_4"), "toast", false, "", 0.05, 0.3, true)
-	gestures.add(actors.get("Maya"), "drink", true, "", 0.1, 0.3, true)
-	gestures.add(actors.get("neighbor_8"), "burger", true, "burger", 0.05, 0.6, true)
+	# resting on the table, so arms read on the table instead of in the air.
+	gestures.add(actors.get("Lily"), "burger", true, "burger", 0.05, 0.6, true)
+	gestures.add(actors.get("neighbor_7"), "toast", false, "", 0.05, 0.3, true)
+	gestures.add(actors.get("neighbor_4"), "drink", true, "", 0.05, 0.3, true)
+	gestures.add(actors.get("Maya"), "drink", false, "", 0.08, 0.6, true)
+	gestures.add(actors.get("neighbor_6"), "burger", false, "burger", 0.0, 0.0, true)
+	gestures.add(actors.get("neighbor_8"), "drink", true, "", 0.0, 0.0, true)
 	# Jack works the food with tongs (left hand; the pose's spatula stays in
 	# the right) and his head turns just enough for the face to read.
 	gestures.add(actors.get("Jack"), "tongs", true, "tongs", -0.02, 0.6)
@@ -74,8 +72,6 @@ func build(parent: Node3D, party) -> void:
 	b.face(Vector3(1.5, 0, 1.0))
 	gestures.add(a, "burger", true, "burger")
 	gestures.add(b, "drink", false)
-	# (The blond boy, neighbor_6, is not at this party: an extra body by
-	# the deck only cluttered the far diners.)
 	# The two elders on the outdoor sofa by the fire pit, mugs in hand.
 	var s0: Transform3D = Party.sofa_seat(0)
 	var s1: Transform3D = Party.sofa_seat(1)
@@ -84,7 +80,7 @@ func build(parent: Node3D, party) -> void:
 	var g := _spawn_seated("neighbor_3", s1.origin, s1.basis.get_euler().y - 0.1, "sit_talk", 0.5)
 	gestures.add(g, "mug", false, "", 0.0, 0.5)
 	# Biscuit trotting across the lawn between the table and the fire pit.
-	var d := _spawn("Biscuit", DOG_POS, -0.95, "walk")
+	var d := _spawn("Biscuit", DOG_POS, -0.75, "walk")
 	d.position.y = 0.0
 	# (size comes from BODY_SCALE["dog"] in _tune)
 	for k in PEOPLE:

@@ -616,7 +616,7 @@ func _s_anims() -> void:
 	var et: Dictionary = _seen(lily, func(x): return x.active == "eat" and x.pose == "sit" and "fork" in x.props and "plate_food" in x.props)
 	var pulled: bool = not _seen(lily, func(x): return x.active == "pull_chair").is_empty()
 	var full: bool = not _seen(lily, func(x): return x.active == "react_satisfied").is_empty()
-	_step("anim_eat", not et.is_empty() and pulled and full, "eat snap=%s, pulled chair=%s, satisfied reaction=%s" % [str(et.get("props", [])), str(pulled), str(full)])
+	_step("anim_eat", not et.is_empty() and pulled and full, "eat snap=%s, pulled chair=%s, satisfied reaction=%s (beats %s, last %s)" % [str(et.get("props", [])), str(pulled), str(full), str(lily.get("beats_seen")), lily.last_done])
 	var wt: Dictionary = _seen(maya, func(x): return x.active == "toilet" and x.pose == "sit" and "phone" in x.props)
 	_step("anim_toilet", not wt.is_empty(), "toilet snap=%s pose=%s" % [str(wt.get("props", [])), str(wt.get("pose", "-"))])
 	_top_up()

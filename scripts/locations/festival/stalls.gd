@@ -41,7 +41,7 @@ func build(parent: Node3D) -> void:
 	# (Round 11: the orange side stall sat outside the frame; dropped for the triangle budget.)
 	# Chalkboards.
 	var menu := _chalkboard(parent, Vector3(-4.2, 0, 1.4), 20.0, 1.25)
-	K.label(menu, "Apple Cider\n· Pumpkin Pie\n· Pretzels\nCandy Apples", Vector3(-0.12, 1.2, 0.13), 0.0021, Color("f4f1e6"), 0.0, Color(0, 0, 0, 0), 64, HORIZONTAL_ALIGNMENT_LEFT)
+	K.label(menu, "Apple Cider\n· Pumpkin Pie\n· Pretzels\nCandy Apples", Vector3(-0.1, 1.12, 0.13), 0.00235, Color("f4f1e6"), 0.0, Color(0, 0, 0, 0), 64, HORIZONTAL_ALIGNMENT_LEFT, 4.0)
 	menu.get_parent().scale = Vector3.ONE * 0.84  # r13: A-frame ~1.3 m, human scale
 	var hm := _chalkboard(parent, Vector3(3.35, 0, 0.75), -24.0, 0.95, "fox")
 	hm.get_parent().scale = Vector3.ONE * 0.85

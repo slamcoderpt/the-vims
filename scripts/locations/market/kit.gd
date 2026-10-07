@@ -217,7 +217,7 @@ static func glow_mat(kind: String) -> StandardMaterial3D:
 			m.emission = Color(1.0, 0.74, 0.4); m.emission_energy_multiplier = 2.6
 		"cool":
 			# HDR albedo so the fridge interiors cross the glow threshold.
-			m.albedo_color = Color(1.45, 1.6, 1.85)
+			m.albedo_color = Color(1.0, 1.25, 1.75)
 			m.emission = Color(0.8, 0.9, 1.0); m.emission_energy_multiplier = 0.9
 		"sky":
 			m.emission = Color(0.9, 0.95, 1.0); m.emission_energy_multiplier = 0.45
@@ -366,28 +366,27 @@ static func tile_floor(parent: Node3D, size: Vector2, center: Vector3, tile := 0
 	var img := Image.create(px * n, px * n, true, Image.FORMAT_RGB8)
 	for ty in n:
 		for tx in n:
-			# warm cream tiles (two tones, faint per-tile variation) with
-			# a clearly visible warm-grey grout line and a bevelled edge.
-			# near-white glossy cream tiles (two subtle tones) with light
-			# grey grout, like the bright supermarket floor in ref5.
-			var base := Color("f1ebe0") if (tx + ty) % 2 == 0 else Color("e4dacb")
-			var f := 0.97 + 0.04 * h(Vector3i(tx, ty, 5))
+			# warm cream / beige checker tiles (ref5): two clearly different
+			# warm tones, faint per-tile mottling, a warm taupe grout line and a
+			# soft bevel, so the floor reads golden instead of flat white.
+			var base := Color("ecdfc6") if (tx + ty) % 2 == 0 else Color("d8c3a0")
+			var f := 0.96 + 0.06 * h(Vector3i(tx, ty, 5))
 			for y in px:
 				for x in px:
-					var c := shade(base, f * (0.98 + 0.04 * h(Vector3i(tx * px + x, ty * px + y, 1))))
+					var c := shade(base, f * (0.97 + 0.05 * h(Vector3i(tx * px + x, ty * px + y, 1))))
 					if x < 2 or y < 2:
-						c = Color("b3a99a")
+						c = Color("a48b68")
 					elif x < 3 or y < 3:
-						c = shade(base, 0.93)
+						c = shade(base, 0.9)
 					elif x == px - 1 or y == px - 1:
-						c = shade(base, 1.03)
+						c = shade(base, 1.04)
 					img.set_pixel(tx * px + x, ty * px + y, c)
 	img.generate_mipmaps()
 	var tex := ImageTexture.create_from_image(img)
 	var mat := StandardMaterial3D.new()
 	mat.albedo_texture = tex
-	mat.roughness = 0.22
-	mat.metallic_specular = 0.6
+	mat.roughness = 0.3
+	mat.metallic_specular = 0.42
 	mat.uv1_triplanar = true
 	mat.uv1_world_triplanar = true
 	mat.uv1_scale = Vector3.ONE / (tile * n)

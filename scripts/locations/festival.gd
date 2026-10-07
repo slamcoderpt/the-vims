@@ -34,9 +34,14 @@ const Crowd := preload("res://scripts/locations/festival/crowd.gd")
 ## plane hides its ground floor), so the clock tower + upper floors fill the
 ## top band of the standard 35 deg camera right behind the fountain, like
 ## the reference skyline. TOWN_ANCHOR is where the tower front meets y = 0.
-const TOWN_SCALE := 0.42
+## r15 (critic r14: town hall cropped, clock unreadable, foliage confetti):
+## smaller-scale hall (0.26) sunk to its top two floors, a squat clock tower
+## whose big white face sits at ~(920, 105) px with the whole cap in frame,
+## forced-perspective crowns behind it filling the skyline, and a light warm
+## haze on everything in the backdrop.
+const TOWN_SCALE := 0.26
 const TOWN_YAW := 12.0
-const TOWN_ANCHOR := Vector3(-2.6, -1.35, -11.4)
+const TOWN_ANCHOR := Vector3(-1.6, -1.55, -10.8)  # r15: clock ~(900, 120) px, cap in frame
 const STAGE_POS := Vector3(2.7, 0, -8.5)  # r12: upper centre-right, clear of the HUD task panel
 
 var stalls
@@ -229,6 +234,7 @@ func _print_stats() -> void:
 		await get_tree().process_frame
 	var tris := 0
 	var meshes := 0
+	var actor_tris := 0
 	for mi in find_children("*", "MeshInstance3D", true, false):
 		if mi.mesh:
 			meshes += 1
@@ -237,6 +243,8 @@ func _print_stats() -> void:
 				var idx = arr[Mesh.ARRAY_INDEX]
 				var n: int = (idx.size() / 3) if idx != null and idx.size() > 0 else (arr[Mesh.ARRAY_VERTEX] as PackedVector3Array).size() / 3
 				tris += n
+				if mi.get_parent() is Skeleton3D or mi.get_parent() is BoneAttachment3D:
+					actor_tris += n
 				if n > 800 and not (mi.get_parent() is Skeleton3D):
 					print("  mesh ", mi.get_parent().name, "/", mi.name, " vis=", mi.is_visible_in_tree(), " surf ", si, " tris ", n)
 	var cam := get_viewport().get_camera_3d()
@@ -254,6 +262,7 @@ func _print_stats() -> void:
 		print("SCREEN FountainSpot ", cam.unproject_position(Decor.FOUNTAIN).round())
 		var cw: Vector3 = town.node.transform * town.clock_center
 		print("SCREEN Clock world=%s px=%s cam=%s" % [cw, cam.unproject_position(cw).round(), cam.global_position])
+	print("FESTIVAL_STATS actor_tris=%d actors=%d" % [actor_tris, crowd.actors.size()])
 	print("FESTIVAL_STATS meshes=%d tris=%d draws=%d prims=%d" % [meshes, tris,
 		RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME),
 		RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_PRIMITIVES_IN_FRAME)])

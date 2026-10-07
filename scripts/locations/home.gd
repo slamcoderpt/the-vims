@@ -1421,7 +1421,7 @@ func _build_exterior() -> void:
 		Vector3(24.0, 0, -5.0), Vector3(22.5, 0, -2.5), Vector3(20.5, 0, -7.5),
 		Vector3(10.5, 0, -9.0), Vector3(19.0, 0, -12.0), Vector3(23.0, 0, 3.0),
 		# Round trees between the side path and the next-door houses (ref3 right edge).
-		Vector3(10.9, 0, -5.6), Vector3(11.0, 0, 3.2), Vector3(11.2, 0, 11.4),
+		Vector3(11.0, 0, 3.2), Vector3(11.2, 0, 11.4),
 		# Front-right lawn (bottom-right corner of the night frame): a clump
 		# of round trees instead of a next-door roof right under the lens.
 		Vector3(12.4, 0, 6.6), Vector3(15.8, 0, 9.0), Vector3(12.8, 0, 10.2), Vector3(18.0, 0, 7.6),
@@ -1454,15 +1454,17 @@ func _build_exterior() -> void:
 		_halo_pts.append({"pos": Vector3(lx, 0, -9.6) + lh, "size": 2.6, "color": STREET_HALO})
 		_halo_pts.append({"pos": Vector3(lx + 3.2, 0, -14.6) + lh, "size": 2.8, "color": STREET_HALO})
 		# Second street (between the two rows of neighbour houses).
-		PropLib.place(o, "street_lamp", Vector3i(cc(lx + 1.4), 0, cc(-26.0)), 0, 1)
-		_halo_pts.append({"pos": Vector3(lx + 1.4, 0, -26.0) + lh, "size": 3.0, "color": STREET_HALO})
+		# (every other post: mostly behind the first row of houses; mobile budget)
+		if i % 2 == 0:
+			PropLib.place(o, "street_lamp", Vector3i(cc(lx + 1.4), 0, cc(-26.0)), 0, 1)
+			_halo_pts.append({"pos": Vector3(lx + 1.4, 0, -26.0) + lh, "size": 3.0, "color": STREET_HALO})
 	# Lamp posts along the back garden path, in frame above the bedrooms at
 	# night (ref3): glow voxels + halos only (no extra omni lights).
 	for k in 3:
 		var gp := Vector3(10.15, 0, -1.2 + k * 3.4)
 		PropLib.place(_g("ext"), "lantern", Vector3i(fc(gp.x), 0, fc(gp.z)), 0)
 		_halo_pts.append({"pos": gp + Vector3(0.16, 0.25, 0.16), "size": 1.3, "color": STREET_HALO})
-	for lp: Vector3 in [Vector3(-1.2, 0, -7.4), Vector3(4.6, 0, -7.4), Vector3(10.4, 0, -4.6), Vector3(10.5, 0, 0.6), Vector3(10.5, 0, 8.0), Vector3(14.2, 0, 7.4)]:
+	for lp: Vector3 in [Vector3(-1.2, 0, -7.4), Vector3(4.6, 0, -7.4), Vector3(10.4, 0, -4.6), Vector3(10.5, 0, 8.0)]:
 		PropLib.place(o, "street_lamp", Vector3i(cc(lp.x), 0, cc(lp.z)), 0, 1)
 		_halo_pts.append({"pos": lp + lh, "size": 2.6, "color": STREET_HALO})
 	var bushes := [Vector3(-9.8, 0, -3.0), Vector3(-9.8, 0, 1.0), Vector3(9.4, 0, -3.5), Vector3(9.4, 0, 0.5),
@@ -1612,7 +1614,7 @@ func _ensure_neighbourhood(lit: bool) -> void:
 		var hs: float = PropLib.scale_of("house") * 0.9
 		# Mobile budget: the lit (night) street keeps only the houses the
 		# bedroom camera can see.
-		var night_skip := [0, 6, 7, 8, 12]
+		var night_skip := [0, 5, 6, 7, 8, 12]
 		for i in spots.size():
 			if lit and i in night_skip:
 				continue

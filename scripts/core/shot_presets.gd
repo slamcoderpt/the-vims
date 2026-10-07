@@ -46,7 +46,7 @@ const PRESETS := {
 	"bbq": {
 		"ref": "refs/ref4_backyard_bbq_sunset.png",
 		"location": "backyard", "day": 0, "hour": 19, "minute": 36, "season": 1,
-		"camera": {"target": Vector3(0.95, 1.2, -0.3), "yaw": -14.0, "pitch": 18.0, "distance": 8.4, "fov": 48.0},
+		"camera": {"target": Vector3(0.95, 1.15, -0.3), "yaw": -14.0, "pitch": 21.0, "distance": 8.6, "fov": 48.0},
 		"tasks": [
 			{"title": "Grill Dinner", "icon": "burger", "done": true},
 			{"title": "Talk to Neighbors", "icon": "people"},

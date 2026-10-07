@@ -10,7 +10,7 @@ const Party := preload("res://scripts/locations/backyard/party.gd")
 const Cast := preload("res://scripts/locations/backyard/cast.gd")
 const SunsetEnv := preload("res://scripts/locations/backyard/sunset_env.gd")
 
-const CAMERA := {"target": Vector3(0.95, 1.2, -0.3), "yaw": -14.0, "pitch": 18.0, "distance": 8.4, "fov": 48.0}
+const CAMERA := {"target": Vector3(0.95, 1.15, -0.3), "yaw": -14.0, "pitch": 21.0, "distance": 8.6, "fov": 48.0}
 
 var garden
 var house
@@ -139,7 +139,7 @@ func _interactables() -> void:
 		 "needs": {"hunger": 0.6, "social": 0.1}},
 		{"id": "chat_table", "label": "Chat at Table", "icon": "chat", "minutes": 20.0, "pose": "sit_talk",
 		 "needs": {"social": 0.25}, "task": "Talk to Neighbors"},
-	], Vector3(5.4, 0.8, 1.6), Vector3(0, 0.4, 0), Vector3(0, 0, 1.0))
+	], Vector3(3.1, 0.8, 1.35), Vector3(0, 0.4, 0), Vector3(0, 0, 1.0))
 	var pit := Node3D.new()
 	pit.name = "FirePit"
 	pit.position = Party.PIT_POS

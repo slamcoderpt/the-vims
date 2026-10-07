@@ -691,9 +691,18 @@ func Looks_has(look: String) -> bool:
 ## A first (+ last) name nobody in town has yet, picked from h.
 func _fresh_name(first: Array, last: Array, h: int) -> String:
 	_index_townies()
-	for k in 200:
+	# First names in use (a town of Ivy Okafor and Ivy Pemberton reads badly).
+	var firsts := {}
+	for n in _townie_by_name:
+		firsts[str(n).get_slice(" ", 0)] = true
+	for m in household:
+		firsts[str(m.name).get_slice(" ", 0)] = true
+	for k in 400:
 		var hh := (h + k * 7919) & 0x7fffffff
-		var nm: String = first[hh % first.size()]
+		var f: String = first[hh % first.size()]
+		if k < 200 and firsts.has(f):
+			continue
+		var nm := f
 		if not last.is_empty():
 			nm += " " + str(last[(hh / first.size()) % last.size()])
 		if not _townie_by_name.has(nm) and member_index(nm) < 0:
@@ -753,6 +762,9 @@ func rel_list(i: int) -> Array:
 			if not ti.is_empty():
 				kind = str(ti.get("kind", "adult"))
 				look = str(ti.get("look", ""))
+				# A location's own look: make sure its portrait bust exists.
+				if ti.get("look_def") is Dictionary and kind != "dog":
+					LifeStages.register_look({"look": look, "look_def": ti.look_def})
 		out.append({"name": other, "value": v, "level": rel_level(v), "family": fam, "kind": kind, "look": look,
 			"romance": float(relationships[k].get("romance", 0.0)), "status": str(relationships[k].get("status", ""))})
 	out.sort_custom(func(x, y): return x.family and not y.family or (x.family == y.family and x.value > y.value))

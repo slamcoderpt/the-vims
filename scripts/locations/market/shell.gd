@@ -32,6 +32,82 @@ static func build(root: Node3D, halo_pts: Array) -> void:
 	_greenery(root)
 
 
+# ------------------------------------------------------------------ wood decks
+
+const DECK := Color("a86d3e")
+const DECK_EDGE := Color("5e3a22")
+
+
+## Warm wood plank platforms under the produce displays and the checkout
+## (ref5: the stands sit on wood, the walkways are cream tile). Called after
+## the stands exist: each stand node gets a deck sized to its own footprint
+## (in its local, rotated frame); wall / checkout zones are fixed rectangles.
+## All decks of one parent share one merged mesh.
+static func decks(root: Node3D) -> void:
+	var vb := VoxelBuilder.new()
+	vb.jitter = 0.0
+	# produce wall strip along the left wall, checkout + cashier zone
+	_deck_rect(vb, Vector2(X0, -8.15), Vector2(-4.55, -1.25))
+	_deck_rect(vb, Vector2(2.6, -0.45), Vector2(5.3, 4.35))
+	Kit.add(root, vb, U, "Decks", false, null, Vector3(0, 0.012 - U, 0), Vector3.ZERO, true)
+	for nm: String in ["ProduceStand", "TableA", "TableB"]:
+		var node := root.get_node_or_null(nm) as Node3D
+		if node == null:
+			continue
+		var box := AABB()
+		var first := true
+		for mi in node.find_children("*", "MeshInstance3D", true, false):
+			var m: MeshInstance3D = mi
+			if m.mesh == null:
+				continue
+			var xf := node.global_transform.affine_inverse() * m.global_transform if node.is_inside_tree() else _rel(node, m)
+			var bb: AABB = xf * m.mesh.get_aabb()
+			if bb.position.y > 0.6:
+				continue   # signs / labels up high do not widen the footprint
+			box = bb if first else box.merge(bb)
+			first = false
+		if first:
+			continue
+		var dv := VoxelBuilder.new()
+		dv.jitter = 0.0
+		_deck_rect(dv, Vector2(box.position.x - 0.16, box.position.z - 0.16), Vector2(box.end.x + 0.16, box.end.z + 0.16))
+		Kit.add(node, dv, U, "Deck", false, null, Vector3(0, 0.012 - U, 0), Vector3.ZERO, true)
+
+
+static func _rel(node: Node3D, m: Node3D) -> Transform3D:
+	var xf := Transform3D.IDENTITY
+	var n: Node = m
+	while n != null and n != node:
+		if n is Node3D:
+			xf = (n as Node3D).transform * xf
+		n = n.get_parent()
+	return xf
+
+
+static func _deck_rect(vb: VoxelBuilder, a: Vector2, b: Vector2) -> void:
+	var x0 := int(round(a.x / U))
+	var x1 := int(round(b.x / U))
+	var z0 := int(round(a.y / U))
+	var z1 := int(round(b.y / U))
+	for x in range(x0, x1):
+		for z in range(z0, z1):
+			var edge := x - x0 < 2 or x1 - 1 - x < 2 or z - z0 < 2 or z1 - 1 - z < 2
+			var c: Color
+			if edge:
+				c = Kit.shade(DECK_EDGE, 0.95 + 0.1 * Kit.h(Vector3i(x / 6, 0, z / 6), 4))
+			else:
+				# planks 2 cells wide running along x, staggered butt joints
+				var row := (z - z0 - 2) / 2
+				var seg := (x - x0 + row * 7) / 16
+				var f := 0.86 + 0.24 * Kit.h(Vector3i(row, seg, 9), 3)
+				if (x - x0 + row * 7) % 16 == 0:
+					f *= 0.72   # butt joint
+				elif (z - z0 - 2) % 2 == 0:
+					f *= 0.93   # plank seam side
+				c = Kit.shade(DECK, f)
+			vb.set_v(Vector3i(x, 0, z), c)
+
+
 # ------------------------------------------------------------------ walls
 
 static func _walls(root: Node3D) -> void:
@@ -163,24 +239,30 @@ static func _ceiling(root: Node3D, halo_pts: Array) -> void:
 				p.y = 2.95   # hangs low so it clears the Dairy / Snacks signs
 			var cord := int((H - 0.25 - p.y) / U) - 7
 			Fx.pendant(lamps, Vector3i(int(round(p.x / U)), int(round(p.y / U)), int(round(p.z / U))), cord)
-			# warm bloom around the bulb: a wide soft amber glow + a hot core
-			halo_pts.append([p + Vector3(0.03, 0.02, 0.03), 1.3, Color(0.85, 0.62, 0.36, 1.0)])
-			halo_pts.append([p + Vector3(0.03, 0.0, 0.03), 0.6, Color(1.0, 0.94, 0.8, 1.0)])
+			# warm bloom around the globe bulb hanging under the shade, nudged
+			# towards the camera so the shade never occludes it from above
+			var bulb := p + Vector3(0.0, -0.1, 0.0)
+			var tow := Vector3(0.07, 0.12, 0.26)
+			halo_pts.append([bulb + tow, 1.15, Color(0.8, 0.55, 0.28, 1.0)])
+			halo_pts.append([bulb + tow * 1.2, 0.42, Color(1.0, 0.9, 0.7, 1.0)])
 			if r[3] == true:
-				# warm cone straight down: a pool on the tiles / crates below
-				Kit.spot(root, p + Vector3(0, -0.05, 0), Color(1.0, 0.86, 0.66), 2.2, 5.0, 30.0)
+				# warm cone straight down: a golden pool on the tiles / crates
+				Kit.spot(root, p + Vector3(0, -0.15, 0), Color(1.0, 0.8, 0.55), 3.4, 6.0, 33.0)
 			elif r[3] == false:
-				Kit.light(root, p + Vector3(0, -0.4, 0), Color(1.0, 0.86, 0.66), 1.1, 4.0)
-			pools.append([Vector3(x, 0.012, r[0] + 0.25), Vector2(3.4, 3.4), Color(1.0, 0.74, 0.44, 0.3 if r[3] == true else 0.2)])
+				Kit.light(root, p + Vector3(0, -0.4, 0), Color(1.0, 0.82, 0.6), 1.4, 4.5)
+			pools.append([Vector3(x, 0.012, r[0] + 0.15), Vector2(3.0, 3.0), Color(1.0, 0.7, 0.38, 0.34 if r[3] == true else 0.22)])
 	Kit.add(root, lamps, U, "Pendants", false, Kit.glow_mat("warm"), Vector3.ZERO, Vector3.ZERO, true, false)
 	# Cool spill from the fridge bank + its reflection streak on the tiles.
 	for fx: float in [-4.6, -1.4, 1.8, 5.0]:
 		Kit.light(root, Vector3(fx, 1.4, -7.3), Color(0.82, 0.9, 1.0), 1.6, 5.0)
 	pools.append([Vector3(-1.0, 0.014, -7.6), Vector2(11.0, 2.8), Color(0.55, 0.75, 1.0, 0.5)])
 	pools.append([Vector3(5.2, 0.014, -7.6), Vector2(4.6, 2.4), Color(0.55, 0.75, 1.0, 0.45)])
-	# Spill pools in the front walkway (from the pendants above the camera).
-	for wp: Vector3 in [Vector3(-1.0, 0.012, 0.9), Vector3(1.3, 0.012, 0.6), Vector3(0.2, 0.012, 2.4)]:
-		pools.append([wp, Vector2(2.6, 2.6), Color(1.0, 0.8, 0.55, 0.16)])
+	# The front half of the store has its pendants above / behind the
+	# camera (cutaway): their warm cones still light the family, the produce
+	# island and the checkout, with matching pools on the tiles.
+	for fp: Vector3 in [Vector3(-4.2, 3.7, 1.0), Vector3(-1.0, 3.7, 1.2), Vector3(1.6, 3.7, 1.6), Vector3(3.9, 3.7, 1.6)]:
+		Kit.spot(root, fp, Color(1.0, 0.8, 0.55), 3.0, 6.0, 34.0)
+		pools.append([Vector3(fp.x, 0.012, fp.z), Vector2(3.2, 3.2), Color(1.0, 0.72, 0.4, 0.22)])
 	root.add_child(Kit.pools(pools))
 
 

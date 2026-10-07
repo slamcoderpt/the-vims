@@ -340,7 +340,7 @@ static func fridge(width: int, seed: int, stocked := true, dairy := true) -> Vox
 	# cavity
 	vb.clear_box(Vector3i(1, 3, 2), Vector3i(width - 2, CT - 3, D - 2))
 	# glowing back + glowing ceiling strip inside
-	vb.box(Vector3i(1, 3, 1), Vector3i(width - 2, CT - 3, 1), Color("d6ecff"), true)
+	vb.box(Vector3i(1, 3, 1), Vector3i(width - 2, CT - 3, 1), Color("cfe8ff"), true)
 	# lit side walls of the cavity (cool white light boxes)
 	vb.box(Vector3i(1, 3, 2), Vector3i(1, CT - 3, D - 4), Color("c4e2fb"), true)
 	vb.box(Vector3i(width - 2, 3, 2), Vector3i(1, CT - 3, D - 4), Color("c4e2fb"), true)
@@ -504,41 +504,40 @@ static func crate(vb: VoxelBuilder, o: Vector3i, w: int, d: int, h: int, col := 
 
 ## Pendant lamp (black cone shade, glowing rim + bulb). o = bottom centre cell.
 static func pendant(vb: VoxelBuilder, o: Vector3i, cord: int) -> void:
-	# Black industrial cone shade (wide bottom), warm-lit inner rim, a big
-	# glowing bulb hanging below the rim so it reads from above and from the
-	# side, and a brass cap + cord.
-	var shade_c := Color("2c4a36")
-	var rim := Color("c99a4a")
-	for y in 5:
-		var r := 5 - y
+	# Ref5 pendant: a compact matte-black cylinder shade with a hot warm
+	# rim, and a big glowing globe bulb hanging well below it, so the light
+	# source itself reads from the high 3/4 camera (not just a dark cone).
+	var shade_c := Color("1f1d1c")
+	var shade_hi := Color("34302c")
+	for y in range(2, 7):
+		for x in range(-3, 4):
+			for z in range(-3, 4):
+				var d := x * x + z * z
+				if d > 10:
+					continue
+				var inner := d <= 4
+				if y < 5 and inner:
+					continue
+				vb.set_v(o + Vector3i(x, y, z), shade_hi if (y == 6 or (x + z + y) % 5 == 0) else shade_c)
+	# warm-lit inside of the shade + glowing lower rim
+	for x in range(-2, 3):
+		for z in range(-2, 3):
+			if x * x + z * z <= 4:
+				vb.set_v(o + Vector3i(x, 4, z), Color("fff3d6"), true)
+	for x in range(-3, 4):
+		for z in range(-3, 4):
+			var d := x * x + z * z
+			if d <= 10 and d > 4:
+				vb.set_v(o + Vector3i(x, 2, z), Color("ffcf7a"), true)
+	# globe bulb (5 cells tall) hanging below the rim
+	for y in range(-4, 2):
+		var r := 2 if y > -4 and y < 1 else 1
 		for x in range(-r, r + 1):
 			for z in range(-r, r + 1):
-				var d := x * x + z * z
-				if d > r * r + r:
+				if x * x + z * z > r * r + 1:
 					continue
-				var inner := d <= (r - 1) * (r - 1) + (r - 1)
-				if y < 2 and inner:
-					continue
-				vb.set_v(o + Vector3i(x, y + 2, z), rim if y == 0 else shade_c)
-	# glowing inside of the shade (visible through the open bottom)
-	for x in range(-4, 5):
-		for z in range(-4, 5):
-			if x * x + z * z <= 13:
-				vb.set_v(o + Vector3i(x, 3, z), Color("fff0cc"), true)
-	# inner rim ring lit warm (a thin bright line along the lower edge)
-	for x in range(-4, 5):
-		for z in range(-4, 5):
-			var d := x * x + z * z
-			if d <= 20 and d > 12:
-				vb.set_v(o + Vector3i(x, 2, z), Color("ffd890"), true)
-	# bulb: 3x3 glowing globe hanging just below the rim
-	for x in range(-1, 2):
-		for z in range(-1, 2):
-			for y in range(0, 2):
-				if absi(x) + absi(z) <= 1 or y == 1:
-					vb.set_v(o + Vector3i(x, y, z), Color("fff6dc") if y == 1 else Color("ffe4a8"), true)
-	vb.set_v(o + Vector3i(0, -1, 0), Color("ffe09a"), true)
-	vb.set_v(o + Vector3i(0, 2, 0), Color("fff6dc"), true)
+				var hot := absi(x) + absi(z) <= 1 and y > -4
+				vb.set_v(o + Vector3i(x, y, z), Color("fffaf0") if hot else Color("ffe2a0"), true)
 	# brass cap + cord
 	vb.set_v(o + Vector3i(0, 7, 0), Color("b8893e"))
 	vb.set_v(o + Vector3i(1, 7, 0), Color("a07432"))

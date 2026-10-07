@@ -13,13 +13,13 @@ const LAMPS := [
 	[-7.2, -3.4, false],   # 2 behind the FALL TREATS stall
 	[5.4, -3.0, false],    # 3 right side, by the game booth / crafts table
 	[-7.6, 0.9, false],    # 4 bottom-left, among the barrels
-	[-0.9, -9.23, false],  # 5 right of the fountain (= z -7.2 after dz), beside the clock tower
+	[0.9, -8.2, false],   # 5 r15: right of the fountain, clear of the clock tower
 ]
 const FOUNTAIN := Vector3(-2.4, 0, -6.7)  # = (-2.4, K.dz(-8.27)); r12 camera: upper centre-left
 const FOUNTAIN_SCALE := 0.84  # r13: spout stays below the clock face
 const LAMP_TOP := 4.2
 const SU := 0.06  # string-light wire cell size
-const BU := 0.08  # bulb cell size
+const BU := 0.065  # bulb cell size (r15: smaller, read as glowing points)
 const FV := 1.5 / 16.0  # foreground dressing cell size
 
 var stage_pos := Vector3(7.4, 0, -14.6)  # set by festival.gd before build()
@@ -201,8 +201,8 @@ func _catenary(vb: VoxelBuilder, bv: VoxelBuilder, a: Vector3, b: Vector3, sag: 
 			var bq := Vector3i(floori(m.x / BU - 1.0), floori(m.y / BU) - 2, floori(m.z / BU - 1.0))
 			for bx in 2:
 				for bz in 2:
-					bv.set_v(bq + Vector3i(bx, 1, bz), Color("ffd27a"), true)
-					bv.set_v(bq + Vector3i(bx, 0, bz), Color("ffc456"), true)
+					bv.set_v(bq + Vector3i(bx, 1, bz), Color("ffc466"), true)
+					bv.set_v(bq + Vector3i(bx, 0, bz), Color("ffa443"), true)
 			glow_points.append([(Vector3(bq) + Vector3(1.0, 1.0, 1.0)) * BU, 0.85, Color(1.0, 0.74, 0.38)])
 		if bunting and i % 8 == 0 and i > 3 and i < n - 3:
 			var c: Color = flag_cols[(i / 8) % flag_cols.size()]
@@ -228,11 +228,11 @@ func _strings(parent: Node3D) -> void:
 	# r13: runs kept out of the clock-tower window (screen x 800-950,
 	# y < 110) so the backdrop reads; garlands hang across the left of the
 	# frame, from the banner lamp over to the stage, and down the right side.
-	var low0 := Vector3(L[0].x, 2.75, L[0].z)
+	var low0 := Vector3(L[0].x, 2.45, L[0].z)
 	var runs := [
 		# [a, b, sag, bunting]
 		[L[2], L[0], 0.45, false],
-		[low0, stage_fl + Vector3(0, -1.45, 0), 0.35, true],
+		[low0, stage_fl + Vector3(0, -1.8, 0), 0.3, true],
 		[L[1], stage_fr, 0.3, false],
 		[L[5], stage_fl, 0.3, false],
 		[L[3], stage_fr, 0.45, false],
@@ -350,7 +350,7 @@ func _props(parent: Node3D) -> void:
 	var C := 16
 	# Flower barrels: foreground corners (framing, not blocking) + around the square.
 	var barrels := [
-		[-0.4, -6.0, 2], [5.6, -6.4, 0], [7.4, -2.0, 2],
+		[-0.4, -6.0, 2], [5.6, -6.4, 0],
 		[-2.7, -11.6, 1], [3.1, -12.2, 2],
 	]
 	var i := 0
@@ -360,10 +360,10 @@ func _props(parent: Node3D) -> void:
 	# Ground lanterns (small, along the walkway edges).
 	for l in [[-3.55, 0.35], [2.0, -1.3], [-2.0, -4.2], [1.9, -5.6], [-4.4, -9.4], [5.2, -9.6]]:
 		_ground_lantern(near, int(l[0] * C), int(K.dz(l[1]) * C))
-	# Picnic tables.
-	_picnic_table(near, int(6.6 * C), int(K.dz(-7.0) * C))
+	# (r15: the picnic table sat under the HUD task panel; dropped for the
+	# triangle budget.)
 	# Pumpkin piles + hay.
-	var piles := [[-0.2, -5.4], [6.2, -5.0], [-4.3, -10.6], [6.0, -11.6]]
+	var piles := [[-0.2, -5.4], [6.2, -5.0], [-4.3, -10.6]]
 	var j := 0
 	for p: Array in piles:
 		var px := int(p[0] * C)
@@ -377,7 +377,7 @@ func _props(parent: Node3D) -> void:
 	K.hay(near, int(-3.6 * C), 0, int(K.dz(-12.4) * C), 16, 9, 9)
 	# r13: bottom-left corner cluster (below the HUD portraits): mum barrels,
 	# cider barrels, a crate of apples, pumpkins, hay and a glowing lantern.
-	for b: Array in [[-7.1, 1.7, 0, 6.5], [-6.0, 2.75, 2, 6.0], [-8.4, 0.3, 1, 6.0], [-4.9, 3.5, 1, 5.5]]:
+	for b: Array in [[-7.1, 1.7, 0, 6.5], [-6.0, 2.75, 1, 6.0], [-8.4, 0.3, 0, 6.0], [-4.9, 3.5, 1, 5.5]]:
 		_barrel_planter(near, int(b[0] * C), int(b[1] * C), b[3], b[2], i)
 		i += 1
 	_cider_barrel(near, int(-8.0 * C), int(2.5 * C))

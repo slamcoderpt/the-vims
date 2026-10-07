@@ -50,7 +50,7 @@ static func build(acc, L: Dictionary) -> Dictionary:
 	const LEG := 10
 	const BW := 20
 	const BH := 16
-	const BL := 48
+	const BL := 44
 	const HW := 20
 	const HH := 19
 	const HD := 14
@@ -90,15 +90,30 @@ static func build(acc, L: Dictionary) -> Dictionary:
 			c = saddle
 		return sh(c, 1.0 + (hh(p, 32) - 0.5) * 0.025)
 	fill(body, 0, BW - 1, 0, BH - 1, 0, BL - 1, func(p: Vector3i) -> Color:
-		if not in_rbox(p, Vector3(BW, BH, BL), 4.5, 0.6):
+		if not in_rbox(p, Vector3(BW, BH, BL), 3.0, 0.8):
 			return Color(0, 0, 0, 0)
 		return body_fn.call(p))
-	# Haunches: rounded tan thigh bumps on the flanks over the folded hind legs.
-	for sx in [-1, BW]:
-		fill(body, sx, sx, 2, 10, 2, 15, func(p: Vector3i) -> Color:
-			if (p.y >= 9 or p.y <= 2) and (p.z <= 3 or p.z >= 14):
+	# Haunches (r15b, ref1): a big rounded thigh on each flank over the
+	# folded hind leg (two layers, the outer one smaller), with a white hind
+	# paw tucked forward along the belly, so the lying pup reads as a puppy
+	# and not a sausage.
+	for side in [-1, 1]:
+		for layer in 2:
+			var x := (-1 - layer) if side < 0 else (BW + layer)
+			var ry := 6.2 - layer * 1.6
+			var rz := 8.0 - layer * 2.0
+			for y in range(0, 13):
+				for z in range(0, 18):
+					var dy := (y - 6.0) / ry
+					var dz := (z - 9.0) / rz
+					if dy * dy + dz * dz > 1.0:
+						continue
+					body.set_v(Vector3i(x, y, z), sh(tan, (1.02 if layer == 1 else 0.97) + (hh(Vector3i(x, y / 2, z / 2), 38) - 0.5) * 0.03))
+		var px := -1 if side < 0 else BW
+		fill(body, px, px, 0, 2, 15, 21, func(p: Vector3i) -> Color:
+			if p.y == 2 and p.z == 21:
 				return Color(0, 0, 0, 0)
-			return sh(tan, 0.97 + (hh(p, 38) - 0.5) * 0.03))
+			return sh(white, 0.98 + (hh(p, 40) - 0.5) * 0.02))
 	# Fluffy white chest bib under the chin + gold tag on the collar.
 	fill(body, 6, BW - 7, 2, 10, BL, BL, func(p: Vector3i) -> Color:
 		if (p.x == 6 or p.x == BW - 7) and p.y >= 9:

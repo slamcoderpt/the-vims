@@ -289,7 +289,7 @@ static func _face(c: Ctx) -> void:
 				var outer := (ei == 0 and x == x0) or (ei == 1 and x == x0 + 2)
 				paint(c, x, c.BR - (1 if outer else 0), bc)
 	# ---- Blush.
-	var blush := skin.lerp(Color(0.98, 0.42, 0.45), 0.42 if c.child else (0.3 if c.girl else 0.18))
+	var blush := skin.lerp(Color(0.98, 0.42, 0.45), 0.55 if c.child else (0.3 if c.girl else 0.18))
 	if c.child:
 		for x in [c.exs[0] - 1, c.exs[0], c.exs[1] + 2, c.exs[1] + 3]:
 			paint(c, x, c.N, blush)

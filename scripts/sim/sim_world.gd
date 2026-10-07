@@ -209,6 +209,11 @@ func _arrive_by_car() -> void:
 			var cp: Vector3 = camera_rig.global_position
 			ag.actor.face(Vector3(cp.x, drop.y, cp.z))
 		carpool(drop, "car", 1.5)
+		# Out of the car and a few steps onto the lot.
+		var inward := Vector3(-drop.x, 0.0, -drop.z)
+		if inward.length() > 0.1:
+			var to := drop + inward.normalized() * minf(2.5, inward.length())
+			ag.command({"action": {"id": "go_here", "label": "Go Here", "icon": "home", "minutes": 0.0}, "point": to, "auto": true})
 		stats["arrivals"] = int(stats.get("arrivals", 0)) + 1
 		if OS.has_environment("VIMS_PLAYTEST"):
 			print("  arrive: %s dropped off at %s on %s" % [ag.display_name(), str(drop), loc_name])
@@ -493,6 +498,10 @@ func _process(delta: float) -> void:
 	for ag in agents:
 		if ag:
 			ag.tick(delta, dm)
+	_offlot_acc += dm
+	if _offlot_acc >= 5.0:
+		_offlot_acc = 0.0
+		_offlot_careers()
 	if _touch_down and not _touch_moved and not _touch_long_done and _touches == 1:
 		if Time.get_ticks_msec() / 1000.0 - _touch_t >= LONG_PRESS:
 			_touch_long_done = true
@@ -941,6 +950,71 @@ func depart(ag, dest: String) -> void:
 	elif _on_lot_count() == 0:
 		# Nobody left here: follow whoever is out.
 		Game.selected = i
+
+
+var _offlot_acc := 0.0
+
+
+## Family members out on other lots still keep their jobs and school: the
+## carpool / bus picks them up wherever they are (their lot becomes home, where
+## they are dropped off after the shift). If home is on screen they show up
+## there (hidden at work) so the normal end-of-shift drop-off and paycheck run.
+func _offlot_careers() -> void:
+	if not Game.work_enabled or not Game.live:
+		return
+	var now := Game.total_minutes()
+	for i in Game.household.size():
+		if i < agents.size() and agents[i] != null:
+			continue
+		if not Game.is_off_lot(i):
+			continue
+		var m: Dictionary = Game.household[i]
+		var c: Dictionary = m.get("career", {})
+		if c.is_empty() or not m.has("work"):
+			continue
+		var w: Dictionary = m.work
+		var d := Game.day
+		if str(w.get("state", "")) != "" or int(c.get("last_day", -1)) == d or not Careers.works_on(c, d):
+			continue
+		var st := Careers.shift_start(c, d)
+		if now < st - Careers.LEAVE_BEFORE or now >= Careers.shift_end(c, d) - 30.0:
+			continue
+		var school := Careers.is_school(c)
+		var from := Game.lot_of(i)
+		w.state = "away"
+		w.start = now
+		w.until = Careers.shift_end(c, d)
+		w.late = now > st + 5.0
+		c.last_day = d
+		m["lot"] = "home"
+		m.erase("arriving")
+		Game.notify.emit("%s was picked up at %s for %s" % [m.name, "home" if from == "home" else Game.LOCATION_NAMES.get(from, from), "school" if school else "work"], "book" if school else "laptop")
+		Game.career_changed.emit(i)
+		if OS.has_environment("VIMS_PLAYTEST"):
+			print("  work: %s picked up off-lot at %s" % [m.name, from])
+		if loc_name == "home":
+			bring_member(i)
+
+
+## Member i joins the lot on screen right now (picked up for work while off
+## the lot, or a late arrival): a body, an agent, and the away state if working.
+func bring_member(i: int):
+	if i < 0 or i >= Game.household.size() or location == null:
+		return null
+	while agents.size() < Game.household.size():
+		agents.append(null)
+	if agents[i] != null:
+		return agents[i]
+	var a := ensure_actor(i)
+	if a == null:
+		return null
+	var ag = SimAgent.new()
+	ag.setup(self, i, a)
+	agents[i] = ag
+	if str(Game.household[i].get("work", {}).get("state", "")) == "away":
+		ag.set_away()
+	refresh_interactables()
+	return ag
 
 
 ## Show another lot (nobody moves).
@@ -1778,10 +1852,11 @@ func _measure_lot_factor() -> float:
 
 
 ## Babies stay home (in the crib); everyone else goes where the family goes.
+## Members out on another lot on their own (send_alone) aren't here either.
 func _member_on_lot(m: Dictionary) -> bool:
 	if m.get("kind", "") == "baby":
 		return loc_name == "home"
-	return true
+	return Game.lot_of_member(m) == loc_name
 
 
 ## The actor for member i on this lot, built for their life stage: the

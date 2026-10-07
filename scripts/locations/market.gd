@@ -34,6 +34,7 @@ func build() -> void:
 	var t0 := Time.get_ticks_msec()
 	Shell.build(self, _halo_pts)
 	Stands.build(self, _halo_pts)
+	Shell.decks(self)
 	if not _halo_pts.is_empty():
 		add_child(Kit.halos(_halo_pts))
 	_spawn_people()
@@ -49,24 +50,24 @@ func camera_home() -> Dictionary:
 
 
 func lighting_profile() -> Dictionary:
-	# Bright, airy, neutral-white store (ref5): a clean white ambient /
-	# ceiling fill and a neutral skylight key, so the near-white tile floor
-	# stays white and coloured produce / packaging pops. Warm light only as
-	# local accents (pendant bulbs + their small pools); the fridge wall glows
-	# cool white. Grade is neutral, no global amber tint.
+	# Golden, cosy store (ref5): a warm-tinted low ambient fill and a soft
+	# warm skylight key keep the cream/beige checker floor from washing out;
+	# the pendants paint warm pools on the tiles and produce, and the fridge
+	# wall glows cool white-blue against the warm wood. Exposure is held a
+	# touch under 1 so the lamp pools and glow read as light.
 	return {
-		"sun_heading": 200.0, "sun_elev": 64.0, "sun_energy": 0.55,
-		"sun_color_day": Color(1.0, 0.99, 0.97),
-		"ambient_day": Color(0.97, 0.97, 0.98), "ambient_energy": 0.62,
-		"ambient_night": Color(0.9, 0.88, 0.86), "ambient_night_energy": 0.62,
+		"sun_heading": 200.0, "sun_elev": 62.0, "sun_energy": 0.42,
+		"sun_color_day": Color(1.0, 0.92, 0.8),
+		"ambient_day": Color(1.0, 0.86, 0.7), "ambient_energy": 0.46,
+		"ambient_night": Color(0.85, 0.74, 0.62), "ambient_night_energy": 0.45,
 		"lamp_night_mult": 1.1,
 		"sky_day": Color(0.86, 0.9, 0.95), "sky_night": Color(0.2, 0.2, 0.24),
-		"fog_day": Color(0.95, 0.95, 0.95), "fog_night": Color(0.4, 0.38, 0.38), "fog_density": 0.004,
-		"exposure": 0.97, "tonemap_white": 4.5,
+		"fog_day": Color(0.93, 0.86, 0.76), "fog_night": Color(0.4, 0.34, 0.3), "fog_density": 0.004,
+		"exposure": 0.93, "tonemap_white": 4.0,
 		"shadow_distance": 24.0,
 		"post": {"focus_y": 0.53, "band": 0.3, "falloff": 0.28, "blur_px": 3.4, "top_boost": 0.2,
-			"saturation": 1.18, "contrast": 1.06, "tint": Vector3(1.0, 1.0, 1.0),
-			"lift": Vector3(0.008, 0.008, 0.01), "vignette": 0.14},
+			"saturation": 1.16, "contrast": 1.08, "tint": Vector3(1.03, 1.0, 0.95),
+			"lift": Vector3(0.012, 0.008, 0.004), "vignette": 0.2},
 	}
 
 
@@ -78,7 +79,7 @@ func _fix_sun(_a = null, _b = null) -> void:
 		return
 	var sun = lt.get("sun")
 	if sun is DirectionalLight3D:
-		sun.light_color = Color(1.0, 0.98, 0.95)
+		sun.light_color = Color(1.0, 0.92, 0.8)
 
 
 func get_actor(key: String) -> SimActor:
