@@ -462,7 +462,8 @@ func _s_meal() -> void:
 	var h0: float = lily.member.needs.hunger
 	await _until_game(func(): return lily.phase != "act", 60.0)
 	var left: int = int(sim.meal.get("servings", 0))
-	_step("meal_eaten", lily.member.needs.hunger > h0 + 0.3 and left == n0 - 1 and Game.has_moodlet(lily.index, "good_meal"),
+	# (Someone else may grab a serving meanwhile: at least Lily's is gone.)
+	_step("meal_eaten", lily.member.needs.hunger > h0 + 0.3 and left <= n0 - 1 and Game.has_moodlet(lily.index, "good_meal"),
 		"Lily hunger %.2f -> %.2f, servings %d -> %d" % [h0, lily.member.needs.hunger, n0, left])
 	# Leftovers show up in the table's menu for everyone else.
 	if not sim.meal.is_empty():
@@ -584,6 +585,9 @@ func _s_social() -> void:
 	var maya = _agent("Maya")
 	maya.cancel_all()
 	maya.autonomy = false
+	# (This checks friendship levels, not routing: Maya comes over first.)
+	lily.cancel_all()
+	maya.actor.global_position = sim._open_spot(lily.actor.global_position + Vector3(1.0, 0, 0.6))
 	# (An upset sim may reject a social: keep Maya cheerful for this check.)
 	Game.add_moodlet(maya.index, "t_cheer", "Test Cheer", "star", 40.0, 0.0)
 	var hug_ok: bool = lily.command({"action": SimActions_hug(lily, maya), "other": maya})

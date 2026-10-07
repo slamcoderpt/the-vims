@@ -1070,7 +1070,7 @@ static func _build_dog(L: Dictionary) -> Dictionary:
 	const LEG := 5
 	const BW := 10
 	const BH := 8
-	const BL := 18
+	const BL := 21
 	const HW := 12
 	const HH := 10
 	const HD := 9

@@ -36,6 +36,8 @@ var selected_side := false
 ## Tail tip straight above the head before layout lifts; plumbob side (+1/-1/0).
 var base_tip := Vector2.ZERO
 var plumb_side := 0
+## Screen rect reserved for the plumbob (selected sim only).
+var pb_rect := Rect2()
 var offset := Vector2.ZERO
 ## Horizontal lean of the tail tip (px) so it can point toward the head.
 var tail_lean := 0.0

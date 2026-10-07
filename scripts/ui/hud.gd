@@ -171,7 +171,7 @@ func _layout_household() -> void:
 		if sel:
 			ch = 136.0 if compact else 146.0
 		else:
-			ch = 88.0 if dog else maxf(92.0 if compact else 100.0, ph)
+			ch = (84.0 if compact else 92.0) if dog else maxf(92.0 if compact else 110.0, ph)
 		var p = _portraits[i]
 		p.setup(i, m, sel, Vector2(cw, ch))
 		p.position = Vector2(0, y)
@@ -264,8 +264,8 @@ func _is_selected_actor(a: Node3D) -> bool:
 
 ## Screen gap (px) between the top of a sim's head and the tip of its
 ## bubble's tail; scales a little with head size so far sims stay snug.
-const MIN_GAP := 18.0
-const MAX_GAP := 30.0
+const MIN_GAP := 30.0
+const MAX_GAP := 50.0
 ## Top of the area bubbles may use (below the screen edge).
 const SAFE_TOP := 12.0
 const BUBBLE_PAD := 14.0
@@ -324,7 +324,7 @@ func _head_metrics(a: Node3D) -> Vector3:
 
 
 func _gap_for(dy: float) -> float:
-	return clampf(dy * 0.3, MIN_GAP, MAX_GAP)
+	return clampf(dy * 0.45, MIN_GAP, MAX_GAP)
 
 
 ## Anchor point for one bubble: `head` (projected head top) and the base tail
@@ -463,11 +463,14 @@ func _resolve_layout() -> void:
 
 func _place_main(b, vs: Vector2) -> void:
 	b.plumb_side = 0
+	b.pb_rect = Rect2()
 	if b.head == Vector2.INF:
 		_placed.append(Rect2(b.target, b.size + Vector2(0, WorldBubble.TAIL_H)))
 		return
 	var sel: bool = _sel_actor != null and b.anchor == _sel_actor
 	var full: Vector2 = b.size + Vector2(0, WorldBubble.TAIL_H)
+	if sel and _place_selected(b, vs, full):
+		return
 	var best := INF
 	var best_pos := Vector2.ZERO
 	var best_lift := 0.0
@@ -526,6 +529,45 @@ func _place_main(b, vs: Vector2) -> void:
 	_placed.append(Rect2(best_pos, full))
 	if best_side != 0:
 		_placed.append(_pb_rect(best_pos, b.size, best_side))
+
+
+## Selected sim (ref1 "Work" + gem): the plumbob floats straight over the
+## head with its own clear space, and the action bubble hangs beside the gem
+## (left preferred) with its tail dipping toward the head. Returns false when
+## neither side fits so the generic layout takes over.
+func _place_selected(b, vs: Vector2, full: Vector2) -> bool:
+	var gap := _gap_for(b.head_px)
+	var h: float = PB_H * plumbob.gem_scale
+	var pbr := Rect2(b.head.x - PB_W * 0.5, b.head.y - gap * 0.6 - h, PB_W, h)
+	if pbr.position.y < SAFE_TOP:
+		return false
+	var pc := _cost(pbr, vs)
+	var best := INF
+	var best_pos := Vector2.ZERO
+	var best_side := 0
+	for side in [-1, 1]:
+		for lift in [0.0, 16.0, 34.0, 56.0]:
+			for dx in [0.0, 14.0, 30.0]:
+				var x: float = pbr.position.x - 14.0 - dx - b.size.x if side < 0 else pbr.end.x + 14.0 + dx
+				# bubble body roughly level with the gem, tail bottom near
+				# the gem's lower half
+				var y: float = pbr.end.y - full.y - 6.0 - lift
+				var r := Rect2(Vector2(x, y), full)
+				var c: float = _cost(r, vs) + lift * 8.0 + dx * 6.0 + (0.0 if side < 0 else 300.0)
+				if c < best:
+					best = c
+					best_pos = r.position
+					best_side = side
+	if best + pc > 4000.0:
+		return false
+	b.target = best_pos
+	var tx: float = best_pos.x + b.size.x - 22.0 if best_side < 0 else best_pos.x + 22.0
+	b.tip = Vector2(lerpf(tx, b.head.x, 0.5), best_pos.y + full.y)
+	b.plumb_side = best_side
+	b.pb_rect = pbr
+	_placed.append(Rect2(best_pos, full))
+	_placed.append(pbr.grow(6.0))
+	return true
 
 
 ## Plumbob slot beside a bubble at `pos`: level with the bubble, bottom a bit
@@ -756,7 +798,7 @@ func _update_plumbob() -> void:
 			tip = Vector2(hm.x, hm.y - 8.0)
 			var b = _main_bubble_for(a)
 			if b != null and b.plumb_side != 0:
-				var r := _pb_rect(b.target, b.size, b.plumb_side)
+				var r: Rect2 = b.pb_rect if b.pb_rect.size.x > 0.0 else _pb_rect(b.target, b.size, b.plumb_side)
 				tip = Vector2(r.get_center().x, r.end.y)
 			elif b != null:
 				tip = Vector2(b.tip.x, b.target.y - 4.0)

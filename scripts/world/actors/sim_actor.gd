@@ -491,19 +491,28 @@ func _human_pose() -> void:
 				# Office chairs swivel: the whole body turns part way toward
 				# the player and the head the rest, so beard, nose and eye
 				# read in profile / 3/4 even from behind the desk.
-				body_yaw = _glance(2.1, 0.3, 0.16)
+				var behind := smoothstep(1.6, 2.6, absf(_cam_a))
+				body_yaw = _glance(2.2, lerpf(0.3, 0.42, behind), lerpf(0.16, 0.2, behind))
 				# Scoot to the front of the seat, lean in toward the screen,
-				# and lean out to the player's side so head and shoulder
-				# clear a tall chair back (Sims-style presentation cheat).
+				# and (Sims-style presentation cheat) slide to the player's
+				# side of the seat and lean out, so head, beard, plaid
+				# shoulder and the typing arms clear a tall chair back.
 				var sd := signf(_cam_a) if absf(_cam_a) > 0.3 else 0.0
-				_tgt_pos.z += 0.12 / _s
-				_tgt_pos.x += sd * 0.07 / _s
-				_ab(b_torso, 0.16, 0.0, -sd * 0.14)
-				_ab(b_head, -0.2, 0.0, sd * 0.1)
-			_sb(b_arm_l, -1.0, -0.12 - body_yaw, -0.06)
-			_sb(b_arm_r, -1.0, 0.12 - body_yaw, 0.06)
-			_sb(b_fore_l, -0.62 + 0.08 * maxf(0.0, tap), 0.0, 0.0)
-			_sb(b_fore_r, -0.62 + 0.08 * maxf(0.0, tap2), 0.0, 0.0)
+				var ws := _s * maxf(scale.x, 0.01)
+				_tgt_pos.z += (0.12 + 0.04 * behind) / ws
+				_tgt_pos.x += sd * (0.07 + 0.3 * behind) / ws
+				_ab(b_torso, 0.12, 0.0, -sd * (0.14 + 0.1 * behind))
+				_ab(b_head, -0.22, 0.0, sd * (0.1 + 0.08 * behind))
+			# The far hand stays on the keyboard; the hand nearer the camera
+			# works the mouse out to the side, so a plaid arm and a hand on
+			# the desk read beside the body instead of hiding behind it.
+			var near_l := _cam_a > 0.0
+			var kl := 0.35 if near_l and absf(body_yaw) > 0.3 else 1.0
+			var kr := 0.35 if not near_l and absf(body_yaw) > 0.3 else 1.0
+			_sb(b_arm_l, -1.0 - 0.15 * (1.0 - kl), -0.12 - body_yaw * kl, -0.06 + 0.1 * (1.0 - kl))
+			_sb(b_arm_r, -1.0 - 0.15 * (1.0 - kr), 0.12 - body_yaw * kr, 0.06 - 0.1 * (1.0 - kr))
+			_sb(b_fore_l, -0.62 + 0.08 * maxf(0.0, tap) * kl - 0.1 * (1.0 - kl), 0.0, 0.0)
+			_sb(b_fore_r, -0.62 + 0.08 * maxf(0.0, tap2) * kr - 0.1 * (1.0 - kr), 0.0, 0.0)
 			_ab(b_head, -0.04 + 0.02 * sin(t * 0.8), 0.05 * sin(t * 0.4), 0.04)
 		"read":
 			_sb(b_arm_l, -0.45, 0.0, -0.18)
@@ -700,8 +709,8 @@ func _dog_pose() -> void:
 			_ab(b_leg_fl, -0.25 * paw, 0.0, 0.0)
 			# Head is tipped up, so tip the ears back down to hang beside the
 			# cheeks (framing the face) instead of sticking out.
-			_sb(b_ear_l, 0.3 + 0.05 * perk, 0.0, 0.1 + 0.04 * perk)
-			_sb(b_ear_r, 0.3 + 0.05 * perk, 0.0, -0.1 - 0.04 * perk)
+			_sb(b_ear_l, 0.12 + 0.05 * perk, 0.0, 0.02 + 0.04 * perk)
+			_sb(b_ear_r, 0.12 + 0.05 * perk, 0.0, -0.02 - 0.04 * perk)
 			# Rump slightly raised (playful), chest low.
 			_sb(b_body, 0.06)
 		"bow":
@@ -744,13 +753,16 @@ func _dog_lie(front := false) -> float:
 				c = c.normalized()
 				var want := (r * 0.95 + c * 0.25).normalized()
 				if front:
-					want = (c * 0.68 + r * 0.74).normalized()
+					# Long side toward the player (body length, saddle and
+					# tail read), nose to screen-right and a little toward
+					# the viewer, head swung round to look at the camera.
+					want = (r * 1.0 + c * 0.12).normalized()
 				var want_yaw := atan2(want.x, want.z)
 				_tgt_root_rot.y = wrapf(want_yaw - global_rotation.y, -PI, PI)
-				look_yaw = clampf(wrapf(atan2(c.x, c.z) - want_yaw, -PI, PI), -0.85, 0.85)
+				look_yaw = clampf(wrapf(atan2(c.x, c.z) - want_yaw, -PI, PI), -0.9, 0.9)
 	# A lying dog's anchor sits at its haunches: the chest, paws and head
 	# reach forward (toward the toy) instead of centring on the spot.
-	_tgt_root_pos = Basis(Vector3.UP, _tgt_root_rot.y) * Vector3(0.0, 0.0, (2.0 if front else 6.0) * vs)
+	_tgt_root_pos = Basis(Vector3.UP, _tgt_root_rot.y) * Vector3(0.0, 0.0, (17.0 if front else 6.0) * vs)
 	_tgt_pos.y = -float(_meta.leg) + 0.3 * vs
 	if front:
 		# Paws splayed a little so the bone sits between them.
@@ -759,8 +771,11 @@ func _dog_lie(front := false) -> float:
 	else:
 		_sb(b_leg_fl, -1.5, 0.1, 0.0)
 		_sb(b_leg_fr, -1.5, -0.1, 0.0)
-	_sb(b_leg_bl, -1.45, 0.55, 0.0)
-	_sb(b_leg_br, -1.45, -0.55, 0.0)
+	# Hind legs folded along the flanks (a side-on dog with splayed hips
+	# shows a stray tan block poking at the camera).
+	var splay := 0.08 if front else 0.55
+	_sb(b_leg_bl, -1.45, splay, 0.0)
+	_sb(b_leg_br, -1.45, -splay, 0.0)
 	_sb(b_tail, -1.25, 0.0, 0.15 * sin(_t * 11.0))
 	_ab(b_head, 0.1, look_yaw, 0.0)
 	return look_yaw
