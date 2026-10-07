@@ -16,8 +16,8 @@ const LAMPS := [
 	[5.4, -3.0, false],    # 5 right side, by the game booth
 	[-4.4, -19.0, false],  # 6 far back by the town hall
 ]
-const FOUNTAIN := Vector3(0.2, 0, -9.2)
-const FOUNTAIN_SCALE := 1.3
+const FOUNTAIN := Vector3(0.2, 0, -10.2)
+const FOUNTAIN_SCALE := 1.4
 const LAMP_TOP := 4.2
 const SU := 0.06  # string-light cell size
 
@@ -136,23 +136,32 @@ func _fountain(parent: Node3D) -> void:
 	K.cyl(vb, 0, 47, 0, 6.0, 1, water)
 	K.cyl(vb, 0, 48, 0, 2.0, 5, stone)
 	K.cyl(vb, 0, 53, 0, 1.2, 3, Color("a8d4ea"))
-	# Water curtains falling from both bowls (sparse columns).
-	for k in 28:
-		var ang := TAU * k / 28.0
-		var r1 := 14.6
-		var x := int(round(cos(ang) * r1))
-		var z := int(round(sin(ang) * r1))
-		if k % 2 == 0:
-			for y in range(11, 34):
-				if posmod(y + k, 5) != 0:
-					vb.set_v(Vector3i(x, y, z), Color("a8d4ea") if posmod(y, 3) else Color("cfe8f4"))
-	for k in 16:
-		var ang := TAU * (k + 0.5) / 16.0
+	# Water spilling over the bowl rims: short glossy drips + splash rings.
+	for k in 36:
+		var ang := TAU * k / 36.0
+		var x := int(round(cos(ang) * 14.8))
+		var z := int(round(sin(ang) * 14.8))
+		var n := 3 + int(K.hs(k, 1, 9) * 4.0)
+		for y in range(34 - n, 34):
+			vb.set_v(Vector3i(x, y, z), Color("bfe2f2") if posmod(y + k, 2) else Color("e4f4fb"))
+		if k % 3 == 0:
+			var x2 := int(round(cos(ang) * 15.5))
+			var z2 := int(round(sin(ang) * 15.5))
+			for y in range(14, 20 + int(K.hs(k, 2, 9) * 5.0)):
+				if posmod(y + k, 3) != 0:
+					vb.set_v(Vector3i(x2, y, z2), Color("cfe8f4"))
+	for k in 20:
+		var ang := TAU * (k + 0.5) / 20.0
 		var x := int(round(cos(ang) * 8.4))
 		var z := int(round(sin(ang) * 8.4))
-		for y in range(36, 47):
-			if posmod(y + k, 4) != 0:
-				vb.set_v(Vector3i(x, y, z), Color("b8dcef"))
+		for y in range(43 - int(K.hs(k, 3, 9) * 4.0), 47):
+			vb.set_v(Vector3i(x, y, z), Color("d4ecf6"))
+	# Spout plume on top.
+	for y in range(56, 61):
+		vb.set_v(Vector3i(0, y, 0), Color("e8f6fc"))
+	for d in [Vector3i(1, 59, 0), Vector3i(-1, 59, 0), Vector3i(0, 59, 1), Vector3i(0, 59, -1)]:
+		vb.set_v(d, Color("d8eef8"))
+		vb.set_v(d * Vector3i(2, 1, 2) + Vector3i(0, -2, 0), Color("cfe8f4"))
 	K.pumpkin(vb, -22, 0, 18, 2.8, 2, 2)
 	var fm := K.inst(parent, vb, U, FOUNTAIN, 0.0, true, Vector3.ZERO, "Fountain")
 	fm.scale = Vector3.ONE * FOUNTAIN_SCALE

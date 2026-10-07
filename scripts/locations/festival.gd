@@ -150,14 +150,14 @@ func camera_home() -> Dictionary:
 func lighting_profile() -> Dictionary:
 	return {
 		"sun_heading": -32.0, "sun_elev": 34.0, "sun_energy": 1.25,
-		"ambient_day": Color(0.82, 0.77, 0.8), "ambient_energy": 0.56,
+		"ambient_day": Color(0.86, 0.76, 0.72), "ambient_energy": 0.58,
 		"ambient_night": Color(0.42, 0.38, 0.62), "ambient_night_energy": 0.45,
 		"sky_day": Color(0.74, 0.8, 0.92), "sky_night": Color(0.1, 0.1, 0.22),
 		"fog_day": Color(0.86, 0.8, 0.78), "fog_night": Color(0.12, 0.12, 0.26),
 		"fog_density": 0.0012, "exposure": 1.0, "shadow_distance": 45.0,
 		"lamp_night_mult": 1.6,
 		"post": {"focus_y": 0.6, "band": 0.24, "falloff": 0.42, "blur_px": 2.6, "top_boost": 0.85,
-			"saturation": 1.14, "contrast": 1.12, "tint": Vector3(1.02, 0.99, 0.95),
+			"saturation": 1.2, "contrast": 1.12, "tint": Vector3(1.04, 0.99, 0.92),
 			"lift": Vector3(0.0, 0.0, 0.0), "vignette": 0.24, "gamma": 1.04},
 	}
 
@@ -179,6 +179,9 @@ func _tune_env() -> void:
 	env.glow_bloom = 0.0
 	env.glow_hdr_threshold = lerpf(1.25, 0.85, n)
 	env.tonemap_white = 5.0
+	# Golden late-afternoon key: warmer than lighting.gd's default ramp.
+	if "sun" in lt and lt.sun:
+		lt.sun.light_color = Color(1.0, 0.8, 0.56)
 
 
 func _print_stats() -> void:

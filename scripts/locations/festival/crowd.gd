@@ -28,7 +28,7 @@ func build(parent: Node3D, stalls, stage) -> void:
 	var vendor_pos: Vector3 = stalls.vendor_spot
 	# Heroes ~1/4 screen tall and spaced apart so faces never overlap:
 	# Jack at the treats counter, Biscuit in front of him, Lily centre, Maya right.
-	var jack := spawn(parent, "Jack", "dad", Vector3(-2.75, 0, 0.75), Vector3(-6.0, 0, 3.0), "talk")
+	var jack := spawn(parent, "Jack", "dad", Vector3(-2.75, 0, 0.75), Vector3(-5.6, 0, 6.5), "talk")
 	var lily := spawn(parent, "Lily", "bunny_girl", Vector3(-0.15, 0, 0.2), Vector3(0.6, 0, 12.0), "talk")
 	_hold(lily, "candy_apple", "fore_r")
 	var dog := spawn(parent, "Biscuit", "beagle", Vector3(-1.35, 0, 1.45), Vector3(4.0, 0, 3.4), "idle")
@@ -88,8 +88,8 @@ func _far_folk(parent: Node3D) -> void:
 		F.add(p[0], p[1], p[2], seed % 4 == 0, seed)
 		seed += 1
 	# Around the fountain (0.2, -9.6) and across the back of the square.
-	for p in [[-2.9, -9.0, 60], [2.9, -9.8, 300], [-2.2, -11.9, 20], [2.0, -12.4, 90],
-			[-1.6, -7.3, 200], [-3.9, -13.6, 30], [0.8, -14.8, 0], [-0.9, -16.5, 270],
+	for p in [[-3.3, -9.6, 60], [3.3, -10.4, 300], [-2.2, -11.9, 20], [2.0, -12.4, 90],
+			[-1.9, -7.4, 200], [-3.9, -13.6, 30], [0.8, -14.8, 0], [-0.9, -16.5, 270],
 			[-5.8, -14.8, 90], [3.2, -16.6, 180], [-2.6, -18.6, 0], [1.6, -19.8, 90],
 			[-7.4, -17.6, 45], [5.6, -19.4, 270], [-4.4, -20.6, 0]]:
 		F.add(p[0], p[1], p[2], seed % 5 == 0, seed)
