@@ -242,18 +242,18 @@ static func gondola(length: int, seed: int, kinds: Array, double_sided := false,
 	var vb := VoxelBuilder.new()
 	vb.jitter = 0.03
 	var D := 9 if big else 8
-	var levels := [2, 14, 26] if big else [2, 10, 18, 26, 34]
-	var H := 37 if big else 42
-	var max_h := 11 if big else 7
+	var levels := [2, 14, 26] if big else [2, 9, 16, 23]
+	var H := 37 if big else 30
+	var max_h := 11 if big else 6
 	var z0 := -D if double_sided else 0
 	# back panel (slatwall lines; flat rows merge into long quads)
 	vb.box(Vector3i(0, 0, 0), Vector3i(length, H, 1), func(p: Vector3i) -> Color:
-		return Color("4d4944") if p.y % 4 == 1 else Color("45413d"))
+		return Color("cfb48c") if p.y % 4 == 1 else Color("c3a67c"))
 	# uprights
 	for x in [0, length - 1]:
-		vb.box(Vector3i(x, 0, z0), Vector3i(1, H + 1, D - z0), Color("34322f"))
+		vb.box(Vector3i(x, 0, z0), Vector3i(1, H + 1, D - z0), Color("8a5a31"))
 	# base plinth
-	vb.box(Vector3i(0, 0, z0), Vector3i(length, 2, D - z0), Color("3b3835"))
+	vb.box(Vector3i(0, 0, z0), Vector3i(length, 2, D - z0), Color("6e4428"))
 	for li in levels.size():
 		var y: int = levels[li]
 		vb.box(Vector3i(1, y, z0 + 1), Vector3i(length - 2, 1, D - z0 - 1), Color("bfc3c6"))
@@ -270,7 +270,18 @@ static func gondola(length: int, seed: int, kinds: Array, double_sided := false,
 			for p: Vector3i in back.vox:
 				vb.set_v(Vector3i(length - 1 - p.x, p.y, -p.z), back.vox[p])
 	# header cap
-	vb.box(Vector3i(0, H, z0), Vector3i(length, 1, D - z0), Color("34322f"))
+	vb.box(Vector3i(0, H, z0), Vector3i(length, 1, D - z0), Color("7a4a26"))
+	if double_sided:
+		# Island gondola seen from above: the top is an open display shelf
+		# stocked from both sides (no bare slab), split by a low divider.
+		vb.box(Vector3i(0, H, z0 + 1), Vector3i(length, 1, D - z0 - 2), Color("e9dcc0"))
+		var topb := VoxelBuilder.new()
+		for ri in 3:
+			stock(vb, 1, length - 2, H + 1, D - 1 - ri * 3, 5 - ri % 2, seed * 7 + 9 + ri * 5, kinds, big, lod)
+			stock(topb, 1, length - 2, H + 1, D - 1 - ri * 3, 5 - (ri + 1) % 2, seed * 11 + 13 + ri * 5, kinds, big)
+		for p: Vector3i in topb.vox:
+			vb.set_v(Vector3i(length - 1 - p.x, p.y, -p.z), topb.vox[p])
+		return vb
 	# overstock heaped on top: cardboard cases and spare packs, uneven
 	var ox := 1
 	var k := 0
@@ -298,7 +309,7 @@ static func gondola(length: int, seed: int, kinds: Array, double_sided := false,
 ## Glowing dairy / drinks fridge bank, local facing +z. Tall (2.6 m) glass
 ## doors with a bright white back light, four shelves of goods and a stock
 ## overhang of cartons on top.
-static func fridge(width: int, seed: int, stocked := true) -> VoxelBuilder:
+static func fridge(width: int, seed: int, stocked := true, dairy := true) -> VoxelBuilder:
 	var vb := VoxelBuilder.new()
 	vb.jitter = 0.03
 	var H := 42
@@ -331,64 +342,101 @@ static func fridge(width: int, seed: int, stocked := true) -> VoxelBuilder:
 			vb.box(Vector3i(2, y + 1, fz - 2), Vector3i(width - 4, mini(top - 2, 5), 3), func(p: Vector3i) -> Color:
 				return drinks[(p.x / 3 + si) % drinks.size()] if p.y != y + 3 else Color("fdf6e0"))
 			continue
-		var x := 2
-		var item := 0
-		while x < width - 4:
-			var r := Kit.h(Vector3i(x / 9, y, seed), 3)
-			var kind: int = [0, 0, 1, 2, 2, 1, 0, 2][int(r * 8.0) % 8]
-			if si == 0 and kind == 0:
-				kind = 1
-			var b := Vector3i(x, y + 1, fz)
-			match kind:
-				0: # milk jug: white, 3 wide, coloured cap + label band, handle
-					var cap := milk_caps[(int(r * 31.0) + item / 3) % 4]
-					var hh := mini(top - 1, 6)
-					for dx in 3:
-						for yy in hh:
-							for zz in 3:
-								var cc := Color("fbfbf6")
-								if zz == 2 and (yy == 2 or yy == 3) and dx < 3:
-									cc = cap if yy == 2 else Color("ffffff")
-								if dx == 2 and zz < 2:
-									cc = Color("e9e9e2")
-								vb.set_v(b + Vector3i(dx, yy, zz - 2), cc)
-					vb.set_v(b + Vector3i(0, hh, -1), cap)
-					vb.set_v(b + Vector3i(1, hh, -1), cap)
-					vb.set_v(b + Vector3i(2, hh - 1, -1), Color("e0e0d8"))
-					x += 4
-				1: # gable-top carton: coloured, white band, peaked top
-					var col := juice[(int(r * 37.0) + item) % juice.size()]
-					var hh := mini(top - 2, 5)
-					for dx in 3:
-						for yy in hh:
-							for zz in 3:
-								var cc := col
-								if yy == hh - 2:
-									cc = Color("ffffff")
-								elif dx == 0:
-									cc = Kit.shade(col, 0.82)
-								vb.set_v(b + Vector3i(dx, yy, zz - 2), cc)
-					for zz in 3:
-						vb.set_v(b + Vector3i(1, hh, zz - 2), Kit.shade(col, 1.15))
-					vb.set_v(b + Vector3i(1, hh + 1, -1), Kit.shade(col, 1.15))
-					x += 4
-				_: # bottle: 2 wide body, label, neck + cap
-					var col := drinks[(int(r * 41.0) + item) % drinks.size()]
-					var hh := mini(top - 3, 6)
-					for dx in 2:
-						for yy in hh:
-							for zz in 2:
-								var cc := col
-								if yy == 2 or yy == 3:
-									cc = Color("fdf6e0") if yy == 2 else Kit.shade(col, 1.25)
-								elif dx == 1 and zz == 1:
-									cc = Kit.shade(col, 1.35)
-								vb.set_v(b + Vector3i(dx, yy, zz - 1), cc)
-					vb.set_v(b + Vector3i(0, hh, 0), Kit.shade(col, 1.2))
-					vb.set_v(b + Vector3i(0, hh + 1, 0), Kit.shade(col, 1.2))
-					vb.set_v(b + Vector3i(0, hh + 2, 0), Color("ffffff"))
-					x += 3
-			item += 1
+		# Merchandised per door: each door/shelf holds ONE product line in
+		# one colour (milk jugs, gable cartons, yoghurt pots, bottles), so the
+		# case reads as rows of milk and drinks, not confetti.
+		var door := 0
+		while door * 12 + 2 < width - 2:
+			var x := door * 12 + 2
+			var xe := mini(door * 12 + 11, width - 2)
+			var r := Kit.h(Vector3i(door, si, seed), 3)
+			var kind := 0
+			if dairy:
+				kind = [0, 0, 1, 3, 0, 1, 0, 3][int(r * 8.0) % 8]
+				if si == 0:
+					kind = 0
+				elif si == 3:
+					kind = 3 if door % 2 == 0 else 1
+			else:
+				kind = [2, 2, 1, 2, 4, 2][int(r * 6.0) % 6]
+			var colr := Kit.h(Vector3i(door, si, seed), 7)
+			while x < xe - 1:
+				var b := Vector3i(x, y + 1, fz)
+				match kind:
+					0: # milk jug: white, coloured cap + label band, handle
+						var cap := milk_caps[(door + si) % 4]
+						var hh := mini(top - 1, 6)
+						if x + 3 > xe:
+							break
+						for dx in 3:
+							for yy in hh:
+								for zz in 3:
+									var cc := Color("fbfbf6")
+									if zz == 2 and (yy == 2 or yy == 3):
+										cc = cap if yy == 2 else Color("ffffff")
+									if dx == 2 and zz < 2:
+										cc = Color("e9e9e2")
+									vb.set_v(b + Vector3i(dx, yy, zz - 2), cc)
+						vb.set_v(b + Vector3i(0, hh, -1), cap)
+						vb.set_v(b + Vector3i(1, hh, -1), cap)
+						vb.set_v(b + Vector3i(2, hh - 1, -1), Color("e0e0d8"))
+						x += 4
+					1: # gable-top carton: coloured, white band, peaked top
+						var col := juice[int(colr * juice.size()) % juice.size()]
+						var hh := mini(top - 2, 5)
+						if x + 3 > xe:
+							break
+						for dx in 3:
+							for yy in hh:
+								for zz in 3:
+									var cc := col
+									if yy == hh - 2:
+										cc = Color("ffffff")
+									elif dx == 0:
+										cc = Kit.shade(col, 0.82)
+									vb.set_v(b + Vector3i(dx, yy, zz - 2), cc)
+						for zz in 3:
+							vb.set_v(b + Vector3i(1, hh, zz - 2), Kit.shade(col, 1.15))
+						x += 4
+					3: # yoghurt pots stacked two high, coloured lids
+						var lidc := juice[int(colr * juice.size()) % juice.size()]
+						if x + 2 > xe:
+							break
+						for st in 2:
+							for dx in 2:
+								for zz in 2:
+									vb.set_v(b + Vector3i(dx, st * 3, zz - 1), Color("fbfbf6"))
+									vb.set_v(b + Vector3i(dx, st * 3 + 1, zz - 1), Color("fbfbf6") if zz == 0 else lidc)
+									vb.set_v(b + Vector3i(dx, st * 3 + 2, zz - 1), lidc)
+						x += 2
+					4: # water: tall clear-blue bottles, white caps
+						var hh := mini(top - 2, 7)
+						if x + 2 > xe:
+							break
+						for dx in 2:
+							for yy in hh - 1:
+								for zz in 2:
+									vb.set_v(b + Vector3i(dx, yy, zz - 1), Color("a9d8f2") if yy != 3 else Color("2e7de0"))
+						vb.set_v(b + Vector3i(0, hh - 1, 0), Color("ffffff"))
+						x += 3
+					_: # soft-drink bottle: 2 wide body, label, neck + cap
+						var col := drinks[int(colr * drinks.size()) % drinks.size()]
+						var hh := mini(top - 3, 6)
+						if x + 2 > xe:
+							break
+						for dx in 2:
+							for yy in hh:
+								for zz in 2:
+									var cc := col
+									if yy == 2 or yy == 3:
+										cc = Color("fdf6e0") if yy == 2 else Kit.shade(col, 1.25)
+									elif dx == 1 and zz == 1:
+										cc = Kit.shade(col, 1.3)
+									vb.set_v(b + Vector3i(dx, yy, zz - 1), cc)
+						vb.set_v(b + Vector3i(0, hh, 0), Kit.shade(col, 1.2))
+						vb.set_v(b + Vector3i(0, hh + 1, 0), Color("ffffff"))
+						x += 3
+			door += 1
 	# door frames (dark) + handles
 	for x in range(0, width, 12):
 		vb.box(Vector3i(x, 3, D - 1), Vector3i(1, CT - 3, 1), Color("4a5058"))
@@ -606,3 +654,259 @@ static func cart_icon(vb: VoxelBuilder, o: Vector3i, col: Color) -> void:
 		for i in s.length():
 			if s[i] == "#":
 				vb.set_v(o + Vector3i(i, rows.size() - 1 - r, 0), col)
+
+
+# ------------------------------------------------------------------ packs (P grid)
+
+## Curated package palettes [body, accent]: strong, readable pairs.
+const PALS := [
+	[Color("e8402f"), Color("fde46a")], [Color("f6c22c"), Color("d8332f")], [Color("2f7fd8"), Color("f6c22c")],
+	[Color("f08a24"), Color("2f6fb5")], [Color("43a447"), Color("fdf8ec")], [Color("8e4fc2"), Color("ef6aa0")],
+	[Color("ef6aa0"), Color("fdf8ec")], [Color("27b3c4"), Color("f08a24")], [Color("f4f1e8"), Color("e8402f")],
+	[Color("a0643a"), Color("f6d7a8")], [Color("1f4f9a"), Color("fdf8ec")], [Color("d8332f"), Color("2f7fd8")],
+]
+
+## Distinct real-size packaged-goods designs, modelled on the fine P grid
+## (1/32 m) so each package is ~real size with a readable front graphic.
+const PACK_DESIGNS := ["cereal_bear", "cereal_bowl", "cereal_swoosh", "canister", "crackers", "chips",
+	"sauce", "soda", "juice", "jar", "pasta"]
+
+
+## One package standing at o, front face towards +z. Returns its size
+## (w, h, d) in cells.
+static func pack(vb: VoxelBuilder, o: Vector3i, design: String, pal: int, max_h: int, v: int) -> Vector3i:
+	var pp: Array = PALS[((pal % PALS.size()) + PALS.size()) % PALS.size()]
+	var col: Color = pp[0]
+	var col2: Color = pp[1]
+	var side := Kit.shade(col, 0.8)
+	match design:
+		"cereal_bear":
+			var w := good(vb, o, "cereal", col, col2, max_h, 1, v)
+			return Vector3i(w, mini(max_h, 10 - (v % 2)), 3)
+		"cereal_bowl":
+			var w := 7
+			var hh := mini(max_h, 11 - (v % 2))
+			var d := 3
+			for x in w:
+				for y in hh:
+					for z in d:
+						var cc := col if z == d - 1 else side
+						if z == d - 1:
+							if y >= hh - 3:
+								cc = col2
+								if y == hh - 2 and x >= 1 and x <= w - 2 and (x + v) % 2 == 0:
+									cc = PAPER
+							elif x == 0:
+								cc = Kit.shade(col, 0.88)
+						vb.set_v(o + Vector3i(x, y, z), cc)
+			var fz := o.z + d - 1
+			# white bowl heaped with golden flakes + a strawberry
+			for x in range(2, 5):
+				vb.set_v(Vector3i(o.x + x, o.y + 1, fz), Color("fbfbf6"))
+			for x in range(1, 6):
+				vb.set_v(Vector3i(o.x + x, o.y + 2, fz), Color("fbfbf6") if x != 1 else Color("dfe6ee"))
+			for x in range(1, 6):
+				vb.set_v(Vector3i(o.x + x, o.y + 3, fz), Color("f6c450") if x % 2 == 0 else Color("e0912e"))
+			for x in range(2, 5):
+				vb.set_v(Vector3i(o.x + x, o.y + 4, fz), Color("f6c450") if x != 3 else Color("e0912e"))
+			vb.set_v(Vector3i(o.x + 4, o.y + 5, fz), Color("e0302a"))
+			vb.set_v(Vector3i(o.x + 4, o.y + 6, fz), Color("4f9e34"))
+			return Vector3i(w, hh, d)
+		"cereal_swoosh":
+			var w := 6
+			var hh := mini(max_h, 9 + (v % 2))
+			var d := 3
+			for x in w:
+				for y in hh:
+					for z in d:
+						var cc := col if z == d - 1 else side
+						if z == d - 1:
+							var s := y - x
+							if s >= 1 and s <= 2:
+								cc = col2
+							elif y == 0:
+								cc = Kit.shade(col, 0.82)
+						vb.set_v(o + Vector3i(x, y, z), cc)
+			# white logo plate with ink lettering
+			var ly := o.y + hh - 3
+			for x in range(1, w - 1):
+				vb.set_v(Vector3i(o.x + x, ly, o.z + d - 1), PAPER)
+				vb.set_v(Vector3i(o.x + x, ly + 1, o.z + d - 1), PAPER if x == 1 or x == w - 2 else (INK if (x + v) % 2 == 0 else col2))
+			return Vector3i(w, hh, d)
+		"canister":
+			# round oat canister: rounded corners, lid, paper label band
+			var w := 4
+			var hh := mini(max_h, 8)
+			var d := 4
+			for x in w:
+				for z in d:
+					if (x == 0 or x == w - 1) and (z == 0 or z == d - 1):
+						continue
+					for y in hh:
+						var cc := col
+						if y >= hh - 1:
+							cc = col2
+						elif y >= 2 and y <= 4:
+							cc = PAPER if y != 3 else (INK if x % 2 == 1 and z == d - 1 else PAPER)
+						vb.set_v(o + Vector3i(x, y, z), cc)
+			return Vector3i(w, hh, d)
+		"crackers":
+			var w := good(vb, o, "box", col, col2, max_h, 1, 0)
+			return Vector3i(w, mini(max_h, 6), 3)
+		"chips":
+			var w := good(vb, o, "bag", col, col2, max_h, 1, v)
+			return Vector3i(w, mini(max_h, 8), 3)
+		"sauce":
+			# squeeze bottle: body, paper label with a stripe, white cap
+			var bc: Color = [Color("d8261f"), Color("f2c12e"), Color("3f8f2c")][v % 3]
+			var hh := mini(max_h, 9)
+			for x in 3:
+				for z in 3:
+					for y in hh - 2:
+						var cc := bc
+						if z == 2 and y >= 2 and y <= 4:
+							cc = PAPER if y != 3 else col
+						if (x == 0 or x == 2) and (z == 0 or z == 2) and y >= hh - 4:
+							continue
+						vb.set_v(o + Vector3i(x, y, z), cc)
+			vb.set_v(o + Vector3i(1, hh - 2, 1), Color("fbfbf6"))
+			vb.set_v(o + Vector3i(1, hh - 1, 1), Color("fbfbf6"))
+			return Vector3i(3, hh, 3)
+		"soda":
+			# six-pack of cans: two rows, silver tops, label stripe
+			var hh := mini(max_h, 4)
+			for k in 3:
+				for r in 2:
+					for y in hh:
+						var cc := col if y != hh - 2 else col2
+						if y == hh - 1:
+							cc = Color("cfd4d8")
+						for x in 2:
+							vb.set_v(o + Vector3i(k * 2 + x, y, r * 2 + 1), cc if x == 1 or y == hh - 1 else Kit.shade(cc, 0.86))
+							vb.set_v(o + Vector3i(k * 2 + x, y, r * 2), Kit.shade(cc, 0.9))
+			# plastic ring band
+			for x in 6:
+				vb.set_v(o + Vector3i(x, hh, 3), Color("f4f2ec"))
+			return Vector3i(6, hh + 1, 4)
+		"juice":
+			# tall bottle: body, label band, shoulder, neck, cap
+			var hh := mini(max_h, 11)
+			for y in hh:
+				for x in 3:
+					for z in 3:
+						var cc := col
+						if y >= hh - 3:
+							if x != 1 or z != 1:
+								continue
+							cc = Kit.shade(col, 1.15) if y < hh - 1 else col2
+						elif y >= 3 and y <= 5 and z == 2:
+							cc = PAPER if y != 4 else col2
+						elif (x == 0 or x == 2) and (z == 0 or z == 2) and y == hh - 4:
+							continue
+						vb.set_v(o + Vector3i(x, y, z), cc)
+			return Vector3i(3, hh, 3)
+		"jar":
+			var jc: Color = [Color("b8263a"), Color("6a2a7a"), Color("f08a24"), Color("c98a3a")][v % 4]
+			var lid: Color = [Color("e7c25a"), Color("f4f2ec"), Color("d8332f")][v % 3]
+			var hh := mini(max_h, 5)
+			for x in 3:
+				for z in 3:
+					for y in hh:
+						var cc := jc
+						if y == hh - 1:
+							cc = lid
+						elif y == 2 and z == 2:
+							cc = PAPER
+						vb.set_v(o + Vector3i(x, y, z), cc)
+			return Vector3i(3, hh, 3)
+		"pasta":
+			var w := 4
+			var hh := mini(max_h, 11)
+			var d := 3
+			for x in w:
+				for y in hh:
+					for z in d:
+						var cc := col if z == d - 1 else side
+						if z == d - 1:
+							if y >= hh - 2:
+								cc = PAPER
+								if y == hh - 2 and x % 2 == 1:
+									cc = INK
+							elif x >= 1 and x <= 2 and y >= 2 and y <= hh - 4:
+								cc = Color("f2d27a") if (y + x) % 2 == 0 else Color("e3b54e")
+						vb.set_v(o + Vector3i(x, y, z), cc)
+			return Vector3i(w, hh, d)
+	return Vector3i(1, 1, 1)
+
+
+## Fill one shelf of an end cap (P grid) with brand blocks: each block is
+## one design + palette, 1-3 facings, a second row behind the front row, the
+## odd gap; consecutive blocks never repeat the same design.
+static func pack_shelf(vb: VoxelBuilder, x0: int, w: int, y: int, zf: int, max_h: int, seed: int, mix: Array) -> void:
+	var x := x0
+	var g := 0
+	var last := ""
+	while x < x0 + w - 3:
+		var hv := Vector3i(g, y, seed)
+		var design: String = mix[int(Kit.h(hv, 41) * mix.size()) % mix.size()]
+		if design == last:
+			design = mix[(mix.find(design) + 1 + int(Kit.h(hv, 42) * 3.0)) % mix.size()]
+			if design == last:
+				design = mix[(mix.find(design) + 1) % mix.size()]
+		last = design
+		var pal := int(Kit.h(hv, 43) * PALS.size())
+		var v := int(Kit.h(hv, 59) * 12.0)
+		var facings := 1 + int(Kit.h(hv, 53) * 3.0)
+		if design in ["soda", "crackers"]:
+			facings = 1
+		for f in facings:
+			var tmp := VoxelBuilder.new()
+			var sz := pack(tmp, Vector3i.ZERO, design, pal, max_h, v + f * 0)
+			if x + sz.x > x0 + w:
+				break
+			var back := 1 if Kit.h(Vector3i(g, f, seed), 71) < 0.2 else 0
+			# front row + a second facing row behind it (reads full from above)
+			for row in 2:
+				var zo := zf - sz.z * (row + 1) - back - row
+				for p: Vector3i in tmp.vox:
+					vb.set_v(Vector3i(x, y, zo) + p, tmp.vox[p])
+			x += sz.x + (1 if design in ["sauce", "juice", "jar", "canister"] else 0)
+		x += 1 if Kit.h(hv, 67) < 0.7 else 2
+		g += 1
+
+
+## Camera-facing end cap on the fine P grid (real-size packs): warm wood
+## frame, cream back panel, four shelves with white price lips and yellow
+## sale tickets, a red header. Local facing +z, min corner at 0.
+static func endcap(length: int, seed: int, mix: Array) -> VoxelBuilder:
+	var vb := VoxelBuilder.new()
+	vb.jitter = 0.035
+	var D := 16
+	var H := 54
+	var levels := [4, 17, 30, 43]
+	# back panel (vertical planks)
+	vb.box(Vector3i(0, 0, 0), Vector3i(length, H, 2), func(p: Vector3i) -> Color:
+		return Color("e9dcc0") if (p.x / 6) % 2 == 0 else Color("e1d2b4"))
+	# wooden sides
+	for x in [0, length - 2]:
+		vb.box(Vector3i(x, 0, 0), Vector3i(2, H + 1, D), Kit.wood(WOOD, 3))
+	# kick plinth
+	vb.box(Vector3i(2, 0, 2), Vector3i(length - 4, levels[0], D - 2), Color("6e4428"))
+	for li in levels.size():
+		var y: int = levels[li]
+		vb.box(Vector3i(2, y, 2), Vector3i(length - 4, 1, D - 2), Color("efe7d8"))
+		vb.box(Vector3i(2, y, D - 1), Vector3i(length - 4, 1, 1), Color("fbfbf8"))
+		for tx in range(4 + (seed + li) % 5, length - 5, 9):
+			var tc := Color("f5d03b") if (tx / 9 + li + seed) % 3 == 0 else Color("ffffff")
+			vb.box(Vector3i(tx, y - 1, D), Vector3i(3, 2, 1), tc)
+			vb.set_v(Vector3i(tx + 1, y, D), INK if tc != Color("ffffff") else Color("d8332f"))
+		var top: int = (levels[li + 1] if li + 1 < levels.size() else H) - y - 2
+		pack_shelf(vb, 2, length - 4, y + 1, D - 1, top, seed * 13 + li * 7, mix)
+	# header board on top
+	vb.box(Vector3i(0, H, 0), Vector3i(length, 1, D), Kit.wood(WOOD_D, 2))
+	vb.box(Vector3i(1, H + 1, 1), Vector3i(length - 2, 5, 2), Color("d8332f"))
+	vb.box(Vector3i(1, H + 1, 3), Vector3i(length - 2, 1, 1), Color("b52a24"))
+	for x in range(4, length - 4, 3):
+		vb.set_v(Vector3i(x, H + 3, 3), Color("fdf3d4"))
+		vb.set_v(Vector3i(x + 1, H + 3, 3), Color("fdf3d4") if x % 2 == 0 else Color("f6c22c"))
+	return vb

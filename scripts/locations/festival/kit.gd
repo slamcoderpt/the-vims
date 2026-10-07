@@ -15,7 +15,7 @@ const CORNERS := [
 const SHADE := [0.93, 0.9, 1.0, 0.7, 0.97, 0.86]
 const AOV := [1.0, 0.8, 0.66, 0.52]
 
-## Round 11 (standard high Sims camera): the square is compressed in depth
+## Round 11/12 (standard high Sims camera): the square is compressed in depth
 ## behind z = -5 so the fountain, stage and town-hall front all land inside
 ## the frame of the shared 35 deg game camera. Every far coordinate in the
 ## festival pieces goes through dz().

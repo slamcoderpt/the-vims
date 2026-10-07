@@ -30,7 +30,7 @@ func build(parent: Node3D) -> void:
 	# of the central walkway, crafts table bottom-right, striped side stalls
 	# receding along the right side. The walkway from the camera to the
 	# fountain (x -1.5..1.5) stays open cobblestone.
-	treats = _place(parent, "TreatsStall", _treats_stall(), Vector3(-4.5, 0, -2.0), 28.0)
+	treats = _place(parent, "TreatsStall", _treats_stall(), Vector3(-4.1, 0, -2.25), 26.0)
 	var sc := Vector3(TW * 0.5 + 4.5, (SIGN_Y0 + SIGN_Y1) * 0.5 - 0.3, TD + 1.06)
 	_sign(treats, "FALL TREATS", _lp(sc), 0.0031, 0.0)
 	vendor_spot = treats.transform * _lp(Vector3(16.0, 0.0, TD - 14.0))
@@ -42,7 +42,7 @@ func build(parent: Node3D) -> void:
 	# Chalkboards.
 	var menu := _chalkboard(parent, Vector3(-4.2, 0, 1.4), 20.0, 1.25)
 	K.label(menu, "Apple Cider\n· Pumpkin Pie\n· Pretzels\nCandy Apples", Vector3(-0.12, 1.2, 0.13), 0.0021, Color("f4f1e6"), 0.0, Color(0, 0, 0, 0), 64, HORIZONTAL_ALIGNMENT_LEFT)
-	var hm := _chalkboard(parent, Vector3(3.0, 0, 1.9), -24.0, 0.95, "fox")
+	var hm := _chalkboard(parent, Vector3(3.35, 0, 0.75), -24.0, 0.95, "fox")
 	K.label(hm, "HANDMADE", Vector3(0, 1.18, 0.13), 0.0025, Color("f4f1e6"))
 	var gm := _chalkboard(parent, Vector3(2.2, 0, -3.0), -16.0, 0.6)
 	K.label(gm, "3 TRIES", Vector3(-0.02, 0.62, 0.13), 0.0015, Color("f8e9a0"))

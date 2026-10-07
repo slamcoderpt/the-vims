@@ -16,6 +16,7 @@ const Fx := preload("res://scripts/locations/market/fixtures.gd")
 const Produce := preload("res://scripts/locations/market/produce.gd")
 const Shell := preload("res://scripts/locations/market/shell.gd")
 const Stands := preload("res://scripts/locations/market/stands.gd")
+const ShotPresets := preload("res://scripts/core/shot_presets.gd")
 
 const U := 0.0625
 const P := 0.03125
@@ -41,8 +42,10 @@ func build() -> void:
 		print("MARKET_BUILD_MS ", Time.get_ticks_msec() - t0)
 
 
+## Same Sims-style camera language as home / backyard (pitch 32-38, fov
+## 37-42); single source of truth is the "market" shot preset.
 func camera_home() -> Dictionary:
-	return {"target": Vector3(0.3, 0.6, -1.7), "yaw": 15.0, "pitch": 35.0, "distance": 12.5, "fov": 40.0}
+	return ShotPresets.PRESETS["market"].camera.duplicate()
 
 
 func lighting_profile() -> Dictionary:

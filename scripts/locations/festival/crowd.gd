@@ -51,7 +51,7 @@ func build(parent: Node3D, stalls, stage) -> void:
 	var jack := spawn(parent, "Jack", "dad", Vector3(-2.75, 0, 0.15), Vector3(-1.6, 0, 7.4), "talk")
 	var lily := spawn(parent, "Lily", "bunny_girl", Vector3(-0.45, 0, -0.4), Vector3(1.6, 0, 8.4), "talk")
 	_hold(lily, "candy_apple", "fore_r")
-	var dog := spawn(parent, "Biscuit", "beagle", Vector3(-1.75, 0, 0.6), Vector3(0.6, 0, 4.6), "idle")
+	var dog := spawn(parent, "Biscuit", "beagle", Vector3(-1.75, 0, 0.6), Vector3(2.4, 0, 3.4), "idle")
 	var maya := spawn(parent, "Maya", "cat_girl", Vector3(1.85, 0, 0.15), Vector3(-1.6, 0, 10.4), "talk")
 	_hold(maya, "fox_plush", "torso")
 	# The standard game camera looks down ~35-40 deg at the heroes; a slight
@@ -78,9 +78,9 @@ func build(parent: Node3D, stalls, stage) -> void:
 		["npc_3", Vector3(5.9, 0, -5.0), Vector3(5.1, 0, -5.7), "talk"],
 		["npc_0", Vector3(5.1, 0, -5.7), Vector3(5.9, 0, -5.0), "idle"],
 		["npc_4", Vector3(0.9, 0, -9.0), Vector3(1.4, 0, 6.0), "walk"],
-		# r12: a chatting pair filling the open cobbles right of Lily.
-		["npc_2", Vector3(2.2, 0, -2.3), Vector3(3.1, 0, -1.6), "talk"],
-		["npc_4", Vector3(3.0, 0, -1.7), Vector3(2.0, 0, -2.1), "talk"],
+		# r12: a chatting pair between the game booth and the stage crowd.
+		["npc_2", Vector3(2.85, 0, -4.75), Vector3(3.6, 0, -4.2), "talk"],
+		["npc_4", Vector3(3.55, 0, -4.3), Vector3(2.8, 0, -4.9), "talk"],
 	]
 	_far_folk(parent, stage.node.transform)
 	var i := 1

@@ -228,7 +228,7 @@ static func _fridges(root: Node3D, halo_pts: Array) -> void:
 	var bank := Fx.fridge(u(6.4), 3)
 	Fx.put(vb, bank, Vector3i(u(-4.4), 0, u(-8.7)))
 	# second bank on the right of the back wall (beverages, behind the aisles)
-	var bank2 := Fx.fridge(u(5.6), 9, false)
+	var bank2 := Fx.fridge(u(5.6), 9, true, false)
 	Fx.put(vb, bank2, Vector3i(u(2.1), 0, u(-8.7)))
 	Kit.add(root, vb, U, "Fridges", false, Kit.glow_mat("cool"), Vector3.ZERO, Vector3.ZERO, true)
 	# Soft cool bloom along the lit header strips and inside the cases.
@@ -255,26 +255,44 @@ static func _aisles(root: Node3D) -> void:
 	# Long runs from just behind the end caps back to the fridge walkway,
 	# split by a cross aisle so a second row of end caps reads mid-store.
 	# (the run against the right wall is mostly hidden: cheap two-tone stock)
-	for seg: Array in [[2.6, -6.6, 3.3, 11, kinds_a, false], [5.5, -6.6, 3.3, 12, kinds_b, false],
-			[7.7, -8.0, 4.2, 5, kinds_c, false]]:
-		var g := Fx.gondola(u(seg[2]), seg[3], seg[4], false, 0, seg[5])
+	# The two middle runs are double-sided: the camera sits right of the
+	# main aisle, so it sees their +x faces stocked too.
+	for seg: Array in [[2.6, -6.6, 3.3, 11, kinds_a, false, true], [5.5, -6.6, 3.3, 12, kinds_b, false, true],
+			[7.7, -8.0, 4.2, 5, kinds_c, false, false]]:
+		var g := Fx.gondola(u(seg[2]), seg[3], seg[4], seg[6], 0, seg[5])
 		Fx.put(vb, g, Vector3i(u(seg[0]), 0, u(seg[1])), 3)
-	# mid-store end caps facing the camera (cross aisle at z ~ -11)
-	var e1 := Fx.gondola(u(1.0), 4, ["cereal", "box", "cereal"], false, 1)
-	Fx.put(vb, e1, Vector3i(u(2.1), 0, u(-3.3)), 0)
-	# Wide camera-facing end cap packed with chunky cereal / snack boxes
-	# (right of centre, between Maya and the checkout, like the reference).
-	var e2 := Fx.gondola(u(1.9), 6, ["cereal", "cereal", "box", "cereal", "bag"], false, 1)
-	Fx.put(vb, e2, Vector3i(u(4.1), 0, u(-3.3)), 0)
-	# Low display of cereal boxes with a pot of flowers (centre-right).
+	# Camera-facing end caps on the fine P grid: real-size packs in many
+	# distinct designs (cereal with bowl / mascot / swoosh fronts, crackers,
+	# chips, sauces, juice, jars, pasta, soda) mixed per shelf.
+	var ec := VoxelBuilder.new()
+	ec.jitter = 0.0
+	var mix_a := ["cereal_bowl", "cereal_bear", "cereal_swoosh", "crackers", "canister", "pasta", "juice"]
+	var mix_b := ["cereal_swoosh", "cereal_bowl", "chips", "sauce", "cereal_bear", "jar", "crackers", "soda", "pasta", "juice"]
+	var e1 := Fx.endcap(32, 4, mix_a)
+	ec.stamp(e1, Vector3i(int(round(2.1 / P)), 0, int(round(-3.3 / P))))
+	var e2 := Fx.endcap(60, 6, mix_b)
+	ec.stamp(e2, Vector3i(int(round(4.1 / P)), 0, int(round(-3.3 / P))))
+	# Low display table of cereal boxes with a pot of flowers (centre-right).
 	var d := Vector3i(u(1.75), 0, u(-0.35))
 	vb.box(d, Vector3i(u(1.0), u(0.55), u(0.7)), Kit.wood(Fx.WOOD, 2))
-	for i in 3:
-		var col: Color = Fx.BOX_COLS[(i * 3 + 1) % Fx.BOX_COLS.size()]
-		Fx.product(vb, d + Vector3i(i * 5, u(0.55), 8), "cereal", col, Fx.BOX_COLS[(i * 7 + 2) % 10], 7)
-		Fx.product(vb, d + Vector3i(i * 5, u(0.55), 4), "cereal", Kit.shade(col, 0.85), Fx.BOX_COLS[(i * 5) % 10], 7)
+	var dp := Vector3i(d.x * 2, u(0.55) * 2, d.z * 2)
+	var table_mix := ["cereal_bowl", "cereal_swoosh", "cereal_bear", "crackers"]
+	var tx := 1
+	var ti := 0
+	while tx < 30:
+		var tmp := VoxelBuilder.new()
+		var sz := Fx.pack(tmp, Vector3i.ZERO, table_mix[ti % table_mix.size()], ti * 5 + 2, 11, ti)
+		if tx + sz.x > 31:
+			break
+		for row in 2:
+			ec.stamp(tmp, dp + Vector3i(tx, 0, 21 - sz.z * (row + 1) - row))
+		tx += sz.x + 1
+		ti += 1
+	Kit.add(root, ec, P, "EndCaps", false, null, Vector3.ZERO, Vector3.ZERO, true)
 	# Flower bucket on top.
-	var fpos := d + Vector3i(6, u(0.55) + 6, 2)
+	var fpos := d + Vector3i(6, u(0.55), 1)
+	vb.box(fpos, Vector3i(4, 3, 4), Color("b55f33"))
+	fpos += Vector3i(0, 3, 0)
 	vb.box(fpos, Vector3i(4, 3, 4), Color("c96f3e"))
 	for i in 22:
 		var fp := fpos + Vector3i(int(Kit.h(Vector3i(i, 0, 0), 1) * 6.0) - 1, 3 + int(Kit.h(Vector3i(i, 1, 0), 2) * 4.0), int(Kit.h(Vector3i(i, 2, 0), 3) * 6.0) - 1)

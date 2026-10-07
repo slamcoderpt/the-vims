@@ -17,7 +17,7 @@ const LAMPS := [
 	[-4.4, -19.0, false],  # 6 far back by the town hall
 ]
 const FOUNTAIN := Vector3(-2.4, 0, -6.7)  # = (-2.4, K.dz(-8.27)); r12 camera: upper centre-left
-const FOUNTAIN_SCALE := 1.25
+const FOUNTAIN_SCALE := 1.05
 const LAMP_TOP := 4.2
 const SU := 0.06  # string-light wire cell size
 const BU := 0.08  # bulb cell size
@@ -395,36 +395,21 @@ func _foreground(parent: Node3D) -> void:
 	var vb := VoxelBuilder.new()
 	vb.jitter = 0.0
 	var C := 1.0 / FV
-	# Bottom-left: hay stack topped with pumpkins, cider barrel, mums.
-	K.hay(vb, int(-5.2 * C), 0, int(2.6 * C), 12, 7, 7)
-	K.hay(vb, int(-4.9 * C), 7, int(2.75 * C), 8, 5, 5)
-	K.pumpkin(vb, int(-4.5 * C), 12, int(3.0 * C), 2.6, 3, 0)
-	K.pumpkin(vb, int(-3.7 * C), 0, int(3.55 * C), 3.2, 4, 1)
-	K.pumpkin(vb, int(-3.0 * C), 0, int(3.1 * C), 2.0, 5, 3)
-	_cider_barrel(vb, int(-6.3 * C), int(2.0 * C))
-	_barrel_planter(vb, int(-8.0 * C), int(2.7 * C), 4.5, 0, 41)
-	K.mums(vb, -7.0 * C, 0, 3.7 * C, 4.6, 1, 42)
-	# Round 10 (low 18 deg camera, frame bottom at z ~3.2): glowing lanterns
-	# on crates + mums/pumpkins along the bottom edge, below the heroes' feet,
-	# so they frame the shot (soft in the tilt-shift band) without hiding them.
-	# Round 11: the two lanterns no longer sit bottom-centre (critic r10: they
-	# walled off the heroes); one small lantern per bottom corner instead.
-	# (The frame bottom sits at z ~2.7 under the round-11 camera.)
-	K.pumpkin(vb, int(-2.75 * C), 0, int(2.6 * C), 2.0, 6, 0)
-	# Bottom-centre-right: a soft mums cluster + pumpkins (the walkway between
-	# Jack and Lily stays open).
-	K.mums(vb, 0.35 * C, 0, 2.55 * C, 3.6, 1, 48)
-	K.pumpkin(vb, int(1.1 * C), 0, int(2.45 * C), 2.4, 11, 2)
-	K.pumpkin(vb, int(-0.25 * C), 0, int(2.75 * C), 1.7, 12, 0)
-	K.mums(vb, 2.0 * C, 0, 2.9 * C, 3.4, 0, 43)
-	_barrel_planter(vb, int(4.3 * C), int(1.7 * C), 4.2, 1, 47)
-	K.pumpkin(vb, int(-0.1 * C), 0, int(3.9 * C), 2.0, 10, 2)
-	# Bottom-right: mums bushes, pumpkins, a planter barrel.
-	_barrel_planter(vb, int(6.0 * C), int(1.6 * C), 4.5, 1, 44)
-	K.mums(vb, 3.9 * C, 0, 2.95 * C, 4.0, 0, 45)
-	K.mums(vb, 6.2 * C, 0, 3.0 * C, 3.8, 2, 46)
-	K.pumpkin(vb, int(3.6 * C), 0, int(3.4 * C), 2.6, 7, 2)
-	K.pumpkin(vb, int(2.6 * C), 0, int(3.3 * C), 1.9, 8, 0)
+	# r12 (standard game camera, frame bottom at z ~0.5 (right) .. 1.6
+	# (left)): soft corner dressing along the bottom edge, below the heroes'
+	# feet, leaving the walkway between Jack, Lily and Maya open.
+	# Bottom-centre: mums + pumpkins between Biscuit and Maya.
+	K.mums(vb, -0.45 * C, 0, 1.3 * C, 3.6, 1, 48)
+	K.pumpkin(vb, int(0.3 * C), 0, int(1.2 * C), 2.4, 11, 2)
+	K.pumpkin(vb, int(-1.0 * C), 0, int(1.55 * C), 1.8, 12, 0)
+	K.pumpkin(vb, int(0.85 * C), 0, int(1.45 * C), 1.7, 10, 1)
+	# Bottom-left (beside the menu board): hay bale with pumpkins + mums.
+	K.hay(vb, int(-3.3 * C), 0, int(1.9 * C), 10, 6, 6)
+	K.pumpkin(vb, int(-2.75 * C), 6, int(2.15 * C), 2.2, 3, 0)
+	K.pumpkin(vb, int(-2.3 * C), 0, int(2.05 * C), 2.6, 4, 1)
+	# Bottom-right: mums and pumpkins between Maya and the HANDMADE board.
+	K.mums(vb, 2.55 * C, 0, 1.35 * C, 3.4, 0, 45)
+	K.pumpkin(vb, int(2.1 * C), 0, int(1.5 * C), 2.0, 7, 2)
 	K.inst(parent, vb, FV, Vector3.ZERO, 0.0, true, Vector3.ZERO, "Foreground")
 
 

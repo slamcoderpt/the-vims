@@ -20,7 +20,7 @@ const PRESETS := {
 	"festival": {
 		"ref": "refs/ref2_autumn_festival.png",
 		"location": "festival", "day": 5, "hour": 16, "minute": 42, "season": 2,
-		"camera": {"target": Vector3(-1.25, 0.9, -2.5), "yaw": 12.0, "pitch": 34.0, "distance": 10.5, "fov": 40.0},
+		"camera": {"target": Vector3(-1.25, 0.6, -2.6), "yaw": 12.0, "pitch": 35.0, "distance": 14.5, "fov": 40.0},
 		"tasks": [
 			{"title": "Buy Festival Snack", "icon": "apple", "done": true},
 			{"title": "Meet 3 Neighbors", "icon": "chat"},

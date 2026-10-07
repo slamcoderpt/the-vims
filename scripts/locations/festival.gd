@@ -19,10 +19,11 @@ const Crowd := preload("res://scripts/locations/festival/crowd.gd")
 ## camera as the rest of the game (pitch 32-38, fov 37-42, similar distance),
 ## never the concept art's eye-level angle. The live camera and the
 ## screenshot preset are the same shot (see ShotPresets "festival").
-## The square is composed for this camera: depth behind z = -5 is compressed
-## (K.dz) so the fountain, stage and town-hall front sit in the upper third.
-## Town backdrop is scaled down so the clock tower stays in frame under the
-## steeper (ref-like) camera; hall front lands at z ~ -26.
+## Round 12 (game owner): same distance / character screen size as home and
+## backyard (adult ~220 px tall at 1672x941). The square is composed for
+## this camera: depth behind z = -5 is compressed (K.dz) so the fountain,
+## stage and town-hall front all land in the upper third, with short-trunked
+## trees whose canopies drop into the top band.
 const TOWN_SCALE := 0.58
 const STAGE_POS := Vector3(2.7, 0, -8.5)  # r12: upper centre-right, clear of the HUD task panel
 const TOWN_POS := Vector3(0.0, -0.3, 2.75)  # hall front at z ~ -14.05 (= K.dz(-22.4))
@@ -225,7 +226,7 @@ func _print_stats() -> void:
 					print("  mesh ", mi.get_parent().name, "/", mi.name, " vis=", mi.is_visible_in_tree(), " surf ", si, " tris ", n)
 	var cam := get_viewport().get_camera_3d()
 	if cam:
-		for k: String in ["Jack", "Lily", "Maya", "Biscuit", "vendor", "guitarist", "game_host"]:
+		for k: String in ["Jack", "Lily", "Maya", "Biscuit", "vendor", "guitarist", "game_host", "crafter", "neighbor_6", "neighbor_7"]:
 			var a: Node3D = crowd.actors.get(k)
 			if a:
 				var f := cam.unproject_position(a.global_position)
