@@ -312,6 +312,12 @@ func place_ghost() -> bool:
 		world.say_selected("Can't place it there", "dots")
 		Game.notify.emit("Can't place it there", "dots")
 		return false
+	if not ghost_item.get("walk", false):
+		var who := _blocks_route(_box(ghost_item, ghost_rot, ghost_pos))
+		if who != "":
+			world.say_selected("That blocks the way", "dots")
+			Game.notify.emit("That would trap %s: leave a path" % who, "dots")
+			return false
 	var price: int = ghost_item.get("price", 0)
 	var entry: Dictionary
 	if moving_uid >= 0:
@@ -358,6 +364,49 @@ static func _lift(item: Dictionary) -> float:
 
 ## Placement rule: furniture and walls need free floor (NavGrid); floor tiles
 ## need floor and no other tile in the same square; rugs go anywhere on floor.
+## Would an object in `box` cut a household member off from the rest of the
+## lot (the stairs, or the others on a one-storey lot)? Returns their name.
+func _blocks_route(box: AABB) -> String:
+	var nav = world.nav
+	if nav == null:
+		return ""
+	var li: int = nav.level_of(box.position + Vector3(0, 0.05, 0))
+	var hubs: Array = []
+	for l in nav.links:
+		if l.la == li:
+			hubs.append(l.a)
+		if l.lb == li:
+			hubs.append(l.b)
+	var on_level: Array = []
+	for ag in world.agents:
+		if ag and is_instance_valid(ag.actor) and nav.level_of(ag.actor.global_position) == li:
+			on_level.append(ag)
+	if hubs.is_empty():
+		if on_level.size() < 2:
+			return ""
+		hubs.append(on_level[0].actor.global_position)
+	var reach := func(ag) -> bool:
+		for h in hubs:
+			if ag.actor.global_position.distance_to(h) < 0.3:
+				return true
+			nav.find_path(ag.actor.global_position, h, true)
+			if nav.last_ok:
+				return true
+		return false
+	var before := {}
+	for ag in on_level:
+		before[ag] = reach.call(ag)
+	const PROBE := -999
+	nav.add_obstacle(PROBE, box)
+	var trapped := ""
+	for ag in on_level:
+		if before[ag] and not reach.call(ag):
+			trapped = ag.display_name()
+			break
+	nav.remove_obstacle(PROBE)
+	return trapped
+
+
 func _can_place(item: Dictionary, box: AABB) -> bool:
 	if world.nav == null:
 		return false

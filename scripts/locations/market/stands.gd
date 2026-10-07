@@ -120,7 +120,7 @@ static func _produce_wall(root: Node3D, fix: VoxelBuilder, prod: VoxelBuilder) -
 			var top: float = tr[1]
 			# support / riser
 			fix.box(Vector3i(u(bx), 0, u(z)), Vector3i(u(tr[2]), u(top - 0.2), u(lenz)), Kit.wood(Fx.WOOD_D, 3))
-			_crate(fix, prod, Vector3(bx, top - 0.22, z + 0.03), Vector3(0.5, 0.22, lenz - 0.06), ks[2 - t], sec * 3 + t, 2, Fx.WOOD, t == 0 and z > -4.5)
+			_crate(fix, prod, Vector3(bx, top - 0.22, z + 0.03), Vector3(0.5, 0.22, lenz - 0.06), ks[2 - t], sec * 3 + t, 2, Fx.WOOD, false)
 		# back board + top shelf with baskets
 		fix.box(Vector3i(u(xw), 0, u(z)), Vector3i(u(0.55), u(2.1), u(lenz)), Kit.wood(Color("9a6438"), 2))
 		fix.box(Vector3i(u(xw + 0.55), u(2.0), u(z)), Vector3i(u(0.35), 1, u(lenz)), Kit.wood(Fx.WOOD_L, 1, 1))
@@ -165,8 +165,8 @@ static func _produce_island(root: Node3D, fix: VoxelBuilder, prod: VoxelBuilder)
 	_tag(root, Vector3(-1.98, 0.7, 0.88), "$1.20", 6.0)
 	_tag(root, Vector3(-0.98, 0.98, -0.07), "$0.80", 6.0)
 	# front-left extra crates on the floor (foreground spill)
-	_crate(fix, prod, Vector3(-4.9, 0.0, 1.9), Vector3(1.0, 0.3, 0.8), "orange", 77, 3)
-	_crate(fix, prod, Vector3(-4.75, 0.0, 0.9), Vector3(0.95, 0.5, 0.85), "pepper_mix", 78, 3)
+	_crate(fix, prod, Vector3(-4.9, 0.0, 1.9), Vector3(1.0, 0.3, 0.8), "orange", 77, 3, Fx.WOOD, false)
+	_crate(fix, prod, Vector3(-4.75, 0.0, 0.9), Vector3(0.95, 0.5, 0.85), "pepper_mix", 78, 3, Fx.WOOD, false)
 	# near-camera crates (lower-left foreground, softened by the DOF)
 	# Low foreground display (bottom-left of the shot, soft in the DOF).
 	fix.box(Vector3i(u(-3.3), 0, u(3.75)), Vector3i(u(2.75), u(0.38), u(0.95)), wood)
@@ -197,18 +197,18 @@ static func _chalkboard(root: Node3D) -> void:
 	for x in W:
 		for y in Hh:
 			var edge := x < 1 or x >= W - 1 or y < 1 or y >= Hh - 1
-			vb.set_v(Vector3i(x, y + 6, 0), Kit.vary(Fx.WOOD, Vector3i(x, y, 0), 0.08) if edge else Kit.vary(Color("2b302d"), Vector3i(x, y, 0), 0.05))
-	for y in 7:
+			vb.set_v(Vector3i(x, y + 10, 0), Kit.vary(Fx.WOOD, Vector3i(x, y, 0), 0.08) if edge else Kit.vary(Color("2b302d"), Vector3i(x, y, 0), 0.05))
+	for y in 11:
 		vb.set_v(Vector3i(1, y, -1), Fx.WOOD_D)
 		vb.set_v(Vector3i(W - 2, y, -1), Fx.WOOD_D)
 	var lv := VoxelBuilder.new()
-	Fx.leaf_icon(lv, Vector3i(6, 7, 1), Color("6cbf45"), Color("2f7a2a"))
+	Fx.leaf_icon(lv, Vector3i(6, 11, 1), Color("6cbf45"), Color("2f7a2a"))
 	for p: Vector3i in lv.vox:
 		vb.set_v(p, lv.vox[p])
 	var mi := Kit.add(root, vb, U, "Chalkboard", true, null, Vector3(-3.55, 0.0, -1.75), Vector3(W * 0.5, 0, 0))
 	mi.rotation.y = deg_to_rad(32)
 	mi.rotation.x = deg_to_rad(-8)
-	var l := Kit.label(mi, "Local\nFresh\nToday!", Vector3(-0.04, 1.27, 0.075), 0.0024, Color("f4f1e6"), 0.0, 96)
+	var l := Kit.label(mi, "Local\nFresh\nToday!", Vector3(-0.04, 1.52, 0.075), 0.0024, Color("f4f1e6"), 0.0, 96)
 	l.rotation.z = deg_to_rad(4)
 	l.line_spacing = -18.0
 

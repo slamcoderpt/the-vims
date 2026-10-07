@@ -4,7 +4,7 @@ extends RefCounted
 
 const Party := preload("res://scripts/locations/backyard/party.gd")
 const Gestures := preload("res://scripts/locations/backyard/gestures.gd")
-const DOG_POS := Vector3(2.85, 0.0, 2.0)
+const DOG_POS := Vector3(2.7, 0.0, 2.9)
 
 ## key -> [look, aliases]
 const PEOPLE := {
@@ -58,10 +58,10 @@ func build(parent: Node3D, party) -> void:
 	gestures.add(actors.get("neighbor_6"), "drink", false)
 	gestures.add(actors.get("neighbor_3"), "drink", true)
 	# On the deck, chatting with plates and drinks.
-	var a := _spawn("neighbor_1", Vector3(4.3, 0.375, -3.4), 0.0, "talk")
-	var b := _spawn("neighbor_2", Vector3(6.9, 0.375, -3.6), 0.0, "idle")
+	var a := _spawn("neighbor_1", Vector3(3.5, 0.375, -3.3), 0.0, "talk")
+	var b := _spawn("neighbor_2", Vector3(5.1, 0.375, -3.6), 0.0, "idle")
 	a.face(Vector3(6.0, 0, 1.5))
-	b.face(Vector3(3.6, 0, 0.5))
+	b.face(Vector3(2.4, 0, 0.5))
 	gestures.add(a, "burger", true, "burger")
 	gestures.add(b, "toast", false)
 	# Lounge by the fire pit.
@@ -70,9 +70,9 @@ func build(parent: Node3D, party) -> void:
 	gestures.add(c, "mug", true)
 	gestures.add(e, "mug", false)
 	# Biscuit trotting across the lawn between the table and the fire pit.
-	var d := _spawn("Biscuit", DOG_POS, -PI * 0.62, "walk")
+	var d := _spawn("Biscuit", DOG_POS, -PI * 0.5 - 0.05, "walk")
 	d.position.y = 0.0
-	d.scale = Vector3.ONE * 0.66
+	d.scale = Vector3.ONE * 0.85
 	# Chat interactables on guests.
 	for k in GUEST_NAMES:
 		var act: Node3D = actors.get(k)

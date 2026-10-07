@@ -147,8 +147,8 @@ func _stage() -> void:
 	cashier.body_scale = 1.12
 	# Background shoppers spread down the aisles, in the gaps between the family.
 	_place("npc_2", Vector3(-3.0, 0, -3.4), Vector3(-5.0, 0, -4.2), "idle")
-	_place("npc_5", Vector3(0.9, 0, -8.6), Vector3(0.6, 0, -11.0), "idle")
-	_place("npc_4", Vector3(-0.7, 0, -5.4), Vector3(-0.4, 0, -11.0), "idle")
+	_place("npc_5", Vector3(-0.9, 0, -8.8), Vector3(-0.6, 0, -11.0), "idle")
+	_place("npc_4", Vector3(0.75, 0, -6.2), Vector3(0.2, 0, -11.0), "idle")
 	_place("npc_0", Vector3(1.55, 0, -5.6), Vector3(2.4, 0, -6.0), "stand_read")
 	_place("npc_6", Vector3(4.0, 0, -6.2), Vector3(4.6, 0, -6.6), "idle")
 	_hold(actors["npc_4"], "basket")

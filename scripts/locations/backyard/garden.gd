@@ -22,10 +22,10 @@ const PICKET := Color("f4efe6")
 
 ## Rects (metres): x0, z0, x1, z1
 const BEDS := [
-	[-12.8, -6.35, 1.4, -5.3, 1.0],    # along back fence
+	[-12.8, -6.35, 1.4, -4.95, 1.15],    # along back fence
 	[-9.0, -5.3, -5.6, -3.6, 0.9],     # back-left corner behind grill
-	[4.8, -2.55, 12.8, -1.85, 1.1],    # in front of the deck (right of steps)
-	[0.2, -2.55, 2.3, -1.85, 1.0],     # in front of the deck (left of steps)
+	[4.6, -2.55, 12.8, -1.45, 1.25],    # in front of the deck (right of steps)
+	[-0.4, -2.55, 2.3, -1.55, 1.2],     # in front of the deck (left of steps)
 	[8.8, -1.6, 13.5, 0.2, 0.9],       # behind the lounge
 	[9.2, 3.8, 14.0, 6.5, 1.0],        # right foreground
 	[-10.0, 3.7, 0.6, 4.75, 1.15],     # along the front fence
@@ -585,7 +585,7 @@ func _neighbours() -> void:
 	nmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	# Sunk a little so the low bbq camera sees a band of sunset sky above
 	# the roofline (the lots behind sit lower than ours).
-	nmi.position.y = -1.6
+	nmi.position.y = -2.8
 	if not vb.glow.is_empty():
 		nmi.set_surface_override_material(nmi.mesh.get_surface_count() - 1, V.glow_soft())
 	root.add_child(nmi)
@@ -595,8 +595,8 @@ func _neighbours() -> void:
 	var dark := func(q: Vector3i) -> Color:
 		var c: Color = [Color("27402e"), Color("2f4a34"), Color("223a2a"), Color("35503a")][int(V.h1(q, 7) * 4.0) % 4]
 		return V.shade(c, 0.9 + clampf(float(q.y) * 0.015, 0.0, 0.25))
-	for i in 18:
-		var tx := -54.0 + i * 4.6 + _rng.randf_range(-1.2, 1.2)
+	for i in 12:
+		var tx := -54.0 + i * 6.6 + _rng.randf_range(-1.2, 1.2)
 		var tz := -50.0 + _rng.randf_range(-3.0, 2.0)
 		var r := _rng.randf_range(1.6, 2.6)
 		var hgt := _rng.randf_range(4.0, 7.5)
@@ -605,12 +605,12 @@ func _neighbours() -> void:
 		V.blob(tl, Vector3(tx * 2, hgt * 2, tz * 2), Vector3(r * 2, r * 2 * 1.1, r * 2), dark, 0.32, i)
 		V.blob(tl, Vector3(tx * 2 + r, hgt * 2 - r * 0.8, tz * 2), Vector3(r * 1.3, r * 1.2, r * 1.3), dark, 0.32, i + 40, true)
 	# A couple of tall conifers for variety in the skyline.
-	for cx in [-29.0, -8.5, 12.0]:
+	for cx in [-29.0, 12.0]:
 		var cz := -47.0
 		for k in 10:
 			var rr := maxf(0.5, 3.4 - k * 0.32)
 			V.blob(tl, Vector3(cx * 2, 2.0 + k * 1.6, cz * 2), Vector3(rr, 1.0, rr), dark, 0.25, k)
-	V.inst(tl, root, 0.5, Vector3(0, -1.6, 0), 0.0, Vector3.ZERO, false, false, "TreeLine")
+	V.inst(tl, root, 0.5, Vector3(0, -3.0, 0), 0.0, Vector3.ZERO, false, false, "TreeLine")
 
 
 func _house(vb: VoxelBuilder, hd: Array, wall: Color, roof: Color) -> void:

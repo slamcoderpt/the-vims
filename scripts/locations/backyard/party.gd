@@ -53,8 +53,8 @@ const SEATS := {
 	"far_m": Vector3(-8, -16, 0.0),
 	"far_m2": Vector3(8, -16, 0.0),
 	"far_r": Vector3(24, -16, 0.0),
-	"near_l": Vector3(-19, 16, PI),
-	"near_r": Vector3(17, 16, PI),
+	"near_l": Vector3(-24, 16, PI),
+	"near_r": Vector3(22, 16, PI),
 	"end_l": Vector3(-41, 0, PI * 0.5),
 	"end_r": Vector3(41, 0, -PI * 0.5),
 }
@@ -471,12 +471,12 @@ func _sofa(vb: VoxelBuilder, x: int, z: int) -> void:
 	var base := Color("8f8a84")
 	var cush := Color("dcd6cc")
 	var len := 44
-	V.b(vb, x, 0, z - len / 2, 14, 5, len, V.noisy(base, 0.06))
-	V.b(vb, x + 2, 5, z - len / 2 + 2, 12, 3, len - 4, V.noisy(cush, 0.04))
-	V.b(vb, x + 9, 5, z - len / 2, 5, 13, len, V.noisy(base, 0.06))
-	V.b(vb, x + 7, 8, z - len / 2 + 2, 3, 9, len - 4, V.noisy(cush, 0.04))
-	V.b(vb, x, 5, z - len / 2, 14, 5, 2, V.noisy(base, 0.06))
-	V.b(vb, x, 5, z + len / 2 - 2, 14, 5, 2, V.noisy(base, 0.06))
+	V.b(vb, x, 0, z - len / 2, 14, 5, len, base)
+	V.b(vb, x + 2, 5, z - len / 2 + 2, 12, 3, len - 4, cush)
+	V.b(vb, x + 9, 5, z - len / 2, 5, 13, len, base)
+	V.b(vb, x + 7, 8, z - len / 2 + 2, 3, 9, len - 4, cush)
+	V.b(vb, x, 5, z - len / 2, 14, 5, 2, base)
+	V.b(vb, x, 5, z + len / 2 - 2, 14, 5, 2, base)
 	# Seam lines between cushions.
 	for k in [1, 2]:
 		V.b(vb, x + 2, 7, z - len / 2 + 2 + k * 13, 8, 1, 1, V.shade(cush, 0.8))
@@ -508,7 +508,7 @@ func _lantern(vb: VoxelBuilder, x: int, y: int, z: int, _s: float) -> void:
 
 
 const POSTS := [Vector3(-5.6, 3.6, -3.6), Vector3(-0.6, 3.9, -3.4), Vector3(7.6, 3.8, -0.8)]
-const PORCH_POSTS := [Vector3(1.69, 3.3, -2.62), Vector3(6.81, 3.3, -2.62), Vector3(12.81, 3.3, -2.62)]
+const PORCH_POSTS := [Vector3(1.69, 3.5, -2.6), Vector3(6.81, 3.5, -2.6), Vector3(12.81, 3.5, -2.6)]
 
 
 func _posts(vb: VoxelBuilder) -> void:
@@ -553,5 +553,5 @@ func _string_lights(vb: VoxelBuilder) -> void:
 	_strand(vb, p0, p1, 0.55)
 	_strand(vb, p1, PORCH_POSTS[0], 0.25)
 	_strand(vb, p1, p2, 0.6)
-	_strand(vb, PORCH_POSTS[0], PORCH_POSTS[1], 0.14)
-	_strand(vb, PORCH_POSTS[1], PORCH_POSTS[2], 0.16)
+	_strand(vb, PORCH_POSTS[0], PORCH_POSTS[1], 0.1)
+	_strand(vb, PORCH_POSTS[1], PORCH_POSTS[2], 0.1)

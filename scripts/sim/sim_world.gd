@@ -583,7 +583,14 @@ func ground_point(screen: Vector2) -> Dictionary:
 		return {} if t0 < 0.0 else {"pos": from + dir * t0, "level": 0}
 	var order: Array = range(nav.level_y.size())
 	order.reverse()
+	# Floors above the one the camera looks at are hidden (Sims floor view):
+	# a tap goes through them.
+	var view_top: int = nav.level_y.size() - 1
+	if camera_rig and "target" in camera_rig:
+		view_top = nav.level_of(camera_rig.target - Vector3(0, 0.8, 0))
 	for li in order:
+		if li > view_top:
+			continue
 		var y: float = nav.level_y[li]
 		var t := (y - from.y) / dir.y
 		if t <= 0.0:

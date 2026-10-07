@@ -190,7 +190,7 @@ static func _signs(root: Node3D) -> void:
 	Fx.leaf_icon(lv, Vector3i(0, 0, 0), Color("8fd14f"), Color("3d8a2a"))
 	Kit.add(fresh, lv, U * 1.3, "Leaf", false, null, Vector3(1.55, -0.02, 0.11), Vector3(3.5, 4, 0))
 	# Produce
-	var prod := _board(root, "SignProduce", Vector3(-3.3, 2.6, -2.3), 28.0, 1.2, 0.38, Color("3a2a20"), Color("7a5130"), true, 2.9)
+	var prod := _board(root, "SignProduce", Vector3(-3.95, 2.7, -2.6), 28.0, 1.2, 0.38, Color("3a2a20"), Color("7a5130"), true, 2.9)
 	_text(prod, "Produce", Vector3(0, 0.0, z), 0.95, 0.24, Color("f6efe0"))
 	# MARKET (over the grocery aisles, right)
 	var mk := _board(root, "SignMarket", Vector3(3.5, 4.0, -2.0), -14.0, 3.1, 0.9, Color("34302d"), Color("8a5a31"))
@@ -202,11 +202,12 @@ static func _signs(root: Node3D) -> void:
 	Fx.leaf_icon(lv2, Vector3i(0, 0, 0), Color("6cbf45"), Color("2f7a2a"))
 	Kit.add(mk, lv2, U * 0.75, "Leaf", false, null, Vector3(1.15, 0.0, 0.11), Vector3(3.5, 4, 0))
 	# Aisle signs hanging over the aisles, deeper in the store.
-	var aisles := [["Dairy", Vector3(0.9, 2.6, -8.2), 0.0, 1.05], ["Snacks", Vector3(4.2, 2.7, -3.6), -6.0, 1.15],
-		["Beverages", Vector3(6.3, 3.0, -8.0), -8.0, 1.5], ["Bakery", Vector3(5.9, 2.95, -2.2), -24.0, 1.25]]
+	var aisles := [["Dairy", Vector3(0.95, 2.6, -8.2), 0.0, 1.3], ["Snacks", Vector3(4.75, 2.55, -3.6), -6.0, 1.15],
+		["Beverages", Vector3(4.1, 2.75, -10.6), -4.0, 1.95], ["Bakery", Vector3(5.9, 2.95, -2.2), -24.0, 1.25]]
 	for a in aisles:
-		var b := _board(root, "Sign" + a[0], a[1], a[2], a[3], 0.42, Color("3b2a1f"), Color("7a5130"))
-		_text(b, a[0], Vector3(0, 0.0, z), a[3] - 0.26, 0.26, Color("f6efe0"))
+		var bh := 0.42 if a[3] < 1.3 else 0.5
+		var b := _board(root, "Sign" + a[0], a[1], a[2], a[3], bh, Color("3b2a1f"), Color("7a5130"))
+		_text(b, a[0], Vector3(0, 0.0, z), a[3] - 0.26, bh - 0.16, Color("f6efe0"))
 
 
 # ------------------------------------------------------------------ greenery
@@ -236,7 +237,7 @@ static func _greenery(root: Node3D) -> void:
 				vb.set_v(p + Vector3i(0, 0, 1), Kit.shade(col, 0.9))
 	# Hanging planters with trailing ivy (top of frame, like the reference).
 	for hp: Vector3 in [Vector3(-5.2, 3.4, -0.6), Vector3(-4.9, 3.2, -4.4), Vector3(0.2, 3.95, -1.0),
-			Vector3(7.0, 3.45, 0.4), Vector3(-5.0, 3.3, -8.4), Vector3(0.9, 3.7, -6.0), Vector3(-2.6, 3.6, -9.6)]:
+			Vector3(7.0, 3.45, 0.4), Vector3(-5.0, 3.3, -8.4), Vector3(2.4, 3.75, -6.6), Vector3(-2.6, 3.6, -9.6)]:
 		var o := Vector3i(int(round(hp.x / U)), int(round(hp.y / U)), int(round(hp.z / U)))
 		for x in range(-3, 4):
 			for z in range(-3, 4):

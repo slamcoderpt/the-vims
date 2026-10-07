@@ -215,8 +215,10 @@ func _porch(vb: VoxelBuilder) -> void:
 	for z in range(WALL_Z, beam_z + 4):
 		var yy := 28 + int(float(beam_z + 4 - z) / 9.0)
 		V.b(vb, X0 - 1, yy, z, X1 - X0 + 2, 1, 1, func(q: Vector3i) -> Color:
-			return V.shade(Color("5a4f55"), 0.85 + V.h1(Vector3i(q.x / 3 + posmod(q.z, 2) * 5, 0, q.z), 6) * 0.3))
-	V.b(vb, X0 - 1, 27, beam_z + 3, X1 - X0 + 2, 1, 1, Color("3e3640"))
+			var c := V.shade(Color("4a4754"), 0.8 + V.h1(Vector3i(q.x / 3 + posmod(q.z, 2) * 5, 0, q.z), 6) * 0.32)
+			return V.shade(c, 0.78) if posmod(q.z, 3) == 0 else c)
+	# Chunky timber fascia along the front edge (reads like ref4's pergola).
+	V.b(vb, X0 - 1, 26, beam_z + 3, X1 - X0 + 2, 2, 1, V.wood(Color("8a5a36"), 0, 1))
 
 
 func _interior(vb: VoxelBuilder) -> void:
@@ -230,24 +232,25 @@ func _interior(vb: VoxelBuilder) -> void:
 		var w := q.z + 134
 		if u < 2 or u > 81 or w < 2 or w > 27:
 			return Color("f3dfe4")
-		return V.shade(Color("f0b8c8"), 0.92 + V.h1(q, 6) * 0.14))
+		# Shaggy pile in soft 3-cell tufts (merges into few quads).
+		return V.shade(Color("f0b8c8"), 0.94 + V.hs(u / 3, w / 3, 6) * 0.1))
 	# Light grey sofa against the back wall (facing the glass), with cushions.
 	var sc := Color("d9d4cf")
-	V.b(vb, 82, fy, bz, 72, 7, 18, V.noisy(sc, 0.04))
-	V.b(vb, 82, fy + 7, bz, 72, 12, 6, V.noisy(V.shade(sc, 0.94), 0.04))
-	V.b(vb, 78, fy, bz, 4, 12, 18, V.noisy(V.shade(sc, 0.9), 0.04))
-	V.b(vb, 154, fy, bz, 4, 12, 18, V.noisy(V.shade(sc, 0.9), 0.04))
+	V.b(vb, 82, fy, bz, 72, 7, 18, sc)
+	V.b(vb, 82, fy + 7, bz, 72, 12, 6, V.shade(sc, 0.94))
+	V.b(vb, 78, fy, bz, 4, 12, 18, V.shade(sc, 0.9))
+	V.b(vb, 154, fy, bz, 4, 12, 18, V.shade(sc, 0.9))
 	for k in 3:
-		V.b(vb, 84 + k * 23, fy + 7, bz + 6, 22, 2, 11, V.noisy(V.shade(sc, 1.04), 0.03))
+		V.b(vb, 84 + k * 23, fy + 7, bz + 6, 22, 2, 11, V.shade(sc, 1.04))
 	V.b(vb, 88, fy + 9, bz + 6, 8, 8, 2, Color("6f86a8"))
 	V.b(vb, 140, fy + 9, bz + 6, 8, 8, 2, Color("e2b456"))
 	V.b(vb, 114, fy + 9, bz + 6, 8, 7, 2, Color("8a8f9c"))
 	# Mustard armchair on the left, angled to the room.
 	var ac := Color("d9a441")
-	V.b(vb, 50, fy, -136, 16, 7, 16, V.noisy(ac, 0.05))
-	V.b(vb, 46, fy, -136, 4, 16, 16, V.noisy(V.shade(ac, 0.88), 0.05))
-	V.b(vb, 50, fy, -138, 16, 11, 2, V.noisy(V.shade(ac, 0.92), 0.05))
-	V.b(vb, 50, fy, -120, 16, 11, 2, V.noisy(V.shade(ac, 0.92), 0.05))
+	V.b(vb, 50, fy, -136, 16, 7, 16, ac)
+	V.b(vb, 46, fy, -136, 4, 16, 16, V.shade(ac, 0.88))
+	V.b(vb, 50, fy, -138, 16, 11, 2, V.shade(ac, 0.92))
+	V.b(vb, 50, fy, -120, 16, 11, 2, V.shade(ac, 0.92))
 	# Coffee table with a lamp-lit bowl + books.
 	V.b(vb, 96, fy + 6, -134, 40, 2, 14, V.wood(Color("9a6a3e"), 0, 2))
 	for lq in [Vector2i(97, -133), Vector2i(134, -133), Vector2i(97, -122), Vector2i(134, -122)]:
@@ -264,21 +267,21 @@ func _interior(vb: VoxelBuilder) -> void:
 		var lw := 2 + (4 - absi(i - 4))
 		V.b(vb, 117 - lw / 2, ly, bz + 1, lw, 1, 1, Color("4f8f44") if i % 2 == 0 else Color("3a7034"))
 	V.b(vb, 117, 35, bz + 1, 1, 10, 1, Color("2f5a2a"))
-	for fx in [88, 136]:
+	for fx: int in [88, 136]:
 		V.b(vb, fx, 36, bz, 10, 10, 1, Color("5b3b26"))
 		V.b(vb, fx + 1, 37, bz + 1, 8, 8, 1, func(q: Vector3i) -> Color:
 			return Color("8fb7d9").lerp(Color("f6c98f"), float(q.y - 37) / 8.0))
 	# Wall sconces (glowing).
-	for sx in [72, 162]:
+	for sx: int in [72, 162]:
 		V.b(vb, sx, 34, bz, 4, 6, 2, Color("ffe1a0"), true)
 		V.b(vb, sx, 33, bz, 4, 1, 3, Color("3a3030"))
 	# Tall bookshelves with books + ceramics, left and right.
-	for bx0 in [32, 172]:
+	for bx0: int in [172]:
 		V.b(vb, bx0, fy, bz, 24, 44, 9, V.wood(Color("94592f"), 1, 2))
 		for sh in 5:
 			var sy := fy + 2 + sh * 8
 			vb.clear_box(Vector3i(bx0 + 1, sy, bz + 2), Vector3i(22, 6, 7))
-			var bx := bx0 + 1
+			var bx: int = bx0 + 1
 			while bx < bx0 + 23:
 				var kind := int(V.hs(bx, sy, 9) * 5.0)
 				if kind == 0 and bx < bx0 + 19:
@@ -309,7 +312,7 @@ func _interior(vb: VoxelBuilder) -> void:
 	V.b(vb, 164, fy + 9, -130, 2, 4, 2, Color("3a3030"))
 	V.b(vb, 161, fy + 13, -133, 8, 6, 8, Color("ffe6b0"), true)
 	# Pendant lamps + a hanging lantern near the glass (ref4).
-	for px in [116]:
+	for px: int in [116]:
 		V.b(vb, px, 44, -128, 1, 10, 1, Color("2d2d33"))
 		V.b(vb, px - 5, 40, -133, 11, 4, 11, Color("ffdc95"), true)
 	V.b(vb, 186, 46, -110, 1, 8, 1, Color("2d2d33"))

@@ -716,9 +716,12 @@ func _s_gohere() -> void:
 		hud.menu.close()
 		await _frames(2)
 	var taps0: int = sim.stats.taps
+	var spx := _cam().unproject_position(gp)
+	print("  go here probe: screen %s ok=%s ground=%s cam target %s" % [str(spx), str(_screen_ok(spx)), str(sim.ground_point(spx)), str(main.camera_rig.target)])
 	await _tap_world(gp)
 	await _frames(2)
 	var go_ok: bool = lily.order.get("action", {}).get("id", "") == "go_here"
+	print("  go here: Lily at %s, target %s, order point %s spot %s" % [str(lp), str(gp), str(lily.order.get("point", "-")), str(lily.spot)])
 	await _until_game(func(): return lily.phase == "idle", 60.0)
 	_step("go_here", go_ok and _flat(lily.actor.global_position, gp) < 0.4,
 		"tap -> %s, dist to target %.2f, phase=%s (taps +%d, menu was open=%s)" % ["Go Here" if go_ok else "'%s'" % lily.current_label(), _flat(lily.actor.global_position, gp), lily.phase, sim.stats.taps - taps0, str(menu_open)])
@@ -764,6 +767,14 @@ func _s_build() -> void:
 		await _frames(2)
 	await _choose("Place")
 	await _frames(2)
+	if b.placed_count() == 0 and b.ghost:
+		# Refused (it would block a route): try a few other free spots like a player would.
+		print("  placement refused at %s: trying elsewhere" % str(b.ghost_pos))
+		for off in [Vector3(1.5, 0, 0), Vector3(-1.5, 0, 0), Vector3(0, 0, 1.5), Vector3(0, 0, -1.5), Vector3(2.5, 0, 1.0)]:
+			b._move_ghost(b.ghost_pos + off, true)
+			if b.ghost_valid and b.place_ghost():
+				break
+		await _frames(2)
 	var placed_ok: bool = b.placed_count() == 1 and Game.money == money_b - 350 and sim.nav.obstacles.size() == 1
 	_step("buy_place", buy_menu and paused_in_buy and has_ghost and placed_ok,
 		"menu=%s paused=%s ghost=%s placed=%d money %d -> %d obstacles=%d" % [str(buy_menu), str(paused_in_buy), str(has_ghost), b.placed_count(), money_b, Game.money, sim.nav.obstacles.size()])
@@ -789,11 +800,12 @@ func _s_build() -> void:
 	Game.speed = 2
 	if uid >= 0:
 		_menus.clear()
-		await _tap_world(b.nodes[uid].global_position + Vector3(0, 0.45, 0), false)
+		await _tap_world(b.nodes[uid].global_position + Vector3(0, 0.45, 0))
 		await _frames(2)
 		await _choose("Relax")
 		await _until_game(func(): return lily.phase == "act", 90.0)
-	_step("use_bought_item", lily.phase == "act" and lily.current_label() == "Relax", "phase=%s action=%s pose=%s" % [lily.phase, lily.current_label(), lily.actor.pose])
+	_step("use_bought_item", lily.phase == "act" and lily.current_label() == "Relax", "phase=%s action=%s pose=%s (menu %s, last=%s, fails=%d)" % [lily.phase, lily.current_label(), lily.actor.pose,
+		str(_menus.map(func(m): return m[0])), lily.last_done, lily.route_fails])
 	await _shot("use_bought")
 
 	# ---------------------------------------------------------------- build: sell
