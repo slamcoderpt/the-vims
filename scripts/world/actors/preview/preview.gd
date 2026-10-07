@@ -213,6 +213,16 @@ func _ready() -> void:
 				a.set_pose(s2[3])
 			add_child(seat.build_instance(0.0625))
 			rig.apply({"target": Vector3(0.0, 0.6, 0.1), "yaw": 36.0, "pitch": 36.0, "distance": 5.5, "fov": 30.0})
+		"dog4":
+			var x := -3.0
+			for p in ["idle", "sit", "walk", "sleep"]:
+				var d := SimActor.create("beagle")
+				d.position = Vector3(x, 0, 0.0)
+				d.rotation_degrees.y = 60.0
+				add_child(d)
+				d.set_pose(p)
+				x += 2.0
+			rig.apply({"target": Vector3(0, 0.5, 0), "yaw": 10.0, "pitch": 22.0, "distance": 10.0, "fov": 30.0})
 		"dogcheck":
 			var x := -1.5
 			for p in ["play", "idle", "sleep"]:
