@@ -349,9 +349,7 @@ func _props(parent: Node3D) -> void:
 	var C := 16
 	# Flower barrels: foreground corners (framing, not blocking) + around the square.
 	var barrels := [
-		[-6.9, 2.6, 0], [-6.0, 3.5, 1], [-7.6, 0.4, 1],
 		[-2.2, -6.2, 2], [2.0, -7.6, 0], [7.4, -2.0, 2],
-		[-5.2, 4.6, 0],
 		[-2.7, -11.6, 1], [3.1, -12.2, 2],
 	]
 	var i := 0
@@ -359,13 +357,13 @@ func _props(parent: Node3D) -> void:
 		_barrel_planter(near, int(b[0] * C), int(b[1] * C), 5.0, b[2], i)
 		i += 1
 	# Ground lanterns (small, along the walkway edges).
-	for l in [[-7.0, 3.6], [6.9, 0.2], [-2.0, -4.2], [1.9, -5.6], [-2.5, -9.0], [2.9, -9.3]]:
+	for l in [[-3.55, 0.35], [2.0, -1.3], [-2.0, -4.2], [1.9, -5.6], [-2.5, -9.0], [2.9, -9.3]]:
 		_ground_lantern(near, int(l[0] * C), int(l[1] * C))
 	# Picnic tables.
 	_picnic_table(near, int(-5.0 * C), int(-8.0 * C))
 	_picnic_table(near, int(3.9 * C), int(-7.2 * C))
 	# Pumpkin piles + hay.
-	var piles := [[-1.4, -5.6], [1.6, -6.3], [-7.4, -1.8], [8.4, 0.2], [-1.9, -9.6], [6.0, -11.6]]
+	var piles := [[-1.4, -5.6], [1.6, -6.3], [-1.9, -9.6], [6.0, -11.6]]
 	var j := 0
 	for p: Array in piles:
 		var px := int(p[0] * C)
@@ -374,11 +372,11 @@ func _props(parent: Node3D) -> void:
 		K.pumpkin(near, px + 7, 0, pz + 3, 2.8, j + 1, j + 1)
 		K.pumpkin(near, px - 4, 0, pz + 6, 2.4, j + 2, j + 3)
 		j += 1
-	K.hay(near, int(-7.9 * C), 0, int(-1.0 * C), 16, 9, 9)
-	K.hay(near, int(-7.7 * C), 9, int(-0.8 * C), 12, 8, 7)
 	K.hay(near, int(7.6 * C), 0, int(-5.6 * C), 16, 9, 9)
 	K.hay(near, int(-2.6 * C), 0, int(-6.8 * C), 16, 9, 9)
 	K.hay(near, int(1.4 * C), 0, int(-12.4 * C), 16, 9, 9)
+	# (Round 11: dressing outside the preset frame (far left under the HUD,
+	# below the frame bottom) was dropped to stay under the triangle budget.)
 	# (Round 10: the round-9 pumpkin display / far-left hay sat outside the
 	# tighter eye-level frame and were dropped to fund finer tree leaves.)
 	K.inst(parent, near, U, Vector3.ZERO, 0.0, true, Vector3.ZERO, "SquareProps")
@@ -408,21 +406,24 @@ func _foreground(parent: Node3D) -> void:
 	# Round 10 (low 18 deg camera, frame bottom at z ~3.2): glowing lanterns
 	# on crates + mums/pumpkins along the bottom edge, below the heroes' feet,
 	# so they frame the shot (soft in the tilt-shift band) without hiding them.
-	_crate_box(vb, int(-2.6 * C) - 3, int(3.4 * C) - 3, 7, 4, 7)
-	_ground_lantern(vb, int(-2.6 * C), int(3.4 * C), 4, FV)
-	K.pumpkin(vb, int(-3.2 * C), 0, int(3.5 * C), 2.4, 6, 0)
-	K.pumpkin(vb, int(-1.3 * C), 0, int(4.0 * C), 1.8, 9, 1)
-	_crate_box(vb, int(0.9 * C) - 3, int(3.0 * C) - 3, 7, 4, 7)
-	_ground_lantern(vb, int(0.9 * C), int(3.0 * C), 4, FV)
-	K.mums(vb, 2.2 * C, 0, 3.6 * C, 3.4, 0, 43)
-	_barrel_planter(vb, int(3.6 * C), int(3.2 * C), 4.2, 1, 47)
+	# Round 11: the two lanterns no longer sit bottom-centre (critic r10: they
+	# walled off the heroes); one small lantern per bottom corner instead.
+	# (The frame bottom sits at z ~2.7 under the round-11 camera.)
+	K.pumpkin(vb, int(-2.75 * C), 0, int(2.6 * C), 2.0, 6, 0)
+	# Bottom-centre-right: a soft mums cluster + pumpkins (the walkway between
+	# Jack and Lily stays open).
+	K.mums(vb, 0.35 * C, 0, 2.55 * C, 3.6, 1, 48)
+	K.pumpkin(vb, int(1.1 * C), 0, int(2.45 * C), 2.4, 11, 2)
+	K.pumpkin(vb, int(-0.25 * C), 0, int(2.75 * C), 1.7, 12, 0)
+	K.mums(vb, 2.0 * C, 0, 2.9 * C, 3.4, 0, 43)
+	_barrel_planter(vb, int(4.3 * C), int(1.7 * C), 4.2, 1, 47)
 	K.pumpkin(vb, int(-0.1 * C), 0, int(3.9 * C), 2.0, 10, 2)
 	# Bottom-right: mums bushes, pumpkins, a planter barrel.
-	_barrel_planter(vb, int(8.8 * C), int(2.0 * C), 4.5, 1, 44)
-	K.mums(vb, 7.5 * C, 0, 3.3 * C, 4.4, 0, 45)
-	K.mums(vb, 9.6 * C, 0, 3.3 * C, 3.8, 2, 46)
-	K.pumpkin(vb, int(6.3 * C), 0, int(3.7 * C), 2.8, 7, 2)
-	K.pumpkin(vb, int(5.7 * C), 0, int(3.3 * C), 1.9, 8, 0)
+	_barrel_planter(vb, int(6.0 * C), int(1.6 * C), 4.5, 1, 44)
+	K.mums(vb, 3.9 * C, 0, 2.95 * C, 4.0, 0, 45)
+	K.mums(vb, 6.2 * C, 0, 3.0 * C, 3.8, 2, 46)
+	K.pumpkin(vb, int(3.6 * C), 0, int(3.4 * C), 2.6, 7, 2)
+	K.pumpkin(vb, int(2.6 * C), 0, int(3.3 * C), 1.9, 8, 0)
 	K.inst(parent, vb, FV, Vector3.ZERO, 0.0, true, Vector3.ZERO, "Foreground")
 
 

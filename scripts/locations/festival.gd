@@ -14,17 +14,16 @@ const Stage := preload("res://scripts/locations/festival/stage.gd")
 const Decor := preload("res://scripts/locations/festival/decor.gd")
 const Crowd := preload("res://scripts/locations/festival/crowd.gd")
 
-## Round 10: low 3/4 eye-level camera (18 deg pitch, pushed in) so the heroes
-## fill the lower-centre third (~1/3 frame tall) with readable faces, and the
-## plaza, fountain, stage and clock tower recede as layers behind them.
-## (Round 9 was pulled back + up (critic r8) so heroes were ~1/5 frame tall and the
-## plaza, fountain, stage and clock tower all read with room to breathe.)
-const CAMERA := {"target": Vector3(-1.05, 1.5, -2.0), "yaw": 0.0, "pitch": 18.0, "distance": 12.0, "fov": 44.0}
+## Round 11: actors are now real-world size (adult ~1.76 m, kids ~1.24 m,
+## beagle ~0.8 m), which on its own shrinks the heroes ~30 % against the
+## stalls. The camera sits between round 9 (far/top-down) and round 10
+## (close/low): ~20 deg pitch, heroes ~1/4 frame tall in the lower centre.
+const CAMERA := {"target": Vector3(-1.05, 1.2, -1.6), "yaw": 0.0, "pitch": 19.0, "distance": 9.6, "fov": 46.0}
 ## Town backdrop is scaled down so the clock tower stays in frame under the
 ## steeper (ref-like) camera; hall front lands at z ~ -26.
-const TOWN_SCALE := 0.64
+const TOWN_SCALE := 0.58
 const STAGE_POS := Vector3(7.4, 0, -14.6)
-const TOWN_POS := Vector3(0.0, 0.0, -4.44)
+const TOWN_POS := Vector3(0.0, -0.3, -5.6)
 
 var stalls
 var stage
@@ -228,12 +227,14 @@ func _print_stats() -> void:
 			if a:
 				var f := cam.unproject_position(a.global_position)
 				var h := cam.unproject_position(a.head_top()) if a.has_method("head_top") else f
-				print("SCREEN %s feet=%s head=%s h=%d" % [k, f.round(), h.round(), int(f.y - h.y)])
+				print("SCREEN %s feet=%s head=%s h=%d worldh=%.2f" % [k, f.round(), h.round(), int(f.y - h.y), (a.head_top().y - a.global_position.y) if a.has_method("head_top") else 0.0])
 		for k: String in ["Fountain", "Stage", "TreatsStall", "GameStall", "CraftsStall"]:
 			var n := find_child(k, true, false) as Node3D
 			if n:
 				print("SCREEN %s %s" % [k, cam.unproject_position(n.global_position).round()])
 		print("SCREEN FountainSpot ", cam.unproject_position(Decor.FOUNTAIN).round())
+		var cw: Vector3 = TOWN_POS + town.clock_center * TOWN_SCALE
+		print("SCREEN Clock world=%s px=%s cam=%s" % [cw, cam.unproject_position(cw).round(), cam.global_position])
 	print("FESTIVAL_STATS meshes=%d tris=%d draws=%d prims=%d" % [meshes, tris,
 		RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME),
 		RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_PRIMITIVES_IN_FRAME)])

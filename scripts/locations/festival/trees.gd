@@ -5,7 +5,7 @@ extends RefCounted
 ## Merged per group into one mesh.
 
 const K := preload("res://scripts/locations/festival/kit.gd")
-const VS := [0.3, 0.3, 0.25]  # back trees finer (r10: 0.35 m cubes read as mush); sides sit under the HUD
+const VS := [0.3, 0.3, 0.28]  # back trees finer (r10: 0.35 m cubes read as mush); sides sit under the HUD
 
 ## [x, z, height_m, crown_radius_m, palette (0 orange, 1 red, 2 yellow, 3 mixed), group]
 const TREES := [

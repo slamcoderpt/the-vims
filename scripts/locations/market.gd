@@ -19,7 +19,7 @@ const Stands := preload("res://scripts/locations/market/stands.gd")
 
 const U := 0.0625
 const P := 0.03125
-const CART_S := 1.65
+const CART_S := 1.12
 
 var actors := {}
 var _cart: MeshInstance3D
@@ -42,7 +42,7 @@ func build() -> void:
 
 
 func camera_home() -> Dictionary:
-	return {"target": Vector3(0.3, 1.7, 1.4), "yaw": 0.0, "pitch": 9.0, "distance": 8.0, "fov": 50.0}
+	return {"target": Vector3(0.3, 1.5, 1.0), "yaw": 0.0, "pitch": 11.0, "distance": 8.6, "fov": 46.0}
 
 
 func lighting_profile() -> Dictionary:
@@ -106,15 +106,20 @@ func _spawn_people() -> void:
 	add_child(cashier)
 	actors["cashier"] = cashier
 	actors["npc_3"] = cashier
-	var shoppers := ["npc_2", "npc_5", "npc_4", "npc_0", "npc_6"]
+	var shoppers := ["npc_2", "npc_5", "npc_4", "npc_0", "npc_6", "npc_1", "npc_7"]
 	for i in shoppers.size():
 		var s := SimActor.create(shoppers[i])
 		s.name = "Shopper%d" % i
 		add_child(s)
 		actors["shopper_%d" % i] = s
 		actors[shoppers[i]] = s
+	# Real-world sizes (shared art direction): adult ~1.75 m, child ~70 % of
+	# that, the beagle's back about a child's knee-to-hip. SimActor clamps
+	# body_scale to a hero minimum, so shrink the node by what it kept.
+	for k: String in actors:
+		_life_size(actors[k])
 	# Soft contact shadows under everyone standing on the tiles.
-	for k: String in ["dad", "bunny_girl", "cat_girl", "cashier", "shopper_0", "shopper_1", "shopper_2", "shopper_3", "shopper_4"]:
+	for k: String in ["dad", "bunny_girl", "cat_girl", "cashier", "shopper_0", "shopper_1", "shopper_2", "shopper_3", "shopper_4", "shopper_5", "shopper_6"]:
 		Kit.blob(actors[k], 0.95 if k != "bunny_girl" and k != "cat_girl" else 0.8)
 	# Cart (with Biscuit riding in it).
 	_cart = Kit.add(self, Fx.cart(), P * CART_S, "Cart", true, null, Vector3.ZERO, Vector3(8.5, 0, -3))
@@ -128,6 +133,20 @@ func _spawn_people() -> void:
 		_act("chat", "Chat", "chat", 10.0, {"social": 0.15}, {"task": "Meet a Neighbor"}),
 		_act("ask", "Ask About Deals", "tag", 5.0, {"social": 0.05}),
 	], Vector3(0.6, 1.7, 0.5), Vector3(0, 0.85, 0))
+
+
+const LIFE_H := {"dad": 1.75, "bunny_girl": 1.24, "cat_girl": 1.24, "beagle": 0.52}
+
+
+func _life_size(a: SimActor) -> void:
+	if a.skeleton == null or a._meta.is_empty():
+		return
+	var want: float = LIFE_H.get(a.look, 1.72 if a.kind() != "child" else 1.24)
+	var eff := float(a._meta.get("height", 1.75)) * a.skeleton.scale.y
+	if eff > 0.01:
+		a.scale = Vector3.ONE * (want / eff)
+	if OS.get_environment("VIMS_STATS") != "":
+		print("MARKET_ACTOR ", a.look, " height_m=", eff * a.scale.y)
 
 
 func _place(key: String, pos: Vector3, face_to: Vector3, pose: String) -> SimActor:
@@ -148,30 +167,29 @@ func _stage() -> void:
 	# so the tall glowing fridge wall and the shelving runs read behind.
 	# "stand_type" holds both forearms forward at chest height: hands on the
 	# cart handle.
-	var jack := _place("dad", Vector3(-0.1, 0, 2.55), cam + Vector3(8.0, 0, 0), "stand_type")
-	jack.body_scale = 1.0
+	var jack := _place("dad", Vector3(-0.25, 0, 2.25), cam + Vector3(5.5, 0, 0), "stand_type")
 	var cart_yaw := jack.rotation.y
 	var fwd := Vector3(sin(cart_yaw), 0, cos(cart_yaw))
-	_cart.position = jack.position + fwd * 0.58
+	_cart.position = jack.position + fwd * 0.5
 	_cart.rotation.y = cart_yaw
-	var dog := _place("beagle", _cart.position + fwd * 0.62 + Vector3(0, 13 * P * CART_S - 0.12, 0), cam + Vector3(-1.5, 0, 0), "sit")
-	dog.body_scale = 1.0
-	dog.rotation.y = lerp_angle(cart_yaw, dog.rotation.y, 0.6)
+	# Biscuit rides in the cart, sitting up on the groceries, head above the rim.
+	var dog := _place("beagle", _cart.position + fwd * 0.5 + Vector3(0, 0.6, 0), cam + Vector3(-1.0, 0, 0), "sit")
+	dog.rotation.y = lerp_angle(cart_yaw, dog.rotation.y, 0.7)
 	# The "type" pose turns the head ~0.9 rad to the sim's left, so the
 	# girls' bodies are turned the other way to keep their faces on camera.
-	var lily := _place("bunny_girl", Vector3(-1.6, 0, 2.75), cam, "stand_type")
+	var lily := _place("bunny_girl", Vector3(-1.55, 0, 2.95), cam, "stand_type")
 	lily.rotation.y -= 0.75
-	var maya := _place("cat_girl", Vector3(2.1, 0, 2.65), cam, "stand_type")
+	var maya := _place("cat_girl", Vector3(1.5, 0, 3.05), cam, "stand_type")
 	maya.rotation.y -= 0.8
-	lily.body_scale = 1.0
-	maya.body_scale = 1.0
 	_hold(lily, "carrots")
 	_hold(maya, "cereal")
 	var cashier := _place("cashier", Vector3(4.4, 0, 2.9), Vector3(1.0, 0, 12.0), "idle")
-	cashier.body_scale = 1.0
 	# Background shoppers browse down the aisles, in the screen gaps between
 	# the family (never directly behind a head).
-	_place("npc_2", Vector3(-3.4, 0, -3.4), Vector3(-5.0, 0, -4.2), "idle")
+	_place("npc_2", Vector3(-2.5, 0, -0.4), Vector3(-4.2, 0, -0.2), "idle")
+	_place("npc_1", Vector3(-0.5, 0, -3.8), Vector3(-4.0, 0, -3.0), "idle")
+	_place("npc_7", Vector3(1.05, 0, -6.2), Vector3(2.4, 0, -6.6), "stand_read")
+	_hold(actors["npc_1"], "basket")
 	_place("npc_5", Vector3(-2.3, 0, -14.1), Vector3(-2.0, 0, -16.0), "idle")
 	_place("npc_4", Vector3(1.4, 0, -11.2), Vector3(0.6, 0, -14.0), "idle")
 	_place("npc_0", Vector3(-1.6, 0, -6.4), Vector3(-4.6, 0, -6.6), "stand_read")

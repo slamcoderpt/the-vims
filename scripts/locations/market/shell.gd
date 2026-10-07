@@ -141,7 +141,7 @@ static func _ceiling(root: Node3D, halo_pts: Array) -> void:
 	# back so they read in the eye-level camera, each with a warm omni light
 	# and a soft light pool on the glossy floor.
 	var lamps := VoxelBuilder.new()
-	lamps.jitter = 0.02
+	lamps.jitter = 0.0
 	var pools := []
 	var rows := [[3.4, 4.55, [-4.0, -1.3, 1.5, 4.4], true], [0.6, 4.4, [-4.3, -0.8, 1.3, 5.3], true],
 		[-2.3, 3.75, [-4.4, -1.6, 1.2, 3.5, 6.0], true], [-5.2, 3.65, [-4.1, -1.5, 1.2, 3.5, 6.0], true],
@@ -161,7 +161,7 @@ static func _ceiling(root: Node3D, halo_pts: Array) -> void:
 			elif r[3] == false:
 				Kit.light(root, p + Vector3(0, -0.4, 0), Color(1.0, 0.86, 0.66), 1.1, 4.0)
 			pools.append([Vector3(x, 0.012, r[0]), Vector2(2.4, 2.4), Color(1.0, 0.7, 0.4, 0.4 if r[3] == true else 0.3)])
-	Kit.add(root, lamps, U, "Pendants", false, Kit.glow_mat("warm"), Vector3.ZERO, Vector3.ZERO, false, false)
+	Kit.add(root, lamps, U, "Pendants", false, Kit.glow_mat("warm"), Vector3.ZERO, Vector3.ZERO, true, false)
 	# Two big near-camera pendants hanging into the top of the frame (between
 	# the FRESH & LOCAL and MARKET boards), like the reference's foreground lamps.
 	var big := VoxelBuilder.new()

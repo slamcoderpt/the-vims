@@ -246,15 +246,15 @@ static func _aisles(root: Node3D) -> void:
 		var g := Fx.gondola(u(seg[2]), seg[3], seg[4])
 		Fx.put(vb, g, Vector3i(u(seg[0]), 0, u(seg[1])), 3)
 	# mid-store end caps facing the camera (cross aisle at z ~ -11)
-	var e3 := Fx.gondola(u(1.4), 8, ["cereal", "box", "bag"])
+	var e3 := Fx.gondola(u(1.4), 8, ["cereal", "box", "bag"], false, 1)
 	Fx.put(vb, e3, Vector3i(u(2.1), 0, u(-8.8)), 0)
-	var e4 := Fx.gondola(u(1.4), 9, ["bottle", "can", "box"])
+	var e4 := Fx.gondola(u(1.4), 9, ["bottle", "can", "box"], false, 1)
 	Fx.put(vb, e4, Vector3i(u(5.0), 0, u(-8.8)), 0)
-	var e1 := Fx.gondola(u(1.0), 4, ["cereal", "box", "cereal"])
+	var e1 := Fx.gondola(u(1.0), 4, ["cereal", "box", "cereal"], false, 1)
 	Fx.put(vb, e1, Vector3i(u(2.1), 0, u(-2.4)), 0)
 	# Wide camera-facing end cap packed with chunky cereal / snack boxes
 	# (right of centre, between Maya and the checkout, like the reference).
-	var e2 := Fx.gondola(u(1.9), 6, ["cereal", "cereal", "box", "cereal"])
+	var e2 := Fx.gondola(u(1.9), 6, ["cereal", "cereal", "box", "cereal", "bag"], false, 1)
 	Fx.put(vb, e2, Vector3i(u(4.1), 0, u(-3.0)), 0)
 	# Low display of cereal boxes with a pot of flowers (centre-right).
 	var d := Vector3i(u(1.75), 0, u(-0.35))

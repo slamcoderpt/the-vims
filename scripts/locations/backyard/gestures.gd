@@ -80,8 +80,8 @@ func _process(delta: float) -> void:
 				fore_e = Vector3(-1.45, 0.0, 0.0)
 			"tongs":
 				# Reaching forward and down over the grate, tongs flipping.
-				arm_e = Vector3(-0.95 + 0.05 * w, 0.0, 0.12 * m)
-				fore_e = Vector3(-0.35 - 0.08 * w, 0.0, 0.0)
+				arm_e = Vector3(-1.1 + 0.04 * w, 0.0, 0.1 * m)
+				fore_e = Vector3(-0.3 - 0.06 * w, 0.0, 0.0)
 			"mug", "drink":
 				arm_e = Vector3(-0.75 + 0.04 * w, 0.15 * m, -0.18 * m)
 				fore_e = Vector3(-1.2, 0.0, 0.0)
@@ -130,7 +130,7 @@ func _process(delta: float) -> void:
 		var hand := gp * Vector3(0.0, -fl + 0.01, 0.045)
 		if String(it.item) == "tongs":
 			# Tongs continue the forearm line (pointing at the food).
-			var tb := gp.basis.orthonormalized() * Basis(Vector3.RIGHT, -0.45)
+			var tb := gp.basis.orthonormalized() * Basis(Vector3.RIGHT, 0.4)
 			mi.transform = Transform3D(tb, hand)
 		else:
 			mi.transform = Transform3D(Basis(), hand)
@@ -158,12 +158,12 @@ static func _mesh(kind: String) -> ArrayMesh:
 		"tongs":
 			# Steel tongs along -y from the grip, jaws slightly splayed.
 			vb.box(Vector3i(0, -2, 0), Vector3i(2, 3, 1), Color("1f1f24"))
-			vb.box(Vector3i(0, -6, 0), Vector3i(1, 4, 1), Color("c9ccd2"))
-			vb.box(Vector3i(1, -6, 0), Vector3i(1, 4, 1), Color("aeb2b8"))
-			vb.set_v(Vector3i(-1, -7, 0), Color("c9ccd2"))
-			vb.set_v(Vector3i(2, -7, 0), Color("aeb2b8"))
-			vb.set_v(Vector3i(-1, -8, 0), Color("dfe2e6"))
-			vb.set_v(Vector3i(2, -8, 0), Color("c9ccd2"))
+			vb.box(Vector3i(0, -9, 0), Vector3i(1, 7, 1), Color("d3d6dc"))
+			vb.box(Vector3i(1, -9, 0), Vector3i(1, 7, 1), Color("b4b8be"))
+			vb.set_v(Vector3i(-1, -10, 0), Color("d3d6dc"))
+			vb.set_v(Vector3i(2, -10, 0), Color("b4b8be"))
+			vb.set_v(Vector3i(-1, -11, 0), Color("e8eaee"))
+			vb.set_v(Vector3i(2, -11, 0), Color("d3d6dc"))
 		"mug":
 			vb.box(Vector3i(-1, -2, -1), Vector3i(3, 4, 3), Color("f3efe6"))
 			vb.box(Vector3i(-1, 2, -1), Vector3i(3, 1, 3), Color("7a4a2a"))

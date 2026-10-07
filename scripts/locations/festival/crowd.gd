@@ -17,10 +17,30 @@ func spawn(parent: Node3D, key: String, look: String, pos: Vector3, face_to: Vec
 		a.seat_height = seat
 	a.position = pos
 	parent.add_child(a)
+	_life_size(a)
 	a.face(face_to)
 	a.set_pose(pose)
 	actors[key] = a
 	return a
+
+
+## Art direction (fixed): adult ~1.75 m (desk + monitor), child ~70 % of
+## that, beagle's back at a child's knee-to-hip; stalls are real-world size.
+const LIFE_H := {"adult": 1.76, "child": 1.24, "dog": 0.8}
+
+
+## Scale an actor to real-world height. body_scale is clamped to the hero
+## minimum inside SimActor, so the remainder goes on the node scale.
+func _life_size(a: SimActor) -> void:
+	var m: Dictionary = a._meta
+	var mh: float = float(m.get("height", 0.0))
+	if mh <= 0.01 or a.skeleton == null:
+		return
+	var want: float = LIFE_H.get(String(m.get("kind", "adult")), 1.76) / mh
+	a.body_scale = want
+	var eff: float = a.skeleton.scale.x
+	if want / eff < 0.999:
+		a.scale = Vector3.ONE * (want / eff)
 
 
 func build(parent: Node3D, stalls, stage) -> void:
@@ -31,9 +51,8 @@ func build(parent: Node3D, stalls, stage) -> void:
 	var jack := spawn(parent, "Jack", "dad", Vector3(-2.75, 0, 0.75), Vector3(-5.2, 0, 7.0), "talk")
 	var lily := spawn(parent, "Lily", "bunny_girl", Vector3(-0.45, 0, 0.2), Vector3(1.6, 0, 9.0), "talk")
 	_hold(lily, "candy_apple", "fore_r")
-	var dog := spawn(parent, "Biscuit", "beagle", Vector3(-1.75, 0, 1.2), Vector3(1.2, 0, 5.2), "idle")
-	dog.scale = Vector3.ONE * 0.85
-	var maya := spawn(parent, "Maya", "cat_girl", Vector3(2.55, 0, 1.45), Vector3(-1.6, 0, 11.0), "talk")
+	var dog := spawn(parent, "Biscuit", "beagle", Vector3(-1.75, 0, 1.2), Vector3(3.0, 0, 3.4), "idle")
+	var maya := spawn(parent, "Maya", "cat_girl", Vector3(1.95, 0, 1.45), Vector3(-2.2, 0, 11.0), "talk")
 	_hold(maya, "fox_plush", "torso")
 	# The preset camera looks down ~30 deg at the near heroes; a slight
 	# lean back (pivot at the feet) lifts the faces out from under the hats.
@@ -112,7 +131,7 @@ func _far_folk(parent: Node3D) -> void:
 			[-4.6, -11.6, 220, false], [10.4, -8.0, 300, true]]:
 		F.add(p[0], p[1], p[2], p[3], seed)
 		seed += 1
-	F.build(parent)
+	F.build(parent, U * 1.0)
 
 
 func get_actor(key: String) -> Node3D:

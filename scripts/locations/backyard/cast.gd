@@ -4,7 +4,7 @@ extends RefCounted
 
 const Party := preload("res://scripts/locations/backyard/party.gd")
 const Gestures := preload("res://scripts/locations/backyard/gestures.gd")
-const DOG_POS := Vector3(2.55, 0.0, 2.05)
+const DOG_POS := Vector3(2.5, 0.0, 2.35)
 
 ## key -> [look, aliases]
 const PEOPLE := {
@@ -41,7 +41,7 @@ func build(parent: Node3D, party) -> void:
 	var gb := Basis(Vector3.UP, Party.GRILL_ROT)
 	var gf: Vector3 = Party.GRILL_POS + gb * Party.COOK_SPOT
 	var gd: Vector3 = Party.GRILL_POS + gb * Vector3(0.0, 0.0, 0.0) - gf
-	_spawn("Jack", gf, atan2(gd.x, gd.z) + 0.12, "grill")
+	_spawn("Jack", gf, atan2(gd.x, gd.z) + 0.28, "grill")
 	# Sit-down dinner (ref4): the long table runs across the picture. Four
 	# diners on the far side face the camera in 3/4, two on the near side
 	# sit with their backs to us in the gaps between them (so no head covers
@@ -66,7 +66,7 @@ func build(parent: Node3D, party) -> void:
 	gestures.add(actors.get("neighbor_7"), "drink", true, "", 0.05, 0.6)
 	# Jack works the food with tongs (left hand; the pose's spatula stays in
 	# the right) and his head turns just enough for the face to read.
-	gestures.add(actors.get("Jack"), "tongs", true, "tongs", -0.05, 0.45)
+	gestures.add(actors.get("Jack"), "tongs", true, "tongs", -0.02, 0.6)
 	# On the deck, chatting with plates and drinks.
 	var a := _spawn("neighbor_1", Vector3(3.6, 0.375, -3.3), 0.0, "talk")
 	var b := _spawn("neighbor_2", Vector3(4.9, 0.375, -3.5), 0.0, "idle")
@@ -78,7 +78,7 @@ func build(parent: Node3D, party) -> void:
 	var c := _spawn_seated("neighbor_5", Vector3(5.17, 0, 1.3), -PI * 0.5 - 0.2, "sit_talk", 0.5)
 	gestures.add(c, "mug", true, "", 0.0, 0.4)
 	# Biscuit trotting across the lawn between the table and the fire pit.
-	var d := _spawn("Biscuit", DOG_POS, -1.0, "walk")
+	var d := _spawn("Biscuit", DOG_POS, -1.3, "walk")
 	d.position.y = 0.0
 	# (size comes from BODY_SCALE["dog"] in _tune)
 	for k in PEOPLE:

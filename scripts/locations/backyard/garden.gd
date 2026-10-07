@@ -46,7 +46,7 @@ const MOUNDS := [
 	[-3.1, 3.75, 0.9, 0.4, 1.1],
 	[1.3, 3.35, 0.75, 0.4, 1.15],    # in front of the near chairs
 	[5.2, 4.05, 1.0, 0.5, 1.15],     # in front of the fire pit
-	[-1.4, -1.6, 0.9, 0.4, 1.0],   # behind the table, by the deck steps
+	[-3.5, -1.95, 0.8, 0.4, 1.0],   # behind the grill lid
 	[-6.4, -2.6, 0.9, 0.6, 1.0],     # behind the grill
 	[11.0, 2.4, 1.6, 0.9, 1.0],
 ]

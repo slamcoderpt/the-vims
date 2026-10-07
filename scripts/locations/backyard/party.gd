@@ -19,15 +19,15 @@ const TABLE_POS := Vector3(0.75, 0.0, 0.75)
 ## far side's diners face the camera in a row, the near side sit with their
 ## backs to us in the gaps between them, the left end is a little nearer.
 const TABLE_ROT := 0.12
-const GRILL_POS := Vector3(-2.8, 0.0, -0.55)
+const GRILL_POS := Vector3(-2.45, 0.0, -0.55)
 const GRILL_ROT := 0.08
 ## Where the cook stands (grill-local): behind the right end of the firebox,
 ## clear of the open lid, reaching over the grate.
 const GRILL_SCALE := 1.08
-const COOK_SPOT := Vector3(0.84, 0.0, -0.46)
+const COOK_SPOT := Vector3(0.78, 0.0, -0.36)
 const PIT_POS := Vector3(3.5, 0.0, 2.45)
 ## Lanterns (fine cells: x, y, z of the base corner; 7x7 footprint).
-const LANTERNS := [Vector3i(-64, 0, 2), Vector3i(24, 0, -38), Vector3i(122, 0, -10), Vector3i(-88, 0, -58), Vector3i(150, 0, 50),
+const LANTERNS := [Vector3i(-60, 0, 4), Vector3i(24, 0, -38), Vector3i(122, 0, -10), Vector3i(-88, 0, -58), Vector3i(150, 0, 50),
 		Vector3i(44, 6, -50), Vector3i(118, 6, -50), Vector3i(-50, 0, 44), Vector3i(70, 0, 68),
 		Vector3i(-118, 0, 42), Vector3i(100, 0, 62), Vector3i(-140, 0, -20)]
 ## Lanterns that also get a real OmniLight (the rest only bake a pool on the lawn).
@@ -98,7 +98,7 @@ func build(parent: Node3D) -> void:
 	_grill()
 	var yard := VoxelBuilder.new()
 	yard.jitter = 0.05
-	_prep_table(yard, -25, -30)
+	_prep_table(yard, -19, -32)
 	_fire_pit(yard, int(PIT_POS.x * F), int(PIT_POS.z * F))
 	_sofa(yard, 78, 28)
 	_side_table(yard, 74, 58)
@@ -499,10 +499,15 @@ func _grill() -> void:
 	V.b(vb, -17, 12, -4, 7, 1, 8, func(q: Vector3i) -> Color:
 		return V.shade(steel, 0.92 + V.h1(q, 9) * 0.12))
 	V.b(vb, -17, 11, -4, 1, 1, 8, steel_d)
+	# Plate of sesame buns + ketchup / mustard squeeze bottles.
 	V.b(vb, -16, 13, -3, 5, 1, 5, Color("f6f3ee"))
-	for pq in [Vector2i(-16, -3), Vector2i(-13, -3), Vector2i(-15, 0)]:
-		V.b(vb, pq.x, 14, pq.y, 2, 1, 2, Color("c4505a"))
-	V.b(vb, -11, 13, 2, 1, 3, 1, Color("f2f2f2")); V.p(vb, -11, 16, 2, Color("d02a24"))
+	for bq in [Vector2i(-16, -3), Vector2i(-14, -1), Vector2i(-16, 0)]:
+		V.b(vb, bq.x, 14, bq.y, 2, 1, 2, Color("d9984e"))
+		V.b(vb, bq.x, 15, bq.y, 2, 1, 2, Color("e8b263"))
+		V.p(vb, bq.x + 1, 15, bq.y, Color("fbf0d6"))
+	V.b(vb, -12, 13, -3, 1, 4, 1, Color("d02a24")); V.p(vb, -12, 17, -3, Color("f2f2f2"))
+	V.b(vb, -12, 13, -1, 1, 4, 1, Color("f2c22a")); V.p(vb, -12, 17, -1, Color("d02a24"))
+	V.b(vb, -12, 13, 2, 1, 3, 1, Color("f2f2f2")); V.p(vb, -12, 16, 2, Color("3a3a3a"))
 	# Hanging tools on the shelf edge.
 	V.b(vb, -17, 8, 0, 1, 4, 1, steel_d); V.p(vb, -17, 7, 0, steel)
 	V.b(vb, -17, 9, 2, 1, 3, 1, steel_d); V.b(vb, -17, 8, 2, 1, 1, 1, blk)

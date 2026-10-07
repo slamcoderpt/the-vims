@@ -30,22 +30,21 @@ func build(parent: Node3D) -> void:
 	# of the central walkway, crafts table bottom-right, striped side stalls
 	# receding along the right side. The walkway from the camera to the
 	# fountain (x -1.5..1.5) stays open cobblestone.
-	treats = _place(parent, "TreatsStall", _treats_stall(), Vector3(-4.9, 0, -2.0), 28.0)
+	treats = _place(parent, "TreatsStall", _treats_stall(), Vector3(-4.5, 0, -2.0), 28.0)
 	var sc := Vector3(TW * 0.5 + 4.5, (SIGN_Y0 + SIGN_Y1) * 0.5 - 0.3, TD + 1.06)
 	_sign(treats, "FALL TREATS", _lp(sc), 0.0031, 0.0)
 	vendor_spot = treats.transform * _lp(Vector3(16.0, 0.0, TD - 14.0))
-	game = _place(parent, "GameStall", _game_stall(), Vector3(2.6, 0, -3.4), -14.0)
-	crafts = _place(parent, "CraftsStall", _crafts_table(), Vector3(5.8, 0, 1.6), -30.0)
+	game = _place(parent, "GameStall", _game_stall(), Vector3(0.9, 0, -4.2), -8.0)
+	crafts = _place(parent, "CraftsStall", _crafts_table(), Vector3(3.7, 0, -0.1), -38.0)
 	_place(parent, "RedStall", _side_stall(RED, CREAM, 0), Vector3(8.4, 0, -7.6), -42.0)
 	_place(parent, "BlueStall", _side_stall(BLUE, CREAM, 1), Vector3(11.6, 0, -12.0), -55.0)
-	# Round 9 wider shot: an orange produce stall fills the left edge.
-	_place(parent, "OrangeStall", _side_stall(Color("e2662a"), CREAM, 2), Vector3(-9.9, 0, -1.6), 62.0)
+	# (Round 11: the orange side stall sat outside the frame; dropped for the triangle budget.)
 	# Chalkboards.
 	var menu := _chalkboard(parent, Vector3(-4.3, 0, 2.0), 20.0, 1.25)
 	K.label(menu, "Apple Cider\n· Pumpkin Pie\n· Pretzels\nCandy Apples", Vector3(-0.12, 1.2, 0.13), 0.0021, Color("f4f1e6"), 0.0, Color(0, 0, 0, 0), 64, HORIZONTAL_ALIGNMENT_LEFT)
-	var hm := _chalkboard(parent, Vector3(4.45, 0, 3.5), -22.0, 1.0, "fox")
+	var hm := _chalkboard(parent, Vector3(3.0, 0, 2.5), -24.0, 0.95, "fox")
 	K.label(hm, "HANDMADE", Vector3(0, 1.18, 0.13), 0.0025, Color("f4f1e6"))
-	var gm := _chalkboard(parent, Vector3(3.9, 0, -2.2), -20.0, 0.6)
+	var gm := _chalkboard(parent, Vector3(2.2, 0, -3.0), -16.0, 0.6)
 	K.label(gm, "3 TRIES", Vector3(-0.02, 0.62, 0.13), 0.0015, Color("f8e9a0"))
 
 
