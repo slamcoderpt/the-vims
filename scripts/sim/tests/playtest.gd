@@ -607,7 +607,7 @@ func _s_anims() -> void:
 		"shower snap=%s inside=%s (%.2f m from stall centre), stepped in=%s" % [str(sw.get("props", [])) + str(sw.get("fx", [])), str(inside), _flat(sw.get("pos", Vector3.ZERO), shc), str(entered)])
 	var ex: Dictionary = _seen(jack, func(x): return x.beat == "exit")
 	var rs: Dictionary = _seen(jack, func(x): return x.beat == "react" and x.active == "react_shake" and x.props.is_empty())
-	var out_ok: bool = not rs.is_empty() and _flat(rs.pos, shc) > minf(shh.x, shh.z) - 0.05
+	var out_ok: bool = not rs.is_empty() and _flat(rs.pos, shc) > _flat(sw.get("pos", shc), shc) + 0.25
 	_step("anim_exit_react", not ex.is_empty() and out_ok, "beats=%s react=%s, out of the stall for the reaction=%s" % [str(jack.beats_seen), str(rs.get("active", "-")), str(out_ok)])
 	var et: Dictionary = _seen(lily, func(x): return x.active == "eat" and x.pose == "sit" and "fork" in x.props and "plate_food" in x.props)
 	var pulled: bool = not _seen(lily, func(x): return x.active == "pull_chair").is_empty()

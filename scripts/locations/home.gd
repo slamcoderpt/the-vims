@@ -609,7 +609,8 @@ func _build_structure() -> void:
 	# divider would hide the bedside story scene behind it.
 	_wall(2, 3.5, -4.75, 0.0, 1, "pink", "blue", both_low)
 	_wall(2, 5.5, 0.25, 4.75, 1, "hall", "bath", {"office": "low", "bed": "tall"}, [[3.4, 4.4, 0.0, 2.1]])
-	_build_office_roof()
+	if OS.get_environment("VIMS_NOROOF") == "":
+		_build_office_roof()
 
 
 ## Gable roof over the office wing, standing only in the "bed" view. Ridge

@@ -551,8 +551,10 @@ func _human_pose() -> void:
 			# height, the brush tip at the middle of the picture), elbow
 			# slightly out; small dabbing strokes. The palette rests on the
 			# lap in the far hand.
-			_sb(bi, -1.9 + 0.1 * dab, (0.08 + 0.06 * dab2) * m, -0.16 * m)
-			_sb(bf, -0.45 - 0.18 * maxf(0.0, dab), 0.0, 0.1 * m)
+			# r12: arm well up and out toward the canvas (reads in silhouette
+			# from the 3/4-back house camera), elbow nearly straight.
+			_sb(bi, -1.75 + 0.08 * dab, (0.12 + 0.05 * dab2) * m, -0.38 * m)
+			_sb(bf, -0.12 - 0.15 * maxf(0.0, dab), 0.0, 0.0)
 			if _seated():
 				# Perch on the front edge of the stool, leaning in to the canvas.
 				_tgt_pos.z += 0.14 / _s
@@ -560,7 +562,7 @@ func _human_pose() -> void:
 			_sb(pf, -1.15)
 			# Chin up to the canvas (not down at the lap), a little tilt.
 			_ab(b_head, -0.16, 0.05 * dab2, 0.06 * sin(t * 0.7))
-			_ab(b_torso, 0.2, 0.0, 0.0)
+			_ab(b_torso, 0.26, 0.0, 0.0)
 			# Body square to the canvas; the head turns part way toward the
 			# player (stopping ~50 deg short) so eyes and smile read in 3/4.
 			var py := _present(0.85, 0.9, 0.03, 0.07)

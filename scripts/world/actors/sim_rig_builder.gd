@@ -758,8 +758,14 @@ static func _human_hair(vb: VoxelBuilder, style: String, hc: Callable, W: int, H
 				# never a puffed dome), ending in ragged locks at mid back.
 				var lock_fn := func(p: Vector3i) -> Color:
 					var c: Color = hc.call(p)
-					var lock := posmod(p.x + 1, 3) == 0
-					var f := 0.84 if lock else 1.0
+					# Wavy locks: strands run down the back (x) and along the
+					# side curtains (z), and drift a little with height so the
+					# hair reads as soft waves instead of a flat brown panel.
+					var side_v := p.x < 0 or p.x >= W
+					var u := p.z if side_v else p.x
+					var wave := int(floor(sin(p.y * 0.9) * 1.2))
+					var lock := posmod(u + 1 + wave, 3) == 0
+					var f := 0.82 if lock else (1.08 if posmod(u + wave, 3) == 0 else 1.0)
 					if p.y < B:
 						f *= 0.94
 					return _sh(c, f)

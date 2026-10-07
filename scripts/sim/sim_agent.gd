@@ -737,14 +737,18 @@ func _make_anim_ctx(a: Dictionary, info: Dictionary) -> Dictionary:
 	var c: Vector3 = surf.global_transform * surf.look_at_spot
 	var top := c.y + half.y
 	var floor_y := spot.y
+	var p: Vector3 = actor.global_position
+	var b: Basis = surf.global_transform.basis.orthonormalized()
+	var lp := b.inverse() * (p - c)
+	lp.x = clampf(lp.x, -half.x + 0.12, half.x - 0.12)
+	lp.z = clampf(lp.z, -half.z + 0.12, half.z - 0.12)
+	var q := c + b * lp
 	if top - floor_y > 0.45 and top - floor_y < 1.2:
-		var p: Vector3 = actor.global_position
-		var b: Basis = surf.global_transform.basis.orthonormalized()
-		var lp := b.inverse() * (p - c)
-		lp.x = clampf(lp.x, -half.x + 0.12, half.x - 0.12)
-		lp.z = clampf(lp.z, -half.z + 0.12, half.z - 0.12)
-		var q := c + b * lp
 		ctx["surface"] = Vector3(q.x, top + 0.005, q.z)
+	elif c.y - half.y - floor_y < 0.3:
+		# A tall unit (stove with hood, fridge column): its work top sits at
+		# the usual counter / table height.
+		ctx["surface"] = Vector3(q.x, floor_y + (0.75 if anim == "eat" else 0.92), q.z)
 	if str(info.get("use", "")) == "inside":
 		var ih: Vector3 = world._box_half(t)
 		var ic: Vector3 = t.global_transform * t.look_at_spot
