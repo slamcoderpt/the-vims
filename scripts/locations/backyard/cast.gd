@@ -4,7 +4,7 @@ extends RefCounted
 
 const Party := preload("res://scripts/locations/backyard/party.gd")
 const Gestures := preload("res://scripts/locations/backyard/gestures.gd")
-const DOG_POS := Vector3(2.45, 0.0, 2.35)
+const DOG_POS := Vector3(2.55, 0.0, 2.05)
 
 ## key -> [look, aliases]
 const PEOPLE := {
@@ -55,8 +55,8 @@ func build(parent: Node3D, party) -> void:
 	_seat("neighbor_8", party, "far_2", "sit_talk", 0.1)
 	_seat("neighbor_3", party, "far_3", "sit_talk", -0.1)
 	_seat("Maya", party, "far_4", "sit_talk", -0.25)
-	_seat("neighbor_6", party, "near_l", "sit_talk", -0.3)
-	_seat("neighbor_4", party, "near_r", "sit_talk", 0.3)
+	_seat("neighbor_6", party, "near_l", "sit_talk", -0.2)
+	_seat("neighbor_4", party, "near_r", "sit_talk", 0.2)
 	_seat("neighbor_7", party, "end_r", "sit_talk", 0.35)
 	gestures = Gestures.new()
 	parent.add_child(gestures)
@@ -64,9 +64,11 @@ func build(parent: Node3D, party) -> void:
 	gestures.add(actors.get("neighbor_8"), "toast", true, "", 0.08, 0.3)
 	gestures.add(actors.get("neighbor_3"), "drink", false, "", 0.05, 0.3)
 	gestures.add(actors.get("Maya"), "toast", true, "", 0.1, 0.3)
-	gestures.add(actors.get("neighbor_6"), "drink", false, "", 0.0, 0.4)
-	gestures.add(actors.get("neighbor_4"), "drink", false, "", 0.0, 0.4)
+	gestures.add(actors.get("neighbor_6"), "drink", false, "", 0.0, 0.0)
+	gestures.add(actors.get("neighbor_4"), "toast", true, "", 0.0, 0.0)
 	gestures.add(actors.get("neighbor_7"), "drink", true, "", 0.05, 0.6)
+	# Jack glances up from the grill so his face reads over the lid.
+	gestures.add(actors.get("Jack"), "look", false, "", 0.35, 0.5)
 	# On the deck, chatting with plates and drinks.
 	var a := _spawn("neighbor_1", Vector3(3.6, 0.375, -3.3), 0.0, "talk")
 	var b := _spawn("neighbor_2", Vector3(4.9, 0.375, -3.5), 0.0, "idle")

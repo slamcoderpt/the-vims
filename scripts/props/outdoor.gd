@@ -71,7 +71,7 @@ static func m_house(vb: VoxelBuilder, v: int) -> void:
 			var wz := 6 + k * 11
 			for xx: int in [0, w - 1]:
 				V.b(vb, xx, wy - 1, wz - 1, 1, 7, 6, trim)
-				var on2 := not lit or V.hs(xx, wy, wz + v) > 0.2
+				var on2 := not lit or V.hs(xx, wy, wz + v) > 0.1
 				for zz2 in range(wz, wz + 4):
 					for yy in range(wy, wy + 5):
 						V.p(vb, xx, yy, zz2, pane.call(Vector3i(xx, yy, zz2), wy + 4) if on2 else Color("3a4058"), on2 and lit)

@@ -117,8 +117,8 @@ func build(parent: Node3D) -> void:
 	# Glow sprites: fire pit, grill coals, table candles, house lamps + doors.
 	halos.add(PIT_POS + Vector3(0, 0.6, 0), 1.9, Color(1.0, 0.45, 0.12, 0.85))
 	var tb := Transform3D(Basis(Vector3.UP, TABLE_ROT), TABLE_POS)
-	for cq in [Vector2(-11, -3), Vector2(5, -3), Vector2(21, 0)]:
-		halos.add(tb * Vector3(cq.x / 16.0, 1.14, cq.y / 16.0), 0.55, Color(1.0, 0.65, 0.3, 0.9))
+	for cq in [Vector2(-11, -3), Vector2(12, -3), Vector2(21, 0)]:
+		halos.add(tb * Vector3(cq.x / 16.0, 0.95, cq.y / 16.0), 0.55, Color(1.0, 0.65, 0.3, 0.9))
 	for wx in [29.5 / 16.0, 193.5 / 16.0]:
 		halos.add(Vector3(wx, 2.4, -5.9), 0.9, Color(1.0, 0.7, 0.35, 0.6))
 	for dx in [3.4, 5.2, 7.0, 8.8, 10.6]:
@@ -178,25 +178,27 @@ func _table() -> void:
 	vb.jitter = 0.04
 	var L := TL
 	var D := TD
-	# Chunky legs + apron (only the feet show under the cloth drape).
+	# Chunky legs + apron (only the feet show under the cloth drape). Real
+	# dining height: the cloth top sits at 0.75 m, so seated diners show
+	# their chest and arms above the table.
 	for q in [Vector2i(-L + 2, -D + 2), Vector2i(L - 4, -D + 2), Vector2i(-L + 2, D - 4), Vector2i(L - 4, D - 4)]:
-		V.b(vb, q.x, 0, q.y, 2, 11, 2, WOOD_D)
-		V.b(vb, q.x, 3, q.y, 2, 1, 2, V.shade(WOOD_D, 0.8))
-	V.b(vb, -L + 1, 11, -D + 1, L * 2 - 2, 1, D * 2 - 2, V.wood(WOOD_D, 0, 2))
-	V.b(vb, -L, 12, -D, L * 2, 2, D * 2, V.wood(WOOD_L, 0, 3))
+		V.b(vb, q.x, 0, q.y, 2, 8, 2, WOOD_D)
+		V.b(vb, q.x, 2, q.y, 2, 1, 2, V.shade(WOOD_D, 0.8))
+	V.b(vb, -L + 1, 8, -D + 1, L * 2 - 2, 1, D * 2 - 2, V.wood(WOOD_D, 0, 2))
+	V.b(vb, -L, 9, -D, L * 2, 2, D * 2, V.wood(WOOD_L, 0, 3))
 	# Red gingham cloth over the whole top, draping down every side (ref4).
 	var gc := func(q: Vector3i) -> Color:
 		var c: Color = _gingham(q.x, q.z)
 		return V.shade(c, 0.97 + V.h1(q, 6) * 0.05)
-	V.b(vb, -L - 1, 14, -D - 1, L * 2 + 2, 1, D * 2 + 2, gc)
+	V.b(vb, -L - 1, 11, -D - 1, L * 2 + 2, 1, D * 2 + 2, gc)
 	for side in [-1, 1]:
 		var zz := -D - 2 if side < 0 else D + 1
-		V.b(vb, -L - 1, 10, zz, L * 2 + 2, 5, 1, func(q: Vector3i) -> Color:
-			return V.shade(_gingham(q.x, q.y), 0.88 if q.y < 14 else 0.95))
+		V.b(vb, -L - 1, 7, zz, L * 2 + 2, 5, 1, func(q: Vector3i) -> Color:
+			return V.shade(_gingham(q.x, q.y), 0.88 if q.y < 11 else 0.95))
 		var xx := -L - 2 if side < 0 else L + 1
-		V.b(vb, xx, 10, -D - 1, 1, 5, D * 2 + 2, func(q: Vector3i) -> Color:
-			return V.shade(_gingham(q.z, q.y), 0.85 if q.y < 14 else 0.95))
-	var y := 15
+		V.b(vb, xx, 7, -D - 1, 1, 5, D * 2 + 2, func(q: Vector3i) -> Color:
+			return V.shade(_gingham(q.z, q.y), 0.85 if q.y < 11 else 0.95))
+	var y := 12
 	# Place settings: a big white plate with one clear food item, a tall
 	# amber drink beside it, folded napkin.
 	var foods := [0, 3, 0, 2, 1, 0, 3, 2, 0]
@@ -229,12 +231,12 @@ func _table() -> void:
 	_burger_platter(vb, -3, y, 1)
 	V.b(vb, -6, y, -5, 1, 4, 1, Color("d02a24")); V.p(vb, -6, y + 4, -5, Color("f2f2f2"))
 	V.b(vb, -4, y, -5, 1, 4, 1, Color("f2c22a")); V.p(vb, -4, y + 4, -5, Color("f2f2f2"))
-	_candle(vb, 4, y, -4)
+	_candle(vb, 12, y, -4)
 	_melon(vb, 7, y, 1)
 	# Low vase, lined up between diners (never in front of a face).
-	V.b(vb, 15, y, -6, 3, 3, 3, Color("8fb7d9"))
-	V.blob(vb, Vector3(16.5, y + 5, -4.5), Vector3(2.4, 1.8, 2.4), V.mix([Color("f59cc6"), Color("fbf7f0"), Color("ee7fb4"), Color("e2513f"), Color("5f9e3a")], 3), 0.4, 3)
-	_pitcher(vb, 0, y, -6)
+	V.b(vb, 1, y, -5, 3, 2, 3, Color("8fb7d9"))
+	V.blob(vb, Vector3(2.5, y + 3, -3.5), Vector3(2.2, 1.4, 2.2), V.mix([Color("f59cc6"), Color("fbf7f0"), Color("ee7fb4"), Color("e2513f"), Color("5f9e3a")], 3), 0.4, 3)
+	_pitcher(vb, 15, y, -6)
 	_candle(vb, 20, y, -1)
 	_bowl_big(vb, 24, y, 1, Color("e9c23a"), [Color("f4e04a"), Color("e8b53a"), Color("fff0a0")])
 	# Chairs.
@@ -423,11 +425,11 @@ func _grill() -> void:
 	# Food on the grate: thick patties, sausages and corn cobs.
 	for i in 4:
 		var px := -8 + i * 4
-		V.b(vb, px, 17, -4, 3, 2, 3, V.mix([Color("6b3a1f"), Color("5a2e18"), Color("7b4526"), Color("3e2012")], i))
+		V.b(vb, px, 17, -4, 3, 1, 3, V.mix([Color("9a5a2e"), Color("8a4a26"), Color("a8663a")], i))
+		V.b(vb, px, 17, -3, 3, 1, 1, Color("4a2414"))
 		if i % 2 == 0:
-			V.b(vb, px, 19, -4, 3, 1, 1, Color("f2c22a"))
-		else:
-			V.p(vb, px + 1, 19, -3, Color("3e2012"))
+			V.b(vb, px, 18, -4, 3, 1, 3, Color("f7cf3e"))
+			V.p(vb, px + 2, 18, -2, Color("ffe07a"))
 	for i in 3:
 		V.b(vb, -7 + i * 3, 17, 1, 2, 2, 1, Color("a2512e"))
 		V.b(vb, -7 + i * 3, 17, 2, 2, 1, 1, Color("8a4426"))

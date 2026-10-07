@@ -150,6 +150,10 @@ func bind_location(loc: Node3D, p_name: String) -> void:
 			ag.set_away()
 		elif str(w.get("state", "")) == "going":
 			w.state = ""
+		elif str(w.get("state", "")) == "home":
+			# Mid home-shift (save / travel): sit back down if it's still on.
+			w.state = ""
+			ag.member.get("career", {})["last_day"] = -1
 	roll_wishes()
 
 

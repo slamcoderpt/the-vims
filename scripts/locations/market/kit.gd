@@ -366,7 +366,7 @@ static func tile_floor(parent: Node3D, size: Vector2, center: Vector3, tile := 0
 		for tx in n:
 			# warm cream tiles (two tones, faint per-tile variation) with
 			# a clearly visible warm-grey grout line and a bevelled edge.
-			var base := Color("f1e6d0") if (tx + ty) % 2 == 0 else Color("e5d5ba")
+			var base := Color("eee0c4") if (tx + ty) % 2 == 0 else Color("dfcbab")
 			var f := 0.95 + 0.08 * h(Vector3i(tx, ty, 5))
 			for y in px:
 				for x in px:

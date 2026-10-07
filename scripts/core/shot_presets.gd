@@ -7,7 +7,7 @@ const PRESETS := {
 	"home_day": {
 		"ref": "refs/ref1_home_office_day.png",
 		"location": "home", "day": 1, "hour": 14, "minute": 16, "season": 1,
-		"camera": {"target": Vector3(-5.6, 3.6, -1.9), "yaw": 38.0, "pitch": 36.0, "distance": 8.7, "fov": 40.0},
+		"camera": {"target": Vector3(-5.3, 3.2, -1.0), "yaw": 27.0, "pitch": 38.0, "distance": 11.5, "fov": 40.0},
 		"tasks": [
 			{"title": "Answer Emails", "icon": "laptop", "done": true},
 			{"title": "Practice Creativity", "icon": "palette"},
@@ -20,7 +20,7 @@ const PRESETS := {
 	"festival": {
 		"ref": "refs/ref2_autumn_festival.png",
 		"location": "festival", "day": 5, "hour": 16, "minute": 42, "season": 2,
-		"camera": {"target": Vector3(0.0, 2.4, -5.0), "yaw": 0.0, "pitch": 22.5, "distance": 26.0, "fov": 33.0},
+		"camera": {"target": Vector3(-1.05, 1.5, -2.0), "yaw": 0.0, "pitch": 18.0, "distance": 12.0, "fov": 44.0},
 		"tasks": [
 			{"title": "Buy Festival Snack", "icon": "apple", "done": true},
 			{"title": "Meet 3 Neighbors", "icon": "chat"},
@@ -33,7 +33,7 @@ const PRESETS := {
 	"home_night": {
 		"ref": "refs/ref3_home_night_cutaway.png",
 		"location": "home", "day": 0, "hour": 21, "minute": 18, "season": 1,
-		"camera": {"target": Vector3(3.5, 2.6, -3.2), "yaw": 4.0, "pitch": 25.5, "distance": 22.0, "fov": 37.0},
+		"camera": {"target": Vector3(4.3, 3.4, -1.7), "yaw": 22.0, "pitch": 32.0, "distance": 17.0, "fov": 37.0},
 		"tasks": [
 			{"title": "Take Bath", "icon": "bath"},
 			{"title": "Brush Teeth", "icon": "brush", "done": true},
@@ -59,7 +59,7 @@ const PRESETS := {
 	"market": {
 		"ref": "refs/ref5_grocery_market.png",
 		"location": "market", "day": 0, "hour": 8, "minute": 24, "season": 1,
-		"camera": {"target": Vector3(0.4, 1.35, -1.4), "yaw": 0.0, "pitch": 7.0, "distance": 16.0, "fov": 34.0},
+		"camera": {"target": Vector3(0.3, 1.7, 1.4), "yaw": 0.0, "pitch": 9.0, "distance": 8.0, "fov": 50.0},
 		"tasks": [
 			{"title": "Buy Groceries", "icon": "cart", "done": true},
 			{"title": "Meet a Neighbor", "icon": "people"},

@@ -42,7 +42,7 @@ func build() -> void:
 
 
 func camera_home() -> Dictionary:
-	return {"target": Vector3(0.4, 1.35, -1.4), "yaw": 0.0, "pitch": 7.0, "distance": 16.0, "fov": 34.0}
+	return {"target": Vector3(0.3, 1.7, 1.4), "yaw": 0.0, "pitch": 9.0, "distance": 8.0, "fov": 50.0}
 
 
 func lighting_profile() -> Dictionary:
@@ -51,17 +51,17 @@ func lighting_profile() -> Dictionary:
 	# lamps (bright emissive bulbs + warm omni/spot lights) paint amber pools
 	# on the cream tiles and crates; the fridge cases glow cool blue-white.
 	return {
-		"sun_heading": 200.0, "sun_elev": 64.0, "sun_energy": 0.32,
-		"ambient_day": Color(1.0, 0.95, 0.9), "ambient_energy": 0.5,
+		"sun_heading": 200.0, "sun_elev": 64.0, "sun_energy": 0.5,
+		"ambient_day": Color(1.0, 0.96, 0.9), "ambient_energy": 0.64,
 		"ambient_night": Color(0.85, 0.74, 0.62), "ambient_night_energy": 0.4,
 		"lamp_night_mult": 1.2,
 		"sky_day": Color(0.8, 0.84, 0.9), "sky_night": Color(0.2, 0.18, 0.2),
-		"fog_day": Color(0.9, 0.85, 0.78), "fog_night": Color(0.4, 0.32, 0.26), "fog_density": 0.0035,
-		"exposure": 0.94,
-		"shadow_distance": 18.0,
+		"fog_day": Color(0.93, 0.93, 0.91), "fog_night": Color(0.4, 0.32, 0.26), "fog_density": 0.006,
+		"exposure": 0.96,
+		"shadow_distance": 24.0,
 		"post": {"focus_y": 0.53, "band": 0.3, "falloff": 0.28, "blur_px": 3.4, "top_boost": 0.2,
-			"saturation": 1.16, "contrast": 1.12, "tint": Vector3(1.0, 1.0, 0.99),
-			"lift": Vector3(0.008, 0.005, 0.004), "vignette": 0.24},
+			"saturation": 1.14, "contrast": 1.08, "tint": Vector3(1.0, 0.99, 0.98),
+			"lift": Vector3(0.006, 0.006, 0.008), "vignette": 0.18},
 	}
 
 
@@ -73,7 +73,7 @@ func _fix_sun(_a = null, _b = null) -> void:
 		return
 	var sun = lt.get("sun")
 	if sun is DirectionalLight3D:
-		sun.light_color = Color(1.0, 0.94, 0.86)
+		sun.light_color = Color(1.0, 0.98, 0.95)
 
 
 func get_actor(key: String) -> SimActor:
@@ -141,7 +141,7 @@ func _place(key: String, pos: Vector3, face_to: Vector3, pose: String) -> SimAct
 func _stage() -> void:
 	if actors.is_empty():
 		return
-	var cam := Vector3(0.4, 0, 14.2)
+	var cam := Vector3(0.3, 0, 9.3)
 	# Telephoto view down the main aisle: the family is spread across the
 	# mid-ground (Lily at the produce island, Jack pushing the cart with
 	# Biscuit riding in it, Maya by the checkout) with open tile between them,
@@ -171,11 +171,11 @@ func _stage() -> void:
 	cashier.body_scale = 1.0
 	# Background shoppers browse down the aisles, in the screen gaps between
 	# the family (never directly behind a head).
-	_place("npc_2", Vector3(-3.6, 0, -3.6), Vector3(-5.0, 0, -4.2), "idle")
-	_place("npc_5", Vector3(1.75, 0, -10.3), Vector3(-2.0, 0, -6.0), "idle")
-	_place("npc_4", Vector3(0.3, 0, -9.1), Vector3(-0.6, 0, -12.0), "idle")
-	_place("npc_0", Vector3(-2.5, 0, -8.0), Vector3(-4.6, 0, -6.6), "stand_read")
-	_place("npc_6", Vector3(4.0, 0, -6.6), Vector3(4.6, 0, -6.6), "idle")
+	_place("npc_2", Vector3(-3.4, 0, -3.4), Vector3(-5.0, 0, -4.2), "idle")
+	_place("npc_5", Vector3(-2.3, 0, -14.1), Vector3(-2.0, 0, -16.0), "idle")
+	_place("npc_4", Vector3(1.4, 0, -11.2), Vector3(0.6, 0, -14.0), "idle")
+	_place("npc_0", Vector3(-1.6, 0, -6.4), Vector3(-4.6, 0, -6.6), "stand_read")
+	_place("npc_6", Vector3(4.0, 0, -7.6), Vector3(4.6, 0, -7.6), "idle")
 	_hold(actors["npc_4"], "basket")
 	_hold(actors["npc_2"], "basket")
 	_hold(actors["npc_6"], "basket")

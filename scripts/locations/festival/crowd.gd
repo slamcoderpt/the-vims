@@ -31,15 +31,15 @@ func build(parent: Node3D, stalls, stage) -> void:
 	var jack := spawn(parent, "Jack", "dad", Vector3(-2.75, 0, 0.75), Vector3(-5.2, 0, 7.0), "talk")
 	var lily := spawn(parent, "Lily", "bunny_girl", Vector3(-0.45, 0, 0.2), Vector3(1.6, 0, 9.0), "talk")
 	_hold(lily, "candy_apple", "fore_r")
-	var dog := spawn(parent, "Biscuit", "beagle", Vector3(-1.8, 0, 1.95), Vector3(2.2, 0, 6.0), "idle")
+	var dog := spawn(parent, "Biscuit", "beagle", Vector3(-1.75, 0, 1.2), Vector3(1.2, 0, 5.2), "idle")
 	dog.scale = Vector3.ONE * 0.85
-	var maya := spawn(parent, "Maya", "cat_girl", Vector3(3.2, 0, 2.35), Vector3(0.4, 0, 12.0), "talk")
+	var maya := spawn(parent, "Maya", "cat_girl", Vector3(2.55, 0, 1.45), Vector3(-1.6, 0, 11.0), "talk")
 	_hold(maya, "fox_plush", "torso")
 	# The preset camera looks down ~30 deg at the near heroes; a slight
 	# lean back (pivot at the feet) lifts the faces out from under the hats.
-	maya.rotation.x = deg_to_rad(-11.0)
-	jack.rotation.x = deg_to_rad(-5.0)
-	lily.rotation.x = deg_to_rad(-5.0)
+	maya.rotation.x = deg_to_rad(-4.0)
+	jack.rotation.x = deg_to_rad(-2.0)
+	lily.rotation.x = deg_to_rad(-2.0)
 	# --- Stall keepers.
 	spawn(parent, "vendor", "npc_6", vendor_pos, jack.position, "talk")
 	var g: Node3D = stalls.game
@@ -54,11 +54,11 @@ func build(parent: Node3D, stalls, stage) -> void:
 	# Animated townsfolk spaced along the walkway and round the stalls (three
 	# depth bands; nobody stands on the open path between Lily and the fountain).
 	var folk := [
-		["npc_7", Vector3(-2.6, 0, -5.0), Vector3(-2.0, 0, 6.0), "walk"],
-		["npc_5", Vector3(-3.6, 0, -4.4), Vector3(-5.0, 0, -2.0), "talk"],
+		["npc_7", Vector3(-1.0, 0, -6.6), Vector3(-0.2, 0, 6.0), "walk"],
+		["npc_5", Vector3(-3.9, 0, -5.6), Vector3(-5.2, 0, -3.4), "talk"],
 		["npc_3", Vector3(5.9, 0, -5.0), Vector3(5.1, 0, -5.7), "talk"],
 		["npc_0", Vector3(5.1, 0, -5.7), Vector3(5.9, 0, -5.0), "idle"],
-		["npc_4", Vector3(1.3, 0, -7.0), Vector3(1.8, 0, 6.0), "walk"],
+		["npc_4", Vector3(0.9, 0, -9.0), Vector3(1.4, 0, 6.0), "walk"],
 	]
 	_far_folk(parent)
 	var i := 1
@@ -101,15 +101,15 @@ func _far_folk(parent: Node3D) -> void:
 	# Mid ground: browsing the side stalls, queueing at the game booth,
 	# chatting in pairs at the edges of the walkway.
 	for p in [[-6.4, -5.6, 90, false], [-7.0, -7.4, 0, false], [-6.7, -6.6, 270, true],
-			[3.6, -5.2, 0, false], [7.2, -4.0, 270, false],
+			[7.2, -4.0, 270, false],
 			[9.4, -6.0, 300, false], [9.8, -9.6, 270, false],
 			[-2.2, -8.0, 135, true], [6.3, -8.4, 200, false], [7.0, -9.0, 30, true],
 			# Round 9 (wider camera): a scattered, smaller crowd filling the
 			# open cobbles between the heroes, fountain, game booth and stage.
 			[8.2, -4.0, 200, false], [9.0, -4.6, 120, false],
-			[0.9, -5.6, 330, false], [1.6, -5.9, 200, true], [4.4, -6.4, 0, false],
+			[4.4, -6.4, 0, false],
 			[-1.6, -12.8, 180, false],
-			[2.4, -8.6, 160, false], [-4.6, -11.6, 220, false], [10.4, -8.0, 300, true]]:
+			[-4.6, -11.6, 220, false], [10.4, -8.0, 300, true]]:
 		F.add(p[0], p[1], p[2], p[3], seed)
 		seed += 1
 	F.build(parent)
@@ -141,11 +141,14 @@ func _hold(a: SimActor, prop: String, bone: String) -> void:
 	var hand: float = -float(meta.get("fore_len", 0.22)) + 0.02
 	match prop:
 		"candy_apple":
-			mi.position = Vector3(0.0, hand - 0.02, 0.03)
-			mi.rotation = Vector3(1.1, 0, -0.6)
+			# Held up beside the face (not in front of the mouth).
+			mi.position = Vector3(0.03, hand - 0.03, 0.05)
+			mi.rotation = Vector3(0.35, 0, -0.25)
 		"fox_plush":
-			mi.position = Vector3(0.0, 0.1, 0.17)
-			mi.rotation = Vector3(0, 0, 0)
+			# Hugged against her side, turned 3/4 so its face reads.
+			mi.position = Vector3(0.15, 0.02, 0.15)
+			mi.rotation = Vector3(0, -0.5, 0)
+			mi.scale = Vector3.ONE * 0.9
 		"guitar":
 			mi.position = Vector3(0.02, 0.1, 0.17)
 			mi.rotation = Vector3(0, 0, deg_to_rad(-68.0))

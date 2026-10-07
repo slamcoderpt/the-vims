@@ -14,9 +14,12 @@ const Stage := preload("res://scripts/locations/festival/stage.gd")
 const Decor := preload("res://scripts/locations/festival/decor.gd")
 const Crowd := preload("res://scripts/locations/festival/crowd.gd")
 
-## Round 9: pulled back + up (critic r8) so heroes are ~1/5 frame tall and the
-## plaza, fountain, stage and clock tower all read with room to breathe.
-const CAMERA := {"target": Vector3(0.0, 2.4, -5.0), "yaw": 0.0, "pitch": 22.5, "distance": 26.0, "fov": 33.0}
+## Round 10: low 3/4 eye-level camera (18 deg pitch, pushed in) so the heroes
+## fill the lower-centre third (~1/3 frame tall) with readable faces, and the
+## plaza, fountain, stage and clock tower recede as layers behind them.
+## (Round 9 was pulled back + up (critic r8) so heroes were ~1/5 frame tall and the
+## plaza, fountain, stage and clock tower all read with room to breathe.)
+const CAMERA := {"target": Vector3(-1.05, 1.5, -2.0), "yaw": 0.0, "pitch": 18.0, "distance": 12.0, "fov": 44.0}
 ## Town backdrop is scaled down so the clock tower stays in frame under the
 ## steeper (ref-like) camera; hall front lands at z ~ -26.
 const TOWN_SCALE := 0.64
@@ -169,14 +172,14 @@ func lighting_profile() -> Dictionary:
 	# no haze, very light tilt-shift confined to thin top/bottom bands.
 	return {
 		"sun_heading": -12.0, "sun_elev": 24.0, "sun_energy": 1.5,
-		"ambient_day": Color(0.84, 0.74, 0.7), "ambient_energy": 0.7,
+		"ambient_day": Color(0.78, 0.76, 0.84), "ambient_energy": 0.72,
 		"ambient_night": Color(0.42, 0.38, 0.62), "ambient_night_energy": 0.45,
 		"sky_day": Color(0.56, 0.72, 0.92), "sky_night": Color(0.1, 0.1, 0.22),
 		"fog_day": Color(0.78, 0.8, 0.88), "fog_night": Color(0.12, 0.12, 0.26),
 		"fog_density": 0.0007, "exposure": 0.98, "shadow_distance": 45.0,
 		"lamp_night_mult": 1.6,
-		"post": {"focus_y": 0.52, "band": 0.32, "falloff": 0.3, "blur_px": 2.2, "top_boost": 0.55,
-			"saturation": 1.16, "contrast": 1.1, "tint": Vector3(1.04, 1.0, 0.93),
+		"post": {"focus_y": 0.52, "band": 0.34, "falloff": 0.15, "blur_px": 3.6, "top_boost": 0.9,
+			"saturation": 1.1, "contrast": 1.12, "tint": Vector3(1.02, 1.0, 0.96),
 			"lift": Vector3(0.0, 0.0, 0.0), "vignette": 0.22, "gamma": 1.04},
 	}
 
@@ -193,14 +196,14 @@ func _tune_env() -> void:
 		return
 	var env: Environment = lt.env
 	var n: float = lt.night
-	env.glow_intensity = lerpf(0.22, 0.6, n)
+	env.glow_intensity = lerpf(0.34, 0.6, n)
 	env.glow_strength = 0.9
 	env.glow_bloom = 0.0
-	env.glow_hdr_threshold = lerpf(1.4, 0.9, n)
+	env.glow_hdr_threshold = lerpf(1.15, 0.9, n)
 	env.tonemap_white = 5.0
 	# Golden late-afternoon key: warmer than lighting.gd's default ramp.
 	if "sun" in lt and lt.sun:
-		lt.sun.light_color = Color(1.0, 0.72, 0.44)
+		lt.sun.light_color = Color(1.0, 0.8, 0.58)
 
 
 func _print_stats() -> void:

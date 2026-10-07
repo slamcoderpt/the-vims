@@ -304,9 +304,14 @@ func _ground_lantern(vb: VoxelBuilder, x: int, z: int, y0 := 0, cs := U) -> void
 	K.box(vb, x - 3, y, z - 3, 6, 1, 6, iron)
 	for c in [Vector2i(-3, -3), Vector2i(2, -3), Vector2i(-3, 2), Vector2i(2, 2)]:
 		K.box(vb, x + c.x, y + 1, z + c.y, 1, 9, 1, iron)
-	K.box(vb, x - 2, y + 1, z - 2, 4, 9, 4, Color("ffa040"), true)
-	K.box(vb, x - 3, y + 1, z - 2, 6, 9, 4, Color("ffb450"), true)
-	K.box(vb, x - 2, y + 1, z - 3, 4, 9, 6, Color("ffa848"), true)
+	# Glass glows hottest round the flame (mid height), amber at the rims.
+	var glass := func(q: Vector3i) -> Color:
+		var t := clampf(1.0 - absf(float(q.y - y) - 4.5) / 4.5, 0.0, 1.0)
+		var edge := absi(q.x - x) >= 2 or absi(q.z - z) >= 2
+		return Color("ff9a38").lerp(Color("fff1b8"), t * (0.75 if edge else 1.0))
+	K.box(vb, x - 2, y + 1, z - 2, 4, 9, 4, glass, true)
+	K.box(vb, x - 3, y + 1, z - 2, 6, 9, 4, glass, true)
+	K.box(vb, x - 2, y + 1, z - 3, 4, 9, 6, glass, true)
 	K.box(vb, x - 3, y + 5, z - 3, 6, 1, 6, iron)
 	K.box(vb, x - 4, y + 10, z - 4, 8, 1, 8, iron)
 	K.box(vb, x - 3, y + 11, z - 3, 6, 1, 6, iron)
@@ -315,6 +320,10 @@ func _ground_lantern(vb: VoxelBuilder, x: int, z: int, y0 := 0, cs := U) -> void
 	var gk := cs / U
 	glow_points.append([Vector3(x, y + 6, z) * cs, 1.5 * gk, Color(1.0, 0.7, 0.35)])
 	glow_points.append([Vector3(x, y + 5, z) * cs, 0.6 * gk, Color(1.0, 0.86, 0.6)])
+	if cs > U:
+		# Near-camera lanterns: an extra halo in front of the glass (the
+		# centre one is depth-hidden inside it) so they read as lit.
+		glow_points.append([Vector3(x, y + 5.5, z + 5) * cs, 1.9, Color(1.0, 0.62, 0.3)])
 
 
 func _picnic_table(vb: VoxelBuilder, x: int, z: int) -> void:
@@ -350,7 +359,7 @@ func _props(parent: Node3D) -> void:
 		_barrel_planter(near, int(b[0] * C), int(b[1] * C), 5.0, b[2], i)
 		i += 1
 	# Ground lanterns (small, along the walkway edges).
-	for l in [[-7.0, 3.6], [-3.3, 2.9], [6.9, 0.2], [-2.0, -4.2], [1.9, -5.6], [-2.5, -9.0], [2.9, -9.3]]:
+	for l in [[-7.0, 3.6], [6.9, 0.2], [-2.0, -4.2], [1.9, -5.6], [-2.5, -9.0], [2.9, -9.3]]:
 		_ground_lantern(near, int(l[0] * C), int(l[1] * C))
 	# Picnic tables.
 	_picnic_table(near, int(-5.0 * C), int(-8.0 * C))
@@ -370,21 +379,8 @@ func _props(parent: Node3D) -> void:
 	K.hay(near, int(7.6 * C), 0, int(-5.6 * C), 16, 9, 9)
 	K.hay(near, int(-2.6 * C), 0, int(-6.8 * C), 16, 9, 9)
 	K.hay(near, int(1.4 * C), 0, int(-12.4 * C), 16, 9, 9)
-	# Pumpkin display on tiered hay (right edge of the wider round-9 shot).
-	var dx := int(10.2 * C)
-	var dz := int(-2.4 * C)
-	K.hay(near, dx - 16, 0, dz - 6, 32, 9, 12)
-	K.hay(near, dx - 10, 9, dz - 4, 20, 8, 9)
-	K.hay(near, dx - 16, 0, dz + 6, 32, 9, 9)
-	var pk := 0
-	for pp in [[-12, 9, 9, 3.6], [-4, 9, 10, 3.0], [5, 9, 9, 3.8], [12, 9, 10, 2.8],
-			[-6, 17, 0, 3.2], [3, 17, 1, 3.6], [-1, 9, -2, 2.6], [-14, 0, 17, 3.4], [-6, 0, 18, 2.4], [14, 0, 17, 3.0]]:
-		K.pumpkin(near, dx + pp[0], pp[1], dz + pp[2], pp[3], 60 + pk, pk)
-		pk += 1
-	_barrel_planter(near, dx + 22, dz + 10, 5.0, 1, 61)
-	_barrel_planter(near, int(-11.4 * C), int(-4.6 * C), 5.0, 2, 62)
-	K.hay(near, int(-12.6 * C), 0, int(-6.6 * C), 16, 9, 9)
-	K.pumpkin(near, int(-11.9 * C), 9, int(-6.3 * C), 3.4, 63, 2)
+	# (Round 10: the round-9 pumpkin display / far-left hay sat outside the
+	# tighter eye-level frame and were dropped to fund finer tree leaves.)
 	K.inst(parent, near, U, Vector3.ZERO, 0.0, true, Vector3.ZERO, "SquareProps")
 
 
@@ -409,13 +405,18 @@ func _foreground(parent: Node3D) -> void:
 	_cider_barrel(vb, int(-6.3 * C), int(2.0 * C))
 	_barrel_planter(vb, int(-8.0 * C), int(2.7 * C), 4.5, 0, 41)
 	K.mums(vb, -7.0 * C, 0, 3.7 * C, 4.6, 1, 42)
-	# Bottom-centre: two big lanterns on low crates + pumpkins.
-	_crate_box(vb, int(-0.5 * C) - 3, int(3.6 * C) - 3, 7, 5, 7)
-	_ground_lantern(vb, int(-0.5 * C), int(3.6 * C), 5, FV)
-	K.pumpkin(vb, int(-1.3 * C), 0, int(3.9 * C), 2.3, 6, 0)
-	_crate_box(vb, int(1.9 * C) - 3, int(3.8 * C) - 3, 7, 5, 7)
-	_ground_lantern(vb, int(1.9 * C), int(3.8 * C), 5, FV)
-	K.mums(vb, 1.2 * C, 0, 4.1 * C, 3.2, 2, 43)
+	# Round 10 (low 18 deg camera, frame bottom at z ~3.2): glowing lanterns
+	# on crates + mums/pumpkins along the bottom edge, below the heroes' feet,
+	# so they frame the shot (soft in the tilt-shift band) without hiding them.
+	_crate_box(vb, int(-2.6 * C) - 3, int(3.4 * C) - 3, 7, 4, 7)
+	_ground_lantern(vb, int(-2.6 * C), int(3.4 * C), 4, FV)
+	K.pumpkin(vb, int(-3.2 * C), 0, int(3.5 * C), 2.4, 6, 0)
+	K.pumpkin(vb, int(-1.3 * C), 0, int(4.0 * C), 1.8, 9, 1)
+	_crate_box(vb, int(0.9 * C) - 3, int(3.0 * C) - 3, 7, 4, 7)
+	_ground_lantern(vb, int(0.9 * C), int(3.0 * C), 4, FV)
+	K.mums(vb, 2.2 * C, 0, 3.6 * C, 3.4, 0, 43)
+	_barrel_planter(vb, int(3.6 * C), int(3.2 * C), 4.2, 1, 47)
+	K.pumpkin(vb, int(-0.1 * C), 0, int(3.9 * C), 2.0, 10, 2)
 	# Bottom-right: mums bushes, pumpkins, a planter barrel.
 	_barrel_planter(vb, int(8.8 * C), int(2.0 * C), 4.5, 1, 44)
 	K.mums(vb, 7.5 * C, 0, 3.3 * C, 4.4, 0, 45)

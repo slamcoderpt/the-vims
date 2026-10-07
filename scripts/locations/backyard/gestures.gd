@@ -31,7 +31,8 @@ func keep_eyes_open(actor: Node3D) -> void:
 
 
 ## mode: "toast" (glass raised high), "drink" (glass at chest), "burger"
-## (burger held up near the mouth), "mug" (mug at chest), "cheer" (both arms).
+## (burger held up near the mouth), "mug" (mug at chest), "cheer" (both arms),
+## "look" (head only: lift/turn toward the camera, arms keep their pose).
 ## look: max head yaw (radians) toward the camera, so diners glance at the
 ## player in 3/4 while their body stays square to the table.
 func add(actor: Node3D, mode: String, left := false, item := "", lift := 0.0, look := 0.0) -> void:
@@ -80,8 +81,10 @@ func _process(delta: float) -> void:
 			"mug", "drink":
 				arm_e = Vector3(-0.75 + 0.04 * w, 0.15 * m, -0.18 * m)
 				fore_e = Vector3(-1.2, 0.0, 0.0)
-		skel.set_bone_pose_rotation(arm, Quaternion.from_euler(arm_e))
-		skel.set_bone_pose_rotation(fore, Quaternion.from_euler(fore_e))
+		var head_only := String(it.mode) == "look"
+		if not head_only:
+			skel.set_bone_pose_rotation(arm, Quaternion.from_euler(arm_e))
+			skel.set_bone_pose_rotation(fore, Quaternion.from_euler(fore_e))
 		if String(it.mode) == "cheer":
 			var arm2: int = a.get("b_arm_r") if left else a.get("b_arm_l")
 			var fore2: int = a.get("b_fore_r") if left else a.get("b_fore_l")
@@ -105,6 +108,8 @@ func _process(delta: float) -> void:
 				cur.y = yaw
 			cur.x -= float(it.lift)
 			skel.set_bone_pose_rotation(hb, Quaternion.from_euler(cur))
+		if head_only:
+			continue
 		# Held item: in skeleton space, at the hand, kept upright.
 		var mi: MeshInstance3D = it.mi
 		if mi == null:

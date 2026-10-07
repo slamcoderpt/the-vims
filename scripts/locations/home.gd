@@ -146,14 +146,14 @@ func apply_preset(preset: String) -> void:
 
 ## Interior groups closed off under the office roof / ground-floor facade in
 ## the "bed" view: hidden there (nothing to see, saves draws + triangles).
-const CLOSED_IN_BED := ["Furniture_office", "Fine_office", "Micro_office", "Workstation", "Easel",
-	"Furniture_living", "Fine_living", "Micro_living", "Furniture_kitchen"]
+const CLOSED_IN_BED := ["Furniture_office", "Fine_office", "Micro_office", "Workstation", "EaselMesh", "DogBedMesh",
+	"Furniture_living", "Fine_living", "Micro_living", "Furniture_kitchen", "Fine_kitchen", "Micro_kitchen"]
 
 
 ## In the "office_in" view the camera stands inside the office with every
 ## office wall up: the other rooms and most of the yard are walled off (the
 ## window glass is painted), so their meshes are hidden (mobile budget).
-const CLOSED_ROOMS_OFFICE_IN := ["pink", "blue", "hall", "bath", "kitchen"]
+const CLOSED_ROOMS_OFFICE_IN := ["blue", "bath", "kitchen"]
 const CLOSED_EXT_OFFICE_IN := ["Ground", "Garden", "Fine_ext", "Furniture_ext", "ShowerGlass"]
 var _office_in_hidden: Array[Node3D] = []
 
@@ -175,7 +175,7 @@ func set_wall_view(view: String) -> void:
 				_office_in_hidden.append(c)
 	for c in _office_in_hidden:
 		if is_instance_valid(c):
-			c.visible = view != "office_in"
+			c.visible = view != "office_in" and not (view == "bed" and String(c.name) in CLOSED_IN_BED)
 	_ensure_neighbourhood(_is_night)
 	for vm in _view_meshes:
 		vm[0].visible = vm[1] == view
@@ -833,6 +833,7 @@ func _build_office() -> void:
 	# --- Art corner: easel by the first window, canvas angled to the camera.
 	_rug(R, -6.1, y, -3.95, 2.9, 2.2, "patch_pink")
 	var easel_mi := PropLib.instance("easel", 0)
+	easel_mi.name = "EaselMesh"
 	easel_mi.scale = Vector3.ONE * (PU / PropLib.FU)
 	easel_mi.position = Vector3(-4.45, y, -3.7)
 	easel_mi.rotation_degrees.y = 24.0
@@ -867,16 +868,37 @@ func _build_office() -> void:
 	_rug(R, -6.6, y, -1.0, 2.5, 2.0, "check_blue")
 	_rug(R, -3.9, y, -1.75, 2.6, 2.6, "blue_braid")
 	var ball := _put(R, "tennis_ball", Vector3(-4.35, y + PU, -0.85))
-	var dogbed := _putc(R, "dog_bed", -5.55, y, 0.35, 0)
+	# Wicker dog bed (instance at 0.8 x: about the beagle's length, ref1) by the
+	# play rug, not in the middle of the floor.
+	var dbm := PropLib.instance("dog_bed", 0)
+	dbm.name = "DogBedMesh"
+	dbm.scale = Vector3.ONE * (PU / PropLib.FU) * 0.8
+	dbm.position = Vector3(-2.75, y, 1.05)
+	dbm.rotation_degrees.y = -18.0
+	add_child(dbm)
+	var dogbed := AABB(Vector3(-3.1, y, 0.75), Vector3(0.7, 0.35, 0.6))
 	var toybox := _wallput(R, "toy_box", "+x", rx, -0.95, y)
 	_put(R, "soccer_ball", Vector3(-1.75, y + PU, 0.35))
 	_put(R, "toy_blocks", Vector3(-3.25, y + PU, -0.35), 0, 1)
 	_put(R, "toy_robot", Vector3(-2.3, y + PU, -0.45), 1)
 	_put(R, "toy_blocks", Vector3(-2.15, y + PU, 0.15), 0, 0)
 	_put(R, "plush", Vector3(-1.55, y + PU, -1.35), 3, 1)
+	# Front reading nook beside the balcony (fills the floor in front of the
+	# play rugs, ref1's busy foreground): rug, beanbag, floor lamp, crate of
+	# books, a basket of toys and plants along the divider.
+	_rug(R, -4.2, y, 2.1, 2.7, 2.3, "patch_pink")
+	_put(R, "beanbag", Vector3(-3.75, y, 2.45), 0, 2)
+	_put(R, "pouf", Vector3(-2.35, y, 3.2), 0, 2)
+	_put(R, "lamp_floor", Vector3(-4.3, y, 3.9))
+	_lamp(Vector3(-4.0, y + 1.95, 4.1), 0.45, 2.4, 0.35, Color(1.0, 0.7, 0.4), 0.4)
+	_put(R, "book_stack", Vector3(-2.9, y + PU, 2.45), 0, 1)
+	_put(R, "basket", Vector3(-1.75, y, 2.1), 0, 1)
+	_put(R, "plush", Vector3(-1.62, y + 7 * PU, 2.25), 0, 1)
+	_put(R, "plant", Vector3(-1.6, y, 1.2), 0, 6)
 	_put(R, "plant", Vector3(-1.55, y, 4.15), 0, 4)
+	_put(R, "plant", Vector3(-1.6, y, 3.3), 0, 1)
 	_put(R, "plant", Vector3(-4.3, y, 4.1), 0, 4)
-	_put(R, "toy_blocks", Vector3(-2.75, y, 3.05), 0, 0)
+	_put(R, "toy_blocks", Vector3(-2.75, y, 3.85), 0, 0)
 	# --- Balcony railing over the living room, with trailing planters on it.
 	PropLib.railing(_g(R), Vector3i(fc(-8.75), fc(y), fc(1.5) - 2), fc(4.25) + 2, 0, 16)
 	PropLib.railing(_g(R), Vector3i(fc(-4.5), fc(y), fc(1.5) - 2), fc(3.25) + 2, 2, 16)
@@ -1273,14 +1295,14 @@ func _build_exterior() -> void:
 	var o := VoxelBuilder.new()
 	var trees := [
 		Vector3(-8.5, 0, -8.0), Vector3(-3.5, 0, -7.6), Vector3(1.5, 0, -8.2), Vector3(6.5, 0, -7.7),
-		Vector3(-13.5, 0, -2.0), Vector3(-13.0, 0, 5.5), Vector3(12.5, 0, -1.0), Vector3(13.0, 0, 6.5),
+		Vector3(-13.5, 0, -2.0), Vector3(-13.0, 0, 5.5), Vector3(13.4, 0, 5.0),
 		Vector3(-18.5, 0, -17.0), Vector3(-6.5, 0, -16.8), Vector3(5.5, 0, -17.2), Vector3(17.0, 0, -16.6),
-		Vector3(-24.0, 0, -6.0), Vector3(22.0, 0, -8.0), Vector3(-20, 0, 10.0), Vector3(19, 0, 12.0),
-		Vector3(-12.0, 0, 9.5), Vector3(12.0, 0, 9.0), Vector3(-6.0, 0, 11.5), Vector3(7.5, 0, 12.0),
-		Vector3(11.5, 0, 3.0), Vector3(-12.5, 0, -6.5), Vector3(14.0, 0, -12.0), Vector3(-15.0, 0, -12.5),
+		Vector3(-24.0, 0, -6.0), Vector3(22.0, 0, -8.0), 
+		Vector3(-12.0, 0, 9.5), Vector3(11.6, 0, 11.0), Vector3(-6.0, 0, 11.5), Vector3(7.5, 0, 12.0),
+		Vector3(-12.5, 0, -6.5), Vector3(14.0, 0, -12.0), Vector3(-15.0, 0, -12.5),
 		# Right-hand lawns (seen beside the bathroom in the night shot).
-		Vector3(13.5, 0, -6.0), Vector3(17.5, 0, -2.5), Vector3(16.0, 0, 3.5), Vector3(20.5, 0, -6.5),
-		Vector3(10.5, 0, -9.0), Vector3(19.0, 0, -12.0), Vector3(23.0, 0, 1.0),
+		Vector3(24.0, 0, -5.0), Vector3(22.5, 0, -2.5), Vector3(20.5, 0, -7.5),
+		Vector3(10.5, 0, -9.0), Vector3(19.0, 0, -12.0), Vector3(23.0, 0, 3.0),
 	]
 	for i in trees.size():
 		var p: Vector3 = trees[i]
@@ -1314,11 +1336,13 @@ func _build_exterior() -> void:
 		_halo_pts.append({"pos": Vector3(lx + 1.4, 0, -26.0) + lh, "size": 3.0, "color": STREET_HALO})
 	# Lamp posts along the back garden path, in frame above the bedrooms at
 	# night (ref3): glow voxels + halos only (no extra omni lights).
-	for lp: Vector3 in [Vector3(-1.2, 0, -7.4), Vector3(10.6, 0, -6.6), Vector3(11.0, 0, 2.6)]:
+	for lp: Vector3 in [Vector3(-1.2, 0, -7.4), Vector3(10.3, 0, -6.6), Vector3(10.0, 0, 0.9)]:
 		PropLib.place(o, "street_lamp", Vector3i(cc(lp.x), 0, cc(lp.z)), 0, 1)
 		_halo_pts.append({"pos": lp + lh, "size": 2.6, "color": STREET_HALO})
 	var bushes := [Vector3(-9.8, 0, -3.0), Vector3(-9.8, 0, 1.0), Vector3(9.4, 0, -3.5), Vector3(9.4, 0, 0.5),
-		Vector3(-6.0, 0, 5.6), Vector3(-2.5, 0, 5.6), Vector3(3.5, 0, 5.6), Vector3(6.5, 0, 5.6), Vector3(-9.8, 0, 4.2), Vector3(9.4, 0, 3.6)]
+		Vector3(-6.0, 0, 5.6), Vector3(-2.5, 0, 5.6), Vector3(3.5, 0, 5.6), Vector3(6.5, 0, 5.6), Vector3(-9.8, 0, 4.2), Vector3(9.4, 0, 3.6),
+		# Side lawn on the right (beside the bathroom in the night shot).
+		Vector3(10.4, 0, -3.6), Vector3(11.7, 0, -0.6), Vector3(10.7, 0, 3.0), Vector3(12.4, 0, 2.2), Vector3(11.2, 0, 6.4)]
 	for i in bushes.size():
 		var p: Vector3 = bushes[i]
 		PropLib.place(o, "bush", Vector3i(cc(p.x), 0, cc(p.z)), 0, i)
@@ -1333,6 +1357,9 @@ func _build_exterior() -> void:
 		if fx0 > fc(0.2) and fx0 < fc(1.9):
 			continue
 		PropLib.place(_g("ext"), "fence", Vector3i(fx0, 0, fz), 0)
+	# Flower beds along the right side of the house.
+	for k in 4:
+		PropLib.place(_g("ext"), "flower_bed", Vector3i(fc(9.35), 0, fc(-4.2 + k * 2.3)), 1, k)
 	# Ground-floor window glass (day: sky reflection, night: warm glow).
 	var gd := VoxelBuilder.new()
 	var gn := VoxelBuilder.new()
@@ -1443,19 +1470,23 @@ func _ensure_neighbourhood(lit: bool) -> void:
 			Vector3(-26, 0, -5.0), Vector3(23, 0, -4.0),
 			# Second row across the back gardens (their roofs + lit upstairs
 			# windows fill the top band of the night shot, ref3).
-			Vector3(-20, 0, -33.0), Vector3(-9, 0, -32.0), Vector3(2, 0, -33.0), Vector3(13, 0, -32.5), Vector3(24, 0, -33.0)]
-		var styles := [1, 4, 2, 0, 5, 3, 2, 5, 3, 0, 4, 1, 2]
+			Vector3(-20, 0, -33.0), Vector3(-9, 0, -32.0), Vector3(2, 0, -33.0), Vector3(13, 0, -32.5), Vector3(24, 0, -33.0),
+			# Next-door houses on the right, gable end towards us: lit windows
+			# fill the lawn beside the bathroom in the night shot (ref3).
+			Vector3(12.6, 0, -7.4)]
+		var styles := [1, 4, 2, 0, 5, 3, 2, 5, 3, 0, 4, 1, 2, 0]
+		var rots := [0, 0, 0, 0, 0, 0, 1, 3, 0, 0, 0, 0, 0, 3]
 		# Neighbour houses drawn a little smaller than authored (0.2 m cells):
 		# they read as a street of homes behind ours, roofs in frame (ref3).
 		var hs: float = PropLib.scale_of("house") * 0.9
 		# Mobile budget: the lit (night) street keeps only the houses the
 		# bedroom camera can see.
-		var night_skip := [0, 6, 7]
+		var night_skip := [0, 6, 7, 8, 12]
 		for i in spots.size():
 			if lit and i in night_skip:
 				continue
 			var c: Vector3 = spots[i] + Vector3(4.0, 0, 3.25)
-			var rot := 0 if (i < 6 or i > 7) else (1 if i == 6 else 3)
+			var rot: int = rots[i]
 			var rs := PropLib.rotated_size("house", rot, styles[i] + (8 if lit else 0))
 			PropLib.place(vb, "house", Vector3i(roundi(c.x / hs) - rs.x / 2, 0, roundi(c.z / hs) - rs.z / 2), rot, styles[i] + (8 if lit else 0))
 		var mi := MeshInstance3D.new()
@@ -1819,7 +1850,7 @@ func _stage(preset: String) -> void:
 		lily.lie_height = 10 * PU / lily.scale.y
 		var ch: AABB = _spots["pink_chair"]
 		var cc3 := ch.get_center()
-		var jack := _place("dad", Vector3(cc3.x, y, cc3.z + 0.04), Vector3(cc3.x - 1.0, y, cc3.z + 0.9), "sit_read", 7 * PU)
+		var jack := _place("dad", Vector3(cc3.x, y, cc3.z + 0.04), Vector3(cc3.x - 0.55, y, cc3.z + 1.0), "sit_read", 7 * PU)
 		var st: AABB = _spots["step"]
 		var maya := _place("cat_girl", Vector3(st.get_center().x, y + 6 * PU, st.get_center().z), Vector3(st.get_center().x + 0.55, y, st.get_center().z + 1.6), "brush_teeth")
 		var cu: AABB = _spots["dog_cushion"]
