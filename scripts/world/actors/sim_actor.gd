@@ -608,10 +608,10 @@ func _human_pose() -> void:
 			_ab(b_torso, 0.16 + 0.02 * pl2, hy * 0.2, 0.0)
 			_ab(b_head, -0.3 + 0.04 * pl2, hy * 0.8, 0.1 + 0.06 * sin(t * 1.1))
 			# Both hands forward on the robot (fiddling with it), elbows in.
-			_sb(b_arm_l, -0.75 + 0.06 * pl, -0.32, 0.12)
-			_sb(b_fore_l, -0.95 - 0.08 * pl2, 0.0, 0.0)
-			_sb(b_arm_r, -0.7 - 0.06 * pl, 0.32, -0.12)
-			_sb(b_fore_r, -0.95 + 0.1 * pl, 0.0, 0.0)
+			_sb(b_arm_l, -0.45 + 0.05 * pl, -0.38, 0.1)
+			_sb(b_fore_l, -0.75 - 0.08 * pl2, 0.0, 0.0)
+			_sb(b_arm_r, -0.4 - 0.05 * pl, 0.38, -0.1)
+			_sb(b_fore_r, -0.75 + 0.1 * pl, 0.0, 0.0)
 
 
 ## Floor sit with the legs in a forward V (toddler style), knees a touch up.
@@ -886,7 +886,7 @@ func _make_prop(pname: String, bone: String) -> MeshInstance3D:
 		"robot":
 			# Held upright between both hands in her lap (the forearm points
 			# forward, so the toy is counter-rotated to stand up).
-			mi.position = Vector3(-0.045, hand - 0.02, 0.07)
-			mi.rotation = Vector3(1.55, 0.35, 0.0)
+			mi.position = Vector3(-0.05, hand - 0.02, 0.07)
+			mi.rotation = Vector3(1.25, 0.35, 0.0)
 	att.add_child(mi)
 	return mi

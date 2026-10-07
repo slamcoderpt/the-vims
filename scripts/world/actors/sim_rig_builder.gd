@@ -864,8 +864,8 @@ static func _human_hat(vb: VoxelBuilder, L: Dictionary, W: int, H: int, Dd: int,
 			# so it reads as a plush knit cap, not a flat cake.
 			var dx := absf(x - hcx) / (W * 0.5 + 0.95)
 			var dz := absf(z - hcz) / ((F + 1) * 0.5 + 0.95)
-			var dy := maxf(0.0, (y - (T - 1.0)) / 4.3)
-			return pow(dx, 2.7) + pow(dz, 2.7) + pow(dy, 2.0) <= 1.0
+			var dy := maxf(0.0, (y - (T - 1.0)) / 4.0)
+			return pow(dx, 3.0) + pow(dz, 3.0) + pow(dy, 2.2) <= 1.0
 		# Hair can't poke through the hat above the cuff line.
 		for y in range(c0, T + 7):
 			for x in range(-4, W + 4):
