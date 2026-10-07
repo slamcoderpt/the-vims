@@ -531,6 +531,11 @@ func _place_main(b, vs: Vector2) -> void:
 		_placed.append(_pb_rect(best_pos, b.size, best_side))
 
 
+const _SEL_SIDES: Array[int] = [-1, 1]
+const _SEL_LIFTS: Array[float] = [0.0, 16.0, 34.0, 56.0]
+const _SEL_DX: Array[float] = [0.0, 14.0, 30.0]
+
+
 ## Selected sim (ref1 "Work" + gem): the plumbob floats straight over the
 ## head with its own clear space, and the action bubble hangs beside the gem
 ## (left preferred) with its tail dipping toward the head. Returns false when
@@ -545,9 +550,9 @@ func _place_selected(b, vs: Vector2, full: Vector2) -> bool:
 	var best := INF
 	var best_pos := Vector2.ZERO
 	var best_side := 0
-	for side in [-1, 1]:
-		for lift in [0.0, 16.0, 34.0, 56.0]:
-			for dx in [0.0, 14.0, 30.0]:
+	for side in _SEL_SIDES:
+		for lift in _SEL_LIFTS:
+			for dx in _SEL_DX:
 				var x: float = pbr.position.x - 14.0 - dx - b.size.x if side < 0 else pbr.end.x + 14.0 + dx
 				# bubble body roughly level with the gem, tail bottom near
 				# the gem's lower half

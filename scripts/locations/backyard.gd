@@ -10,7 +10,7 @@ const Party := preload("res://scripts/locations/backyard/party.gd")
 const Cast := preload("res://scripts/locations/backyard/cast.gd")
 const SunsetEnv := preload("res://scripts/locations/backyard/sunset_env.gd")
 
-const CAMERA := {"target": Vector3(1.7, 0.6, -1.7), "yaw": -14.0, "pitch": 26.0, "distance": 10.2, "fov": 58.0}
+const CAMERA := {"target": Vector3(1.1, 0.9, -0.9), "yaw": -14.0, "pitch": 24.0, "distance": 8.8, "fov": 48.0}
 
 var garden
 var house
@@ -77,6 +77,9 @@ func _print_stats() -> void:
 		vp.get_render_info(Viewport.RENDER_INFO_TYPE_VISIBLE, Viewport.RENDER_INFO_DRAW_CALLS_IN_FRAME),
 		vp.get_render_info(Viewport.RENDER_INFO_TYPE_SHADOW, Viewport.RENDER_INFO_DRAW_CALLS_IN_FRAME),
 		vp.get_render_info(Viewport.RENDER_INFO_TYPE_CANVAS, Viewport.RENDER_INFO_DRAW_CALLS_IN_FRAME)])
+	for a in find_children("*", "Node3D", true, false):
+		if a.has_method("kind") and a.get("_meta") is Dictionary:
+			print("  actor %s %s h=%.2f s=%.2f" % [a.name, a.get("look"), float(a._meta.get("height", 0.0)) * float(a._s), float(a._s)])
 	print("BACKYARD_STATS meshes=%d tris=%d draws=%d prims=%d" % [meshes, tris,
 		RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME),
 		RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_PRIMITIVES_IN_FRAME)])
@@ -109,7 +112,7 @@ func _sync_env() -> void:
 		var gold := smoothstep(16.5, 18.5, h) * (1.0 - smoothstep(20.0, 21.5, h))
 		var nite := smoothstep(20.5, 22.0, h) if h > 12.0 else 1.0 - smoothstep(4.5, 6.0, h)
 		fill.light_color = Color(1.0, 0.74, 0.5).lerp(Color(0.6, 0.66, 1.0), nite)
-		fill.light_energy = gold * 0.42 + nite * 0.12
+		fill.light_energy = gold * 0.58 + nite * 0.12
 		fill.visible = fill.light_energy > 0.01
 
 
@@ -174,10 +177,10 @@ func lighting_profile() -> Dictionary:
 	# string lights, fire pit and the lit house make the warm pools.
 	return {
 		"sun_heading": 262.0, "sun_elev": 11.0, "sun_energy": 1.25,
-		"ambient_day": Color(0.78, 0.62, 0.74), "ambient_night": Color(0.40, 0.38, 0.66),
-		"ambient_energy": 0.62, "ambient_night_energy": 0.5,
+		"ambient_day": Color(0.86, 0.66, 0.70), "ambient_night": Color(0.40, 0.38, 0.66),
+		"ambient_energy": 0.7, "ambient_night_energy": 0.5,
 		"exposure": 1.0, "shadow_distance": 30.0,
 		"lamp_night_mult": 1.35, "glow_boost_night": 1.9,
-		"post": {"focus_y": 0.53, "band": 0.2, "falloff": 0.32, "blur_px": 5.0, "top_boost": 1.25,
+		"post": {"focus_y": 0.52, "band": 0.3, "falloff": 0.24, "blur_px": 3.2, "top_boost": 1.25,
 			"saturation": 1.12, "contrast": 1.06, "tint": Vector3(1.04, 0.97, 0.98), "vignette": 0.26},
 	}

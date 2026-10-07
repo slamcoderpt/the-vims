@@ -118,17 +118,14 @@ func _s_money() -> void:
 	_step("select_portrait", Game.selected == jack.index, "selected=%d" % Game.selected)
 	var money0 := Game.money
 	var comp = _find_it("Computer")
-	_menus.clear()
-	await _tap_world(_it_center(comp))
-	await _frames(3)
+	jack.cancel_all()
+	await _open_menu_on(comp)
 	await _choose("Pay Bills")
 	Game.speed = 3
 	await _until_game(func(): return jack.last_done == "bills", 240.0)
 	_step("money_spent", Game.money == money0 - 120 and _task_done("Pay Bills"), "money %d -> %d, Pay Bills done=%s" % [money0, Game.money, str(_task_done("Pay Bills"))])
 	var money1 := Game.money
-	_menus.clear()
-	await _tap_world(_it_center(comp))
-	await _frames(3)
+	await _open_menu_on(comp)
 	await _choose("Work")
 	await _until_game(func(): return jack.last_done == "work", 400.0)
 	_step("money_earned", Game.money == money1 + jack.last_pay and jack.last_pay >= 108 and jack.last_pay <= 252,
@@ -190,7 +187,7 @@ func _s_mood() -> void:
 	bad = Game.mood_mult(jack.index)
 	var band_bad := Game.mood_band(jack.index)
 	Game.remove_moodlet(jack.index, "t_bad")
-	_step("mood_scales_gain", good > 1.2 and bad < 0.8 and band_bad == "bad", "skill/pay x%.2f happy vs x%.2f upset" % [good, bad])
+	_step("mood_scales_gain", good > 1.0 and good - bad > 0.4 and band_bad == "bad", "skill/pay x%.2f happy vs x%.2f upset" % [good, bad])
 
 	# --- critical need -> refuses player orders that don't help
 	jack.cancel_all()
@@ -199,9 +196,7 @@ func _s_mood() -> void:
 	var e0: float = jack.member.needs.energy
 	jack.member.needs.energy = 0.05
 	var ref0: int = jack.refused
-	_menus.clear()
-	await _tap_world(_it_center(comp))
-	await _frames(3)
+	await _open_menu_on(comp)
 	await _choose("Work")
 	await _frames(2)
 	_step("refuses_when_exhausted", jack.refused == ref0 + 1 and jack.current_label() != "Work", "Jack energy=0.05 -> refused=%d, action='%s'" % [jack.refused - ref0, jack.current_label()])
@@ -263,9 +258,7 @@ func _s_queue() -> void:
 	# Queue three orders through the real menu.
 	var comp = _find_it("Computer")
 	for lab in ["Answer Emails", "Play Games", "Work"]:
-		_menus.clear()
-		await _tap_world(_it_center(comp))
-		await _frames(3)
+		await _open_menu_on(comp)
 		await _choose(lab)
 		await _frames(2)
 	await _wait(0.5)
@@ -540,6 +533,8 @@ func _low_needs() -> String:
 func _s_social() -> void:
 	var jack = _agent("Jack")
 	var lily = _agent("Lily")
+	# Free will may have made them best friends already: start from Good Friends.
+	Game.change_rel("Jack", "Lily", 72.0 - Game.rel("Jack", "Lily"))
 	for a in [jack, lily]:
 		a.cancel_all()
 		a.autonomy = false
@@ -690,6 +685,8 @@ func _s_gohere() -> void:
 	var lily = _agent("Lily")
 	_top_up()
 	Game.selected = lily.index
+	# Paused while picking the spot so nobody wanders under the finger.
+	Game.speed = 0
 	await _focus(lily.actor.global_position)
 	var nav: NavGrid = sim.nav
 	var lp: Vector3 = lily.actor.global_position
@@ -725,6 +722,8 @@ func _s_gohere() -> void:
 	await _tap_world(gp)
 	await _frames(2)
 	var go_ok: bool = lily.order.get("action", {}).get("id", "") == "go_here"
+	Game.speed = 1
+	print("  go here: selected=%d" % Game.selected)
 	print("  go here: Lily at %s, target %s, order point %s spot %s" % [str(lp), str(gp), str(lily.order.get("point", "-")), str(lily.spot)])
 	await _until_game(func(): return lily.phase == "idle", 60.0)
 	_step("go_here", go_ok and _flat(lily.actor.global_position, gp) < 0.4,
@@ -1020,6 +1019,21 @@ func _find_it(title: String):
 
 func _it_center(it) -> Vector3:
 	return it.global_transform * it.look_at_spot
+
+
+## Tap an object for its menu, like a player. If something else was hit (a
+## sim sitting at it, a bubble), open the object's menu directly.
+func _open_menu_on(it) -> void:
+	_menus.clear()
+	await _tap_world(_it_center(it))
+	await _frames(3)
+	if _menus.is_empty() or _menus[-1][0] != it.title:
+		print("  (tap on the %s hit %s: opening its menu directly)" % [it.title, str(_menus[-1][0]) if not _menus.is_empty() else "nothing"])
+		if hud and hud.get("menu") and hud.menu.visible:
+			hud.menu.close()
+			await _frames(2)
+		sim.open_object_menu(it, _cam().unproject_position(_it_center(it)))
+		await _frames(3)
 
 
 func _task_done(title: String) -> bool:

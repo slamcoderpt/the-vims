@@ -63,11 +63,11 @@ func _lights() -> void:
 	# Halos are subtle (they suggest glow without washing the frame out);
 	# street lamps + floor lanterns get the strongest ones.
 	var pts: Array = []
-	_add_halos(pts, stalls.glow_points, 0.7)
-	_add_halos(pts, stage.glow_points, 0.75)
-	_add_halos(pts, decor.glow_points, 1.0)
+	_add_halos(pts, stalls.glow_points, 0.45)
+	_add_halos(pts, stage.glow_points, 0.5)
+	_add_halos(pts, decor.glow_points, 0.55)
 	for w: Vector3 in town.window_glows:
-		pts.append([TOWN_POS + w * TOWN_SCALE, 1.0 * TOWN_SCALE, Color(0.4, 0.26, 0.12, 0.6)])
+		pts.append([TOWN_POS + w * TOWN_SCALE, 1.0 * TOWN_SCALE, Color(0.25, 0.16, 0.08, 0.5)])
 	halos = K.halos(pts)
 	add_child(halos)
 	# A handful of real lights (each costs an extra pass per lit mesh on GL Compatibility).
@@ -78,7 +78,7 @@ func _lights() -> void:
 func _add_halos(out: Array, src: Array, k: float) -> void:
 	for e: Array in src:
 		var c: Color = e[2]
-		out.append([e[0], e[1] * 0.85, Color(c.r * k, c.g * k * 0.92, c.b * k * 0.85, c.a)])
+		out.append([e[0], e[1] * 0.6, Color(c.r * k, c.g * k * 0.92, c.b * k * 0.85, c.a)])
 
 
 func _interactables() -> void:
@@ -148,19 +148,20 @@ func camera_home() -> Dictionary:
 ## Kept deliberately restrained: mid-value cobbles, crisp backdrop, only a
 ## mild tilt-shift past the fountain (critic round 1: haze/bloom too strong).
 func lighting_profile() -> Dictionary:
-	# Golden hour (critic round 5): low warm key, peach sky, warm haze that
-	# softens the town backdrop, plus a real tilt-shift DOF.
+	# Round 7: the backdrop must stay crisp and saturated against a blue-ish
+	# sky. Low warm key from behind-left (golden hour), cool clear sky, almost
+	# no haze, very light tilt-shift confined to thin top/bottom bands.
 	return {
-		"sun_heading": -12.0, "sun_elev": 21.0, "sun_energy": 1.4,
-		"ambient_day": Color(0.7, 0.7, 0.88), "ambient_energy": 0.6,
+		"sun_heading": -12.0, "sun_elev": 24.0, "sun_energy": 1.5,
+		"ambient_day": Color(0.66, 0.72, 0.9), "ambient_energy": 0.62,
 		"ambient_night": Color(0.42, 0.38, 0.62), "ambient_night_energy": 0.45,
-		"sky_day": Color(0.84, 0.82, 0.9), "sky_night": Color(0.1, 0.1, 0.22),
-		"fog_day": Color(0.98, 0.8, 0.62), "fog_night": Color(0.12, 0.12, 0.26),
-		"fog_density": 0.0024, "exposure": 1.0, "shadow_distance": 45.0,
+		"sky_day": Color(0.56, 0.72, 0.92), "sky_night": Color(0.1, 0.1, 0.22),
+		"fog_day": Color(0.78, 0.8, 0.88), "fog_night": Color(0.12, 0.12, 0.26),
+		"fog_density": 0.0007, "exposure": 0.98, "shadow_distance": 45.0,
 		"lamp_night_mult": 1.6,
-		"post": {"focus_y": 0.6, "band": 0.2, "falloff": 0.36, "blur_px": 3.8, "top_boost": 0.6,
-			"saturation": 1.15, "contrast": 1.12, "tint": Vector3(1.03, 0.99, 0.93),
-			"lift": Vector3(0.006, 0.0, -0.004), "vignette": 0.3, "gamma": 1.02},
+		"post": {"focus_y": 0.52, "band": 0.32, "falloff": 0.3, "blur_px": 2.2, "top_boost": 0.55,
+			"saturation": 1.16, "contrast": 1.1, "tint": Vector3(1.04, 1.0, 0.93),
+			"lift": Vector3(0.0, 0.0, 0.0), "vignette": 0.22, "gamma": 1.04},
 	}
 
 
@@ -176,10 +177,10 @@ func _tune_env() -> void:
 		return
 	var env: Environment = lt.env
 	var n: float = lt.night
-	env.glow_intensity = lerpf(0.4, 0.7, n)
-	env.glow_strength = 1.0
+	env.glow_intensity = lerpf(0.22, 0.6, n)
+	env.glow_strength = 0.9
 	env.glow_bloom = 0.0
-	env.glow_hdr_threshold = lerpf(1.3, 0.85, n)
+	env.glow_hdr_threshold = lerpf(1.4, 0.9, n)
 	env.tonemap_white = 5.0
 	# Golden late-afternoon key: warmer than lighting.gd's default ramp.
 	if "sun" in lt and lt.sun:
@@ -199,8 +200,8 @@ func _print_stats() -> void:
 				var idx = arr[Mesh.ARRAY_INDEX]
 				var n: int = (idx.size() / 3) if idx != null and idx.size() > 0 else (arr[Mesh.ARRAY_VERTEX] as PackedVector3Array).size() / 3
 				tris += n
-				if n > 4000:
-					print("  mesh ", mi.get_parent().name, "/", mi.name, " surf ", si, " tris ", n)
+				if n > 2500:
+					print("  mesh ", mi.get_parent().name, "/", mi.name, " vis=", mi.is_visible_in_tree(), " surf ", si, " tris ", n)
 	var cam := get_viewport().get_camera_3d()
 	if cam:
 		for k: String in ["Jack", "Lily", "Maya", "Biscuit", "vendor", "guitarist", "game_host"]:

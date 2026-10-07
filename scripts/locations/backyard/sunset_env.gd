@@ -85,7 +85,7 @@ func setup(viewport: Viewport, shared_env: Environment) -> void:
 	env.fog_mode = Environment.FOG_MODE_DEPTH
 	env.fog_light_color = Color(0.78, 0.52, 0.62)
 	env.fog_light_energy = 1.0
-	env.fog_density = 0.32
+	env.fog_density = 0.22
 	env.fog_depth_begin = 22.0
 	env.fog_depth_end = 60.0
 	env.fog_depth_curve = 1.4
@@ -122,19 +122,23 @@ func update(hour: float) -> void:
 	if sky_mat == null:
 		return
 	sky_mat.set_shader_parameter("brightness", lerpf(1.0, 0.3, n))
-	var top := Color(0.27, 0.20, 0.46).lerp(Color(0.05, 0.06, 0.16), n).lerp(Color(0.38, 0.58, 0.9), day)
-	var mid := Color(0.66, 0.36, 0.60).lerp(Color(0.16, 0.12, 0.3), n).lerp(Color(0.6, 0.76, 0.95), day)
-	var low := Color(1.0, 0.56, 0.40).lerp(Color(0.3, 0.16, 0.3), n).lerp(Color(0.8, 0.86, 0.95), day)
-	var hor := Color(1.0, 0.72, 0.42).lerp(Color(0.36, 0.2, 0.3), n).lerp(Color(0.92, 0.9, 0.86), day)
-	sky_mat.set_shader_parameter("sun_dir", Vector3(-0.45, 0.04, -1.0))
-	sky_mat.set_shader_parameter("horizon_y", 0.0)
-	sky_mat.set_shader_parameter("zenith_y", 0.5)
+	# Saturated dusk: gold -> tangerine -> magenta-pink -> violet. The bbq
+	# camera looks down at the yard, so the only sky it sees lies just
+	# below the true horizon (behind the sunken neighbour lots): the
+	# gradient is compressed into that band so it reads purple -> orange.
+	var top := Color(0.30, 0.16, 0.50).lerp(Color(0.05, 0.06, 0.16), n).lerp(Color(0.38, 0.58, 0.9), day)
+	var mid := Color(0.78, 0.28, 0.56).lerp(Color(0.16, 0.12, 0.3), n).lerp(Color(0.6, 0.76, 0.95), day)
+	var low := Color(1.0, 0.44, 0.26).lerp(Color(0.3, 0.16, 0.3), n).lerp(Color(0.8, 0.86, 0.95), day)
+	var hor := Color(1.0, 0.66, 0.30).lerp(Color(0.36, 0.2, 0.3), n).lerp(Color(0.92, 0.9, 0.86), day)
+	sky_mat.set_shader_parameter("sun_dir", Vector3(-0.45, -0.2, -1.0))
+	sky_mat.set_shader_parameter("horizon_y", -0.08)
+	sky_mat.set_shader_parameter("zenith_y", 0.2)
 	sky_mat.set_shader_parameter("cloud_amount", lerpf(1.0, 0.4, n))
 	sky_mat.set_shader_parameter("top_color", top)
 	sky_mat.set_shader_parameter("mid_color", mid)
 	sky_mat.set_shader_parameter("low_color", low)
 	sky_mat.set_shader_parameter("horizon_color", hor)
-	env.fog_light_color = Color(0.62, 0.42, 0.62).lerp(Color(0.2, 0.16, 0.3), n).lerp(Color(0.85, 0.85, 0.88), day)
+	env.fog_light_color = Color(0.40, 0.25, 0.46).lerp(Color(0.2, 0.16, 0.3), n).lerp(Color(0.85, 0.85, 0.88), day)
 
 
 func release() -> void:

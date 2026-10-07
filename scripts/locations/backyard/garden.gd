@@ -571,9 +571,6 @@ func _neighbours() -> void:
 		[-4.0, -40.0, 8.0, 7.0, 5.0, 4],
 		[6.0, -45.0, 8.0, 6.0, 5.0, 1],
 		[18.0, -42.0, 9.0, 7.0, 5.0, 2],
-		# Closer row right behind the back fence: warm lit windows above the
-		# hedge, like the neighbours peeking over in ref4.
-		[-15.5, -19.0, 7.0, 5.0, 4.5, 1],
 	]
 	for hd in houses:
 		_house(vb, hd, walls[hd[5] % walls.size()], roofs[hd[5] % roofs.size()])
@@ -589,6 +586,23 @@ func _neighbours() -> void:
 	if not vb.glow.is_empty():
 		nmi.set_surface_override_material(nmi.mesh.get_surface_count() - 1, V.glow_soft())
 	root.add_child(nmi)
+	# Closer row right behind the back fence at full height: two-storey
+	# houses with warm lit windows rising over the hedge and trees, like the
+	# neighbours peeking over in ref4 (top-left of the bbq shot).
+	var near := FastBuilder.new()
+	near.jitter = 0.0
+	near.skip_down_below = 0
+	near.skip_normals = [Vector3i(0, 0, -1)]
+	for hd in [[-16.5, -21.0, 8.0, 6.0, 5.0, 1], [-7.5, -23.0, 9.0, 6.0, 5.5, 2], [1.5, -24.0, 8.0, 6.0, 5.0, 3]]:
+		_house(near, hd, walls[hd[5] % walls.size()], roofs[hd[5] % roofs.size()])
+	var nmi2 := MeshInstance3D.new()
+	nmi2.name = "NeighboursNear"
+	nmi2.mesh = near.build(V.SIZE_BIG, Vector3.ZERO, false)
+	nmi2.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	nmi2.position.y = -0.6
+	if not near.glow.is_empty():
+		nmi2.set_surface_override_material(nmi2.mesh.get_surface_count() - 1, V.glow_soft())
+	root.add_child(nmi2)
 	# Dark tree clumps at 0.5 m: between and behind the houses.
 	var tl := VoxelBuilder.new()
 	tl.jitter = 0.06

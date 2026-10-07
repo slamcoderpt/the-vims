@@ -70,8 +70,8 @@ static func _walls(root: Node3D) -> void:
 	for wx in [-4.4, -1.5, 1.4, 4.3]:
 		var a := cc(wx - 1.1)
 		var w := cc(2.2)
-		var y0 := cc(2.55)
-		var wh := cc(1.75)
+		var y0 := cc(2.95)
+		var wh := cc(1.45)
 		vb.clear_box(Vector3i(a, y0, z0), Vector3i(w, wh, 1))
 		for x in w:
 			for y in wh:
@@ -110,7 +110,7 @@ static func _ceiling(root: Node3D, halo_pts: Array) -> void:
 		var k := p.z / 3
 		return Kit.shade(CEIL, 0.85 + 0.25 * Kit.h(Vector3i(0, 0, k), 4)))
 	# beams across x
-	for bz in [-9.0, -6.0, -3.0, 0.0, 3.0, 6.0, 9.0, 12.0, 15.0]:
+	for bz in [-9.0, -6.0, -3.0, 0.0, 3.0, 6.0, 9.0]:
 		vb.box(Vector3i(x0, hh - 3, cc(bz)), Vector3i(x1 - x0, 3, 2), BEAM)
 	# two long beams along z
 	for bx in [-2.25, 3.25]:
@@ -184,7 +184,7 @@ static func _text(board: Node3D, text: String, at: Vector3, w: float, h: float, 
 static func _signs(root: Node3D) -> void:
 	var z := 0.105
 	# FRESH & LOCAL (big green, over the produce side, angled towards the aisle)
-	var fresh := _board(root, "SignFresh", Vector3(-2.6, 3.95, -1.2), 24.0, 4.0, 1.12, Color("2f7f3b"), Color("8a5a31"))
+	var fresh := _board(root, "SignFresh", Vector3(-2.6, 4.1, -1.2), 24.0, 4.0, 1.12, Color("2f7f3b"), Color("8a5a31"))
 	_text(fresh, "FRESH & LOCAL", Vector3(-0.3, 0.0, z), 2.9, 0.68, Color("fbf6e6"), 1.3)
 	var lv := VoxelBuilder.new()
 	Fx.leaf_icon(lv, Vector3i(0, 0, 0), Color("8fd14f"), Color("3d8a2a"))
@@ -193,7 +193,7 @@ static func _signs(root: Node3D) -> void:
 	var prod := _board(root, "SignProduce", Vector3(-3.95, 2.7, -2.6), 28.0, 1.2, 0.38, Color("3a2a20"), Color("7a5130"), true, 2.9)
 	_text(prod, "Produce", Vector3(0, 0.0, z), 0.95, 0.24, Color("f6efe0"))
 	# MARKET (over the grocery aisles, right)
-	var mk := _board(root, "SignMarket", Vector3(3.5, 4.0, -2.0), -14.0, 3.1, 0.9, Color("34302d"), Color("8a5a31"))
+	var mk := _board(root, "SignMarket", Vector3(3.5, 4.25, -2.0), -14.0, 3.1, 0.9, Color("34302d"), Color("8a5a31"))
 	_text(mk, "MARKET", Vector3(0.1, 0.0, z), 1.6, 0.46, Color("f4eedf"), 1.25)
 	var cv := VoxelBuilder.new()
 	Fx.cart_icon(cv, Vector3i(0, 0, 0), Color("f4eedf"))
@@ -202,8 +202,8 @@ static func _signs(root: Node3D) -> void:
 	Fx.leaf_icon(lv2, Vector3i(0, 0, 0), Color("6cbf45"), Color("2f7a2a"))
 	Kit.add(mk, lv2, U * 0.75, "Leaf", false, null, Vector3(1.15, 0.0, 0.11), Vector3(3.5, 4, 0))
 	# Aisle signs hanging over the aisles, deeper in the store.
-	var aisles := [["Dairy", Vector3(0.95, 2.6, -8.2), 0.0, 1.3], ["Snacks", Vector3(4.75, 2.55, -3.6), -6.0, 1.15],
-		["Beverages", Vector3(4.1, 2.75, -10.6), -4.0, 1.95], ["Bakery", Vector3(5.9, 2.95, -2.2), -24.0, 1.25]]
+	var aisles := [["Dairy", Vector3(-0.6, 2.95, -9.4), 0.0, 1.3], ["Snacks", Vector3(2.15, 3.05, -6.0), -4.0, 1.25],
+		["Beverages", Vector3(4.3, 3.0, -9.0), -4.0, 1.95], ["Bakery", Vector3(5.9, 2.95, -2.2), -24.0, 1.25]]
 	for a in aisles:
 		var bh := 0.42 if a[3] < 1.3 else 0.5
 		var b := _board(root, "Sign" + a[0], a[1], a[2], a[3], bh, Color("3b2a1f"), Color("7a5130"))
@@ -236,8 +236,8 @@ static func _greenery(root: Node3D) -> void:
 			if y % 3 == 1:
 				vb.set_v(p + Vector3i(0, 0, 1), Kit.shade(col, 0.9))
 	# Hanging planters with trailing ivy (top of frame, like the reference).
-	for hp: Vector3 in [Vector3(-5.2, 3.4, -0.6), Vector3(-4.9, 3.2, -4.4), Vector3(0.2, 3.95, -1.0),
-			Vector3(7.0, 3.45, 0.4), Vector3(-5.0, 3.3, -8.4), Vector3(2.4, 3.75, -6.6), Vector3(-2.6, 3.6, -9.6)]:
+	for hp: Vector3 in [Vector3(-5.2, 3.4, -0.6), Vector3(-4.9, 3.2, -4.4), Vector3(-5.4, 3.5, 2.4),
+			Vector3(7.0, 3.45, 0.4), Vector3(-5.0, 3.3, -8.4), Vector3(6.9, 3.55, -5.4), Vector3(-2.6, 3.6, -9.6)]:
 		var o := Vector3i(int(round(hp.x / U)), int(round(hp.y / U)), int(round(hp.z / U)))
 		for x in range(-3, 4):
 			for z in range(-3, 4):

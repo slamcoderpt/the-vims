@@ -42,7 +42,8 @@ static func m_desk(vb: VoxelBuilder, v: int) -> void:
 
 
 static func m_office_chair(vb: VoxelBuilder, v: int) -> void:
-	var cush := Color("4b505c") if v == 0 else Color("e46d78")
+	var cush := Color("e46d78") if v == 1 else Color("4b505c")
+	var bh := 6 if v == 2 else 10   # v2: low back (never hides a seated sim's head)
 	var frame := DARK
 	# Star base + wheels.
 	V.b(vb, 4, 1, 0, 1, 1, 9, frame); V.b(vb, 0, 1, 4, 9, 1, 1, frame)
@@ -53,8 +54,8 @@ static func m_office_chair(vb: VoxelBuilder, v: int) -> void:
 	V.b(vb, 0, 5, 1, 9, 2, 8, V.noisy(cush, 0.05))
 	V.b(vb, 1, 4, 2, 7, 1, 6, frame)
 	# Back.
-	V.b(vb, 1, 7, 0, 7, 10, 2, V.noisy(cush, 0.05))
-	V.b(vb, 2, 16, 0, 5, 1, 2, V.noisy(cush, 0.05))
+	V.b(vb, 1, 7, 0, 7, bh, 2, V.noisy(cush, 0.05))
+	V.b(vb, 2, 7 + bh - 1, 0, 5, 1, 2, V.noisy(cush, 0.05))
 	V.b(vb, 4, 6, 0, 1, 2, 1, frame)
 	# Arm rests.
 	for ax: int in [0, 8]:
@@ -192,6 +193,9 @@ static func m_nightstand(vb: VoxelBuilder, v: int) -> void:
 ## Single bed 1.12 x 2.12 m, mattress top at y=8 (0.5 m). Head at z=0.
 ## v0 pink gingham (bunny girl), v1 navy star quilt (cat girl), v2 parents' double.
 static func m_bed(vb: VoxelBuilder, v: int) -> void:
+	if v == 3:
+		_bunny_canopy_bed(vb)
+		return
 	var w := 18 if v != 2 else 28
 	var l := 28 if v != 2 else 34
 	v = v % 3
@@ -253,6 +257,84 @@ static func m_bed(vb: VoxelBuilder, v: int) -> void:
 	else:
 		V.b(vb, 2, 8, 3, w - 4, 2, 6, Color("fdfcf9"))
 		V.b(vb, 3, 10, 4, w - 6, 1, 4, Color("fdfcf9"))
+
+
+## Raised pink bunny bed with a tall headboard, canopy crown + sheer drapes
+## at the head end, two pillows, plaid quilt and a frilled bed skirt (ref3).
+## 18 x 40 x 28 cells; mattress top at y = 10 (lie height 10 cells).
+static func _bunny_canopy_bed(vb: VoxelBuilder) -> void:
+	var w := 18
+	var l := 28
+	var pink := Color("f29ab6")
+	var pink_l := Color("f9c6d5")
+	var fr := V.noisy(pink, 0.035)
+	var white := Color("fdfbf8")
+	# Turned legs + side rails (raised bed).
+	for q in [Vector2i(0, 0), Vector2i(w - 2, 0), Vector2i(0, l - 2), Vector2i(w - 2, l - 2)]:
+		V.b(vb, q.x, 0, q.y, 2, 4, 2, V.shade(pink, 0.82))
+	V.b(vb, 0, 4, 1, 1, 3, l - 2, fr)
+	V.b(vb, w - 1, 4, 1, 1, 3, l - 2, fr)
+	# Frilled skirt under the quilt (scalloped hem).
+	for z in range(2, l - 2):
+		for x: int in [0, w - 1]:
+			var hem := 3 if posmod(z, 3) == 1 else 4
+			V.b(vb, x, hem, z, 1, 7 - hem, 1, V.shade(pink_l, 1.0 if posmod(z, 3) != 0 else 0.92))
+	# Mattress.
+	V.b(vb, 1, 6, 2, w - 2, 4, l - 4, V.noisy(white, 0.02))
+	# Tall headboard with a rounded crest, tufted panel and a heart.
+	V.b(vb, 0, 4, 0, w, 16, 2, fr)
+	V.b(vb, 1, 20, 0, w - 2, 1, 2, fr)
+	V.b(vb, 3, 21, 0, w - 6, 1, 2, fr)
+	for x in range(2, w - 2):
+		for y in range(11, 19):
+			if posmod(x + y, 3) == 0:
+				V.p(vb, x, y, 2, V.shade(pink_l, 1.04))
+			else:
+				V.p(vb, x, y, 2, pink_l)
+	for q in [Vector2i(7, 15), Vector2i(8, 16), Vector2i(9, 16), Vector2i(10, 15), Vector2i(7, 16), Vector2i(10, 16), Vector2i(8, 15), Vector2i(9, 15), Vector2i(8, 14), Vector2i(9, 14), Vector2i(9, 17), Vector2i(8, 17), Vector2i(7, 17), Vector2i(10, 17)]:
+		if q.y == 17 and (q.x == 8 or q.x == 9):
+			continue
+		V.p(vb, q.x, q.y, 3, Color("e35d86"))
+	# Bunny ears on the crest.
+	for ex: int in [3, w - 6]:
+		V.b(vb, ex, 22, 0, 3, 6, 2, fr)
+		V.b(vb, ex + 1, 28, 0, 1, 1, 2, fr)
+		V.b(vb, ex + 1, 23, 2, 1, 4, 1, Color("fde4ec"))
+	# Canopy: two slim posts at the head corners, a scalloped crown and sheer
+	# drapes tied back at the sides (they frame the sleeper, never cover her).
+	var post := V.shade(pink, 0.9)
+	V.b(vb, -1, 0, 0, 1, 31, 1, post)
+	V.b(vb, w, 0, 0, 1, 31, 1, post)
+	V.b(vb, -2, 31, -1, w + 4, 1, 6, fr)
+	V.b(vb, -1, 32, 0, w + 2, 1, 4, V.shade(pink, 1.06))
+	V.b(vb, 3, 33, 0, w - 6, 1, 2, V.shade(pink, 1.1))
+	for x in range(-2, w + 2):
+		if posmod(x, 3) != 2:
+			V.p(vb, x, 30, 4, pink_l)
+	V.b(vb, -2, 30, -1, 1, 1, 6, pink_l); V.b(vb, w + 1, 30, -1, 1, 1, 6, pink_l)
+	var sheer := V.noisy(Color("fde9ef"), 0.03)
+	for side: int in [-2, w + 1]:
+		for y in range(12, 30):
+			var depth := 4 if y > 25 else (2 if y < 18 else 3)
+			V.b(vb, side, y, 0, 1, 1, depth, sheer)
+		V.b(vb, side, 18, 0, 1, 1, 3, pink)
+	# Pillows (two plump white ones + a pink heart cushion).
+	V.b(vb, 2, 10, 2, 6, 3, 5, white); V.b(vb, 3, 13, 3, 4, 1, 3, white)
+	V.b(vb, 10, 10, 2, 6, 3, 5, white); V.b(vb, 11, 13, 3, 4, 1, 3, white)
+	# Quilt: pink gingham top, draped sides, white folded band.
+	var quilt := V.plaid(Color("f7b2c6"), Color("ee8aa8"), Color("e06890"), 2)
+	var qz := 10
+	V.b(vb, 0, 10, qz, w, 1, l - 2 - qz, quilt)
+	V.b(vb, 0, 6, qz, 1, 4, l - 2 - qz, quilt)
+	V.b(vb, w - 1, 6, qz, 1, 4, l - 2 - qz, quilt)
+	V.b(vb, 0, 6, l - 3, w, 4, 1, quilt)
+	V.b(vb, 0, 10, qz - 2, w, 1, 2, white)
+	# Footboard (low, scalloped).
+	V.b(vb, 0, 4, l - 2, w, 6, 2, fr)
+	for x in range(0, w):
+		if posmod(x, 4) != 0:
+			V.p(vb, x, 10, l - 1, fr.call(Vector3i(x, 10, l - 1)))
+	V.b(vb, 6, 7, l - 1, 6, 2, 1, pink_l)
 
 
 ## Turned-down quilt to lay over a sim in bed (16 x 3 x 15), v as m_bed.
@@ -507,7 +589,10 @@ static func m_bathtub(vb: VoxelBuilder, _v: int) -> void:
 	V.b(vb, L - 7, 9, 0, 6, 2, 3, Color("f2b5c6"))
 
 
-static func m_shower(vb: VoxelBuilder, _v: int) -> void:
+static func m_shower(vb: VoxelBuilder, v: int) -> void:
+	if v == 1:
+		_shower_cubicle(vb)
+		return
 	# 1.0 x 1.0 m glass cubicle; back wall tiles at z=0 and x=0 are the room walls.
 	var tray := Color("eef1f2")
 	V.b(vb, 0, 0, 0, 16, 1, 16, tray)
@@ -523,14 +608,65 @@ static func m_shower(vb: VoxelBuilder, _v: int) -> void:
 	V.b(vb, 9, 13, 16, 5, 1, 1, Color("8fb4d8"))
 
 
+## Corner shower cubicle (1.0 x 1.0 m tray, 2.3 m tall): tiled back + left
+## walls of its own (stands in front of a low cut-away wall), bright chrome
+## frame on the two glass sides, rain head, towel on a rail on the door.
+static func _shower_cubicle(vb: VoxelBuilder) -> void:
+	var chrome := Color("e4e9ee")
+	var chrome_d := Color("aeb7bf")
+	var H := 26
+	V.b(vb, 0, 0, 0, 16, 1, 16, Color("f3f5f6"))
+	V.b(vb, 1, 1, 1, 14, 1, 14, Color("e2e9ed"))
+	V.b(vb, 7, 1, 7, 2, 1, 2, chrome_d)
+	var tile := func(q: Vector3i) -> Color:
+		var a := q.x + q.z
+		var grout := posmod(q.y, 3) == 0 or posmod(a, 3) == 0
+		var c := Color("a9d6ea") if posmod(floori(q.y / 3.0) + floori(a / 3.0), 2) == 0 else Color("8cc4de")
+		return Color("f2f6f7") if grout else c
+	V.b(vb, 0, 1, 0, 16, H, 1, tile)
+	V.b(vb, 0, 1, 1, 1, H, 15, tile)
+	V.b(vb, 0, H + 1, 0, 16, 1, 1, Color("f2f6f7")); V.b(vb, 0, H + 1, 0, 1, 1, 16, Color("f2f6f7"))
+	# Chrome frame on the open edges.
+	V.b(vb, 15, 1, 15, 1, H, 1, chrome)
+	V.b(vb, 15, 1, 1, 1, H, 1, chrome_d)
+	V.b(vb, 1, 1, 15, 1, H, 1, chrome_d)
+	V.b(vb, 1, H, 15, 15, 1, 1, chrome); V.b(vb, 15, H, 1, 1, 1, 15, chrome)
+	V.b(vb, 1, 1, 15, 15, 1, 1, chrome_d); V.b(vb, 15, 1, 1, 1, 1, 15, chrome_d)
+	# Door hinge line + handle.
+	V.b(vb, 8, 1, 15, 1, H - 1, 1, chrome_d)
+	V.b(vb, 9, 11, 16, 1, 4, 1, chrome)
+	# Rain head + mixer + niche with bottles.
+	V.b(vb, 2, 16, 1, 1, 8, 1, chrome); V.b(vb, 2, 23, 1, 5, 1, 1, chrome)
+	V.b(vb, 5, 22, 1, 4, 1, 4, chrome); V.b(vb, 6, 21, 2, 2, 1, 2, Color("cfdbe2"))
+	V.b(vb, 2, 13, 1, 3, 2, 1, chrome)
+	V.b(vb, 10, 12, 1, 4, 1, 2, Color("f2f6f7"))
+	V.b(vb, 10, 13, 1, 1, 3, 1, Color("f28fb0")); V.b(vb, 12, 13, 1, 1, 2, 1, Color("7ec4e0"))
+	# Towel rail on the door with a striped towel.
+	V.b(vb, 2, 18, 16, 6, 1, 1, chrome)
+	V.b(vb, 2, 8, 16, 6, 10, 1, V.noisy(Color("f7f4ee"), 0.03))
+	V.b(vb, 2, 10, 16, 6, 1, 1, Color("8fb4d8")); V.b(vb, 2, 12, 16, 6, 1, 1, Color("8fb4d8"))
+
+
 ## Glass panes for the shower (build with a transparent material).
-static func m_shower_glass(vb: VoxelBuilder, _v: int) -> void:
+## v1 matches the cubicle: light-blue panes, a frosted band at mid height.
+static func m_shower_glass(vb: VoxelBuilder, v: int) -> void:
+	if v == 1:
+		var gb := func(q: Vector3i) -> Color:
+			if q.y >= 10 and q.y <= 15:
+				return Color("e6f4fa")
+			return Color("9fd3ea") if posmod(q.x + q.y + q.z, 9) != 0 else Color("c9ebf7")
+		V.b(vb, 2, 2, 15, 13, 24, 1, gb)
+		V.b(vb, 15, 2, 2, 1, 24, 13, gb)
+		return
 	var g := Color("bfe2ee")
 	V.b(vb, 1, 1, 15, 14, 33, 1, g)
 	V.b(vb, 15, 1, 1, 1, 33, 14, g)
 
 
-static func m_vanity(vb: VoxelBuilder, _v: int) -> void:
+static func m_vanity(vb: VoxelBuilder, v: int) -> void:
+	if v == 1:
+		_vanity_tall(vb)
+		return
 	V.b(vb, 0, 1, 0, 16, 12, 9, V.wood(WOOD, 1, 2))
 	V.b(vb, 0, 0, 1, 16, 1, 7, WOOD_D)
 	V.b(vb, 1, 2, 9, 7, 9, 1, V.shade(WOOD, 1.08)); V.b(vb, 8, 2, 9, 7, 9, 1, V.shade(WOOD, 1.04))
@@ -545,6 +681,42 @@ static func m_vanity(vb: VoxelBuilder, _v: int) -> void:
 	V.b(vb, 2, 20, 0, 12, 14, 1, WOOD)
 	V.b(vb, 3, 21, 0, 10, 12, 1, Color("cfe4ee"))
 	V.b(vb, 4, 28, 0, 2, 3, 1, Color("eaf6fb"))
+
+
+## Wooden vanity (1.0 m) with a white vessel basin, chrome tap and a tall
+## framed mirror (ref3), back at z = 0.
+static func _vanity_tall(vb: VoxelBuilder) -> void:
+	var wc := Color("a86d3e")
+	var wd := V.wood(wc, 1, 2)
+	V.b(vb, 0, 1, 0, 16, 9, 9, wd)
+	V.b(vb, 0, 0, 1, 16, 1, 7, WOOD_D)
+	V.b(vb, 1, 2, 9, 7, 5, 1, V.shade(wc, 1.1)); V.b(vb, 8, 2, 9, 7, 5, 1, V.shade(wc, 1.05))
+	V.b(vb, 1, 8, 9, 14, 2, 1, V.shade(wc, 1.12))
+	V.b(vb, 6, 8, 10, 4, 1, 1, Color("e8d9a8"))
+	V.p(vb, 6, 4, 10, Color("e8d9a8")); V.p(vb, 9, 4, 10, Color("e8d9a8"))
+	# Counter top.
+	V.b(vb, 0, 10, 0, 16, 1, 10, V.noisy(Color("efe9e0"), 0.03))
+	# Vessel basin (white bowl standing on the counter).
+	V.b(vb, 4, 11, 2, 8, 2, 6, Color("fbfbfa"))
+	V.b(vb, 5, 12, 3, 6, 1, 4, Color("c8dfe9"))
+	# Tall chrome tap.
+	V.b(vb, 7, 11, 0, 2, 4, 1, Color("dfe4e9")); V.b(vb, 7, 14, 1, 2, 1, 2, Color("dfe4e9"))
+	V.p(vb, 6, 13, 0, Color("c3ccd3")); V.p(vb, 9, 13, 0, Color("c3ccd3"))
+	# Toothbrush cup, soap, a tiny plant.
+	V.b(vb, 1, 11, 2, 2, 3, 2, Color("8fc6e8")); V.p(vb, 1, 14, 2, Color("f06a8a")); V.p(vb, 2, 14, 3, Color("4fb0e8"))
+	V.b(vb, 13, 11, 3, 2, 1, 2, Color("f5d2a8"))
+	V.b(vb, 13, 11, 6, 2, 2, 2, Color("d9774a")); V.b(vb, 13, 13, 6, 2, 2, 2, Color("5e9c45"))
+	# Tall framed mirror (dark wood frame so it reads against a pale wall).
+	V.b(vb, 1, 15, 0, 14, 19, 1, Color("6e4426"))
+	V.b(vb, 1, 15, 1, 14, 1, 1, Color("6e4426")); V.b(vb, 1, 33, 1, 14, 1, 1, Color("7d4f2b"))
+	V.b(vb, 1, 15, 1, 1, 19, 1, Color("7d4f2b")); V.b(vb, 14, 15, 1, 1, 19, 1, Color("7d4f2b"))
+	for x in range(2, 14):
+		for yy in range(16, 33):
+			var t := float(yy - 16) / 17.0
+			var c := Color("8fc3dc").lerp(Color("d4ecf6"), t)
+			if (x + yy) % 9 == 0 or (x + yy) % 9 == 1:
+				c = Color("f2fbff")
+			V.p(vb, x, yy, 1, c)
 
 
 static func m_towel_rack(vb: VoxelBuilder, v: int) -> void:

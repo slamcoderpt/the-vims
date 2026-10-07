@@ -153,7 +153,7 @@ static func gondola(length: int, seed: int, kinds: Array, double_sided := false)
 	var vb := VoxelBuilder.new()
 	vb.jitter = 0.03
 	var D := 8
-	var H := 34
+	var H := 42
 	var z0 := -D if double_sided else 0
 	# back panel
 	vb.box(Vector3i(0, 0, 0), Vector3i(length, H, 1), Kit.wood(Color("6e4c32"), 2))
@@ -162,7 +162,7 @@ static func gondola(length: int, seed: int, kinds: Array, double_sided := false)
 		vb.box(Vector3i(x, 0, z0), Vector3i(1, H + 1, D - z0), Kit.wood(WOOD_D, 2))
 	# base plinth
 	vb.box(Vector3i(0, 0, z0), Vector3i(length, 2, D - z0), Color("5b4636"))
-	var levels := [2, 10, 18, 26]
+	var levels := [2, 10, 18, 26, 34]
 	for li in levels.size():
 		var y: int = levels[li]
 		vb.box(Vector3i(1, y, z0 + 1), Vector3i(length - 2, 1, D - z0 - 1), Kit.wood(WOOD_L, 1, 1))
@@ -182,31 +182,35 @@ static func gondola(length: int, seed: int, kinds: Array, double_sided := false)
 	return vb
 
 
-## Glowing dairy / drinks fridge bank, local facing +z.
+## Glowing dairy / drinks fridge bank, local facing +z. Tall (2.6 m) glass
+## doors with a bright white back light, four shelves of goods and a stock
+## overhang of cartons on top.
 static func fridge(width: int, seed: int) -> VoxelBuilder:
 	var vb := VoxelBuilder.new()
 	vb.jitter = 0.03
-	var H := 34
+	var H := 42
 	var D := 12
+	var CT := H - 4   # cavity top
 	var frame := Color("c9ced3")
 	vb.box(Vector3i(0, 0, 0), Vector3i(width, H, D), frame)
 	# kick plate
 	vb.box(Vector3i(0, 0, D - 1), Vector3i(width, 3, 1), Color("3b4048"))
 	# cavity
-	vb.clear_box(Vector3i(1, 3, 2), Vector3i(width - 2, 26, D - 2))
-	# glowing back
-	vb.box(Vector3i(1, 3, 1), Vector3i(width - 2, 26, 1), Color("d8ecff"), true)
+	vb.clear_box(Vector3i(1, 3, 2), Vector3i(width - 2, CT - 3, D - 2))
+	# glowing back + glowing ceiling strip inside
+	vb.box(Vector3i(1, 3, 1), Vector3i(width - 2, CT - 3, 1), Color("e6f3ff"), true)
+	vb.box(Vector3i(1, CT - 1, 2), Vector3i(width - 2, 1, D - 3), Color("f4fbff"), true)
 	# top header light box + brand stripe
-	vb.box(Vector3i(0, 30, D - 1), Vector3i(width, 3, 1), Color("f4fbff"), true)
-	vb.box(Vector3i(0, 33, 0), Vector3i(width, 1, D), Color("2f6fb5"))
-	var shelves := [3, 11, 19]
+	vb.box(Vector3i(0, CT, D - 1), Vector3i(width, 3, 1), Color("f4fbff"), true)
+	vb.box(Vector3i(0, H - 1, 0), Vector3i(width, 1, D), Color("2f6fb5"))
+	var shelves := [3, 11, 19, 27]
 	var milk_caps: Array[Color] = [Color("2e7de0"), Color("e0412e"), Color("37a64a"), Color("f2c12e")]
 	var juice: Array[Color] = [Color("f7a21c"), Color("f5d33a"), Color("e8502f"), Color("8bd36b"), Color("c84fd0"), Color("2e7de0")]
 	var drinks: Array[Color] = [Color("1f8fe8"), Color("3cc24a"), Color("ef4a3a"), Color("f5a82a"), Color("8a4be0"), Color("19c2c9"), Color("f25f9c")]
 	var fz := D - 3   # front row of goods
 	for si in shelves.size():
 		var y: int = shelves[si]
-		var top: int = (shelves[si + 1] if si + 1 < shelves.size() else 29) - y - 1
+		var top: int = (shelves[si + 1] if si + 1 < shelves.size() else CT - 1) - y - 1
 		vb.box(Vector3i(1, y, 2), Vector3i(width - 2, 1, D - 3), Color("aab5bf"))
 		vb.box(Vector3i(1, y, D - 2), Vector3i(width - 2, 1, 1), Color("f2f4f6"))
 		var x := 2
@@ -269,13 +273,28 @@ static func fridge(width: int, seed: int) -> VoxelBuilder:
 			item += 1
 	# door frames (dark) + handles
 	for x in range(0, width, 12):
-		vb.box(Vector3i(x, 3, D - 1), Vector3i(1, 27, 1), Color("4a5058"))
+		vb.box(Vector3i(x, 3, D - 1), Vector3i(1, CT - 3, 1), Color("4a5058"))
 		if x + 10 < width:
-			vb.box(Vector3i(x + 10, 9, D), Vector3i(1, 13, 1), Color("eef2f5"))
-			vb.set_v(Vector3i(x + 10, 9, D - 1), Color("4a5058"))
-	vb.box(Vector3i(width - 1, 3, D - 1), Vector3i(1, 27, 1), Color("5d646c"))
-	vb.box(Vector3i(0, 29, D - 1), Vector3i(width, 1, 1), Color("5d646c"))
+			vb.box(Vector3i(x + 10, 12, D), Vector3i(1, 15, 1), Color("eef2f5"))
+			vb.set_v(Vector3i(x + 10, 12, D - 1), Color("4a5058"))
+	vb.box(Vector3i(width - 1, 3, D - 1), Vector3i(1, CT - 3, 1), Color("5d646c"))
+	vb.box(Vector3i(0, CT - 1, D - 1), Vector3i(width, 1, 1), Color("5d646c"))
 	vb.box(Vector3i(0, 3, D - 1), Vector3i(width, 1, 1), Color("5d646c"))
+	# overstock: cardboard cases and shrink-wrapped bottle packs on top
+	var ox := 1
+	while ox < width - 6:
+		var r := Kit.h(Vector3i(ox, seed, 5), 9)
+		var w := 5 + int(r * 4.0)
+		var hh := 3 + int(Kit.h(Vector3i(ox, seed, 6), 9) * 3.0)
+		if r < 0.7:
+			var cb := Color("c99a62") if r < 0.45 else Color("b8864e")
+			vb.box(Vector3i(ox, H, 2), Vector3i(w, hh, 7), Kit.noise(cb, 0.05, ox))
+			vb.box(Vector3i(ox + 1, H + hh - 2, 9), Vector3i(w - 2, 1, 1), Color("fbf3dc"))
+		else:
+			for k in w / 2:
+				for y in 2:
+					vb.box(Vector3i(ox + k * 2, H + y * 3, 3), Vector3i(2, 3, 5), drinks[(k + seed) % drinks.size()])
+		ox += w + (1 if Kit.h(Vector3i(ox, seed, 7), 9) > 0.5 else 3)
 	return vb
 
 

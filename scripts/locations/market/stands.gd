@@ -169,12 +169,12 @@ static func _produce_island(root: Node3D, fix: VoxelBuilder, prod: VoxelBuilder)
 	_crate(fix, prod, Vector3(-4.75, 0.0, 0.9), Vector3(0.95, 0.5, 0.85), "pepper_mix", 78, 3, Fx.WOOD, false)
 	# near-camera crates (lower-left foreground, softened by the DOF)
 	# Low foreground display (bottom-left of the shot, soft in the DOF).
-	fix.box(Vector3i(u(-3.3), 0, u(3.75)), Vector3i(u(2.75), u(0.38), u(0.95)), wood)
+	fix.box(Vector3i(u(-3.3), 0, u(5.2)), Vector3i(u(2.75), u(0.38), u(0.95)), wood)
 	var fx := -3.28
 	for e: Array in [["tomato", 0.88, 84], ["pepper_mix", 0.88, 85], ["banana", 0.92, 86]]:
-		_crate(fix, prod, Vector3(fx, 0.38, 3.77), Vector3(e[1], 0.26, 0.9), e[0], e[2], 3)
+		_crate(fix, prod, Vector3(fx, 0.38, 5.22), Vector3(e[1], 0.26, 0.9), e[0], e[2], 3)
 		fx += e[1] + 0.02
-	_tag(root, Vector3(-1.05, 0.36, 4.78), "$0.60", -4.0)
+	_tag(root, Vector3(-1.05, 0.36, 6.23), "$0.60", -4.0)
 
 
 ## Mid-store produce table (background left of the aisle).
@@ -227,8 +227,7 @@ static func _fridges(root: Node3D, halo_pts: Array) -> void:
 	# Soft cool bloom along the lit header strips and inside the cases.
 	for i in 16:
 		var hx := -4.0 + i * 0.75
-		halo_pts.append([Vector3(hx, 1.95, -10.9), 1.1, Color(0.55, 0.75, 1.0, 1.0)])
-		halo_pts.append([Vector3(hx, 1.0, -11.1), 1.3, Color(0.45, 0.62, 0.9, 1.0)])
+		halo_pts.append([Vector3(hx, 2.42, -10.9), 0.8, Color(0.4, 0.55, 0.8, 1.0)])
 	Interactable.attach(root, "Dairy Fridge", [
 		_act("buy", "Buy Milk", "milk", 2.0, {"money": -2, "item": "Milk"}),
 		_act("compare", "Compare", "scale", 3.0),
@@ -246,7 +245,7 @@ static func _aisles(root: Node3D) -> void:
 	# Gondola rows run along z (deep into the store) so the aisles recede
 	# towards the back fridges; each is double-sided and faces the main aisle
 	# (-x) and the next aisle (+x). End caps face the camera.
-	var ga := Fx.gondola(u(7.2), 1, kinds_a, true)
+	var ga := Fx.gondola(u(7.2), 1, kinds_a)
 	Fx.put(vb, ga, Vector3i(u(2.6), 0, u(-9.6)), 3)
 	var gb := Fx.gondola(u(6.4), 2, kinds_b)
 	Fx.put(vb, gb, Vector3i(u(5.5), 0, u(-9.6)), 3)
@@ -294,7 +293,7 @@ static func _aisles(root: Node3D) -> void:
 static func _checkout(root: Node3D, _halo_pts: Array) -> void:
 	var vb := VoxelBuilder.new()
 	vb.jitter = 0.035
-	var x0 := u(2.45)
+	var x0 := u(2.9)
 	var z0 := u(1.9)
 	var W := u(0.85)
 	var L := u(4.2)
@@ -372,7 +371,7 @@ static func _checkout(root: Node3D, _halo_pts: Array) -> void:
 			if p.x % 2 == 0 and p.y % 2 == 0:
 				vb.set_v(Vector3i(x0 - 3, u(0.1) + 1 + p.y / 2, tz + 1 + p.x / 2), lv.vox[p])
 	# back counter behind the cashier
-	var bx := u(4.55)
+	var bx := u(5.0)
 	var bz := u(1.8)
 	var bh := u(0.9)
 	vb.box(Vector3i(bx, 0, bz), Vector3i(u(0.6), bh, u(2.2)), Kit.wood(Fx.WOOD_D, 2))
@@ -417,7 +416,7 @@ static func _checkout(root: Node3D, _halo_pts: Array) -> void:
 	Interactable.attach(root, "Checkout", [
 		_act("pay", "Pay", "register", 3.0, {"task": "Pay at Checkout"}),
 		_act("bag", "Bag Groceries", "bag", 2.0),
-	], Vector3(0.85, 1.0, 4.2), Vector3(2.87, 0.5, 4.0), Vector3(2.0, 0, 3.3))
+	], Vector3(0.85, 1.0, 4.2), Vector3(3.32, 0.5, 4.0), Vector3(2.45, 0, 3.3))
 
 
 # ------------------------------------------------------------------ foreground dressing
@@ -472,7 +471,16 @@ static func _foreground(root: Node3D) -> void:
 		Produce.apple(pv, ap, i % 4 == 0)
 	for p: Vector3i in pv.vox:
 		vb.set_v(p, pv.vox[p])
+	# Split crate of oranges and red apples near the camera (bottom centre,
+	# soft in the DOF band).
+	var wo := Vector3i(int(round(0.25 / P)), 0, int(round(5.55 / P)))
+	Fx.crate(vb, wo, 40, 22, 11, Color("a8703f"))
+	vb.box(wo + Vector3i(1, 1, 1), Vector3i(38, 8, 20), Color("6a3a1c"))
+	vb.box(wo + Vector3i(19, 1, 1), Vector3i(1, 10, 20), Color("8a5a31"))
+	Produce.heap2(vb, "orange", wo + Vector3i(1, 8, 1), Vector3i(18, 8, 20), 1, 91)
+	Produce.heap2(vb, "apple", wo + Vector3i(20, 8, 1), Vector3i(19, 8, 20), 1, 92)
 	Kit.add(root, vb, P, "Foreground", false, null, Vector3.ZERO, Vector3.ZERO, false)
+	_tag(root, Vector3(0.92, 0.3, 6.27), "$1.10", -2.0)
 
 
 static func _basket(vb: VoxelBuilder, o: Vector3i, col: Color, handles: bool) -> void:

@@ -429,9 +429,7 @@ func _measure_silhouette() -> void:
 	if img == null or img.is_empty():
 		return
 	var used := img.get_used_rect()
-	if OS.has_environment("PORTRAIT_DUMP"):
-		img.save_png(OS.get_environment("PORTRAIT_DUMP") + "/meas_%s.png" % member.get("look", ""))
-		print("PDUMP measure ", member.get("look"), " used=", used, " img=", img.get_size(), " c=", _plane_c, " h=", _plane_h, " m=", _measured)
+
 	if used.size.x <= 0 or used.size.y <= 0:
 		return
 	var W := float(img.get_width())
@@ -460,9 +458,6 @@ func _process(delta: float) -> void:
 		_render_frames -= 1
 		if _render_frames == 0:
 			_vp.render_target_update_mode = SubViewport.UPDATE_DISABLED
-			if OS.has_environment("PORTRAIT_DUMP"):
-				_vp.get_texture().get_image().save_png(OS.get_environment("PORTRAIT_DUMP") + "/final_%s.png" % member.get("look", ""))
-				print("PDUMP final ", member.get("look"), " vp=", _vp.size, " c=", _plane_c, " h=", _plane_h, " m=", _measured, " meas=", _measuring)
 	if selected:
 		_gem_phase += delta
 		_gem.queue_redraw()

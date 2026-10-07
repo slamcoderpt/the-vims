@@ -5,7 +5,7 @@ extends RefCounted
 ## Merged per group into one mesh.
 
 const K := preload("res://scripts/locations/festival/kit.gd")
-const VS := [0.23, 0.23, 0.34]
+const VS := [0.21, 0.21, 0.32]
 
 ## [x, z, height_m, crown_radius_m, palette (0 orange, 1 red, 2 yellow, 3 mixed), group]
 const TREES := [

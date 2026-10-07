@@ -40,25 +40,43 @@ static func m_house(vb: VoxelBuilder, v: int) -> void:
 	for c in [Vector2i(0, 0), Vector2i(w - 1, 0), Vector2i(0, d - 1), Vector2i(w - 1, d - 1)]:
 		V.b(vb, c.x, 1, c.y, 1, wh - 1, 1, trim)
 	V.b(vb, 0, 11, 0, w, 1, 1, trim); V.b(vb, 0, 11, d - 1, w, 1, 1, trim)
-	# Windows on all four sides, two storeys.
+	# Windows on all four sides, two storeys: 4 x 5 panes with a cross
+	# mullion, sill and (lit) a warm gradient so they read as windows from
+	# far away, not as thin bars.
 	var glass := Color("ffcf7a") if lit else Color("8fb8d8")
+	var pane := func(q: Vector3i, top: int) -> Color:
+		if not lit:
+			return Color("8fb8d8").lerp(Color("d6ebf5"), clampf(float(q.y - top + 4) / 4.0, 0.0, 1.0))
+		var t := clampf(float(top - q.y) / 4.0, 0.0, 1.0)
+		return Color("ffe3a2").lerp(Color("ffb457"), t)
 	for floor_i in 2:
 		var wy := 4 + floor_i * 10
-		for k in 4:
-			var wx := 3 + k * 7
-			if floor_i == 0 and k == 1:
+		for wx: int in [4, 13, 23]:
+			if floor_i == 0 and wx == 13:
 				continue
 			for zz: int in [0, d - 1]:
-				V.b(vb, wx - 1, wy - 1, zz, 5, 6, 1, trim)
-				var on := lit and V.hs(wx, wy, zz + v) > 0.25
-				V.b(vb, wx, wy, zz, 3, 4, 1, glass if on or not lit else Color("3a4058"), on)
-				V.b(vb, wx + 1, wy, zz, 1, 4, 1, trim)
+				V.b(vb, wx - 1, wy - 1, zz, 6, 7, 1, trim)
+				var on := not lit or V.hs(wx, wy, zz + v) > 0.12
+				for xx in range(wx, wx + 4):
+					for yy in range(wy, wy + 5):
+						if on:
+							V.p(vb, xx, yy, zz, pane.call(Vector3i(xx, yy, zz), wy + 4), lit)
+						else:
+							V.p(vb, xx, yy, zz, Color("3a4058"))
+				V.b(vb, wx, wy + 2, zz, 4, 1, 1, trim)
+				V.b(vb, wx + 2, wy, zz, 1, 5, 1, trim)
+				var out := -1 if zz == 0 else 1
+				V.b(vb, wx - 1, wy - 1, zz + out, 6, 1, 1, Color("d9d2c4"))
 		for k in 2:
 			var wz := 6 + k * 11
 			for xx: int in [0, w - 1]:
-				V.b(vb, xx, wy - 1, wz - 1, 1, 6, 5, trim)
-				var on2 := lit and V.hs(xx, wy, wz + v) > 0.3
-				V.b(vb, xx, wy, wz, 1, 4, 3, glass if on2 or not lit else Color("3a4058"), on2)
+				V.b(vb, xx, wy - 1, wz - 1, 1, 7, 6, trim)
+				var on2 := not lit or V.hs(xx, wy, wz + v) > 0.2
+				for zz2 in range(wz, wz + 4):
+					for yy in range(wy, wy + 5):
+						V.p(vb, xx, yy, zz2, pane.call(Vector3i(xx, yy, zz2), wy + 4) if on2 else Color("3a4058"), on2 and lit)
+				V.b(vb, xx, wy + 2, wz, 1, 1, 4, trim)
+				V.b(vb, xx, wy, wz + 2, 1, 5, 1, trim)
 	# Front door + porch light.
 	V.b(vb, 9, 1, d - 1, 4, 8, 1, Color("7a4a2a") if style % 2 == 0 else Color("2f5a7a"))
 	V.p(vb, 12, 4, d, Color("d8b46a"))

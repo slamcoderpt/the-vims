@@ -47,7 +47,7 @@ func build(parent: Node3D) -> void:
 	fine.skip_down_below = 6
 	_interior(fine)
 	_deck_decor(fine)
-	V.inst(fine, root, V.SIZE_FINE, Vector3.ZERO, 0.0, Vector3.ZERO, true, true, "HouseDecor")
+	V.inst(fine, root, V.SIZE_FINE, Vector3.ZERO, 0.0, Vector3.ZERO, false, true, "HouseDecor")
 	# Warm interior light (two lamps filling the room) spilling out + porch fill.
 	V.omni(root, Vector3(4.5, 2.4, -8.0), Color(1.0, 0.74, 0.46), 3.2, 6.0)
 	V.omni(root, Vector3(9.5, 2.4, -8.0), Color(1.0, 0.74, 0.46), 3.2, 6.0)

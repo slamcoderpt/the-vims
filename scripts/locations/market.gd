@@ -19,6 +19,7 @@ const Stands := preload("res://scripts/locations/market/stands.gd")
 
 const U := 0.0625
 const P := 0.03125
+const CART_S := 1.65
 
 var actors := {}
 var _cart: MeshInstance3D
@@ -41,7 +42,7 @@ func build() -> void:
 
 
 func camera_home() -> Dictionary:
-	return {"target": Vector3(0.4, 1.1, -2.6), "yaw": 0.0, "pitch": 12.0, "distance": 13.5, "fov": 46.0}
+	return {"target": Vector3(0.4, 1.1, -1.4), "yaw": 0.0, "pitch": 12.5, "distance": 16.0, "fov": 34.0}
 
 
 func lighting_profile() -> Dictionary:
@@ -56,7 +57,7 @@ func lighting_profile() -> Dictionary:
 		"fog_day": Color(0.98, 0.94, 0.88), "fog_night": Color(0.4, 0.3, 0.22), "fog_density": 0.0022,
 		"exposure": 1.05,
 		"shadow_distance": 18.0,
-		"post": {"focus_y": 0.56, "band": 0.24, "falloff": 0.3, "blur_px": 3.6, "top_boost": 0.2,
+		"post": {"focus_y": 0.53, "band": 0.29, "falloff": 0.3, "blur_px": 3.6, "top_boost": 0.2,
 			"saturation": 1.16, "contrast": 1.1, "tint": Vector3(1.0, 1.0, 0.98), "vignette": 0.16},
 	}
 
@@ -95,7 +96,7 @@ func _spawn_people() -> void:
 	for k: String in ["dad", "bunny_girl", "cat_girl", "cashier", "shopper_0", "shopper_1", "shopper_2", "shopper_3", "shopper_4"]:
 		Kit.blob(actors[k], 0.95 if k != "bunny_girl" and k != "cat_girl" else 0.8)
 	# Cart (with Biscuit riding in it).
-	_cart = Kit.add(self, Fx.cart(), P * 1.45, "Cart", true, null, Vector3.ZERO, Vector3(8.5, 0, -3))
+	_cart = Kit.add(self, Fx.cart(), P * CART_S, "Cart", true, null, Vector3.ZERO, Vector3(8.5, 0, -3))
 	Kit.blob(_cart, 1.05, 0.4, Vector3(0, 0, 0.5))
 	Interactable.attach(_cart, "Shopping Cart", [
 		_act("push", "Push Cart", "cart", 2.0),
@@ -119,38 +120,41 @@ func _place(key: String, pos: Vector3, face_to: Vector3, pose: String) -> SimAct
 func _stage() -> void:
 	if actors.is_empty():
 		return
-	var cam := Vector3(0.4, 0, 10.6)
-	# The family stands in the mid-ground of the main aisle (about a quarter
-	# of the frame tall) with clear tile between them, so the aisle, fridges
-	# and signs stay readable behind (ref5): Lily at the produce island
-	# (left), Jack pushing the cart with Biscuit riding in it (centre), Maya
-	# with a cereal box (centre-right).
-	var jack := _place("dad", Vector3(-0.3, 0, 0.0), cam + Vector3(7.5, 0, 0), "idle")
+	var cam := Vector3(0.4, 0, 14.2)
+	# Telephoto view down the main aisle: the family is spread across the
+	# mid-ground (Lily at the produce island, Jack pushing the cart with
+	# Biscuit riding in it, Maya by the checkout) with open tile between them,
+	# so the tall glowing fridge wall and the shelving runs read behind.
+	# "stand_type" holds both forearms forward at chest height: hands on the
+	# cart handle.
+	var jack := _place("dad", Vector3(-0.15, 0, 1.6), cam + Vector3(8.0, 0, 0), "stand_type")
+	jack.body_scale = 1.0
 	var cart_yaw := jack.rotation.y
 	var fwd := Vector3(sin(cart_yaw), 0, cos(cart_yaw))
-	_cart.position = jack.position + fwd * 0.55
+	_cart.position = jack.position + fwd * 0.58
 	_cart.rotation.y = cart_yaw
-	var dog := _place("beagle", _cart.position + fwd * 0.55 + Vector3(0, 13 * P * 1.45, 0), cam + Vector3(-1.5, 0, 0), "sit")
+	var dog := _place("beagle", _cart.position + fwd * 0.62 + Vector3(0, 13 * P * CART_S - 0.12, 0), cam + Vector3(-1.5, 0, 0), "sit")
 	dog.body_scale = 1.0
 	dog.rotation.y = lerp_angle(cart_yaw, dog.rotation.y, 0.6)
 	# The "type" pose turns the head ~0.9 rad to the sim's left, so the
 	# girls' bodies are turned the other way to keep their faces on camera.
-	var lily := _place("bunny_girl", Vector3(-1.5, 0, 1.15), cam, "stand_type")
+	var lily := _place("bunny_girl", Vector3(-2.05, 0, 2.55), cam, "stand_type")
 	lily.rotation.y -= 0.75
-	var maya := _place("cat_girl", Vector3(1.9, 0, 0.8), cam, "stand_type")
+	var maya := _place("cat_girl", Vector3(2.2, 0, 2.75), cam, "stand_type")
 	maya.rotation.y -= 0.8
 	lily.body_scale = 1.0
 	maya.body_scale = 1.0
 	_hold(lily, "carrots")
 	_hold(maya, "cereal")
-	var cashier := _place("cashier", Vector3(3.95, 0, 2.7), Vector3(1.0, 0, 8.0), "idle")
-	cashier.body_scale = 1.12
-	# Background shoppers spread down the aisles, in the gaps between the family.
-	_place("npc_2", Vector3(-3.0, 0, -3.4), Vector3(-5.0, 0, -4.2), "idle")
-	_place("npc_5", Vector3(-0.9, 0, -8.8), Vector3(-0.6, 0, -11.0), "idle")
-	_place("npc_4", Vector3(0.75, 0, -6.2), Vector3(0.2, 0, -11.0), "idle")
-	_place("npc_0", Vector3(1.55, 0, -5.6), Vector3(2.4, 0, -6.0), "stand_read")
-	_place("npc_6", Vector3(4.0, 0, -6.2), Vector3(4.6, 0, -6.6), "idle")
+	var cashier := _place("cashier", Vector3(4.4, 0, 2.9), Vector3(1.0, 0, 12.0), "idle")
+	cashier.body_scale = 1.0
+	# Background shoppers browse down the aisles, in the screen gaps between
+	# the family (never directly behind a head).
+	_place("npc_2", Vector3(-3.6, 0, -3.6), Vector3(-5.0, 0, -4.2), "idle")
+	_place("npc_5", Vector3(-0.45, 0, -10.1), Vector3(-4.0, 0, -8.0), "idle")
+	_place("npc_4", Vector3(0.9, 0, -7.4), Vector3(3.0, 0, 6.0), "idle")
+	_place("npc_0", Vector3(-1.5, 0, -5.6), Vector3(-2.6, 0, 2.0), "stand_read")
+	_place("npc_6", Vector3(4.0, 0, -6.6), Vector3(4.6, 0, -6.6), "idle")
 	_hold(actors["npc_4"], "basket")
 	_hold(actors["npc_2"], "basket")
 	_hold(actors["npc_6"], "basket")
@@ -175,9 +179,10 @@ func _hold(a: SimActor, what: String) -> void:
 	var mi := MeshInstance3D.new()
 	match what:
 		"carrots":
-			for i in 3:
-				Produce.carrot(vb, Vector3i(i * 2 - 2, (i % 2), i), 1)
-			mi.mesh = Kit.mesh(vb, P * 0.95, Vector3(0.5, 1, 1))
+			# A bunch of four chunky carrots, leafy tops together at the hand.
+			for i in 4:
+				Produce.big_carrot(vb, Vector3i(i * 2 - 4, (i % 2), -(i % 2)), i, 11 + (i % 2))
+			mi.mesh = Kit.mesh(vb, P * 1.1, Vector3(0, 1, 3))
 			mi.position = Vector3(0.0, hand - 0.03, 0.02)
 			mi.rotation = Vector3(PI, 0.0, 0.0)
 		"cereal":

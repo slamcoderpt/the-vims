@@ -21,7 +21,7 @@ extends Node3D
 const U := 0.0625          # fine grid (windows, railings, stairs)
 const PU := 0.09           # furniture display grid (1.44 x U; PropLib.FU is 1.25 x U)
 const FS := 1.25           # furniture display scale
-const UH := 25             # upstairs wall height in structure cells (3.125 m)
+const UH := 28             # upstairs wall height in structure cells (3.5 m: ref1 tall walls)
 const C := 0.125           # structure grid
 const UF := 3.0            # upstairs floor height (m)
 ## "office_in": the camera stands on the office side of the x = -1 divider
@@ -77,6 +77,7 @@ var _halos: MultiMeshInstance3D
 var _blanket: MeshInstance3D
 var _night_tint: Array[MeshInstance3D] = []   # exterior meshes darkened at night
 var _hood_mat: StandardMaterial3D
+var _shafts: MeshInstance3D
 
 
 # =================================================================== API
@@ -86,7 +87,7 @@ func build() -> void:
 	_is_night = Game.is_night()
 	var stats := OS.get_environment("VIMS_STATS") != ""
 	var steps := [_build_structure, _build_office, _build_living, _build_pink, _build_blue, _build_hall,
-		_build_bath, _build_kitchen, _build_exterior, _bake, _ensure_neighbourhood.bind(_is_night)]
+		_build_bath, _build_kitchen, _build_exterior, _bake, _build_sun_shafts, _ensure_neighbourhood.bind(_is_night)]
 	for st: Callable in steps:
 		var ts := Time.get_ticks_usec()
 		st.call()
@@ -113,16 +114,16 @@ func camera_home() -> Dictionary:
 
 func lighting_profile() -> Dictionary:
 	return {
-		"sun_heading": 205.0, "sun_elev": 34.0, "sun_energy": 1.8,
-		"ambient_day": Color(0.94, 0.86, 0.76), "ambient_energy": 0.58,
+		"sun_heading": 205.0, "sun_elev": 34.0, "sun_energy": 2.05,
+		"ambient_day": Color(0.96, 0.84, 0.72), "ambient_energy": 0.5,
 		"ambient_night": Color(0.66, 0.54, 0.52), "ambient_night_energy": 0.34, "lamp_night_mult": 3.8,
 		"sky_day": Color(0.64, 0.8, 0.94), "sky_night": Color(0.07, 0.09, 0.22),
 		"fog_day": Color(0.9, 0.9, 0.88), "fog_night": Color(0.12, 0.15, 0.32), "fog_density": 0.004,
 		"moon_heading": 150.0, "moon_energy": 0.32, "glow_boost_night": 1.2,
 		"shadow_distance": 40.0,
-		"post_day": {"focus_y": 0.5, "band": 0.3, "falloff": 0.24, "blur_px": 4.5, "top_boost": 1.0,
+		"post_day": {"focus_y": 0.5, "band": 0.35, "falloff": 0.18, "blur_px": 4.0, "top_boost": 1.0,
 			"saturation": 1.16, "contrast": 1.12, "tint": Vector3(1.02, 1.0, 0.96), "vignette": 0.22},
-		"post_night": {"focus_y": 0.55, "band": 0.33, "falloff": 0.2, "blur_px": 2.6, "top_boost": 0.8},
+		"post_night": {"focus_y": 0.52, "band": 0.4, "falloff": 0.12, "blur_px": 2.6, "top_boost": 0.8},
 	}
 
 
@@ -514,7 +515,7 @@ func _build_structure() -> void:
 	# Right exterior.
 	var bed_tall := {"office": "low", "bed": "tall"}
 	_wall(2, 8.75, -4.75, 0.0, 1, "blue", "ext", bed_tall)
-	_wall(2, 8.75, 0.0, 4.75, 1, "bath", "ext", bed_tall, [[2.6, 4.2, 1.0, 2.3]])
+	_wall(2, 8.75, 0.0, 4.75, 1, "bath", "ext", bed_tall, [[3.3, 4.45, 1.0, 2.3]])
 	# Office | pink+hall divider (low from the office, tall for the bedrooms).
 	_wall(2, -1.0, -4.75, 0.0, 1, "office", "pink", {"office": "low", "office_in": "tall", "bed": "tall"}, [[1.4, 2.6, 0.0, 2.15]])
 	_wall(2, -1.0, 0.0, 4.75, 1, "office", "hall", {"office": "low", "office_in": "tall", "bed": "tall"}, [[1.4, 2.6, 0.0, 2.15]])
@@ -544,7 +545,7 @@ func _windows_upstairs() -> void:
 	PropLib.window_frame(_g("office"), Vector3i(fc(-9.0), fc(UF + 0.9), fc(2.0)), fc(1.6), fc(1.4), 4, 2, 2, 1)
 	PropLib.window_frame(_g("pink"), Vector3i(fc(1.85), fc(UF + 0.9), fc(-5.0)), fc(1.3), fc(1.3), 4, 0, 2, 1, Color("ffffff"), Color("f3c0cf"))
 	PropLib.window_frame(_g("blue"), Vector3i(fc(6.4), fc(UF + 0.9), fc(-5.0)), fc(1.4), fc(1.3), 4, 0, 2, 1)
-	PropLib.window_frame(_g("bath"), Vector3i(fc(8.75), fc(UF + 1.0), fc(2.6)), fc(1.6), fc(1.3), 4, 2, 2, -1)
+	PropLib.window_frame(_g("bath"), Vector3i(fc(8.75), fc(UF + 1.0), fc(3.3)), fc(1.15), fc(1.3), 4, 2, 2, -1)
 	# Glass: bright sky panes by day (the light source of ref1's window wall),
 	# deep night-blue panes after dark. Two merged meshes, toggled by time.
 	_up_glass("office", 0, -5.0, -5.85, -3.95, UF + 0.45, UF + 2.55)
@@ -552,7 +553,7 @@ func _windows_upstairs() -> void:
 	_up_glass("office", 2, -9.0, 2.0, 3.6, UF + 0.9, UF + 2.3)
 	_up_glass("pink", 0, -5.0, 1.85, 3.15, UF + 0.9, UF + 2.2)
 	_up_glass("blue", 0, -5.0, 6.4, 7.8, UF + 0.9, UF + 2.2)
-	_up_glass("bath", 2, 8.75, 2.6, 4.2, UF + 1.0, UF + 2.3)
+	_up_glass("bath", 2, 8.75, 3.3, 4.45, UF + 1.0, UF + 2.3)
 
 
 var _upg_day := VoxelBuilder.new()
@@ -588,37 +589,44 @@ func _build_office() -> void:
 	var bz := -4.75   # inner face of the back wall
 	var rx := -1.0    # inner face of the divider (pink/hall side)
 	_windows_upstairs()
-	# --- Work corner on the back wall (ref1: desk with two bright monitors,
-	# laptop, mug, black office chair; cork board with notes above). Dad sits
-	# with his back half to the camera so the screens read over his shoulder.
-	var desk := _put(R, "desk", Vector3(fx + 0.07, y, bz + 0.02), 0)
+	# ref1 layout for a diagonal camera looking into the back-left corner:
+	# the work wall is the LEFT wall (cork board, mountain painting, long desk
+	# with two bright monitors, printer cabinet), tall bookshelves with globe
+	# and trophies stand in the corner on the back wall, and the window wall
+	# (easel, piano + guitar) runs off to the right.
+	var desk := _put(R, "desk", Vector3(fx + 0.02, y, -3.05), 1)
 	var dy := y + 12 * PU
-	_put(R, "monitor", Vector3(desk.position.x + 0.32, dy, bz + 0.06), 0, 0)
-	_put(R, "monitor", Vector3(desk.position.x + 1.55, dy, bz + 0.1), 0, 1)
-	_put(R, "keyboard", Vector3(desk.position.x + 0.55, dy, bz + 0.62))
-	_put(R, "laptop", Vector3(desk.end.x - 0.78, dy, bz + 0.38))
-	_put(R, "mug", Vector3(desk.position.x + 0.06, dy, bz + 0.72), 0, 0)
-	_put(R, "pencil_cup", Vector3(desk.position.x + 0.05, dy, bz + 0.12))
-	_put(R, "book_stack", Vector3(desk.end.x - 0.45, dy, bz + 0.06), 0, 1)
-	var chair := _putc(R, "office_chair", desk.get_center().x - 0.05, y, desk.end.z + 0.42, 2)
-	_wallput(R, "corkboard", "-z", bz, desk.position.x + 0.2, y + 1.4, 0)
-	_wallput(R, "wall_clock", "-z", bz, desk.end.x - 0.55, y + 2.55, 1)
-	_lamp(Vector3(desk.get_center().x, y + 1.7, desk.end.z + 0.2), 0.6, 2.6, 0.35, Color(0.75, 0.85, 1.0), 0.0)
-	# --- Left wall: filing cabinet + printer, tall shelves (globe, trophy, books),
-	# a big landscape picture, plants.
-	_put(R, "filing_cabinet", Vector3(fx, y, desk.end.z + 0.12), 1)
-	_put(R, "printer", Vector3(fx + 0.02, y + 12 * PU, desk.end.z + 0.16), 1)
-	_wallput(R, "frame", "-x", fx, desk.end.z + 0.05, y + 1.55, 0)
-	_wallput(R, "bookshelf", "-x", fx, -2.55, y, 4)
-	_wallput(R, "bookshelf", "-x", fx, -1.05, y, 2)
-	_put(R, "trophy", Vector3(fx + 0.1, y + 30 * PU, -2.2))
-	_put(R, "plant", Vector3(fx + 0.06, y + 30 * PU, -0.85), 0, 2)
-	_put(R, "plant", Vector3(fx + 0.04, y, 0.55), 0, 5)
-	_sconce(R, "-x", fx, 0.2, y + 1.7, 1.2)
-	_wallput(R, "frame", "-x", fx, 0.55, y + 1.25, 6)
+	_put(R, "monitor", Vector3(fx + 0.06, dy, desk.position.z + 0.3), 1, 0)
+	_put(R, "monitor", Vector3(fx + 0.1, dy, desk.position.z + 1.5), 1, 1)
+	_put(R, "keyboard", Vector3(fx + 0.6, dy, desk.position.z + 0.55), 1)
+	_put(R, "laptop", Vector3(fx + 0.3, dy, desk.end.z - 0.85), 1)
+	_put(R, "mug", Vector3(fx + 0.75, dy, desk.end.z - 0.25), 0, 0)
+	_put(R, "pencil_cup", Vector3(fx + 0.12, dy, desk.position.z + 0.06))
+	_put(R, "book_stack", Vector3(fx + 0.08, dy, desk.end.z - 0.35), 1, 1)
+	_put(R, "plant", Vector3(fx + 0.06, dy, desk.position.z + 1.1), 0, 3)
+	_put(R, "desk_lamp", Vector3(fx + 0.1, dy, desk.end.z - 0.62), 1)
+	_lamp(Vector3(fx + 0.55, dy + 0.4, desk.end.z - 0.5), 0.5, 2.2, 0.6, Color(1.0, 0.7, 0.4), 0.5)
+	var chair := _putc(R, "office_chair", desk.end.x + 0.42, y, desk.get_center().z + 0.15, 3, 2)
+	_wallput(R, "corkboard", "-x", fx, desk.position.z + 0.1, y + 1.45, 1)
+	_wallput(R, "frame", "-x", fx, desk.end.z - 0.15, y + 1.6, 0)
+	_wallput(R, "frame", "-x", fx, desk.end.z + 1.35, y + 1.8, 1)
+	_wallput(R, "wall_clock", "-x", fx, desk.position.z + 1.0, y + 2.75, 1)
+	_lamp(Vector3(desk.end.x + 0.2, y + 1.7, desk.get_center().z), 0.6, 2.6, 0.35, Color(0.75, 0.85, 1.0), 0.0)
+	_put(R, "filing_cabinet", Vector3(fx, y, desk.end.z + 0.08), 1)
+	_put(R, "printer", Vector3(fx + 0.02, y + 12 * PU, desk.end.z + 0.12), 1)
+	_put(R, "plant", Vector3(fx + 0.04, y, desk.end.z + 1.05), 0, 5)
+	_sconce(R, "-x", fx, desk.end.z + 0.95, y + 2.2, 1.0)
+	# Corner bookshelves on the back wall (globe, trophies, books, plants).
+	var bs1 := _wallput(R, "bookshelf", "-z", bz, fx + 0.04, y, 4)
+	var bs2 := _wallput(R, "bookshelf", "-z", bz, bs1.end.x + 0.02, y, 0)
+	_put(R, "trophy", Vector3(bs1.position.x + 0.2, y + 30 * PU, bz + 0.12))
+	_put(R, "plant", Vector3(bs2.end.x - 0.5, y + 30 * PU, bz + 0.04), 0, 2)
+	_put(R, "ivy", Vector3(bs2.end.x - 0.4, y + 2.4, bz + 0.03), 0, 1)
+	_put(R, "plant", Vector3(fx + 0.06, y, desk.position.z - 0.75), 0, 1)
+	_lamp(Vector3(bs2.get_center().x, y + 2.3, bz + 0.9), 0.7, 3.0, 0.4)
 	# --- Window wall: two big multi-pane windows, curtains, sill plants, ivy.
-	for cx: float in [-6.1, -3.82, -1.7]:
-		_put(R, "curtain", Vector3(cx, y, bz + 0.02), 0, 3 if cx < -5.0 else 0)
+	for cx: float in [-3.82, -1.7]:
+		_put(R, "curtain", Vector3(cx, y, bz + 0.02), 0, 0)
 	for wx: float in [-5.7, -3.6]:
 		_put(R, "plant", Vector3(wx + 0.1, y + 0.45, bz - 0.04), 0, 3)
 		_put(R, "plant", Vector3(wx + 1.3, y + 0.45, bz - 0.04), 0, 6)
@@ -664,9 +672,9 @@ func _build_office() -> void:
 	var dogbed := _putc(R, "dog_bed", -5.55, y, 0.35, 0)
 	var toybox := _wallput(R, "toy_box", "+x", rx, -0.95, y)
 	_put(R, "soccer_ball", Vector3(-1.75, y + PU, 0.35))
-	_put(R, "toy_blocks", Vector3(-2.85, y + PU, -0.55), 0, 1)
-	_put(R, "toy_robot", Vector3(-2.35, y + PU, -1.15), 1)
-	_put(R, "toy_blocks", Vector3(-2.2, y + PU, 0.35), 0, 0)
+	_put(R, "toy_blocks", Vector3(-3.25, y + PU, -0.35), 0, 1)
+	_put(R, "toy_robot", Vector3(-2.3, y + PU, -0.45), 1)
+	_put(R, "toy_blocks", Vector3(-2.15, y + PU, 0.15), 0, 0)
 	_put(R, "plush", Vector3(-1.55, y + PU, -1.35), 3, 1)
 	_put(R, "plant", Vector3(-1.55, y, 4.15), 0, 4)
 	_put(R, "plant", Vector3(-4.3, y, 4.1), 0, 4)
@@ -768,10 +776,10 @@ func _build_pink() -> void:
 	# right corner (the camera side) hides the story scene.
 	_rug(R, -0.3, y, -3.2, 3.5, 2.9, "patch_pink")
 	var ns := _put(R, "nightstand", Vector3(fx + 0.04, y, bz + 0.04), 0, 2)
-	var bed := _put(R, "bed", Vector3(ns.end.x + 0.06, y, bz + 0.02), 0, 0)
+	var bed := _put(R, "bed", Vector3(ns.end.x - 0.1, y, bz + 0.02), 0, 3)
 	_put(R, "lamp_table", Vector3(ns.position.x + 0.12, y + 10 * PU, ns.position.z + 0.1), 0, 1)
 	_lamp(Vector3(ns.get_center().x + 0.25, y + 1.3, ns.end.z + 0.3), 0.55, 3.2, 0.2, Color(1.0, 0.6, 0.3), 0.55)
-	_put(R, "plush", Vector3(bed.end.x - 0.55, y + 10 * PU, bz + 0.3), 0, 0)
+	_put(R, "plush", Vector3(bed.end.x - 0.72, y + 11 * PU, bz + 0.62), 0, 0)
 	var chair := _putc(R, "chair", bed.end.x + 0.55, y, bed.position.z + 1.55, 3, 2)
 	var st := _put(R, "side_table", Vector3(bed.end.x + 0.12, y, bz + 0.08), 0, 2)
 	_put(R, "lamp_table", Vector3(st.position.x + 0.05, y + 11 * PU, bz + 0.12), 0, 1)
@@ -931,44 +939,42 @@ func _build_bath() -> void:
 	var y := UF
 	var bz := 0.25     # back wall face (low wall to the blue room)
 	var lx := 5.75     # left wall face (hall)
-	var rx := 8.75     # right exterior wall face
+	var rx := 8.75     # right exterior wall face: tall at night, faces the camera
 	var fz := 4.75
-	# ref3 bathroom, turned for our camera (it looks in from the +x side):
-	# vanity + mirror on the tall hall wall so the kid on her step stool
-	# faces the camera while brushing; glass shower in the back-right corner,
-	# tub along the right wall at the front, toilet tucked in the back-left.
-	var shs := PropLib.rotated_size("shower", 3)
-	var shower := _put(R, "shower", Vector3(rx - shs.x * PU, y, bz), 3)
-	var gs := PropLib.size_of("shower_glass")
-	var glass := PropLib.instance("shower_glass", 0, false)
+	# ref3 bathroom: glass shower cubicle in the back-left corner, a wooden
+	# vanity with a vessel basin and a tall mirror between two sconces on the
+	# right wall (the wall the night camera looks at), window beside it, the
+	# kid on her step stool at the sink turned to the camera; toilet in the
+	# back-right corner, tub across the front, bath mats, plants.
+	var shower := _put(R, "shower", Vector3(lx, y, bz), 0, 1)
+	var glass := PropLib.instance("shower_glass", 1, false)
 	glass.scale = Vector3.ONE * (PU / PropLib.FU)
-	# Model glass spans x 1..15 / z 1..15 of the 16-cell tray; rot 3 = -90 deg.
-	glass.rotation_degrees.y = -90.0
-	glass.position = Vector3(shower.end.x - PU - gs.z * PU * 0.5, y + PU, bz + PU + gs.x * PU * 0.5)
+	var gs := PropLib.size_of("shower_glass", 1)
+	# Glass model spans x 2..15 / z 2..15 of the 16-cell tray (normalised to 0).
+	glass.position = Vector3(lx + (2 + gs.x * 0.5) * PU, y + 2 * PU, bz + (2 + gs.z * 0.5) * PU)
 	add_child(glass)
-	var tsz := PropLib.rotated_size("bathtub", 1)
-	var tub := _put(R, "bathtub", Vector3(rx - tsz.x * PU - 0.02, y, fz - tsz.z * PU - 0.05), 1)
-	_rug(R, tub.position.x - 0.75, y, tub.position.z + 0.35, 0.65, 1.3, "round_blue")
-	_wallput(R + "@bed", "towel_rack", "+x", rx, shower.end.z + 0.12, y + 0.85, 2)
-	_wallput(R + "@bed", "shelf_unit", "+x", rx, shower.end.z + 0.05, y + 1.85, 2)
-	_wallput(R + "@bed", "frame", "+x", rx, tub.position.z + 0.5, y + 1.6, 7)
-	_sconce(R + "@bed", "+x", rx, tub.position.z + 0.05, y + 2.0, 0.45, 1)
-	var toilet := _put(R, "toilet", Vector3(lx + 0.06, y, bz + 0.04), 0)
-	var vanity := _wallput(R, "vanity", "-x", lx, toilet.end.z + 0.3, y)
+	_put(R, "bath_mat", Vector3(lx + 0.35, y, shower.end.z + 0.08), 0, 0)
+	var toilet := _put(R, "toilet", Vector3(rx - 0.8, y, bz + 0.05), 0)
+	_put(R, "basket", Vector3(toilet.position.x - 0.66, y, bz + 0.08), 0, 2)
+	# Vanity + tall mirror on the right wall, a sconce either side.
+	var vz := 1.6
+	var vanity := _wallput(R, "vanity", "+x", rx, vz, y, 1)
 	_spots["vanity"] = vanity
-	var ss := PropLib.rotated_size("step_stool", 1)
-	var step := _put(R, "step_stool", Vector3(vanity.end.x + 0.02, y, vanity.get_center().z - ss.z * PU * 0.5), 1)
+	_sconce(R + "@bed", "+x", rx, vanity.position.z - 0.28, y + 1.95, 0.55, 1)
+	_sconce(R + "@bed", "+x", rx, vanity.end.z - 0.06, y + 1.95, 0.55, 1)
+	var step := _put(R, "step_stool", Vector3(vanity.position.x - 0.5, y, vanity.get_center().z - 0.32), 1)
 	_spots["step"] = step
-	_put(R, "bath_mat", Vector3(step.end.x - 0.1, y, step.position.z - 0.2), 1, 0)
-	_put(R, "plant", Vector3(lx + 0.08, y + 13 * PU, vanity.end.z - 0.42), 0, 3)
-	_put(R, "basket", Vector3(lx + 0.05, y, vanity.end.z + 0.15), 1, 2)
-	_wallput(R + "@bed", "towel_rack", "-x", lx, vanity.end.z + 0.25, y + 0.95, 1)
-	_sconce(R + "@bed", "-x", lx, vanity.position.z - 0.32, y + 2.05, 0.6, 1)
-	_sconce(R + "@bed", "-x", lx, vanity.end.z + 0.02, y + 2.05, 0.6, 1)
-	_wallput(R + "@bed", "wall_planter", "-x", lx, vanity.end.z + 0.75, y + 1.75, 2)
-	_put(R, "plant", Vector3(shower.position.x - 0.6, y, bz + 0.05), 0, 6)
-	_put(R, "plant", Vector3(lx + 0.05, y, fz - 0.55), 0, 2)
-	_lamp(Vector3(7.2, y + 2.6, 2.4), 0.3, 3.2, 0.0, Color(1.0, 0.66, 0.4), 0.0)
+	_put(R, "bath_mat", Vector3(vanity.position.x - 1.2, y, vanity.position.z + 0.1), 1, 1)
+	_wallput(R + "@bed", "towel_rack", "+x", rx, vanity.end.z + 0.1, y + 0.95, 2)
+	_put(R, "plant", Vector3(rx - 0.55, y, fz - 0.55), 0, 6)
+	_wallput(R + "@bed", "wall_planter", "+x", rx, 4.45, y + 2.3, 2)
+	_wallput(R + "@bed", "frame", "+x", rx, bz + 0.25, y + 1.7, 5)
+	# Tub across the front of the room (low, never hides the sink scene).
+	var tub := _put(R, "bathtub", Vector3(lx + 0.06, y, fz - PropLib.size_of("bathtub").z * PU - 0.04), 0)
+	_put(R, "plant", Vector3(lx + 0.05, y, shower.end.z + 0.95), 0, 2)
+	_wallput(R, "towel_rack", "-x", lx, shower.end.z + 0.3, y + 0.9, 1)
+	# Warm overhead light so the room reads bright (ref3's bathroom glows).
+	_lamp(Vector3(7.3, y + 2.6, 2.4), 0.45, 3.6, 0.0, Color(1.0, 0.74, 0.48), 0.0)
 	_use(shower, "Shower", [_act("shower", "Take Shower", "shower", 20, {"hygiene": 0.8}, {"pose": "idle"})])
 	_use(tub, "Bathtub", [_act("bath", "Take Bath", "bath", 40, {"hygiene": 0.9, "fun": 0.1}, {"pose": "lie", "task": "Take Bath"})])
 	_use(vanity, "Sink", [
@@ -1229,7 +1235,7 @@ func _ensure_neighbourhood(lit: bool) -> void:
 		# Neighbour houses sit darker than the lawn so their lit windows pop.
 		if _hood_mat == null:
 			_hood_mat = PropLib.night_exterior_material().duplicate()
-			_hood_mat.albedo_color = Color(0.42, 0.44, 0.64)
+			_hood_mat.albedo_color = Color(0.6, 0.6, 0.82)
 		_hood_night.set_surface_override_material(0, _hood_mat)
 
 
@@ -1342,6 +1348,65 @@ func _place_sky() -> void:
 	var dist: float = rig.get("distance") if rig and "distance" in rig else 20.0
 	var fwd := -c3.global_transform.basis.z
 	_moon.global_transform = Transform3D(c3.global_transform.basis, c3.global_position + fwd * (dist + SKY_BEYOND))
+
+
+## Soft volumetric sunbeams through the office's big back windows (ref1's
+## warm light shafts): one additive, unshaded prism per window pane, merged
+## into a single mesh (one draw call), fading from the glass to the floor.
+## Direction matches the afternoon sun from lighting_profile().
+const SHAFT_SHADER := """shader_type spatial;
+render_mode unshaded, blend_add, depth_draw_never, cull_disabled, shadows_disabled, fog_disabled;
+uniform vec3 tint = vec3(1.0, 0.8, 0.5);
+uniform float strength = 0.22;
+void fragment() {
+	ALBEDO = tint * COLOR.a * strength;
+}
+"""
+
+
+func _build_sun_shafts() -> void:
+	var dir := Vector3(0.3, -0.56, 0.77).normalized()
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var wins := [[-5.75, -4.05], [-3.65, -1.95]]
+	for w: Array in wins:
+		for pane in 2:
+			var x0: float = lerpf(w[0], w[1], pane * 0.5) + 0.06
+			var x1: float = lerpf(w[0], w[1], pane * 0.5 + 0.5) - 0.06
+			var y0 := UF + 0.55
+			var y1 := UF + 2.45
+			var z := -4.85
+			var tl := Vector3(x0, y1, z)
+			var tr := Vector3(x1, y1, z)
+			var bl := Vector3(x0, y0, z)
+			var br := Vector3(x1, y0, z)
+			var reach := func(p: Vector3) -> Vector3:
+				return p + dir * ((p.y - UF) / -dir.y)
+			var ftl: Vector3 = reach.call(tl)
+			var ftr: Vector3 = reach.call(tr)
+			var fbl: Vector3 = reach.call(bl)
+			var fbr: Vector3 = reach.call(br)
+			# Four long sides of the prism (top, bottom, left, right sheets).
+			for q in [[tl, tr, ftr, ftl], [bl, br, fbr, fbl], [tl, bl, fbl, ftl], [tr, br, fbr, ftr]]:
+				var a0: Vector3 = q[0]
+				var a1: Vector3 = q[1]
+				var b1: Vector3 = q[2]
+				var b0: Vector3 = q[3]
+				for tri in [[a0, a1, b1, 1.0, 1.0, 0.0], [a0, b1, b0, 1.0, 0.0, 0.0]]:
+					for k in 3:
+						st.set_color(Color(1, 1, 1, tri[3 + k] * 0.9 + 0.1 * (1.0 - tri[3 + k])))
+						st.add_vertex(tri[k])
+	_shafts = MeshInstance3D.new()
+	_shafts.name = "SunShafts"
+	_shafts.mesh = st.commit()
+	_shafts.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var sh := Shader.new()
+	sh.code = SHAFT_SHADER
+	var m := ShaderMaterial.new()
+	m.shader = sh
+	_shafts.material_override = m
+	_shafts.visible = not _is_night
+	add_child(_shafts)
 
 
 func _add_mesh(m: ArrayMesh, n: String, shadows: bool) -> MeshInstance3D:
@@ -1476,6 +1541,8 @@ func _spawn_household() -> void:
 		if k < 0.999:
 			a.scale = Vector3.ONE * k
 		actors[look] = a
+		if OS.get_environment("VIMS_STATS") != "":
+			print("HOME_ACTOR ", look, " height_m=", float(a._meta.get("height", 0.0)) * a.skeleton.scale.y * a.scale.y)
 	for m in Game.household:
 		if actors.has(m.get("look", "")):
 			actors[m.name] = actors[m.look]
@@ -1499,13 +1566,13 @@ func _stage(preset: String) -> void:
 		var bed: AABB = _spots["pink_bed"]
 		var bc := bed.get_center()
 		# Tucked in: head on the pillow at the headboard (back wall), feet to the camera.
-		var lily := _place("bunny_girl", Vector3(bc.x, y, bed.position.z + 1.05), Vector3(bc.x, y, bed.end.z + 2.0), "lie")
-		lily.lie_height = 8 * PU / lily.scale.y
+		var lily := _place("bunny_girl", Vector3(bc.x, y, bed.position.z + 0.85), Vector3(bc.x, y, bed.end.z + 2.0), "lie")
+		lily.lie_height = 10 * PU / lily.scale.y
 		var ch: AABB = _spots["pink_chair"]
 		var cc3 := ch.get_center()
 		var jack := _place("dad", Vector3(cc3.x, y, cc3.z), Vector3(cc3.x - 1.0, y, cc3.z + 0.75), "sit_read", 7 * PU)
 		var st: AABB = _spots["step"]
-		var maya := _place("cat_girl", Vector3(st.get_center().x, y + 6 * PU, st.get_center().z), Vector3(st.get_center().x - 1.6, y, st.get_center().z + 2.2), "brush_teeth")
+		var maya := _place("cat_girl", Vector3(st.get_center().x, y + 6 * PU, st.get_center().z), Vector3(st.get_center().x + 0.55, y, st.get_center().z + 1.6), "brush_teeth")
 		var cu: AABB = _spots["dog_cushion"]
 		var dog := _place("beagle", Vector3(cu.get_center().x, y + 3 * PU, cu.get_center().z), Vector3(cu.get_center().x + 1.0, y, cu.get_center().z + 1.2), "sleep")
 		Game.show_bubble(jack, {"text": "Read Story", "icon": "book_open", "kind": "action", "id": "action", "progress": -1})
@@ -1518,7 +1585,7 @@ func _stage(preset: String) -> void:
 			_blanket = PropLib.instance("blanket", 0)
 			_blanket.scale = Vector3.ONE * (PU / PropLib.FU)
 			add_child(_blanket)
-		_blanket.position = Vector3(bc.x, y + 8 * PU, bed.position.z + 1.55)
+		_blanket.position = Vector3(bc.x, y + 10 * PU, bed.position.z + 1.5)
 		_blanket.rotation_degrees.y = 0.0
 		_blanket.visible = true
 	else:
@@ -1530,7 +1597,7 @@ func _stage(preset: String) -> void:
 		actors["bunny_girl"].rotation.x = 0.0
 		var stl: AABB = _spots["stool"]
 		var lily := _place("bunny_girl", Vector3(stl.get_center().x, y, stl.get_center().z), Vector3(-4.45, y, -3.7), "sit_paint", 6 * PU)
-		var maya := _place("cat_girl", Vector3(-2.55, y, -0.15), Vector3(-2.35, y, 1.2), "play")
+		var maya := _place("cat_girl", Vector3(-2.85, y, -0.8), Vector3(-2.2, y, 0.5), "play")
 		var ball: AABB = _spots["ball"]
 		var dog := _place("beagle", ball.get_center() + Vector3(-0.75, -ball.size.y * 0.5, 0.1), ball.get_center() + Vector3(0.4, 0, 0.9), "play")
 		Game.show_bubble(jack, {"text": "Work", "icon": "laptop", "kind": "action", "id": "action", "progress": 0.32})

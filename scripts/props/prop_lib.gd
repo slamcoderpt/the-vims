@@ -164,9 +164,13 @@ static func glass_material() -> StandardMaterial3D:
 		_glass_mat.vertex_color_use_as_albedo = true
 		_glass_mat.vertex_color_is_srgb = true
 		_glass_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		_glass_mat.albedo_color = Color(1, 1, 1, 0.28)
+		_glass_mat.albedo_color = Color(0.92, 0.98, 1.0, 0.42)
 		_glass_mat.roughness = 0.1
 		_glass_mat.metallic_specular = 0.9
+		# Faint cool self-light so the panes read light-blue even under warm lamps.
+		_glass_mat.emission_enabled = true
+		_glass_mat.emission = Color(0.42, 0.66, 0.82)
+		_glass_mat.emission_energy_multiplier = 0.7
 	return _glass_mat
 
 

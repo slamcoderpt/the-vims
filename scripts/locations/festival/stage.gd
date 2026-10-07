@@ -30,6 +30,7 @@ func build(parent: Node3D, pos: Vector3, rot: float) -> void:
 	var deck := VoxelBuilder.new()
 	deck.jitter = 0.0
 	_deck(deck)
+	_roof(deck)
 	_steps(vb)
 	_truss(vb)
 	_backdrop(vb)
@@ -74,6 +75,22 @@ func _deck(vb: VoxelBuilder) -> void:
 	K.box(vb, 0, h - 1, 0, w, 1, d + 1, K.wood(Color("b07a48"), 0, 2))
 
 
+## Pitched roof at 1/8 m cells (halves its triangle cost; it is a big flat
+## surface so the coarser grid does not show).
+func _roof(vb: VoxelBuilder) -> void:
+	var top := 86 / 2
+	var d := D / 2
+	var w := W / 2
+	for z in range(-1, d + 2):
+		var t := float(z + 1) / float(d + 2)
+		var y := top + 1 + int(round(lerpf(4.0, 0.0, t)))
+		for x in range(-2, w + 2):
+			var c := K.shade(Color("3a2e2a"), 0.86 + K.hs(x / 2, z, 5) * 0.22)
+			if posmod(z, 2) == 0:
+				c = K.shade(c, 0.82)
+			vb.set_v(Vector3i(x, y, z), c)
+
+
 func _steps(vb: VoxelBuilder) -> void:
 	# Front steps.
 	var rise := DECK / 6
@@ -94,14 +111,7 @@ func _truss(vb: VoxelBuilder) -> void:
 	K.box(vb, 0, top, 2, 3, 3, D - 2, dark)
 	K.box(vb, W - 3, top, 2, 3, 3, D - 2, dark)
 	# Dark pitched roof over the truss (reads as a covered bandstand).
-	for z in range(-1, D + 3):
-		var t := float(z + 1) / float(D + 3)
-		var y := top + 3 + int(round(lerpf(7.0, 0.0, t)))
-		for x in range(-3, W + 3):
-			var c := K.shade(Color("3a2e2a"), 0.86 + K.hs(x / 3, z, 5) * 0.22)
-			if posmod(z, 4) == 0:
-				c = K.shade(c, 0.82)
-			vb.set_v(Vector3i(x, y, z), c)
+	# (Built at 2x cells in the deck builder: see _roof.)
 	# Fascia board along the front edge, with a row of warm bulbs under it.
 	K.box(vb, -3, top + 1, D + 2, W + 6, 3, 1, Color("5a2a22"))
 	for x in range(-2, W + 3, 4):
@@ -148,11 +158,11 @@ func _backdrop(vb: VoxelBuilder) -> void:
 	var by0 := 62
 	for x in range(bx0, bx1):
 		for y in range(by0, 80):
-			var c := K.shade(Color("f4e6c8"), 0.94 + K.hs(x / 3, y / 3, 2) * 0.08)
+			var c := K.shade(Color("f2b04a"), 0.95 + K.hs(x / 3, y / 3, 2) * 0.07)
 			if x < bx0 + 2 or x >= bx1 - 2 or y >= 78:
-				c = Color("c8461e")
+				c = Color("8a2a1a")
 			elif x < bx0 + 3 or x >= bx1 - 3 or y >= 77:
-				c = Color("f2a43a")
+				c = Color("f6e2b0")
 			vb.set_v(Vector3i(x, y, 3), c)
 	# Pennant bottom edge.
 	for x in range(bx0, bx1):
@@ -160,10 +170,18 @@ func _backdrop(vb: VoxelBuilder) -> void:
 		var drop := 3 - absi(k - 4) if absi(k - 4) < 3 else 0
 		for d in drop:
 			vb.set_v(Vector3i(x, by0 - 1 - d, 3), Color("c8461e"))
-	K.maple(vb, W / 2 + 9, 63, 4, Color("c8301a"), 2)
-	# Small orange leaves either side of the big one.
-	for side in [-1, 1]:
-		K.maple(vb, W / 2 + 16 + side * 13 - 3, 66, 4, Color("e07a24"), 1)
+	K.maple(vb, W / 2 + 9, 63, 4, Color("c02414"), 2)
+	# Triangle pennants either side of the banner (ref: bunting framing it).
+	var pc := [Color("e2662a"), Color("f6efe0"), Color("c8401e"), Color("f2b33a")]
+	var k := 0
+	for x0 in range(6, W - 8, 7):
+		if x0 + 6 >= bx0 and x0 <= bx1:
+			continue
+		for row in 6:
+			var half := 3 - (row + 1) / 2
+			for dx in range(-half, half + 1):
+				vb.set_v(Vector3i(x0 + 3 + dx, 79 - row, 4), pc[k % pc.size()])
+		k += 1
 	# Warm uplight strip at the foot of the back wall (stage glow).
 	for x in range(6, W - 6, 3):
 		vb.set_v(Vector3i(x, DECK, 3), Color("ffcf70"), true)

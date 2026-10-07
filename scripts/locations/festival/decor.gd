@@ -16,14 +16,16 @@ const LAMPS := [
 	[5.4, -3.0, false],    # 5 right side, by the game booth
 	[-4.4, -19.0, false],  # 6 far back by the town hall
 ]
-const FOUNTAIN := Vector3(0.2, 0, -10.2)
-const FOUNTAIN_SCALE := 1.6
+const FOUNTAIN := Vector3(0.2, 0, -11.3)
+const FOUNTAIN_SCALE := 1.25
 const LAMP_TOP := 4.2
 const SU := 0.06  # string-light wire cell size
-const BU := 0.085  # bulb cell size
+const BU := 0.08  # bulb cell size
 
 var glow_points: Array = []
 var lamp_heads: Array = []
+var _wires: Array = []   # Array of PackedVector3Array polylines (metres)
+var _wire_pts := PackedVector3Array()
 
 
 func build(parent: Node3D) -> void:
@@ -69,9 +71,9 @@ func _lamp_model(banner: bool) -> VoxelBuilder:
 			var bx0 := 3 if side > 0 else -11
 			for x in range(bx0, bx0 + 8):
 				for y in range(33, 58):
-					var c := K.shade(Color("f6dc98"), 0.96 + K.hs(x, y / 3, 4) * 0.06)
+					var c := K.shade(Color("f4b24a"), 0.95 + K.hs(x, y / 3, 4) * 0.08)
 					if x == bx0 or x == bx0 + 7:
-						c = Color("d8822a")
+						c = Color("c8561e")
 					vb.set_v(Vector3i(x, y, 0), c)
 			# Fringe.
 			for x in range(bx0, bx0 + 8):
@@ -111,7 +113,7 @@ func _fountain(parent: Node3D) -> void:
 	vb.jitter = 0.0
 	var stone := func(q: Vector3i) -> Color:
 		var row := q.y / 3
-		var c := K.pick([Color("8a867e"), Color("7a766e"), Color("96928a"), Color("6e6a64")], K.hs(q.x / 3, row, q.z / 3))
+		var c := K.pick([Color("8c8c8e"), Color("7c7c80"), Color("9a9a9c"), Color("707074")], K.hs(q.x / 3, row, q.z / 3))
 		if posmod(q.y, 3) == 0:
 			c = K.shade(c, 0.88)
 		return c
@@ -121,19 +123,19 @@ func _fountain(parent: Node3D) -> void:
 	# water spilling over their rims, a finial spout on top.
 	K.cyl(vb, 0, 0, 0, 26.0, 2, stone)
 	K.cyl(vb, 0, 2, 0, 25.0, 9, stone, false, 21.0)
-	K.cyl(vb, 0, 11, 0, 25.5, 2, Color("b4afa4"), false, 20.5)
+	K.cyl(vb, 0, 11, 0, 25.5, 2, Color("b2b2b4"), false, 20.5)
 	K.cyl(vb, 0, 2, 0, 21.0, 7, water)
 	# Pedestal + lower bowl.
 	K.cyl(vb, 0, 9, 0, 6.0, 4, stone)
 	K.cyl(vb, 0, 13, 0, 4.5, 16, stone)
 	K.cyl(vb, 0, 29, 0, 8.0, 2, stone)
 	K.cyl(vb, 0, 31, 0, 14.0, 3, stone)
-	K.cyl(vb, 0, 34, 0, 14.5, 2, Color("b4afa4"), false, 12.0)
+	K.cyl(vb, 0, 34, 0, 14.5, 2, Color("b2b2b4"), false, 12.0)
 	K.cyl(vb, 0, 34, 0, 12.0, 1, water)
 	# Upper stem + small bowl + finial.
 	K.cyl(vb, 0, 35, 0, 3.0, 10, stone)
 	K.cyl(vb, 0, 45, 0, 7.5, 2, stone)
-	K.cyl(vb, 0, 47, 0, 8.0, 2, Color("b4afa4"), false, 6.0)
+	K.cyl(vb, 0, 47, 0, 8.0, 2, Color("b2b2b4"), false, 6.0)
 	K.cyl(vb, 0, 47, 0, 6.0, 1, water)
 	K.cyl(vb, 0, 48, 0, 2.0, 5, stone)
 	K.cyl(vb, 0, 53, 0, 1.2, 3, Color("a8d4ea"))
@@ -178,15 +180,19 @@ func _catenary(vb: VoxelBuilder, bv: VoxelBuilder, a: Vector3, b: Vector3, sag: 
 	var ca := a / SU
 	var cb := b / SU
 	var n := maxi(int((cb - ca).length()), 2)
-	var wire := Color("2e2a26")
-	var bulb_every := 7
+	var bulb_every := 6
 	var flag_cols := [Color("e2662a"), Color("f6efe0"), Color("c8401e"), Color("7a4a2e"), Color("f2a33a")]
+	_wire_pts = PackedVector3Array()
+	_wires.append(_wire_pts)
 	for i in n + 1:
 		var t := float(i) / n
 		var p := ca.lerp(cb, t)
 		p.y -= sin(t * PI) * sag / SU
 		var q := Vector3i(floori(p.x), floori(p.y), floori(p.z))
-		vb.set_v(q, wire)
+		# Wire itself is a thin tube mesh (see _wire_mesh): far cheaper than
+		# a chain of voxels.
+		if i % 4 == 0 or i == n:
+			_wire_pts.append((Vector3(q) + Vector3(0.5, 0.5, 0.5)) * SU)
 		if bulbs and i % bulb_every == 3 and i > 2 and i < n - 2:
 			vb.set_v(q + Vector3i(0, -1, 0), Color("2a2622"))
 			var m := (Vector3(q) + Vector3(0.5, -1.0, 0.5)) * SU   # socket bottom (m)
@@ -195,7 +201,7 @@ func _catenary(vb: VoxelBuilder, bv: VoxelBuilder, a: Vector3, b: Vector3, sag: 
 				for bz in 2:
 					bv.set_v(bq + Vector3i(bx, 1, bz), Color("ffd27a"), true)
 					bv.set_v(bq + Vector3i(bx, 0, bz), Color("ffc456"), true)
-			glow_points.append([(Vector3(bq) + Vector3(1.0, 1.0, 1.0)) * BU, 0.95, Color(1.0, 0.74, 0.38)])
+			glow_points.append([(Vector3(bq) + Vector3(1.0, 1.0, 1.0)) * BU, 0.85, Color(1.0, 0.74, 0.38)])
 		if bunting and i % 8 == 0 and i > 3 and i < n - 3:
 			var c: Color = flag_cols[(i / 8) % flag_cols.size()]
 			var dir := (cb - ca).normalized()
@@ -213,22 +219,24 @@ func _strings(parent: Node3D) -> void:
 	for l: Array in LAMPS:
 		L.append(Vector3(l[0], LAMP_TOP + 0.1, l[1]))
 	var stage_fl := Vector3(4.7, 4.4, -14.3)   # stage truss front-left corner
+	# Round 7: fewer, cleaner runs. Nothing crosses the walkway at head
+	# height in front of the fountain / stage any more (the old web of
+	# strings + oversized bulbs read as a yellow smear over the backdrop).
 	var runs := [
 		# [a, b, sag, bunting]
-		[L[0], L[1], 0.5, true],
-		[L[0], L[5], 0.7, false],
-		[L[2], L[0], 0.55, false],
-		[L[1], stage_fl, 0.45, false],
-		[L[5], L[1], 0.6, false],
+		[L[2], L[0], 0.45, false],
+		[L[0], L[1], 0.3, false],
+		[L[1], stage_fl, 0.35, false],
 		[L[5], Vector3(10.6, 3.6, -3.4), 0.4, false],
-		[L[5], Vector3(8.6, 3.2, 1.8), 0.45, false],
-		[L[4], L[0], 0.5, false],
-		[L[4], L[1], 0.8, false],
+		[L[4], L[0], 0.4, false],
 		[L[4], L[6], 0.4, false],
 		[L[3], Vector3(11.5, 4.6, -12.0), 0.4, true],
-		[L[3], L[1], 0.6, false],
 		[L[2], Vector3(-10.0, 4.4, -7.0), 0.4, false],
 		[Vector3(-10.0, 4.4, -7.0), L[4], 0.5, true],
+		# High runs from the lamps back towards the town hall: these read as
+		# the glowing bulb garlands across the top of the frame in the ref.
+		[L[0], Vector3(-6.4, 6.2, -16.5), 0.5, false],
+		[L[1], Vector3(6.6, 6.0, -19.5), 0.5, false],
 	]
 	var bv := VoxelBuilder.new()
 	bv.jitter = 0.0
@@ -236,6 +244,43 @@ func _strings(parent: Node3D) -> void:
 		_catenary(vb, bv, r[0], r[1], r[2], r[3])
 	K.inst(parent, vb, SU, Vector3.ZERO, 0.0, false, Vector3.ZERO, "StringLights")
 	K.inst(parent, bv, BU, Vector3.ZERO, 0.0, false, Vector3.ZERO, "StringBulbs")
+	_wire_mesh(parent)
+
+
+## All string-light wires as one mesh of thin square tubes.
+func _wire_mesh(parent: Node3D) -> void:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var hw := 0.02
+	for pl: PackedVector3Array in _wires:
+		for k in pl.size() - 1:
+			var a := pl[k]
+			var b := pl[k + 1]
+			var d := (b - a).normalized()
+			var u := d.cross(Vector3.UP).normalized() * hw
+			var v := u.cross(d).normalized() * hw
+			var sides := [[v, u], [u, -v], [-v, -u], [-u, v]]
+			for sd: Array in sides:
+				var o0: Vector3 = sd[0] + sd[1]
+				var o1: Vector3 = sd[0] - sd[1]
+				var nrm: Vector3 = (sd[0] as Vector3).normalized()
+				st.set_normal(nrm)
+				st.add_vertex(a + o0)
+				st.add_vertex(b + o0)
+				st.add_vertex(b + o1)
+				st.add_vertex(a + o0)
+				st.add_vertex(b + o1)
+				st.add_vertex(a + o1)
+	var mi := MeshInstance3D.new()
+	mi.name = "StringWires"
+	mi.mesh = st.commit()
+	var m := StandardMaterial3D.new()
+	m.albedo_color = Color("2a2622")
+	m.roughness = 1.0
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	mi.material_override = m
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.add_child(mi)
 
 
 # ------------------------------------------------------------------ props
@@ -293,13 +338,14 @@ func _props(parent: Node3D) -> void:
 		[-6.9, 2.6, 0], [-6.0, 3.5, 1], [-7.6, 0.4, 1],
 		[-2.2, -6.2, 2], [2.0, -7.6, 0], [7.4, -2.0, 2],
 		[7.6, 3.4, 1], [2.6, 3.6, 0],
+		[-2.7, -11.6, 1], [3.1, -12.2, 2],
 	]
 	var i := 0
 	for b: Array in barrels:
 		_barrel_planter(near, int(b[0] * C), int(b[1] * C), 5.0, b[2], i)
 		i += 1
 	# Ground lanterns (small, along the walkway edges).
-	for l in [[-7.0, 3.6], [-3.3, 2.9], [1.9, 3.1], [6.9, 0.2], [-2.0, -4.2], [1.9, -5.6], [-1.6, -11.6], [2.4, -11.6]]:
+	for l in [[-7.0, 3.6], [-3.3, 2.9], [1.9, 3.1], [6.9, 0.2], [-2.0, -4.2], [1.9, -5.6], [-2.5, -9.0], [2.9, -9.3]]:
 		_ground_lantern(near, int(l[0] * C), int(l[1] * C))
 	# Picnic tables.
 	_picnic_table(near, int(-5.0 * C), int(-8.0 * C))
