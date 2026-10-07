@@ -934,6 +934,12 @@ func choose_autonomous(ag) -> Dictionary:
 			target = sel.actor.global_position + Vector3(randf_range(-1.2, 1.2), 0, randf_range(-1.2, 1.2))
 		else:
 			target = p + Vector3(randf_range(-2.5, 2.5), 0, randf_range(-2.5, 2.5))
+		if nav and nav.in_bounds(target):
+			# Snap the stroll to a floor cell this sim can actually walk to.
+			var li := nav.level_of(p)
+			var c := nav.approach_cell(li, nav.cell_of(Vector3(target.x, p.y, target.z)), nav.entry_region(p, li), 24)
+			if c.x >= 0:
+				target = nav.center_of(li, c)
 		if nav and nav.in_bounds(target) and _flat(target, p) > 0.6:
 			target.y = p.y
 			best = {"action": {"id": "go_here", "label": "Wander", "minutes": 0.0}, "point": target}
