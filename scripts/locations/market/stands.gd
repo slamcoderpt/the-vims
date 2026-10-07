@@ -55,14 +55,14 @@ static func _crate(fix: VoxelBuilder, prod: VoxelBuilder, at: Vector3, size: Vec
 	Fx.crate(fix, o, w, d, hh, col)
 	if not fine:
 		# coarse produce on the U grid, straight into the fixture builder
-		fix.box(o + Vector3i(1, 1, 1), Vector3i(w - 2, hh - 2, d - 2), Kit.shade(_kind_col(kind), 0.6))
+		fix.box(o + Vector3i(1, 1, 1), Vector3i(w - 2, hh - 2, d - 2), Kit.shade(_kind_col(kind), 0.42))
 		Produce.mini_heap(fix, kind, o + Vector3i(1, hh - 1, 1), Vector3i(w - 2, 4, d - 2), layers, seed)
 		return
 	# produce interior (P grid = 2x U grid), starting a bit below the rim
 	var po := Vector3i(o.x * 2 + 2, o.y * 2 + hh * 2 - 4, o.z * 2 + 2)
 	var ps := Vector3i(w * 2 - 4, 8, d * 2 - 4)
 	# fill below the heap so the crate looks full
-	prod.box(Vector3i(po.x, o.y * 2 + 2, po.z), Vector3i(ps.x, hh * 2 - 6, ps.z), Kit.shade(_kind_col(kind), 0.55))
+	prod.box(Vector3i(po.x, o.y * 2 + 2, po.z), Vector3i(ps.x, hh * 2 - 5, ps.z), Kit.shade(_kind_col(kind), 0.62))
 	Produce.heap2(prod, kind, po, ps, layers + 1, seed)
 
 
@@ -404,14 +404,15 @@ static func _checkout(root: Node3D, _halo_pts: Array) -> void:
 	pv.jitter = 0.05
 	var py := (Hc + 2) * 2
 	var b0 := z0 + u(0.9)
-	Produce.bananas(pv, Vector3i((x0 + 2) * 2, py, (b0 + 22) * 2), 5)
-	Produce.bananas(pv, Vector3i((x0 + 2) * 2 + 1, py + 2, (b0 + 22) * 2 + 1), 4)
-	Produce.broccoli(pv, Vector3i((x0 + 3) * 2, py, (b0 + 15) * 2))
-	Produce.lettuce(pv, Vector3i((x0 + 8) * 2, py, (b0 + 9) * 2))
+	Produce.big_bananas(pv, Vector3i((x0 + 3) * 2, py, (b0 + 21) * 2), 3, 5)
+	Produce.big_bananas(pv, Vector3i((x0 + 3) * 2 + 2, py + 3, (b0 + 21) * 2 + 2), 4, 4)
+	Produce.big_broccoli(pv, Vector3i((x0 + 3) * 2, py, (b0 + 15) * 2), 2)
+	Produce.big_lettuce(pv, Vector3i((x0 + 7) * 2, py, (b0 + 9) * 2), 3)
 	for t in 3:
-		Produce.tomato(pv, Vector3i((x0 + 3) * 2 + t * 4, py, (b0 + 29) * 2 + (t % 2)))
-	Produce.apple(pv, Vector3i((x0 + 3) * 2, py, (b0 + 34) * 2))
-	Produce.apple(pv, Vector3i((x0 + 3) * 2 + 4, py, (b0 + 34) * 2 + 2))
+		Produce.big_tomato(pv, Vector3i((x0 + 3) * 2 + t * 5, py, (b0 + 29) * 2 + (t % 2) * 2), t + 5)
+	Produce.big_apple(pv, Vector3i((x0 + 3) * 2, py, (b0 + 35) * 2), 1)
+	Produce.big_apple(pv, Vector3i((x0 + 3) * 2 + 5, py, (b0 + 35) * 2 + 2), 2)
+	Produce.big_apple(pv, Vector3i((x0 + 3) * 2 + 2, py + 4, (b0 + 35) * 2 + 1), 3, true)
 	Kit.add(root, pv, P, "CheckoutProduce", false)
 	Interactable.attach(root, "Checkout", [
 		_act("pay", "Pay", "register", 3.0, {"task": "Pay at Checkout"}),

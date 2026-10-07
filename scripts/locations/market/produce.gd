@@ -245,12 +245,14 @@ static func heap(vb: VoxelBuilder, kind: String, from: Vector3i, size: Vector3i,
 ## Coarse heap for far-away bins (U grid): 2x2x2 blobs with a stem/leaf
 ## pixel, staggered in layers. Cheap and reads fine through the tilt-shift.
 static func mini_heap(vb: VoxelBuilder, kind: String, from: Vector3i, size: Vector3i, layers := 2, seed := 0) -> void:
+	# 2x2x2 blobs on a 3-cell pitch so a dark gap separates every item (reads
+	# as individual fruit from across the store instead of a colour strip).
 	for L in layers:
-		var off := L % 2
-		for ix in range(0, size.x - off - 1, 2):
-			for iz in range(0, size.z - off - 1, 2):
+		var off := (L % 2) * 1 + (L / 2) % 2
+		for ix in range(0, size.x - off - 1, 3):
+			for iz in range(0, size.z - off - 1, 3):
 				var u := (float(ix) + 1.0) / size.x - 0.5
-				if L > 0 and absf(u) > 0.42 - 0.1 * L:
+				if L > 0 and absf(u) > 0.44 - 0.12 * L:
 					continue
 				var o := from + Vector3i(ix + off, L * 2, iz + off)
 				var r := Kit.h(o, 31 + seed)
@@ -259,9 +261,12 @@ static func mini_heap(vb: VoxelBuilder, kind: String, from: Vector3i, size: Vect
 					for dy in 2:
 						for dz in 2:
 							var p := o + Vector3i(dx, dy, dz)
-							vb.set_v(p, Kit.vary(col if dy == 1 else Kit.shade(col, 0.88), p, 0.06, 5))
-				if kind in ["tomato", "pepper_red", "pepper_mix", "orange", "carrot"] and r > 0.4:
-					vb.set_v(o + Vector3i(int(r * 7.0) % 2, 2, 1), LEAF)
+							var f := 1.08 if dy == 1 else 0.82
+							if dx == 0 and dz == 1 and dy == 1:
+								f = 1.25
+							vb.set_v(p, Kit.vary(Kit.shade(col, f), p, 0.06, 5))
+				if kind in ["tomato", "pepper_red", "pepper_mix", "orange", "carrot", "apple"] and r > 0.35:
+					vb.set_v(o + Vector3i(int(r * 7.0) % 2, 2, 1), LEAF if kind != "apple" else STEM)
 
 
 static func _mini_col(kind: String, r: float) -> Color:
@@ -496,7 +501,7 @@ static func big_item(vb: VoxelBuilder, kind: String, o: Vector3i, s: int, rnd: f
 		"carrot":
 			big_carrot(vb, o + Vector3i(0, 0, 3), s); return Vector3i(3, 2, 14)
 		"banana":
-			big_bananas(vb, o + Vector3i(2, 0, 0), s); return Vector3i(14, 3, 12)
+			big_bananas(vb, o + Vector3i(2, 0, 0), s); return Vector3i(13, 3, 12)
 	big_tomato(vb, o, s)
 	return Vector3i(5, 4, 5)
 
