@@ -133,7 +133,7 @@ func _interactables() -> void:
 		 "needs": {"social": 0.15}, "who": ["adult", "child"]},
 		{"id": "give", "label": "Give Food", "icon": "gift", "minutes": 5.0, "pose": "idle",
 		 "needs": {"social": 0.1}, "who": ["adult", "child"]},
-	], Vector3(1.2, 1.1, 0.8), Vector3(0, 0.55, 0), Vector3(0, 0, 0.65))
+	], Vector3(1.4, 1.1, 0.8), Vector3(0, 0.55, 0), Party.COOK_SPOT / Party.GRILL_SCALE)
 	Interactable.attach(party.table_node, "Dinner Table", [
 		{"id": "eat", "label": "Eat", "icon": "burger", "minutes": 30.0, "pose": "sit",
 		 "needs": {"hunger": 0.6, "social": 0.1}},

@@ -129,8 +129,9 @@ func lighting_profile() -> Dictionary:
 		"moon_heading": 150.0, "moon_energy": 0.45, "glow_boost_night": 1.2,
 		"shadow_distance": 40.0,
 		"post_day": {"focus_y": 0.5, "band": 0.35, "falloff": 0.18, "blur_px": 4.0, "top_boost": 1.0,
-			"saturation": 1.16, "contrast": 1.12, "tint": Vector3(1.02, 1.0, 0.96), "vignette": 0.22},
-		"post_night": {"focus_y": 0.56, "band": 0.36, "falloff": 0.14, "blur_px": 2.8, "top_boost": 0.7},
+			"saturation": 1.22, "contrast": 1.17, "tint": Vector3(1.035, 0.985, 0.94), "vignette": 0.24},
+		"post_night": {"focus_y": 0.56, "band": 0.36, "falloff": 0.14, "blur_px": 2.8, "top_boost": 0.7,
+			"saturation": 1.12, "contrast": 1.12, "gamma": 1.08, "tint": Vector3(1.0, 0.95, 0.94), "vignette": 0.36},
 	}
 
 
