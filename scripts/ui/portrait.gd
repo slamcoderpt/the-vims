@@ -6,6 +6,7 @@ extends "res://scripts/ui/tap_area.gd"
 const UI := preload("res://scripts/ui/ui_kit.gd")
 const SIM_ACTOR := "res://scripts/world/actors/sim_actor.gd"
 const Plumbob := preload("res://scripts/ui/plumbob.gd")
+const Bust := preload("res://scripts/ui/portrait_bust.gd")
 const PORTRAIT_SHADER := """
 shader_type canvas_item;
 uniform vec2 rect_size = vec2(100.0, 130.0);
@@ -113,6 +114,32 @@ void fragment() {
 }
 """
 
+## Studio light for the dedicated portrait busts: vertex colours (AO and
+## block shading baked in) lit by a soft warm key from upper-left of the
+## lens, a cool fill so the turned-away side never goes muddy and a warm rim
+## on the right-hand edges that separates hair from the backdrop.
+const STUDIO_SHADER := """
+shader_type spatial;
+render_mode unshaded, cull_back, shadows_disabled;
+uniform vec3 key_dir = vec3(-0.42, 0.5, 0.76);
+uniform float ambient = 0.6;
+uniform float key = 0.5;
+uniform float rim = 0.16;
+void fragment() {
+	vec3 c = COLOR.rgb;
+	vec3 lin = c;
+	if (!OUTPUT_IS_SRGB) {
+		lin = mix(pow((c + vec3(0.055)) / 1.055, vec3(2.4)), c / 12.92, step(c, vec3(0.04045)));
+	}
+	vec3 n = normalize((INV_VIEW_MATRIX * vec4(NORMAL, 0.0)).xyz);
+	float k = ambient + key * max(dot(n, normalize(key_dir)), 0.0);
+	k += 0.06 * max(n.y, 0.0);
+	vec3 col = lin * k * vec3(1.04, 1.0, 0.97);
+	col += lin * vec3(1.0, 0.85, 0.6) * rim * max(n.x, 0.0);
+	ALBEDO = col;
+}
+"""
+
 ## Portrait backdrop gradients per look (top, bottom), like the soft room
 ## blur behind each head in the refs.
 const BG_TINTS := {
@@ -125,6 +152,7 @@ const BG_TINTS := {
 
 static var _shader: Shader
 static var _bust_mat: ShaderMaterial
+static var _studio_mat: ShaderMaterial
 
 var index := 0
 var member: Dictionary = {}
@@ -144,6 +172,9 @@ var _key: DirectionalLight3D
 var _fill: DirectionalLight3D
 var _rim_l: DirectionalLight3D
 var _render_frames := 0
+## Dedicated high-detail bust (portrait_bust.gd) when the look is known.
+var _bust: Dictionary = {}
+var _bust_mi: MeshInstance3D
 ## Silhouette bounds in camera-plane coords (from the measure pass) and the
 ## plane centre / height of the last framing.
 var _measured := Rect2()
@@ -308,8 +339,18 @@ func _spawn_actor() -> void:
 	if _actor:
 		_actor.queue_free()
 		_actor = null
+	if _bust_mi:
+		_bust_mi.queue_free()
+		_bust_mi = null
+	_bust = {}
 	var look: String = member.get("look", "")
-	if look == "" or not ResourceLoader.exists(SIM_ACTOR):
+	if look == "":
+		return
+	var bd: Dictionary = Bust.build(look)
+	if not bd.is_empty():
+		_spawn_bust(bd)
+		return
+	if not ResourceLoader.exists(SIM_ACTOR):
 		return
 	var script: Script = load(SIM_ACTOR)
 	if script == null or not script.can_instantiate():
@@ -349,6 +390,42 @@ func _spawn_actor() -> void:
 	_measure_silhouette()
 	_measuring = false
 	_frame_camera()
+
+
+func _spawn_bust(bd: Dictionary) -> void:
+	_bust = bd
+	if _studio_mat == null:
+		var sh := Shader.new()
+		sh.code = STUDIO_SHADER
+		_studio_mat = ShaderMaterial.new()
+		_studio_mat.shader = sh
+	var mi := MeshInstance3D.new()
+	mi.name = "PortraitBust"
+	mi.mesh = bd.mesh
+	mi.material_override = _studio_mat
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mi.rotation_degrees = Vector3(bd.pitch, bd.yaw, 0.0)
+	_vp.add_child(mi)
+	_bust_mi = mi
+	_frame_camera()
+
+
+## Bust framing: the card window comes from portrait_bust.gd (voxel units,
+## measured against the ref cards); the width follows the card aspect.
+func _frame_bust() -> void:
+	var vs: float = Bust.VS
+	var fr: Rect2 = _bust.frame
+	var yaw := deg_to_rad(float(_bust.yaw))
+	# The face plane (z ~ 6) swings right with the yaw: follow it halfway so
+	# the face, not the back of the head, sits mid-card.
+	var cx := fr.position.x + 5.0 * sin(yaw)
+	var cy := fr.position.y + fr.size.y * 0.5
+	var view_h := fr.size.y * vs
+	_plane_h = view_h
+	_cam.size = view_h
+	_cam.transform = Transform3D(Basis(), Vector3(cx * vs, cy * vs, 6.0))
+	_mat.set_shader_parameter("smooth_px", 0.0)
+	_request_render()
 
 
 func _apply_bust_material(a: Node3D) -> void:
@@ -411,6 +488,9 @@ func _bone_xf(sk: Skeleton3D, idx: int) -> Transform3D:
 func _frame_camera(measure := false) -> void:
 	# A resize during the measure pass must keep the wide measure view.
 	measure = measure or _measuring
+	if _bust_mi != null and not _bust.is_empty():
+		_frame_bust()
+		return
 	if _actor == null or not is_instance_valid(_actor) or not _actor.is_inside_tree():
 		return
 	var dog: bool = member.get("kind", "") == "dog"

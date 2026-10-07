@@ -127,12 +127,13 @@ static func mesh(vb: VoxelBuilder, vs: float, origin := Vector3.ZERO, glow: Mate
 			var c1 := Color(base.r * sh * a1, base.g * sh * a1, base.b * sh * a1)
 			var c2 := Color(base.r * sh * a2, base.g * sh * a2, base.b * sh * a2)
 			var c3 := Color(base.r * sh * a3, base.g * sh * a3, base.b * sh * a3)
-			if merge and not g:
-				# Faces of +-X run along z; +-Y and +-Z run along x.
+			if merge:
+				# Faces of +-X run along z; +-Y and +-Z run along x. Glow faces
+				# (no AO, flat colour) merge too, into their own runs.
 				var rc := p.z if fi < 2 else p.x
 				var plane := p.x if fi < 2 else (p.y if fi < 4 else p.z)
 				var row := p.y if (fi < 2 or fi >= 4) else p.z
-				var key := Vector3i(fi, plane, row)
+				var key := Vector4i(fi, plane, row, 1 if g else 0)
 				if not runs.has(key):
 					runs[key] = []
 				runs[key].append([rc, c0, c1, c2, c3, p])
@@ -140,8 +141,9 @@ static func mesh(vb: VoxelBuilder, vs: float, origin := Vector3.ZERO, glow: Mate
 			var s := lit if g else solid
 			s.quad((pf + cs[0] - origin) * vs, (pf + cs[1] - origin) * vs, (pf + cs[2] - origin) * vs, (pf + cs[3] - origin) * vs,
 				Vector3(n), c0, c1, c2, c3)
-	for key: Vector3i in runs:
+	for key: Vector4i in runs:
 		var lst: Array = runs[key]
+		var dst := lit if key.w == 1 else solid
 		lst.sort_custom(func(a, b): return a[0] < b[0])
 		var fi := key.x
 		var cs: Array = CORNERS[fi]
@@ -161,7 +163,7 @@ static func mesh(vb: VoxelBuilder, vs: float, origin := Vector3.ZERO, glow: Mate
 				var ccn: Vector3 = cs[ci]
 				var comp := ccn.z if fi < 2 else ccn.x
 				q.append(((p1 if comp > 0.5 else p0) + ccn - origin) * vs)
-			solid.quad(q[0], q[1], q[2], q[3], Vector3(N[fi]), e[1], e[2], e[3], e[4])
+			dst.quad(q[0], q[1], q[2], q[3], Vector3(N[fi]), e[1], e[2], e[3], e[4])
 			k = m + 1
 	var m := ArrayMesh.new()
 	for pair in [[solid, solid_mat()], [lit, glow if glow != null else glow_mat("warm")]]:
@@ -366,7 +368,7 @@ static func tile_floor(parent: Node3D, size: Vector2, center: Vector3, tile := 0
 		for tx in n:
 			# warm cream tiles (two tones, faint per-tile variation) with
 			# a clearly visible warm-grey grout line and a bevelled edge.
-			var base := Color("eee0c4") if (tx + ty) % 2 == 0 else Color("dfcbab")
+			var base := Color("d6b29a") if (tx + ty) % 2 == 0 else Color("c9a48c")
 			var f := 0.95 + 0.08 * h(Vector3i(tx, ty, 5))
 			for y in px:
 				for x in px:
@@ -382,8 +384,8 @@ static func tile_floor(parent: Node3D, size: Vector2, center: Vector3, tile := 0
 	var tex := ImageTexture.create_from_image(img)
 	var mat := StandardMaterial3D.new()
 	mat.albedo_texture = tex
-	mat.roughness = 0.24
-	mat.metallic_specular = 0.6
+	mat.roughness = 0.3
+	mat.metallic_specular = 0.45
 	mat.uv1_triplanar = true
 	mat.uv1_world_triplanar = true
 	mat.uv1_scale = Vector3.ONE / (tile * n)

@@ -264,8 +264,8 @@ func _is_selected_actor(a: Node3D) -> bool:
 
 ## Screen gap (px) between the top of a sim's head and the tip of its
 ## bubble's tail; scales a little with head size so far sims stay snug.
-const MIN_GAP := 5.0
-const MAX_GAP := 12.0
+const MIN_GAP := 3.0
+const MAX_GAP := 8.0
 ## Top of the area bubbles may use (below the screen edge).
 const SAFE_TOP := 12.0
 const BUBBLE_PAD := 14.0
@@ -536,44 +536,40 @@ const _SEL_LIFTS: Array[float] = [0.0, 16.0, 34.0, 56.0]
 const _SEL_DX: Array[float] = [0.0, 14.0, 30.0]
 
 
-## Selected sim (ref1 "Work" + gem): the plumbob floats straight over the
-## head with its own clear space, and the action bubble hangs beside the gem
-## (left preferred) with its tail dipping toward the head. Returns false when
-## neither side fits so the generic layout takes over.
+## Selected sim (ref1 "Work" + gem): the action bubble hangs straight over
+## the head (tail tip just above the hair, toward the bubble's right end)
+## and the plumbob floats beside the bubble, level with it, on the right
+## (left when crowded). Returns false when neither side fits so the generic
+## layout takes over.
+const _SEL_FRACS: Array[float] = [0.72, 0.62, 0.82, 0.5]
 func _place_selected(b, vs: Vector2, full: Vector2) -> bool:
-	var h: float = PB_H * plumbob.gem_scale
-	# head_top() sits a little above the hair; let the gem hover just over
-	# the hair line (ref1) instead of a full gap higher.
-	var pbr := Rect2(b.head.x - PB_W * 0.5, b.head.y + 4.0 - h, PB_W, h)
-	if pbr.position.y < SAFE_TOP:
-		return false
-	# The gem's bottom tip may dip into the hair-line margin of its own head.
-	var pc := _cost(Rect2(pbr.position, pbr.size - Vector2(0, 14.0)), vs)
 	var best := INF
 	var best_pos := Vector2.ZERO
 	var best_side := 0
+	var best_lift := 0.0
 	for side in _SEL_SIDES:
 		for lift in _SEL_LIFTS:
-			for dx in _SEL_DX:
-				var x: float = pbr.position.x - 8.0 - dx - b.size.x if side < 0 else pbr.end.x + 8.0 + dx
-				# bubble body roughly level with the gem, tail bottom near
-				# the gem's lower half
-				var y: float = pbr.end.y - full.y + 10.0 - lift
-				var r := Rect2(Vector2(x, y), full)
-				var c: float = _cost(r, vs) + lift * 8.0 + dx * 6.0 + (0.0 if side < 0 else 300.0)
+			for fr in _SEL_FRACS:
+				var f: float = fr if side > 0 else 1.0 - fr
+				var pos := Vector2(b.base_tip.x - b.size.x * f, b.base_tip.y - lift - full.y)
+				# Body + upper tail: the tail tip itself may dip to the hair.
+				var r := Rect2(pos, b.size + Vector2(0, WorldBubble.TAIL_H * 0.4))
+				var pb := _pb_rect(pos, b.size, side)
+				var c: float = _cost(r, vs) + _cost(pb, vs) + lift * lift * 0.6 + lift * 10.0 \
+					+ absf(fr - 0.72) * 600.0 + (0.0 if side > 0 else 250.0)
 				if c < best:
 					best = c
-					best_pos = r.position
+					best_pos = pos
 					best_side = side
-	if best + pc > 4000.0:
+					best_lift = lift
+	if best > 4000.0:
 		return false
 	b.target = best_pos
-	var tx: float = best_pos.x + b.size.x - 22.0 if best_side < 0 else best_pos.x + 22.0
-	b.tip = Vector2(lerpf(tx, b.head.x, 0.6), best_pos.y + full.y)
+	b.tip = b.base_tip - Vector2(0, best_lift)
 	b.plumb_side = best_side
-	b.pb_rect = pbr
+	b.pb_rect = _pb_rect(best_pos, b.size, best_side)
 	_placed.append(Rect2(best_pos, full))
-	_placed.append(pbr.grow(6.0))
+	_placed.append(b.pb_rect)
 	return true
 
 

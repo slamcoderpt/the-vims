@@ -18,7 +18,7 @@ extends Node
 ## No edits to sim_actor.gd are needed: the layer reads the bones the actor
 ## just wrote and blends its own targets over them (weight fades in/out).
 
-const VS := 0.025   # prop voxel size (body units; the skeleton scales it)
+const VS := 0.032   # prop voxel size (body units; the skeleton scales it)
 
 ## Animation table. Keys per anim:
 ##   base:   SimActor pose to set ("*" = keep the action's own pose)
@@ -85,7 +85,8 @@ const ANIMS := {
 			[0.75, {"arm_r": Vector3(-0.88, 0, 0.24), "fore_r": Vector3(-0.8, 0, 0), "arm_l": Vector3(-0.95, 0, -0.18), "fore_l": Vector3(-0.45, 0, 0), "torso": Vector3(0.14, 0, 0), "head": Vector3(0.28, 0, 0)}],
 		],
 		"osc": [["fore_l", Vector3(0.05, 0, 0), 1.1, 0.0]],
-		"props": [["spoon", "fore_r", Vector3(0, 0, 0.02), Vector3(-1.4, 0, 0), false], ["pan", "fore_l", Vector3(0, -0.02, 0.0), Vector3.ZERO, true]],
+		"props": [["spoon", "fore_r", Vector3(0, 0, 0.02), Vector3(-1.4, 0, 0), false]],
+		"world": [["pan", "surface"]],
 		"fx": [["steam", "pan"]]},
 	"cook": {"stages": [[0.35, "chop"], [1.0, "stir"]]},
 	# ------------------------------------------------------------ bathroom
@@ -675,9 +676,8 @@ func _update_props() -> void:
 			var r: Vector3 = e.get("rot", Vector3.ZERO)
 			mi.global_transform = h * Transform3D(Basis.from_euler(r), pos)
 	var steam: CPUParticles3D = _fx.get("steam")
-	if steam and steam.emitting and _props.has("pan@fore_l"):
-		var pan: MeshInstance3D = _props["pan@fore_l"].mi
-		steam.global_position = pan.global_position + yaw * Vector3(0, 0.08, 0.12 * s)
+	if steam and steam.emitting and _world.has("pan") and (_world["pan"] as Node3D).visible:
+		steam.global_position = (_world["pan"] as Node3D).global_position + Vector3(0, 0.1, 0)
 	var tap: CPUParticles3D = _fx.get("tap")
 	if tap and tap.emitting:
 		var hr := _hand_xf("fore_r").origin
@@ -787,9 +787,9 @@ func _make_fx(fx: String) -> CPUParticles3D:
 	var bm := BoxMesh.new()
 	match fx:
 		"water", "tap", "sprinkle":
-			bm.size = Vector3(0.018, 0.07, 0.018)
-			m.albedo_color = Color(0.7, 0.88, 1.0, 0.75)
-			p.amount = 60 if fx == "water" else 24
+			bm.size = Vector3(0.026, 0.09, 0.026)
+			m.albedo_color = Color(0.78, 0.93, 1.0, 0.85)
+			p.amount = 90 if fx == "water" else 30
 			p.lifetime = 0.5 if fx == "water" else 0.35
 			p.direction = Vector3(0, -1, 0)
 			p.spread = 10.0 if fx == "water" else 4.0
@@ -870,18 +870,18 @@ static func prop_mesh(pname: String) -> ArrayMesh:
 			vb.set_v(Vector3i(0, 0, 6), steel)
 			vb.set_v(Vector3i(0, 1, 6), Color(0.95, 0.7, 0.3))   # a bite of food
 			origin = Vector3(0.5, 0.5, 0.5)
-			size = 0.022
+			size = 0.03
 		"spoon":
 			_fill(vb, 0, 0, 0, 0, -1, 6, Color(0.62, 0.42, 0.24))
 			_fill(vb, -1, 1, -1, 0, 7, 8, Color(0.62, 0.42, 0.24))
 			origin = Vector3(0.5, 0.5, 0.5)
-			size = 0.024
+			size = 0.032
 		"knife":
 			_fill(vb, 0, 0, 0, 0, -1, 2, Color(0.18, 0.16, 0.15))
 			_fill(vb, 0, 0, -1, 0, 3, 8, steel)
 			vb.set_v(Vector3i(0, -1, 9), steel)
 			origin = Vector3(0.5, 0.5, 0.5)
-			size = 0.022
+			size = 0.03
 		"sponge":
 			_fill(vb, 0, 3, 0, 1, 0, 2, Color(0.98, 0.85, 0.3))
 			_fill(vb, 0, 3, 2, 2, 0, 2, Color(0.4, 0.75, 0.45))
@@ -897,13 +897,13 @@ static func prop_mesh(pname: String) -> ArrayMesh:
 					if x > 0 and x < 3:
 						vb.set_v(Vector3i(x, y, 1), Color(0.45, 0.75, 0.95), true)
 			origin = Vector3(2, 1, 0)
-			size = 0.02
+			size = 0.028
 		"remote":
 			_fill(vb, 0, 1, 0, 0, 0, 6, Color(0.15, 0.15, 0.17))
 			vb.set_v(Vector3i(0, 1, 5), Color(0.9, 0.25, 0.25))
 			vb.set_v(Vector3i(1, 1, 3), Color(0.6, 0.6, 0.65))
 			origin = Vector3(1, 0.5, 0.5)
-			size = 0.022
+			size = 0.03
 		"mug":
 			var mc := Color(0.92, 0.38, 0.32)
 			_fill(vb, 0, 3, 0, 4, 0, 3, mc)
@@ -949,8 +949,8 @@ static func prop_mesh(pname: String) -> ArrayMesh:
 			vb.set_v(Vector3i(-1, 1, 11), Color(0.85, 0.3, 0.2))
 			vb.set_v(Vector3i(1, 1, 8), Color(0.4, 0.7, 0.3))
 			vb.set_v(Vector3i(2, 1, 10), Color(0.85, 0.3, 0.2))
-			origin = Vector3(0.5, 1.0, 0.5)
-			size = 0.026
+			origin = Vector3(0.5, 1.0, 9.5)
+			size = 0.03
 		"board_veg":
 			_fill(vb, -5, 5, 0, 0, -3, 3, Color(0.72, 0.52, 0.3))
 			_fill(vb, -3, 1, 1, 1, -1, -1, Color(0.95, 0.5, 0.15))   # carrot
@@ -964,8 +964,8 @@ static func prop_mesh(pname: String) -> ArrayMesh:
 		"guitar":
 			# Acoustic guitar slung across the belly: body at the right hip,
 			# neck up to the left shoulder (actor-forward = +Z).
-			var wood := Color(0.82, 0.55, 0.28)
-			var dk := Color(0.35, 0.2, 0.1)
+			var wood := Color(0.86, 0.3, 0.2)
+			var dk := Color(0.22, 0.12, 0.08)
 			for x in range(-4, 4):
 				for y in range(-5, 3):
 					var dx := (x + 0.5) / 4.2

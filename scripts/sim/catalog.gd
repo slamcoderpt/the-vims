@@ -2,6 +2,9 @@ extends RefCounted
 ## Buy / Build / Decorate catalogue (Sims 3 style categories). Models come
 ## from PropLib (scripts/props/*) or, for build items (walls, floor tiles,
 ## rugs), are generated here as voxels ("proc").
+## anim: ActionAnims animation (scripts/world/actors/action_anims.gd) with its
+##       own keyframed pose, hand props and effects; "use": "inside" anims
+##       (shower, bath) step into the object.
 ## use: "front" = sim stands in front of the item (+Z side) facing it,
 ##      "seat"  = sim sits/lies on the item facing its front.
 ## walk: true = sims walk over it (floors, rugs): no nav obstacle, may sit
@@ -46,7 +49,7 @@ const ITEMS := [
 	# ------------------------------------------------------------ Buy: surfaces
 	{"id": "coffee_table", "label": "Coffee Table", "model": "coffee_table", "v": 0, "price": 120, "cat": "buy", "sub": "surfaces", "icon": "coffee", "use": "front", "actions": []},
 	{"id": "dining_table", "label": "Dining Table", "model": "dining_table", "v": 0, "price": 280, "cat": "buy", "sub": "surfaces", "icon": "plate", "use": "front",
-	 "actions": [{"id": "eat", "label": "Eat", "icon": "plate", "minutes": 30.0, "pose": "sit", "needs": {"hunger": 0.3, "social": 0.05}}]},
+	 "actions": [{"id": "eat", "label": "Eat", "icon": "plate", "minutes": 30.0, "pose": "sit", "anim": "eat", "needs": {"hunger": 0.3, "social": 0.05}}]},
 	{"id": "desk", "label": "Writing Desk", "model": "desk", "v": 0, "price": 260, "cat": "buy", "sub": "surfaces", "icon": "pencil", "use": "front",
 	 "actions": [
 		{"id": "write", "label": "Write Novel", "icon": "pencil", "minutes": 60.0, "pose": "stand_type", "needs": {"fun": 0.08}, "skill": "Writing", "money": 60, "who": ["adult"]},
@@ -55,7 +58,7 @@ const ITEMS := [
 	{"id": "side_table", "label": "Side Table", "model": "side_table", "v": 0, "price": 70, "cat": "buy", "sub": "surfaces", "icon": "coffee", "use": "front", "actions": []},
 	{"id": "nightstand", "label": "Nightstand", "model": "nightstand", "v": 0, "price": 90, "cat": "buy", "sub": "surfaces", "icon": "lantern", "use": "front", "actions": []},
 	{"id": "counter", "label": "Kitchen Counter", "model": "counter", "v": 0, "price": 220, "cat": "buy", "sub": "kitchen", "icon": "cook", "use": "front",
-	 "actions": [{"id": "snack", "label": "Prepare Snack", "icon": "apple", "minutes": 10.0, "pose": "stand_type", "needs": {"hunger": 0.25}, "who": ["adult", "child"]}]},
+	 "actions": [{"id": "snack", "label": "Prepare Snack", "icon": "apple", "minutes": 10.0, "pose": "idle", "anim": "chop", "needs": {"hunger": 0.25}, "who": ["adult", "child"]}]},
 	# ------------------------------------------------------------ Buy: beds
 	{"id": "bed", "label": "Single Bed", "model": "bed", "v": 1, "price": 520, "cat": "buy", "sub": "beds", "icon": "bed", "use": "seat",
 	 "actions": [
@@ -67,29 +70,29 @@ const ITEMS := [
 	# ------------------------------------------------------------ Buy: appliances
 	{"id": "fridge", "label": "Fridge", "model": "fridge", "v": 0, "price": 700, "cat": "buy", "sub": "kitchen", "icon": "milk", "use": "front",
 	 "actions": [
-		{"id": "grab_snack", "label": "Grab a Snack", "icon": "apple", "minutes": 8.0, "pose": "idle", "needs": {"hunger": 0.3}},
-		{"id": "cook_meal", "label": "Cook Meal", "icon": "cook", "minutes": 45.0, "pose": "grill", "needs": {"hunger": 0.75}, "skill": "Cooking", "who": ["adult"]},
+		{"id": "grab_snack", "label": "Grab a Snack", "icon": "apple", "minutes": 8.0, "pose": "idle", "anim": "grab_snack", "needs": {"hunger": 0.3}},
+		{"id": "cook_meal", "label": "Cook Meal", "icon": "cook", "minutes": 45.0, "pose": "idle", "anim": "cook", "needs": {"hunger": 0.75}, "skill": "Cooking", "who": ["adult"]},
 	]},
 	{"id": "stove", "label": "Stove", "model": "stove", "v": 0, "price": 450, "cat": "buy", "sub": "kitchen", "icon": "cook", "use": "front",
-	 "actions": [{"id": "cook", "label": "Cook", "icon": "cook", "minutes": 45.0, "pose": "grill", "needs": {"hunger": 0.7}, "skill": "Cooking", "who": ["adult"]}]},
+	 "actions": [{"id": "cook", "label": "Cook", "icon": "cook", "minutes": 45.0, "pose": "idle", "anim": "cook", "needs": {"hunger": 0.7}, "skill": "Cooking", "who": ["adult"]}]},
 	{"id": "tv", "label": "TV Stand", "model": "tv", "v": 0, "price": 600, "cat": "buy", "sub": "fun", "icon": "tv", "use": "front",
-	 "actions": [{"id": "watch", "label": "Watch TV", "icon": "tv", "minutes": 60.0, "pose": "idle", "needs": {"fun": 0.25}}]},
+	 "actions": [{"id": "watch", "label": "Watch TV", "icon": "tv", "minutes": 60.0, "pose": "idle", "anim": "watch_tv", "needs": {"fun": 0.25}}]},
 	# ------------------------------------------------------------ Buy: plumbing
 	{"id": "toilet", "label": "Toilet", "model": "toilet", "v": 0, "price": 300, "cat": "buy", "sub": "plumbing", "icon": "toilet", "use": "seat",
-	 "actions": [{"id": "use_toilet", "label": "Use Toilet", "icon": "toilet", "minutes": 8.0, "pose": "sit", "needs": {"bladder": 1.0}, "who": ["adult", "child"]}]},
+	 "actions": [{"id": "use_toilet", "label": "Use Toilet", "icon": "toilet", "minutes": 8.0, "pose": "sit", "anim": "toilet", "needs": {"bladder": 1.0}, "who": ["adult", "child"]}]},
 	{"id": "bathtub", "label": "Bathtub", "model": "bathtub", "v": 0, "price": 800, "cat": "buy", "sub": "plumbing", "icon": "bath", "use": "seat",
-	 "actions": [{"id": "bath", "label": "Take Bath", "icon": "bath", "minutes": 40.0, "pose": "lie", "needs": {"hygiene": 1.0, "fun": 0.1}}]},
+	 "actions": [{"id": "bath", "label": "Take Bath", "icon": "bath", "minutes": 40.0, "pose": "sit", "anim": "bath", "needs": {"hygiene": 1.0, "fun": 0.1}}]},
 	{"id": "shower", "label": "Shower", "model": "shower", "v": 0, "price": 650, "cat": "buy", "sub": "plumbing", "icon": "shower", "use": "front",
-	 "actions": [{"id": "shower", "label": "Take Shower", "icon": "shower", "minutes": 20.0, "pose": "idle", "needs": {"hygiene": 0.9}, "who": ["adult", "child"]}]},
+	 "actions": [{"id": "shower", "label": "Take Shower", "icon": "shower", "minutes": 20.0, "pose": "idle", "anim": "shower", "needs": {"hygiene": 0.9}, "who": ["adult", "child"]}]},
 	{"id": "vanity", "label": "Vanity Sink", "model": "vanity", "v": 0, "price": 260, "cat": "buy", "sub": "plumbing", "icon": "tooth", "use": "front",
-	 "actions": [{"id": "brush", "label": "Brush Teeth", "icon": "tooth", "minutes": 5.0, "pose": "idle", "needs": {"hygiene": 0.2}, "who": ["adult", "child"]}]},
+	 "actions": [{"id": "brush", "label": "Brush Teeth", "icon": "tooth", "minutes": 5.0, "pose": "brush_teeth", "needs": {"hygiene": 0.2}, "who": ["adult", "child"]}]},
 	# ------------------------------------------------------------ Buy: fun & hobbies
 	{"id": "piano", "label": "Piano", "model": "piano", "v": 0, "price": 1200, "cat": "buy", "sub": "fun", "icon": "piano", "use": "front",
 	 "actions": [{"id": "practice", "label": "Practice", "icon": "music", "minutes": 45.0, "pose": "stand_type", "needs": {"fun": 0.15}, "skill": "Music", "task": "Build Skill", "who": ["adult", "child"]}]},
 	{"id": "easel", "label": "Easel", "model": "easel", "v": 0, "price": 180, "cat": "buy", "sub": "fun", "icon": "palette", "use": "front",
 	 "actions": [{"id": "paint", "label": "Paint", "icon": "palette", "minutes": 60.0, "pose": "paint", "needs": {"fun": 0.2}, "skill": "Creativity", "task": "Practice Creativity", "who": ["adult", "child"]}]},
 	{"id": "guitar", "label": "Guitar", "model": "guitar", "v": 0, "price": 240, "cat": "buy", "sub": "fun", "icon": "guitar", "use": "front",
-	 "actions": [{"id": "guitar", "label": "Play Guitar", "icon": "guitar", "minutes": 40.0, "pose": "idle", "needs": {"fun": 0.25}, "skill": "Music", "who": ["adult", "child"]}]},
+	 "actions": [{"id": "guitar", "label": "Play Guitar", "icon": "guitar", "minutes": 40.0, "pose": "idle", "anim": "guitar", "needs": {"fun": 0.25}, "skill": "Music", "who": ["adult", "child"]}]},
 	{"id": "telescope", "label": "Telescope", "model": "telescope", "v": 0, "price": 380, "cat": "buy", "sub": "fun", "icon": "star", "use": "front",
 	 "actions": [{"id": "stargaze", "label": "Stargaze", "icon": "star", "minutes": 40.0, "pose": "idle", "needs": {"fun": 0.2}, "skill": "Logic", "who": ["adult", "child"]}]},
 	{"id": "toy_box", "label": "Toy Box", "model": "toy_box", "v": 0, "price": 90, "cat": "buy", "sub": "fun", "icon": "toys", "use": "front",

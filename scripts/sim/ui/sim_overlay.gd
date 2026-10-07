@@ -623,6 +623,11 @@ func _draw_rels(sel: int, y: float, row_h: float) -> void:
 			panel.draw_texture_rect(ic, Rect2(c - Vector2(10, 10), Vector2(20, 20)), false)
 		panel.draw_string(f, Vector2(54, y + 18), r.name, HORIZONTAL_ALIGNMENT_LEFT, 150, 14, UI.INK)
 		var tag: String = ("Family · " if r.family else "") + r.level
+		var rom: float = float(r.get("romance", 0.0))
+		if str(r.get("status", "")) != "":
+			tag = str(r.status) + " · " + r.level
+		elif rom >= Game.ROMANCE_CRUSH:
+			tag = "Crush · " + r.level
 		panel.draw_string(f7, Vector2(PANEL_W - 176, y + 18), tag, HORIZONTAL_ALIGNMENT_RIGHT, 160, 11, UI.INK_SOFT)
 		# centred bar: left half red (dislike), right half green (friendship)
 		var bar := Rect2(54, y + 26, PANEL_W - 54 - 16, 9)
@@ -635,6 +640,13 @@ func _draw_rels(sel: int, y: float, row_h: float) -> void:
 		else:
 			panel.draw_rect(Rect2(mid - wv, bar.position.y, wv, bar.size.y), Color("e5544a"))
 		panel.draw_rect(Rect2(mid - 1, bar.position.y - 2, 2, bar.size.y + 4), Color(0.3, 0.35, 0.45, 0.5))
+		if rom > 0.0:
+			# Romance meter: a thin pink bar under the friendship bar.
+			var rb := Rect2(bar.position.x, bar.end.y + 2, bar.size.x * clampf(rom / 100.0, 0.0, 1.0), 3)
+			panel.draw_rect(rb, Color("ff6fa8"))
+			var hi := UI.icon("heart")
+			if hi:
+				panel.draw_texture_rect(hi, Rect2(Vector2(c.x + 7, c.y - 17), Vector2(13, 13)), false)
 		y += row_h
 	panel.draw_line(Vector2(14, y + 6), Vector2(PANEL_W - 14, y + 6), Color("e3e7ee"), 1.0)
 	var more := list.size() - shown

@@ -11,6 +11,7 @@ extends RefCounted
 const SimActions := preload("res://scripts/sim/sim_actions.gd")
 const Careers := preload("res://scripts/sim/careers.gd")
 const Traits := preload("res://scripts/sim/traits.gd")
+const ActionAnims := preload("res://scripts/world/actors/action_anims.gd")
 
 ## Idle in-game minutes before free will kicks in.
 const AUTONOMY_AFTER := 8.0
@@ -31,6 +32,12 @@ const STUCK_MIN := 0.25
 const MAX_REPATHS := 2
 ## In-game minutes an unreachable object is skipped by free will.
 const UNREACHABLE_FOR := 180.0
+## Action beats (in-game minutes): stepping into a shower / tub, pulling out a
+## chair before sitting, stepping back out, and the end-of-action reaction.
+const ENTER_MIN := 1.6
+const PULL_MIN := 1.2
+const EXIT_MIN := 1.4
+const REACT_MIN := 2.6
 
 ## Need -> [mild moodlet, strong moodlet]: [id, label, icon, mood delta, below].
 ## Strong ones last until the need recovers past RECOVER.
@@ -98,6 +105,20 @@ var _stuck_rem := INF
 var _stuck_n := 0
 var _other_at := Vector3.INF
 var _repath_cool := 0.0
+## Per-action animation layer (ActionAnims): anim name, beat within the
+## action ("enter" -> "" (loop) -> "exit" -> "react"), the point inside the
+## object (shower stall / tub) and the beats seen (playtest).
+var anim := ""
+var beat := ""
+var beat_t := 0.0
+var inside_spot := Vector3.INF
+var inside_face := Vector3.INF
+var react := ""
+var beats_seen: Array = []
+var _anim_ctx := {}
+var _leveled := false
+var _rejected := false
+var _partner_anim_on: Node = null
 
 
 func setup(p_world, i: int, p_actor: Node3D) -> void:
@@ -435,7 +456,8 @@ func tick(delta: float, dm: float) -> void:
 				_say("Busy...", "dots")
 				_end(false)
 		"act":
-			_act(dm)
+			if not _tick_beat(dm):
+				_act(dm)
 
 
 func _idle(delta: float, dm: float) -> void:
@@ -633,6 +655,16 @@ func _begin_act() -> void:
 	var a: Dictionary = order.get("action", {})
 	phase = "act"
 	elapsed = 0.0
+	_leveled = false
+	_rejected = false
+	beats_seen = []
+	var t0 = order.get("target")
+	var title: String = str(t0.title) if t0 != null and is_instance_valid(t0) and "title" in t0 else ""
+	anim = ActionAnims.anim_for(a, title, kind) if actor is SimActor else ""
+	var info: Dictionary = ActionAnims.info(anim)
+	_anim_ctx = _make_anim_ctx(a, info)
+	inside_spot = _anim_ctx.get("inside", Vector3.INF)
+	inside_face = _anim_ctx.get("inside_face", Vector3.INF)
 	var pose: String = a.get("pose", "idle")
 	if kind == "dog" and not pose in SimActions.DOG_POSES:
 		pose = "idle"
@@ -654,7 +686,172 @@ func _begin_act() -> void:
 			npc.face(actor.global_position)
 			if a.get("pose", "") in ["talk", "wave", "sit_talk"]:
 				npc.set_pose("talk")
+				_partner_anim(npc)
+	if other != null and other.actor and is_instance_valid(other.actor) and other.phase == "idle":
+		_partner_anim(other.actor)
+	# Enter beat: step into the stall / tub, or pull out the chair first.
+	beat = ""
+	beat_t = 0.0
+	if anim != "":
+		if inside_spot != Vector3.INF:
+			_set_beat("enter")
+			ActionAnims.of(actor).play("step_in", _anim_ctx)
+		elif seated and str(info.get("base", "")) == "sit":
+			_set_beat("pull")
+			ActionAnims.of(actor).play("pull_chair", _anim_ctx)
+		else:
+			_start_anim()
 	_bubble(0.0, true)
+
+
+func _set_beat(b: String) -> void:
+	beat = b
+	beat_t = 0.0
+	beats_seen.append(b if b != "" else "loop")
+
+
+## Main loop of the action: the base pose plus the action's keyframed anim.
+func _start_anim() -> void:
+	_set_beat("")
+	if inside_spot != Vector3.INF:
+		actor.global_position = inside_spot
+		if inside_face != Vector3.INF:
+			actor.face(inside_face)
+	var aa = ActionAnims.of(actor)
+	if aa and anim != "":
+		aa.play(anim, _anim_ctx)
+
+
+## What an anim needs to know about where it happens: the table / counter top
+## in front of the sim (plates, chopping board, pan), the point inside a
+## shower stall or tub, the tub's water box, the base pose for "*" anims.
+func _make_anim_ctx(a: Dictionary, info: Dictionary) -> Dictionary:
+	var ctx := {"base": str(a.get("pose", "idle"))}
+	if ctx.base == "":
+		ctx.base = "idle"
+	var t = order.get("target")
+	if t == null or not is_instance_valid(t) or not t.has_method("world_use_spot"):
+		return ctx
+	var surf: Node = world.work_surface(t, a) if world.has_method("work_surface") else t
+	var half: Vector3 = world._box_half(surf)
+	var c: Vector3 = surf.global_transform * surf.look_at_spot
+	var top := c.y + half.y
+	var floor_y := spot.y
+	if top - floor_y > 0.45 and top - floor_y < 1.2:
+		var p: Vector3 = actor.global_position
+		var b: Basis = surf.global_transform.basis.orthonormalized()
+		var lp := b.inverse() * (p - c)
+		lp.x = clampf(lp.x, -half.x + 0.12, half.x - 0.12)
+		lp.z = clampf(lp.z, -half.z + 0.12, half.z - 0.12)
+		var q := c + b * lp
+		ctx["surface"] = Vector3(q.x, top + 0.005, q.z)
+	if str(info.get("use", "")) == "inside":
+		var ih: Vector3 = world._box_half(t)
+		var ic: Vector3 = t.global_transform * t.look_at_spot
+		var bx: Vector3 = t.global_transform.basis.x
+		var bz: Vector3 = t.global_transform.basis.z
+		bx.y = 0.0
+		bz.y = 0.0
+		bx = bx.normalized()
+		bz = bz.normalized()
+		var long_ax := bx if ih.x >= ih.z else bz
+		var long_h := maxf(ih.x, ih.z)
+		var short_h := minf(ih.x, ih.z)
+		if anim == "bath":
+			# Sit at the end nearer the sim, legs along the tub.
+			var e1 := ic + long_ax * (long_h - 0.4)
+			var e2 := ic - long_ax * (long_h - 0.4)
+			var near := e1 if _flat(e1, spot) <= _flat(e2, spot) else e2
+			ctx["inside"] = Vector3(near.x, floor_y, near.z)
+			ctx["inside_face"] = Vector3(ic.x, floor_y, ic.z) * 2.0 - Vector3(near.x, floor_y, near.z)
+			ctx["tub_center"] = Vector3(ic.x, ic.y, ic.z)
+			ctx["tub_half"] = Vector3(long_h, ih.y, short_h)
+			ctx["tub_yaw"] = atan2(-long_ax.z, long_ax.x)
+		else:
+			ctx["inside"] = Vector3(ic.x, floor_y, ic.z)
+			# Face back out of the stall (the open side the sim came from).
+			ctx["inside_face"] = Vector3(spot.x, floor_y, spot.z)
+	return ctx
+
+
+## The other side of a social (or a townie) answers with a matching anim.
+func _partner_anim(n: Node) -> void:
+	var pa := ActionAnims.partner_anim(anim)
+	if pa == "" or not (n is SimActor) or n.kind() == "dog":
+		return
+	var aa = ActionAnims.of(n)
+	if aa:
+		aa.play(pa, {"base": "idle"})
+		_partner_anim_on = n
+
+
+func _stop_partner_anim() -> void:
+	if _partner_anim_on != null and is_instance_valid(_partner_anim_on):
+		var aa = ActionAnims.of(_partner_anim_on)
+		if aa:
+			aa.stop()
+	_partner_anim_on = null
+
+
+## Per-frame beats around the action loop (in-game minutes).
+func _tick_beat(dm: float) -> bool:
+	if beat == "":
+		return false
+	if dm <= 0.0:
+		return true
+	beat_t += dm
+	match beat:
+		"enter":
+			var k := clampf(beat_t / ENTER_MIN, 0.0, 1.0)
+			actor.global_position = spot.lerp(inside_spot, k)
+			actor.face(inside_spot + (inside_spot - spot))
+			if k >= 1.0:
+				_start_anim()
+		"pull":
+			if beat_t >= PULL_MIN:
+				_start_anim()
+		"exit":
+			var k2 := clampf(beat_t / EXIT_MIN, 0.0, 1.0)
+			if inside_spot != Vector3.INF:
+				actor.global_position = inside_spot.lerp(spot, k2)
+				actor.face(spot + (spot - inside_spot))
+			if k2 >= 1.0:
+				inside_spot = Vector3.INF
+				_begin_react()
+		"react":
+			if beat_t >= REACT_MIN:
+				beat = ""
+				_end(true)
+	return true
+
+
+## The action is done: step back out (shower, tub) and react (stretch, pat
+## the belly, shake off the water, fist pump on a skill level or pay).
+func _begin_exit() -> void:
+	var a: Dictionary = order.get("action", {})
+	react = ""
+	if anim != "" or _rejected:
+		react = "upset" if _rejected else ActionAnims.reaction_for(anim, a, _leveled)
+		if react == "" and a.has("skill") and float(a.get("needs", {}).get("fun", 0.0)) > 0.1:
+			react = "react_yes"
+	_stop_partner_anim()
+	var aa = ActionAnims.of(actor)
+	if inside_spot != Vector3.INF and anim != "":
+		_set_beat("exit")
+		if aa:
+			aa.play("step_in", _anim_ctx)
+		return
+	_begin_react()
+
+
+func _begin_react() -> void:
+	var aa = ActionAnims.of(actor)
+	if react != "" and aa and kind != "dog":
+		_set_beat("react")
+		aa.play(react, {"base": "idle"})
+		return
+	beat = ""
+	_end(true)
 
 
 ## Another household member started a social with us: stop and face them.
@@ -690,12 +887,17 @@ func _act(dm: float) -> void:
 		_skill_t += step
 		if lvl > 0:
 			_skill_t = 0.0
+			_leveled = true
 			Game.show_bubble(actor, {"kind": "skill", "text": "%s Lv %d!" % [a.skill, lvl], "icon": "star", "id": "skill", "ttl": 3.5})
 			Game.add_moodlet(index, "learned", "Learned Something", "bulb", 12.0, 4.0, "Reached %s level %d" % [a.skill, lvl])
 			Game.notify.emit("%s reached %s level %d" % [display_name(), a.skill, lvl], skill_icon(a.skill))
 		elif _skill_t >= SKILL_CHIP_EVERY:
 			_skill_t -= SKILL_CHIP_EVERY
 			Game.show_bubble(actor, {"kind": "skill", "text": a.skill, "icon": skill_icon(a.skill), "id": "skill"})
+	if anim != "":
+		var aa = ActionAnims.of(actor)
+		if aa:
+			aa.set_progress(elapsed / mins)
 	if elapsed >= mins - 0.0001:
 		_bubble(1.0, true)
 		_complete()
@@ -735,6 +937,7 @@ func _complete() -> void:
 	var rejected := false
 	if a.has("rel"):
 		rejected = _apply_social(a)
+	_rejected = rejected
 	# (A dog playing on its own doesn't tick "Play with Dog".)
 	if a.has("task") and not rejected and not (kind == "dog" and "Dog" in str(a.task)) and _meet_task_ok(str(a.task)):
 		if Game.complete_task_title(a.task):
@@ -771,7 +974,10 @@ func _complete() -> void:
 		member.work.state = ""
 		_evaluate_shift(1.0)
 	world.on_action_done(self, order)
-	_end(true)
+	if phase == "act" and not order.is_empty():
+		_begin_exit()
+	else:
+		_end(true)
 
 
 ## Who this social is with: a household agent's name or a townie's name.
@@ -821,6 +1027,12 @@ func _apply_social(a: Dictionary) -> bool:
 			print("  social rejected: %s -> %s (%s)" % [me, partner, a.get("label", "")])
 		return true
 	var v := Game.change_rel(me, partner, delta)
+	if a.has("rom"):
+		var rv := Game.change_romance(me, partner, float(a.rom) * clampf(Game.mood_mult(index), 0.8, 1.2))
+		if a.has("status") and Game.rel_status(me, partner) != str(a.status):
+			Game.set_rel_status(me, partner, str(a.status))
+		if OS.has_environment("VIMS_PLAYTEST"):
+			print("  romance: %s -> %s %.1f %s" % [me, partner, rv, Game.rel_status(me, partner)])
 	if other == null:
 		world.met_here[partner] = true
 	Game.show_bubble(actor, {"kind": "emote", "icon": "heart" if delta > 0.0 else "dots", "id": "say", "ttl": 1.6})
@@ -866,6 +1078,17 @@ func _end(_ok: bool) -> void:
 		other.actor.set_pose("idle")
 		other.idle_minutes = 0.0
 	_social_partner = null
+	# Anim layer: let go of props, step out of the stall if cut short.
+	_stop_partner_anim()
+	if is_instance_valid(actor):
+		var aa = ActionAnims.of(actor)
+		if aa:
+			aa.stop()
+		if inside_spot != Vector3.INF and phase == "act":
+			actor.global_position = spot
+	inside_spot = Vector3.INF
+	beat = ""
+	anim = ""
 	Game.clear_bubble(actor, "action")
 	actor.set("walk_speed", base_speed)
 	if actor.get("pose") != "idle":

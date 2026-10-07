@@ -476,6 +476,44 @@ func change_rel(a: String, b: String, delta: float) -> float:
 	return r.value
 
 
+## Romance 0..100 between two people (Sims 3 romance meter; family never).
+func romance(a: String, b: String) -> float:
+	var r = relationships.get(rel_key(a, b))
+	return 0.0 if r == null else float(r.get("romance", 0.0))
+
+
+func change_romance(a: String, b: String, delta: float) -> float:
+	if a == b or a == "" or b == "" or (is_family(a) and is_family(b)):
+		return 0.0
+	var k := rel_key(a, b)
+	if not relationships.has(k):
+		relationships[k] = {"value": 0.0, "met": total_minutes(), "last": total_minutes()}
+	var r: Dictionary = relationships[k]
+	var before: float = float(r.get("romance", 0.0))
+	r["romance"] = clampf(before + delta, 0.0, 100.0)
+	relationship_changed.emit(a, b, float(r.value))
+	if before < ROMANCE_CRUSH and r.romance >= ROMANCE_CRUSH and rel_status(a, b) == "":
+		relationship_level_changed.emit(a, b, "Romantic Interest")
+	return r.romance
+
+
+## "" | "Dating" | "Partners" (set by romantic socials).
+func rel_status(a: String, b: String) -> String:
+	var r = relationships.get(rel_key(a, b))
+	return "" if r == null else str(r.get("status", ""))
+
+
+func set_rel_status(a: String, b: String, status: String) -> void:
+	var k := rel_key(a, b)
+	if not relationships.has(k):
+		relationships[k] = {"value": 0.0, "met": total_minutes(), "last": total_minutes()}
+	relationships[k]["status"] = status
+	relationship_level_changed.emit(a, b, status)
+
+
+const ROMANCE_CRUSH := 30.0
+
+
 static func rel_level(v: float) -> String:
 	for lv in REL_LEVELS:
 		if v < lv[0]:
@@ -532,7 +570,8 @@ func rel_list(i: int) -> Array:
 				if TOWNIES[tk].name == other:
 					kind = TOWNIES[tk].kind
 					look = tk
-		out.append({"name": other, "value": v, "level": rel_level(v), "family": fam, "kind": kind, "look": look})
+		out.append({"name": other, "value": v, "level": rel_level(v), "family": fam, "kind": kind, "look": look,
+			"romance": float(relationships[k].get("romance", 0.0)), "status": str(relationships[k].get("status", ""))})
 	out.sort_custom(func(x, y): return x.family and not y.family or (x.family == y.family and x.value > y.value))
 	return out
 

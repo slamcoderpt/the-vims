@@ -247,6 +247,77 @@ def need_social():
     return im.resize((SIZE, SIZE), Image.LANCZOS)
 
 
+def laptop_flat():
+    """Blue-screen laptop (ref1 'Answer Emails' / 'Work')."""
+    im, s = big()
+    d = ImageDraw.Draw(im)
+    d.rounded_rectangle((40, 36, 216, 168), radius=14, fill=(52, 66, 104, 255))     # lid
+    d.rounded_rectangle((54, 50, 202, 154), radius=6, fill=(78, 156, 240, 255))      # screen
+    d.polygon([(54, 50), (150, 50), (54, 120)], fill=(118, 184, 250, 255))           # glare
+    for i, y in enumerate((74, 96, 118)):
+        d.rounded_rectangle((70, y, 70 + (110 if i != 1 else 80), y + 10), radius=5, fill=(222, 238, 255, 255))
+    d.polygon([(26, 176), (230, 176), (246, 212), (10, 212)], fill=(170, 182, 204, 255))  # base
+    d.rounded_rectangle((10, 204, 246, 222), radius=8, fill=(132, 144, 170, 255))
+    d.rounded_rectangle((104, 182, 152, 194), radius=5, fill=(140, 152, 178, 255))   # trackpad
+    return im.resize((SIZE, SIZE), Image.LANCZOS)
+
+
+def book_open():
+    """Open blue book (ref1 'Do Homework')."""
+    im, s = big()
+    d = ImageDraw.Draw(im)
+    blue, dblue = (70, 132, 230, 255), (44, 94, 190, 255)
+    d.polygon([(10, 60), (128, 80), (246, 60), (246, 220), (128, 238), (10, 220)], fill=dblue)   # cover
+    d.polygon([(24, 40), (124, 62), (124, 216), (24, 196)], fill=(236, 242, 255, 255))            # left page
+    d.polygon([(132, 62), (232, 40), (232, 196), (132, 216)], fill=(250, 252, 255, 255))           # right page
+    for k in range(4):
+        y = 84 + k * 28
+        d.line([(42, y - 4), (110, y + 10)], fill=(150, 180, 236, 255), width=8)
+        d.line([(146, y + 10), (214, y - 4)], fill=(150, 180, 236, 255), width=8)
+    d.rectangle((122, 60, 134, 222), fill=blue)
+    return im.resize((SIZE, SIZE), Image.LANCZOS)
+
+
+def chart_bars():
+    """Three rising blue bars (ref1 'Build Skill')."""
+    im, s = big()
+    d = ImageDraw.Draw(im)
+    cols = [(120, 196, 250, 255), (62, 156, 240, 255), (30, 112, 220, 255)]
+    for i, (x, top) in enumerate(((22, 150), (98, 96), (174, 24))):
+        d.rounded_rectangle((x, top, x + 62, 236), radius=10, fill=cols[i])
+        d.rounded_rectangle((x + 8, top + 8, x + 22, 226), radius=6, fill=(255, 255, 255, 70))
+    return im.resize((SIZE, SIZE), Image.LANCZOS)
+
+
+def bill_doc():
+    """Cream invoice with ruled lines and an orange total (ref1 'Pay Bills')."""
+    im, s = big()
+    d = ImageDraw.Draw(im)
+    d.polygon([(40, 14), (176, 14), (220, 58), (220, 242), (40, 242)], fill=(150, 132, 112, 255))
+    d.polygon([(48, 22), (172, 22), (212, 62), (212, 234), (48, 234)], fill=(250, 244, 230, 255))
+    d.polygon([(172, 22), (212, 62), (172, 62)], fill=(222, 210, 188, 255))
+    for k, w in enumerate((92, 120, 104, 120)):
+        y = 78 + k * 30
+        d.rounded_rectangle((70, y, 70 + w, y + 10), radius=5, fill=(170, 160, 150, 255))
+    d.rounded_rectangle((120, 196, 192, 216), radius=6, fill=(240, 140, 60, 255))
+    return im.resize((SIZE, SIZE), Image.LANCZOS)
+
+
+def paw_single(rgb=(176, 98, 40)):
+    """One chunky brown paw print (ref1 'Play with Dog' / 'Play')."""
+    im, s = big()
+    d = ImageDraw.Draw(im)
+    c = rgb + (255,)
+    d.ellipse((58, 118, 198, 236), fill=c)                     # pad
+    d.ellipse((40, 150, 110, 230), fill=c)
+    d.ellipse((146, 150, 216, 230), fill=c)
+    for (x, y, r) in ((40, 92, 30), (96, 52, 32), (160, 52, 32), (216, 92, 30)):
+        d.ellipse((x - r, y - r - 8, x + r, y + r + 8), fill=c)
+    hi = tuple(min(255, int(v * 1.25)) for v in rgb) + (255,)
+    d.ellipse((90, 136, 140, 162), fill=hi)
+    return im.resize((SIZE, SIZE), Image.LANCZOS)
+
+
 def main():
     os.makedirs(OUT, exist_ok=True)
     for name, (ch, t) in EMOJI.items():
@@ -262,6 +333,12 @@ def main():
     save("dots", dots())
     save("armchair", armchair())
     save("sprout", sprout_pot())
+    # Flat, consistent task icons (ref1 Tasks panel) instead of mixed emoji.
+    save("laptop", laptop_flat())
+    save("book", book_open())
+    save("chart", chart_bars())
+    save("bill", bill_doc())
+    save("paw", paw_single())
     print("icons:", len(os.listdir(OUT)))
 
 

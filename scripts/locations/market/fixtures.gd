@@ -187,7 +187,7 @@ static func good(vb: VoxelBuilder, o: Vector3i, kind: String, col: Color, col2: 
 ## Brand blocks of 2-4 facings; each block has its own kind, colours, height
 ## variant and front offset, with the odd gap and a few products stacked or
 ## pushed back, so the shelf reads as real merchandise, not a pattern.
-static func stock(vb: VoxelBuilder, x0: int, w: int, y: int, zf: int, max_h: int, seed: int, kinds: Array, big := 0) -> void:
+static func stock(vb: VoxelBuilder, x0: int, w: int, y: int, zf: int, max_h: int, seed: int, kinds: Array, big := 0, lod := false) -> void:
 	var x := x0
 	var g := 0
 	var depth := 3 if big else 2
@@ -201,6 +201,7 @@ static func stock(vb: VoxelBuilder, x0: int, w: int, y: int, zf: int, max_h: int
 		var v := int(Kit.h(hv, 59) * 7.0)
 		var facings := 2 + int(Kit.h(hv, 53) * 3.0)
 		var back := 1 if Kit.h(hv, 61) < 0.25 else 0
+		var x_start := x
 		for f in facings:
 			var room := x0 + w - x
 			if room < 4:
@@ -208,6 +209,16 @@ static func stock(vb: VoxelBuilder, x0: int, w: int, y: int, zf: int, max_h: int
 			# odd sold-out gap
 			if not big and Kit.h(Vector3i(g, f, seed), 67) < 0.06:
 				x += 3
+				continue
+			if lod:
+				# far / mostly hidden shelves: one two-tone block per facing
+				var lw := 4 if kind in ["cereal", "box", "bag"] else 2
+				if lw > room:
+					break
+				var lh := mini(max_h, 4 + v % 3)
+				vb.box(Vector3i(x, y, zf - 1), Vector3i(lw, lh, 2), func(p: Vector3i) -> Color:
+					return col2 if p.y == y + lh - 2 else col)
+				x += lw + (1 if lw == 2 else 0)
 				continue
 			var tmp := VoxelBuilder.new()
 			var used := good(tmp, Vector3i.ZERO, kind, col, col2, max_h, big, v)
@@ -218,6 +229,8 @@ static func stock(vb: VoxelBuilder, x0: int, w: int, y: int, zf: int, max_h: int
 				vb.set_v(Vector3i(x, y, zoff) + p, tmp.vox[p])
 			x += used + (1 if kind in ["bottle", "can", "jar"] else 0)
 		x += 0 if big else 1
+		if x == x_start:
+			x += 1
 		g += 1
 
 
@@ -225,7 +238,7 @@ static func stock(vb: VoxelBuilder, x0: int, w: int, y: int, zf: int, max_h: int
 ## metal uprights, a dark back panel (so the colourful packs pop), light
 ## shelf lips with price strips, and overstock cases heaped on the top.
 ## big = 1: chunky end-cap version (3 tall shelves of big packs).
-static func gondola(length: int, seed: int, kinds: Array, double_sided := false, big := 0) -> VoxelBuilder:
+static func gondola(length: int, seed: int, kinds: Array, double_sided := false, big := 0, lod := false) -> VoxelBuilder:
 	var vb := VoxelBuilder.new()
 	vb.jitter = 0.03
 	var D := 9 if big else 8
@@ -233,9 +246,9 @@ static func gondola(length: int, seed: int, kinds: Array, double_sided := false,
 	var H := 37 if big else 42
 	var max_h := 11 if big else 7
 	var z0 := -D if double_sided else 0
-	# back panel (pegboard dots)
+	# back panel (slatwall lines; flat rows merge into long quads)
 	vb.box(Vector3i(0, 0, 0), Vector3i(length, H, 1), func(p: Vector3i) -> Color:
-		return Color("57524c") if (p.x % 4 == 1 and p.y % 4 == 1) else Color("47433f"))
+		return Color("4d4944") if p.y % 4 == 1 else Color("45413d"))
 	# uprights
 	for x in [0, length - 1]:
 		vb.box(Vector3i(x, 0, z0), Vector3i(1, H + 1, D - z0), Color("34322f"))
@@ -250,7 +263,7 @@ static func gondola(length: int, seed: int, kinds: Array, double_sided := false,
 			var tc := Color("f5d03b") if (tx / 7 + li + seed) % 3 == 0 else Color("ffffff")
 			vb.set_v(Vector3i(tx, y, D), tc)
 			vb.set_v(Vector3i(tx + 1, y, D), tc)
-		stock(vb, 1, length - 2, y + 1, D - 1, max_h, seed * 7 + li, kinds, big)
+		stock(vb, 1, length - 2, y + 1, D - 1, max_h, seed * 7 + li, kinds, big, lod)
 		if double_sided:
 			var back := VoxelBuilder.new()
 			stock(back, 1, length - 2, y + 1, D - 1, max_h, seed * 11 + li + 3, kinds, big)
@@ -285,7 +298,7 @@ static func gondola(length: int, seed: int, kinds: Array, double_sided := false,
 ## Glowing dairy / drinks fridge bank, local facing +z. Tall (2.6 m) glass
 ## doors with a bright white back light, four shelves of goods and a stock
 ## overhang of cartons on top.
-static func fridge(width: int, seed: int) -> VoxelBuilder:
+static func fridge(width: int, seed: int, stocked := true) -> VoxelBuilder:
 	var vb := VoxelBuilder.new()
 	vb.jitter = 0.03
 	var H := 42
@@ -313,6 +326,11 @@ static func fridge(width: int, seed: int) -> VoxelBuilder:
 		var top: int = (shelves[si + 1] if si + 1 < shelves.size() else CT - 1) - y - 1
 		vb.box(Vector3i(1, y, 2), Vector3i(width - 2, 1, D - 3), Color("aab5bf"))
 		vb.box(Vector3i(1, y, D - 2), Vector3i(width - 2, 1, 1), Color("f2f4f6"))
+		if not stocked:
+			# hidden behind the aisles: flat coloured rows (cheap)
+			vb.box(Vector3i(2, y + 1, fz - 2), Vector3i(width - 4, mini(top - 2, 5), 3), func(p: Vector3i) -> Color:
+				return drinks[(p.x / 3 + si) % drinks.size()] if p.y != y + 3 else Color("fdf6e0"))
+			continue
 		var x := 2
 		var item := 0
 		while x < width - 4:
@@ -532,18 +550,19 @@ static func cart() -> VoxelBuilder:
 	# baguette poking up from the back corner
 	vb.box(Vector3i(14, by + 4, 1), Vector3i(2, 16, 2), Color("d39a52"))
 	vb.box(Vector3i(14, by + 19, 1), Vector3i(2, 1, 2), Color("e4b56e"))
-	# front: juice carton, greens, bananas, tomatoes
-	vb.box(Vector3i(11, by, 19), Vector3i(4, 12, 4), Color("f7a21c"))
-	vb.box(Vector3i(11, by + 8, 23), Vector3i(4, 2, 1), Color("ffffff"))
-	vb.box(Vector3i(12, by + 12, 20), Vector3i(2, 2, 2), Color("43a447"))
-	vb.box(Vector3i(2, by, 18), Vector3i(8, 8, 7), Color("c98a43"))
+	# front: kept low (under the rim) so Biscuit, sitting in the middle on a
+	# heap of shopping, reads clearly: juice carton, greens, bananas, tomatoes
+	vb.box(Vector3i(1, by, 8), Vector3i(15, 6, 16), Color("c98a43"))
+	vb.box(Vector3i(11, by, 20), Vector3i(4, 9, 4), Color("f7a21c"))
+	vb.box(Vector3i(11, by + 6, 24), Vector3i(4, 2, 1), Color("ffffff"))
+	vb.box(Vector3i(12, by + 9, 21), Vector3i(2, 1, 2), Color("43a447"))
 	var pv := VoxelBuilder.new()
-	Produce.big_lettuce(pv, Vector3i(2, by + 7, 17), 3)
-	Produce.big_bananas(pv, Vector3i(3, by + 11, 13), 4, 3)
-	Produce.big_tomato(pv, Vector3i(9, by + 9, 15), 2)
-	Produce.big_tomato(pv, Vector3i(6, by + 12, 21), 5)
-	Produce.big_carrot(pv, Vector3i(12, by + 13, 11), 1, 9)
-	Produce.big_carrot(pv, Vector3i(14, by + 12, 12), 2, 9)
+	Produce.big_lettuce(pv, Vector3i(2, by + 5, 19), 3)
+	Produce.big_bananas(pv, Vector3i(6, by + 6, 21), 4, 3)
+	Produce.big_tomato(pv, Vector3i(9, by + 6, 17), 2)
+	Produce.big_tomato(pv, Vector3i(2, by + 6, 15), 5)
+	Produce.big_carrot(pv, Vector3i(12, by + 6, 15), 1, 7)
+	Produce.big_apple(pv, Vector3i(6, by + 6, 17), 3)
 	for p: Vector3i in pv.vox:
 		vb.set_v(p, pv.vox[p])
 	return vb

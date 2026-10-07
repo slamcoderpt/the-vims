@@ -157,10 +157,10 @@ static func _ceiling(root: Node3D, halo_pts: Array) -> void:
 			halo_pts.append([p + Vector3(0.03, 0.0, 0.03), 0.7, Color(1.0, 0.92, 0.72, 1.0)])
 			if r[3] == true:
 				# warm cone straight down: a pool on the tiles / crates below
-				Kit.spot(root, p + Vector3(0, -0.05, 0), Color(1.0, 0.86, 0.66), 3.2, 5.5, 34.0)
+				Kit.spot(root, p + Vector3(0, -0.05, 0), Color(1.0, 0.84, 0.62), 2.4, 5.5, 34.0)
 			elif r[3] == false:
 				Kit.light(root, p + Vector3(0, -0.4, 0), Color(1.0, 0.86, 0.66), 1.1, 4.0)
-			pools.append([Vector3(x, 0.012, r[0]), Vector2(2.4, 2.4), Color(1.0, 0.7, 0.4, 0.4 if r[3] == true else 0.3)])
+			pools.append([Vector3(x, 0.012, r[0]), Vector2(2.4, 2.4), Color(1.0, 0.7, 0.4, 0.26 if r[3] == true else 0.2)])
 	Kit.add(root, lamps, U, "Pendants", false, Kit.glow_mat("warm"), Vector3.ZERO, Vector3.ZERO, true, false)
 	# Two big near-camera pendants hanging into the top of the frame (between
 	# the FRESH & LOCAL and MARKET boards), like the reference's foreground lamps.

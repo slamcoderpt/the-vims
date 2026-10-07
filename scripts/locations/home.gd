@@ -49,13 +49,13 @@ const SIDING := Color("f3ead9")
 const TRIM := Color("fbf8f1")
 const CAP := Color("2e3450")
 const FOUND := Color("8c8378")
-const W_OFFICE := Color("f0e3cc")
+const W_OFFICE := Color("f6efe4")
 const W_PINK := Color("eaa2b6")
 const W_BLUE := Color("8399d8")
 const W_HALL := Color("efe1c6")
 const W_LIVING := Color("e9dcc2")
 const W_KITCHEN := Color("dfe8d6")
-const FLOOR_WOOD := Color("d3a272")
+const FLOOR_WOOD := Color("d9b27f")
 const FLOOR_LIGHT := Color("d9a56c")
 
 var actors := {}                 # key -> SimActor
@@ -122,14 +122,14 @@ func camera_home() -> Dictionary:
 func lighting_profile() -> Dictionary:
 	return {
 		"sun_heading": 205.0, "sun_elev": 34.0, "sun_energy": 2.05,
-		"ambient_day": Color(0.96, 0.84, 0.72), "ambient_energy": 0.5,
+		"ambient_day": Color(0.86, 0.88, 0.94), "ambient_energy": 0.56,
 		"ambient_night": Color(0.66, 0.54, 0.52), "ambient_night_energy": 0.34, "lamp_night_mult": 3.8,
 		"sky_day": Color(0.64, 0.8, 0.94), "sky_night": Color(0.07, 0.09, 0.22),
 		"fog_day": Color(0.9, 0.9, 0.88), "fog_night": Color(0.12, 0.15, 0.32), "fog_density": 0.004,
 		"moon_heading": 150.0, "moon_energy": 0.45, "glow_boost_night": 1.2,
 		"shadow_distance": 40.0,
 		"post_day": {"focus_y": 0.5, "band": 0.35, "falloff": 0.18, "blur_px": 4.0, "top_boost": 1.0,
-			"saturation": 1.22, "contrast": 1.17, "tint": Vector3(1.035, 0.985, 0.94), "vignette": 0.24},
+			"saturation": 1.16, "contrast": 1.12, "tint": Vector3(1.0, 0.995, 0.985), "vignette": 0.22},
 		"post_night": {"focus_y": 0.56, "band": 0.36, "falloff": 0.14, "blur_px": 2.8, "top_boost": 0.7,
 			"saturation": 1.12, "contrast": 1.12, "gamma": 1.08, "tint": Vector3(1.0, 0.95, 0.94), "vignette": 0.36},
 	}
@@ -877,10 +877,11 @@ func _build_office() -> void:
 	var dbm := PropLib.instance("dog_bed", 0)
 	dbm.name = "DogBedMesh"
 	dbm.scale = Vector3.ONE * (PU / PropLib.FU) * 0.8
-	dbm.position = Vector3(-2.75, y, 1.05)
-	dbm.rotation_degrees.y = -18.0
+	# Between the dog's rug and the cat girl's toys, in the foreground (ref1).
+	dbm.position = Vector3(-4.35, y, 0.45)
+	dbm.rotation_degrees.y = -14.0
 	add_child(dbm)
-	var dogbed := AABB(Vector3(-3.1, y, 0.75), Vector3(0.7, 0.35, 0.6))
+	var dogbed := AABB(Vector3(-4.7, y, 0.15), Vector3(0.7, 0.35, 0.6))
 	var toybox := _wallput(R, "toy_box", "+x", rx, -0.95, y)
 	_put(R, "soccer_ball", Vector3(-1.75, y + PU, 0.35))
 	_put(R, "toy_blocks", Vector3(-3.25, y + PU, -0.35), 0, 1)
@@ -905,9 +906,10 @@ func _build_office() -> void:
 	# --- Balcony railing over the living room, with trailing planters on it.
 	PropLib.railing(_g(R), Vector3i(fc(-8.75), fc(y), fc(1.5) - 2), fc(4.25) + 2, 0, 16)
 	PropLib.railing(_g(R), Vector3i(fc(-4.5), fc(y), fc(1.5) - 2), fc(3.25) + 2, 2, 16)
-	for k in 2:
-		_put(R, "plant", Vector3(-8.4 + k * 1.6, y + 17 * U, 1.3), 0, [2, 6][k])
-	_put(R, "plant", Vector3(-4.68, y + 17 * U, 3.2), 0, 2)
+	# Small trailing planters on the rail cap (micro grid: half size, ref1).
+	for k in 3:
+		_putm(R, "plant", Vector3(-8.3 + k * 1.3, y + 17 * U, 1.38), 0, [2, 6, 2][k])
+	_putm(R, "plant", Vector3(-4.62, y + 17 * U, 3.2), 0, 2)
 	_spots["office_chair"] = chair
 	_spots["desk"] = desk
 	_spots["dad_seat"] = ws.seat

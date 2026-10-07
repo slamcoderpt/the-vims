@@ -19,7 +19,7 @@ const Stands := preload("res://scripts/locations/market/stands.gd")
 
 const U := 0.0625
 const P := 0.03125
-const CART_S := 1.12
+const CART_S := 1.25
 
 var actors := {}
 var _cart: MeshInstance3D
@@ -51,16 +51,16 @@ func lighting_profile() -> Dictionary:
 	# lamps (bright emissive bulbs + warm omni/spot lights) paint amber pools
 	# on the cream tiles and crates; the fridge cases glow cool blue-white.
 	return {
-		"sun_heading": 200.0, "sun_elev": 64.0, "sun_energy": 0.5,
-		"ambient_day": Color(1.0, 0.96, 0.9), "ambient_energy": 0.64,
+		"sun_heading": 200.0, "sun_elev": 64.0, "sun_energy": 0.32,
+		"ambient_day": Color(1.0, 0.93, 0.84), "ambient_energy": 0.6,
 		"ambient_night": Color(0.85, 0.74, 0.62), "ambient_night_energy": 0.4,
 		"lamp_night_mult": 1.2,
 		"sky_day": Color(0.8, 0.84, 0.9), "sky_night": Color(0.2, 0.18, 0.2),
-		"fog_day": Color(0.93, 0.93, 0.91), "fog_night": Color(0.4, 0.32, 0.26), "fog_density": 0.006,
-		"exposure": 0.96,
+		"fog_day": Color(0.95, 0.89, 0.8), "fog_night": Color(0.4, 0.32, 0.26), "fog_density": 0.006,
+		"exposure": 0.92,
 		"shadow_distance": 24.0,
 		"post": {"focus_y": 0.53, "band": 0.3, "falloff": 0.28, "blur_px": 3.4, "top_boost": 0.2,
-			"saturation": 1.14, "contrast": 1.08, "tint": Vector3(1.0, 0.99, 0.98),
+			"saturation": 1.3, "contrast": 1.1, "tint": Vector3(1.03, 0.97, 0.92),
 			"lift": Vector3(0.006, 0.006, 0.008), "vignette": 0.18},
 	}
 
@@ -170,24 +170,23 @@ func _stage() -> void:
 	var jack := _place("dad", Vector3(-0.25, 0, 2.25), cam + Vector3(5.5, 0, 0), "stand_type")
 	var cart_yaw := jack.rotation.y
 	var fwd := Vector3(sin(cart_yaw), 0, cos(cart_yaw))
-	_cart.position = jack.position + fwd * 0.5
+	_cart.position = jack.position + fwd * 0.4
 	_cart.rotation.y = cart_yaw
 	# Biscuit rides in the cart, sitting up on the groceries, head above the rim.
-	var dog := _place("beagle", _cart.position + fwd * 0.5 + Vector3(0, 0.6, 0), cam + Vector3(-1.0, 0, 0), "sit")
-	dog.rotation.y = lerp_angle(cart_yaw, dog.rotation.y, 0.7)
+	var dog := _place("beagle", _cart.position + fwd * 0.6 + Vector3(0, 0.8, 0), cam + Vector3(-0.6, 0, 0), "sit")
 	# The "type" pose turns the head ~0.9 rad to the sim's left, so the
 	# girls' bodies are turned the other way to keep their faces on camera.
 	var lily := _place("bunny_girl", Vector3(-1.55, 0, 2.95), cam, "stand_type")
 	lily.rotation.y -= 0.75
 	var maya := _place("cat_girl", Vector3(1.5, 0, 3.05), cam, "stand_type")
-	maya.rotation.y -= 0.8
+	maya.rotation.y -= 0.5
 	_hold(lily, "carrots")
 	_hold(maya, "cereal")
 	var cashier := _place("cashier", Vector3(4.4, 0, 2.9), Vector3(1.0, 0, 12.0), "idle")
 	# Background shoppers browse down the aisles, in the screen gaps between
 	# the family (never directly behind a head).
-	_place("npc_2", Vector3(-2.5, 0, -0.4), Vector3(-4.2, 0, -0.2), "idle")
-	_place("npc_1", Vector3(-0.5, 0, -3.8), Vector3(-4.0, 0, -3.0), "idle")
+	_place("npc_2", Vector3(-1.9, 0, -1.7), Vector3(-4.2, 0, -1.2), "idle")
+	_place("npc_1", Vector3(1.3, 0, -4.35), Vector3(0.9, 0, -2.4), "idle")
 	_place("npc_7", Vector3(1.05, 0, -6.2), Vector3(2.4, 0, -6.6), "stand_read")
 	_hold(actors["npc_1"], "basket")
 	_place("npc_5", Vector3(-2.3, 0, -14.1), Vector3(-2.0, 0, -16.0), "idle")

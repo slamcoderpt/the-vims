@@ -10,6 +10,9 @@ extends Node
 ## bubble_requested, action_chosen, notify, ...).
 
 const SimAgent := preload("res://scripts/sim/sim_agent.gd")
+const ActionAnims := preload("res://scripts/world/actors/action_anims.gd")
+## Socials done arm-in-arm (the pair stands closer).
+const CLOSE_SOCIALS := ["s_hug", "s_kiss", "s_highfive", "s_handshake"]
 const SimActions := preload("res://scripts/sim/sim_actions.gd")
 const NavConfig := preload("res://scripts/sim/nav_config.gd")
 const BuildMode := preload("res://scripts/sim/build_mode.gd")
@@ -85,10 +88,23 @@ func _ready() -> void:
 	Game.relationship_level_changed.connect(_on_rel_level)
 	Game.skill_changed.connect(_on_skill)
 	Game.bills_changed.connect(_update_mail_flag)
+	Game.tasks_changed.connect(_on_tasks_changed)
 	overlay = SimOverlay.new()
 	overlay.name = "SimOverlay"
 	overlay.hud = main.hud if main else null
 	add_child(overlay)
+
+
+## The HUD's Tasks card rebuilds its rows on tasks_changed and shrinks with a
+## deferred reset_size() that still measures the rows it just freed, so it
+## stays twice as tall as its list (an empty white slab over world bubbles).
+## Shrink it again once those rows are really gone.
+func _on_tasks_changed() -> void:
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var tp = hud.get("tasks") if hud else null
+	if tp is Control and is_instance_valid(tp):
+		(tp as Control).reset_size()
 
 
 ## Bought / moved / sold furniture: new objects to use, and routes that
@@ -221,7 +237,8 @@ func townie_rows(ag, it: Interactable) -> Array:
 			continue
 		rows.append(a)
 	var me: String = ag.display_name()
-	var soc := SimActions.socials_by_rel(ag.kind, info.get("kind", "adult"), tname, Game.has_met(me, tname), Game.rel(me, tname), true)
+	var soc := SimActions.socials_by_rel(ag.kind, info.get("kind", "adult"), tname, Game.has_met(me, tname), Game.rel(me, tname), true,
+		{"romance": Game.romance(me, tname), "status": Game.rel_status(me, tname)})
 	for a in soc:
 		if task != "" and not a.has("task") and not a.get("locked", false):
 			a["task"] = task
@@ -231,6 +248,18 @@ func townie_rows(ag, it: Interactable) -> Array:
 
 func _on_rel_level(a: String, b: String, level: String) -> void:
 	if Game.mode != "live" and not Game.live:
+		return
+	if level in ["Romantic Interest", "Dating", "Partners"]:
+		var rt := {"Romantic Interest": "%s has a crush on %s", "Dating": "%s and %s are going steady!", "Partners": "%s and %s are partners!"}
+		Game.notify.emit(rt[level] % [a, b], "heart")
+		for nm in [a, b]:
+			var mi := Game.member_index(nm)
+			if mi >= 0:
+				var other2: String = b if nm == a else a
+				if level == "Romantic Interest":
+					Game.add_moodlet(mi, "crush", "Crush", "heart", 10.0, 8.0, "Thinking about %s" % other2)
+				else:
+					Game.add_moodlet(mi, "in_love", "In Love", "heart", 25.0, 24.0, "Going steady with %s" % other2)
 		return
 	var up := Game.rel(a, b) > 0.0
 	var tier := Game.rel_tier(Game.rel(a, b))
@@ -837,16 +866,25 @@ func approach(ag, o: Dictionary) -> Dictionary:
 		if d.length() < 0.05:
 			d = Vector3(0, 0, 1)
 		var gap := 0.75 if (ag.kind == "dog" or other.kind == "dog") else 0.9
+		if a.get("id", "") in CLOSE_SOCIALS:
+			gap = 0.6   # arms around each other
 		var s := _open_spot(tp + d.normalized() * gap)
 		return {"spot": s, "face": tp}
 	var it = o.get("target")
 	if it == null or not is_instance_valid(it):
 		return {}
+	# Cooking from the fridge happens at the stove / counter next to it.
+	it = work_surface(it, a)
 	var center: Vector3 = it.global_transform * it.look_at_spot
 	var spot: Vector3
 	var face := center
 	if it.use_spot != Vector3.ZERO:
 		spot = it.world_use_spot()
+		if a.get("id", "") in CLOSE_SOCIALS and townie_of(it) != "":
+			var dv: Vector3 = spot - center
+			dv.y = 0.0
+			if dv.length() > 0.1:
+				spot = _open_spot(Vector3(center.x, spot.y, center.z) + dv.normalized() * 0.6)
 		var users: Array = _users.get(it, [])
 		if shareable(it) and not users.is_empty() and not ag in users:
 			# Stand next to whoever already uses it.
@@ -861,13 +899,17 @@ func approach(ag, o: Dictionary) -> Dictionary:
 		spot = _open_spot(center + d.normalized() * (maxf(half.x, half.z) + 0.4))
 	var pose: String = a.get("pose", "")
 	var seated := (pose.begins_with("sit") and pose != "sit_floor") or pose in ["type", "read"]
+	# Showers and tubs: walk up to the front, then the action steps inside.
+	var inside: bool = ag.kind != "dog" and str(ActionAnims.info(ActionAnims.anim_for(a, str(it.title), ag.kind)).get("use", "")) == "inside"
+	if inside:
+		seated = false
 	if seated and ag.kind != "dog" and nav and nav.seat_height(spot) < 0.3:
 		# Sitting at something that isn't itself a seat (a dinner table, a
 		# fire pit): take the nearest free chair around it.
 		var chair := _free_seat_near(ag, center, maxf(_box_half(it).x, _box_half(it).z) + 1.2)
 		if chair != Vector3.INF:
 			return {"spot": chair, "face": center}
-	var lying: bool = pose in ["lie", "sleep"] and ag.kind != "dog"
+	var lying: bool = pose in ["lie", "sleep"] and ag.kind != "dog" and not inside
 	if nav and not seated and not lying and nav.in_bounds(spot):
 		# Use spots inside furniture (the fridge's own footprint, behind a
 		# counter): stand on the reachable floor cell in front of it instead.
@@ -923,6 +965,36 @@ func _free_seat_near(ag, c: Vector3, r: float) -> Vector3:
 			if d < bd:
 				bd = d
 				best = p
+	return best
+
+
+## Where an action on `it` is actually done: cooking at a tall fridge moves to
+## the nearest stove (else counter) on the same floor, like Sims 3 sims
+## carrying ingredients over to the hob.
+func work_surface(it: Node, a: Dictionary) -> Node:
+	if it == null or not is_instance_valid(it):
+		return it
+	var aid := str(a.get("id", ""))
+	if not aid in ["cook", "cook_fridge", "cook_meal", "gourmet"]:
+		return it
+	if _box_half(it).y * 2.0 < 1.2:
+		return it
+	var c: Vector3 = it.global_transform * it.look_at_spot
+	var best: Node = it
+	var bd := 7.0
+	for other in interactables:
+		if not is_instance_valid(other) or other == it:
+			continue
+		var t := str(other.title)
+		if not (t == "Stove" or t.contains("Counter")):
+			continue
+		var oc: Vector3 = other.global_transform * other.look_at_spot
+		if absf(oc.y - c.y) > 1.0:
+			continue
+		var d := _flat(oc, c) - (1.5 if t == "Stove" else 0.0)
+		if d < bd:
+			bd = d
+			best = other
 	return best
 
 

@@ -168,9 +168,23 @@ static func _produce_island(root: Node3D, fix: VoxelBuilder, prod: VoxelBuilder)
 
 
 ## Mid-store produce table (background left of the aisle).
-static func _produce_table(_root: Node3D, fix: VoxelBuilder, prod: VoxelBuilder) -> void:
+static func _produce_table(root: Node3D, fix: VoxelBuilder, prod: VoxelBuilder) -> void:
 	for t: Vector2 in [Vector2(-4.4, -8.4), Vector2(-4.4, -12.2)]:
 		_table(fix, prod, t.x, t.y, int(t.y))
+	# Small island table in the main aisle (mid-ground, between the family and
+	# the fridges): four tilted-up crates of citrus / apples with price cards.
+	var x0 := 0.2
+	var z0 := -3.0
+	fix.box(Vector3i(u(x0), 0, u(z0)), Vector3i(u(1.6), u(0.7), u(1.0)), Kit.wood(Color("8f5a31"), 2))
+	fix.box(Vector3i(u(x0) - 1, u(0.7) - 1, u(z0) - 1), Vector3i(u(1.6) + 2, 1, u(1.0) + 2), Kit.wood(Fx.WOOD_D, 1))
+	var ks := ["orange", "apple", "lemon", "green_apple"]
+	for i in 4:
+		var cx := x0 + 0.03 + (i % 2) * 0.78
+		var cz := z0 + 0.03 + (i / 2) * 0.48
+		_crate(fix, prod, Vector3(cx, 0.7 + (i / 2) * 0.06, cz), Vector3(0.75, 0.2, 0.46), ks[i], 90 + i, 3, Fx.WOOD, true)
+	_tag(root, Vector3(x0 + 0.4, 0.62, z0 + 1.03), "$0.90", 0.0)
+	_tag(root, Vector3(x0 + 1.2, 0.62, z0 + 1.03), "$1.10", 0.0)
+	Interactable.attach(root, "Fruit Table", _produce_actions("Oranges", 0.9), Vector3(1.6, 0.9, 1.0), Vector3(x0 + 0.8, 0.45, z0 + 0.5), Vector3(x0 + 0.8, 0, z0 + 1.6))
 
 
 static func _table(fix: VoxelBuilder, prod: VoxelBuilder, x0: float, z0: float, sd: int) -> void:
@@ -214,7 +228,7 @@ static func _fridges(root: Node3D, halo_pts: Array) -> void:
 	var bank := Fx.fridge(u(6.4), 3)
 	Fx.put(vb, bank, Vector3i(u(-4.4), 0, u(-16.7)))
 	# second bank on the right of the back wall (beverages, behind the aisles)
-	var bank2 := Fx.fridge(u(5.6), 9)
+	var bank2 := Fx.fridge(u(5.6), 9, false)
 	Fx.put(vb, bank2, Vector3i(u(2.1), 0, u(-16.7)))
 	Kit.add(root, vb, U, "Fridges", false, Kit.glow_mat("cool"), Vector3.ZERO, Vector3.ZERO, true)
 	# Soft cool bloom along the lit header strips and inside the cases.
@@ -240,10 +254,11 @@ static func _aisles(root: Node3D) -> void:
 	# (-x) and the next aisle (+x). End caps face the camera.
 	# Long runs from just behind the end caps back to the fridge walkway,
 	# split by a cross aisle so a second row of end caps reads mid-store.
-	for seg: Array in [[2.6, -14.0, 4.4, 1, kinds_a], [2.6, -8.8, 6.4, 11, kinds_a],
-			[5.5, -14.0, 4.4, 2, kinds_b], [5.5, -8.8, 5.0, 12, kinds_b],
-			[7.7, -14.0, 6.4, 5, kinds_c]]:
-		var g := Fx.gondola(u(seg[2]), seg[3], seg[4])
+	# (the run against the right wall is mostly hidden: cheap two-tone stock)
+	for seg: Array in [[2.6, -14.0, 4.4, 1, kinds_a, false], [2.6, -8.8, 6.4, 11, kinds_a, false],
+			[5.5, -14.0, 4.4, 2, kinds_b, true], [5.5, -8.8, 5.0, 12, kinds_b, false],
+			[7.7, -14.0, 6.4, 5, kinds_c, true]]:
+		var g := Fx.gondola(u(seg[2]), seg[3], seg[4], false, 0, seg[5])
 		Fx.put(vb, g, Vector3i(u(seg[0]), 0, u(seg[1])), 3)
 	# mid-store end caps facing the camera (cross aisle at z ~ -11)
 	var e3 := Fx.gondola(u(1.4), 8, ["cereal", "box", "bag"], false, 1)

@@ -15,7 +15,7 @@ const BATCHES := [
 	["argue", "upset", "deep_talk", "pet_dog", "watch_tv", "react_stretch"],
 	["react_yes", "react_satisfied", "react_shake", "pull_chair", "water_plant", "telescope"],
 ]
-var FACE := -1.35
+var FACE := 2.6
 const LOOKS := ["dad", "bunny_girl", "cat_girl", "dad", "cat_girl", "bunny_girl"]
 
 
@@ -41,7 +41,7 @@ func _ready() -> void:
 		var nodes: Array = []
 		var i := 0
 		for an: String in batch:
-			var pos := base + Vector3(i * 1.6 - 4.0, 0.0, 0.0)
+			var pos := base + Vector3(i * 3.0 - 7.5, 0.0, 0.0)
 			var a := SimActor.create(LOOKS[i % LOOKS.size()])
 			main.location.add_child(a)
 			a.global_position = pos
@@ -90,11 +90,13 @@ func _ready() -> void:
 		await _wait(0.6)
 		var j := 0
 		for an: String in batch:
-			var pos := base + Vector3(j * 1.6 - 4.0, 0.0, 0.0)
-			main.camera_rig.apply({"target": pos + Vector3(0, 0.75, 0), "distance": float(args.get("dist", 4.2)), "pitch": 36.0, "yaw": 20.0})
-			await _wait(0.35)
+			var pos := base + Vector3(j * 3.0 - 7.5, 0.0, 0.0)
+			main.camera_rig.apply({"target": pos + Vector3(0, 1.0, 0), "distance": float(args.get("dist", 4.2)), "pitch": 36.0, "yaw": 20.0})
+			await _wait(0.8)
+			var act: Node = nodes.filter(func(n): return n is SimActor)[j]
+			print("  %s: pose=%s anim=%s/%s props=%s fx=%s" % [an, act.pose, ActionAnims.of(act).current, ActionAnims.of(act).active, str(ActionAnims.of(act).visible_props()), str(ActionAnims.of(act).fx_active())])
 			await _shot("lab_%s_a" % an)
-			await _wait(0.5)
+			await _frames(int(args.get("bframes", 9)))
 			await _shot("lab_%s_b" % an)
 			j += 1
 		for n in nodes:

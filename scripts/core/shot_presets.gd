@@ -7,7 +7,7 @@ const PRESETS := {
 	"home_day": {
 		"ref": "refs/ref1_home_office_day.png",
 		"location": "home", "day": 1, "hour": 14, "minute": 16, "season": 1,
-		"camera": {"target": Vector3(-5.9, 3.2, -1.2), "yaw": 22.0, "pitch": 37.0, "distance": 11.5, "fov": 40.0},
+		"camera": {"target": Vector3(-5.0, 3.6, -1.9), "yaw": 20.0, "pitch": 35.0, "distance": 8.6, "fov": 40.0},
 		"tasks": [
 			{"title": "Answer Emails", "icon": "laptop", "done": true},
 			{"title": "Practice Creativity", "icon": "palette"},

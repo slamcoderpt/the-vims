@@ -151,6 +151,13 @@ const SOCIALS := [
 	 "rel": 14.0, "needs": {"social": 0.45}, "social": {"social": 0.4}, "skill": "Charisma", "kinds": ["adult", "child"], "tkinds": ["adult", "child"]},
 	{"id": "s_handshake", "label": "Secret Handshake", "icon": "star", "minutes": 3.0, "pose": "wave", "min": 3,
 	 "rel": 4.0, "needs": {"fun": 0.2, "social": 0.15}, "social": {"fun": 0.2, "social": 0.15}, "kinds": ["adult", "child"], "tkinds": ["adult", "child"]},
+	# --- romance (adults with non-family adults; rom_min: romance needed)
+	{"id": "s_flirt", "label": "Flirt", "icon": "heart", "minutes": 8.0, "pose": "talk", "min": 0, "romantic": true, "rom_min": 0.0,
+	 "rel": 3.0, "rom": 16.0, "needs": {"social": 0.15, "fun": 0.08}, "social": {"social": 0.1}, "skill": "Charisma", "kinds": ["adult"], "tkinds": ["adult"]},
+	{"id": "s_kiss", "label": "Kiss", "icon": "heart", "minutes": 5.0, "pose": "talk", "min": 1, "romantic": true, "rom_min": 35.0,
+	 "rel": 5.0, "rom": 14.0, "needs": {"social": 0.2, "fun": 0.15}, "social": {"social": 0.2, "fun": 0.1}, "kinds": ["adult"], "tkinds": ["adult"]},
+	{"id": "s_steady", "label": "Ask to Go Steady", "icon": "heart", "minutes": 6.0, "pose": "talk", "min": 1, "romantic": true, "rom_min": 60.0,
+	 "rel": 8.0, "rom": 10.0, "status": "Dating", "needs": {"social": 0.2}, "social": {"social": 0.2}, "kinds": ["adult"], "tkinds": ["adult"]},
 	{"id": "s_makeup", "label": "Apologize", "icon": "heart", "minutes": 8.0, "pose": "talk", "max": -1,
 	 "rel": 16.0, "needs": {"social": 0.1}, "social": {"social": 0.05}, "kinds": ["adult", "child"], "tkinds": ["adult", "child"]},
 	{"id": "s_tease", "label": "Tease", "icon": "laugh", "minutes": 4.0, "pose": "talk", "min": -2, "mean": true,
@@ -172,12 +179,27 @@ const TIER_NAMES := {-2: "Enemies", -1: "Disliked", 0: "Acquaintances", 1: "Frie
 
 ## Socials actor (kind) can do with target right now, given their friendship.
 ## with_locked adds a teaser row for the next tier ("locked": true).
-static func socials_by_rel(actor_kind: String, target_kind: String, target_name: String, met: bool, value: float, with_locked := false) -> Array:
+## rom: {} for family (no romance), else {"romance": 0..100, "status": ""}.
+static func socials_by_rel(actor_kind: String, target_kind: String, target_name: String, met: bool, value: float, with_locked := false, rom = null) -> Array:
 	var out: Array = []
 	var tier := Game.rel_tier(value)
 	var locked: Dictionary = {}
+	var rom_locked: Dictionary = {}
 	for d: Dictionary in SOCIALS:
 		if not actor_kind in d.kinds or not target_kind in d.tkinds:
+			continue
+		if d.get("romantic", false):
+			if not (rom is Dictionary) or not met or tier < int(d.get("min", 0)):
+				continue
+			if d.has("status") and str(rom.get("status", "")) == str(d.status):
+				continue
+			if float(rom.get("romance", 0.0)) < float(d.get("rom_min", 0.0)):
+				if with_locked and rom_locked.is_empty():
+					rom_locked = {"id": "locked_" + str(d.id), "label": "%s (Romance %d)" % [d.label, int(d.rom_min)], "icon": "dots",
+						"locked": true, "need_tier": "more romance", "unlock_label": d.label,
+						"lock_msg": "Flirt with %s to build romance and unlock %s" % [target_name, d.label]}
+				continue
+			out.append(d.duplicate(true))
 			continue
 		var a := d.duplicate(true)
 		a.label = (a.label as String) % target_name if "%s" in a.label else a.label
@@ -203,6 +225,8 @@ static func socials_by_rel(actor_kind: String, target_kind: String, target_name:
 	if not met and actor_kind != "dog" and target_kind != "dog":
 		out.append({"id": "s_wave", "label": "Wave", "icon": "wave", "minutes": 2.0, "pose": "wave",
 			"needs": {"social": 0.05}, "rel": 2.0})
+	if not rom_locked.is_empty():
+		out.append(rom_locked)
 	if with_locked and not locked.is_empty():
 		var tn: String = TIER_NAMES.get(int(locked.get("min", 0)), "closer")
 		out.append({"id": "locked_" + str(locked.id), "label": "%s (%s)" % [locked.label, tn], "icon": "dots",

@@ -290,6 +290,7 @@ static func _build_human(L: Dictionary) -> Dictionary:
 	var ear_x := hw * 0.5 - 2.5
 	if hat == "cat":
 		ear_x = hw * 0.5 - 3.0
+		ear_y += 1.0
 	if hat == "bunny" or hat == "cat":
 		acc.bone("ear_l", "head", Vector3(ear_x, ear_y, -0.5))
 		acc.bone("ear_r", "head", Vector3(-ear_x, ear_y, -0.5))
@@ -316,9 +317,9 @@ static func _build_human(L: Dictionary) -> Dictionary:
 
 	var top_extra := 2.0
 	if hat == "bunny":
-		top_extra = 8.0
+		top_extra = 10.0
 	elif hat == "cat":
-		top_extra = 4.0
+		top_extra = 5.0
 	var meta := {
 		"species": "human",
 		"kind": "child" if child else "adult",
@@ -841,7 +842,7 @@ static func _human_hat(vb: VoxelBuilder, L: Dictionary, W: int, H: int, Dd: int,
 	var hc: Color = L.get("hat_color", Color(0.9, 0.7, 0.8))
 	var knit := func(p: Vector3i) -> Color:
 		var u := p.z if (p.x <= -1 or p.x >= W) else p.x
-		var f := 0.95 if posmod(u, 2) == 0 else 1.04
+		var f := 0.97 if posmod(u, 2) == 0 else 1.025
 		return _sh(hc, f * (1.0 + (_h(p, 21) - 0.5) * 0.05))
 	if hat == "bunny" or hat == "cat":
 		# Rounded knit beanie that sits ON the head: ribbed cuff just above the
@@ -859,10 +860,12 @@ static func _human_hat(vb: VoxelBuilder, L: Dictionary, W: int, H: int, Dd: int,
 			if y < c0:
 				return false
 			# Rounded-box beanie: squarish sides (few terraces), soft crown.
+			# r12: a soft rounded hood (ref1): fuller crown, rounder corners,
+			# so it reads as a plush knit cap, not a flat cake.
 			var dx := absf(x - hcx) / (W * 0.5 + 0.95)
 			var dz := absf(z - hcz) / ((F + 1) * 0.5 + 0.95)
-			var dy := maxf(0.0, (y - (T - 0.5)) / 3.4)
-			return pow(dx, 3.4) + pow(dz, 3.4) + pow(dy, 2.6) <= 1.0
+			var dy := maxf(0.0, (y - (T - 1.0)) / 4.3)
+			return pow(dx, 2.7) + pow(dz, 2.7) + pow(dy, 2.0) <= 1.0
 		# Hair can't poke through the hat above the cuff line.
 		for y in range(c0, T + 7):
 			for x in range(-4, W + 4):
@@ -900,34 +903,33 @@ static func _human_hat(vb: VoxelBuilder, L: Dictionary, W: int, H: int, Dd: int,
 		var el := VoxelBuilder.new()
 		el.jitter = 0.03
 		if hat == "bunny":
-			# r10: small accent ears, 3 wide, 7 tall, 2 deep, pink inner front,
-			# rounded tip, slightly pinched base.
-			for y in range(0, 7):
+			# r12: upright plush ears (ref1: about 3/4 of the head height),
+			# 3 wide, 9 tall, 2 deep, pink inner front, rounded tip, pinched base.
+			for y in range(0, 9):
 				for x in range(0, 3):
 					for z in range(0, 2):
-						if y == 6 and x != 1:
+						if y == 8 and x != 1:
 							continue
 						if y == 0 and x != 1 and z == 0:
 							continue
 						var c := outer
-						if z == 1 and x == 1 and y >= 1 and y <= 5:
+						if z == 1 and x == 1 and y >= 1 and y <= 7:
 							c = inner
 						el.set_v(Vector3i(x, y, z), _sh(c, 1.0 + (_h(Vector3i(x, y, z), 22) - 0.5) * 0.06))
 			out["ear_origin"] = Vector3(1.5, 0.5, 1.0)
 		else:
-			# Round teddy/cat ears: 4 wide, 3 tall, pink inner on the front.
-			for y in range(0, 4):
-				var x0 := 0
-				var x1 := 3
-				if y == 3:
-					x0 = 1; x1 = 2
+			# r12: pointed cat ears (ref1), 5 wide at the base tapering to a
+			# tip over 5 rows, pink inner triangle on the front.
+			for y in range(0, 5):
+				var x0: int = [0, 0, 1, 1, 2][y]
+				var x1: int = [4, 4, 3, 3, 2][y]
 				for x in range(x0, x1 + 1):
 					for z in range(0, 2):
 						var c := outer
-						if z == 1 and y >= 1 and y <= 2 and (x == 1 or x == 2):
+						if z == 1 and y >= 1 and y <= 3 and x > x0 and x < x1:
 							c = inner
 						el.set_v(Vector3i(x, y, z), _sh(c, 1.0 + (_h(Vector3i(x, y, z), 24) - 0.5) * 0.06))
-			out["ear_origin"] = Vector3(2.0, 0.5, 1.0)
+			out["ear_origin"] = Vector3(2.5, 0.5, 1.0)
 		out["ear_l"] = el
 		out["ear_r"] = el
 		if hat == "cat":
@@ -1233,14 +1235,16 @@ static func _build_dog(L: Dictionary) -> Dictionary:
 	const LEG := 5
 	const BW := 10
 	const BH := 8
-	const BL := 17
-	const HW := 12
-	const HH := 10
-	const HD := 9
+	# r12: chibi proportions (ref1): bigger head and ears, longer body;
+	# the back height (LEG + BH) is unchanged.
+	const BL := 19
+	const HW := 14
+	const HH := 12
+	const HD := 10
 	const MZ := 3          # muzzle depth (voxels in front of the face)
 	var head_j := Vector3(0, LEG + BH - 2, BL * 0.5 - 1.5)
 	var h_origin := Vector3(HW * 0.5, 2.0, 2.0)
-	var eye_d := Vector3(0, 3.5, HD - 1.5)
+	var eye_d := Vector3(0, 4.5, HD - 1.5)
 	acc.bone("root", "", Vector3.ZERO)
 	acc.bone("body", "root", Vector3(0, LEG, 0))
 	acc.bone("head", "body", head_j)
@@ -1299,9 +1303,9 @@ static func _build_dog(L: Dictionary) -> Dictionary:
 		# into white cheeks and jaw below the eyes.
 		if ax < 1.0 and p.y >= 3 and (p.z >= HD - 2 or (p.y >= HH - 2 and p.z >= 3)):
 			c = white
-		elif ax < 2.0 and p.y >= 3 and p.y <= 4 and p.z >= HD - 1:
+		elif ax < 2.0 and p.y >= 3 and p.y <= 5 and p.z >= HD - 1:
 			c = white
-		elif p.y <= 2 and p.z >= HD - 3 and ax < 4.0:
+		elif p.y <= 3 and p.z >= HD - 3 and ax < 4.5:
 			c = white
 		elif p.y <= 0 and p.z >= 3:
 			c = white
@@ -1343,27 +1347,27 @@ static func _build_dog(L: Dictionary) -> Dictionary:
 	# either side of the blaze.
 	var eyes := VoxelBuilder.new()
 	eyes.jitter = 0.0
-	for ex: int in [2, HW - 4]:
+	for ex: int in [3, HW - 5]:
 		for dx in 2:
-			for ey in [4, 5, 6]:
+			for ey in [5, 6, 7]:
 				var p := Vector3i(ex + dx, ey, HD - 1)
 				if not head.vox.has(p):
 					p.z -= 1
 				head.erase(p)
 				# Closed lid (seen while blinking/sleeping).
-				head.set_v(p - Vector3i(0, 0, 1), Color(0.16, 0.09, 0.06) if ey == 4 else _sh(tan, 0.82))
-				var glint: bool = ey == 6 and dx == (0 if ex < HW / 2 else 1)
+				head.set_v(p - Vector3i(0, 0, 1), Color(0.16, 0.09, 0.06) if ey == 5 else _sh(tan, 0.82))
+				var glint: bool = ey == 7 and dx == (0 if ex < HW / 2 else 1)
 				eyes.set_v(p, Color(1.0, 1.0, 0.98) if glint else Color(0.04, 0.03, 0.03))
 		# Soft dark brow above each eye.
-		head.set_v(Vector3i(ex, 7, HD - 1), _sh(tan, 0.72))
-		head.set_v(Vector3i(ex + 1, 7, HD - 1), _sh(tan, 0.72))
+		_paint_front(head, ex, 8, _sh(tan, 0.72), HD + 1)
+		_paint_front(head, ex + 1, 8, _sh(tan, 0.72), HD + 1)
 	acc.part("head", head, h_origin)
 	acc.part("eyes", eyes, h_origin + eye_d)
 
 	# Long floppy ears: 2 thick, 6 wide flaring to 7, hanging past the jaw.
 	var ear := VoxelBuilder.new()
 	ear.jitter = 0.03
-	for y in range(-11, 1):
+	for y in range(-13, 1):
 		var z0 := 0
 		var z1 := 5
 		if y <= -5:
@@ -1371,17 +1375,17 @@ static func _build_dog(L: Dictionary) -> Dictionary:
 		if y == 0:
 			z0 = 1
 			z1 = 4
-		if y == -11:
+		if y == -13:
 			z0 = 1
 			z1 = 5
 		for z in range(z0, z1 + 1):
 			for x in range(0, 2):
-				if x == 1 and y <= -7:
+				if x == 1 and y <= -8:
 					continue
 				var c := earc
 				if y >= -1:
 					c = _sh(earc, 1.12)
-				elif y <= -9:
+				elif y <= -11:
 					c = _sh(earc, 0.8)
 				elif x == 0 and (z == z0 or z == z1):
 					c = _sh(earc, 0.88)
@@ -1499,17 +1503,24 @@ static func prop_mesh(pname: String) -> ArrayMesh:
 			origin = Vector3(6, 1, 1)
 			size = 0.04
 		"robot":
-			# Little toy robot the kids build (ref1 rug).
-			var g := Color(0.88, 0.88, 0.9)
-			_fill(vb, 0, 3, 0, 3, 0, 2, Color(0.25, 0.45, 0.85))
-			_fill(vb, 1, 2, 4, 5, 0, 2, g)
-			vb.set_v(Vector3i(1, 5, 3), Color(0.1, 0.1, 0.12))
-			vb.set_v(Vector3i(2, 5, 3), Color(0.1, 0.1, 0.12))
-			_fill(vb, 0, 0, -2, -1, 1, 1, Color(0.2, 0.2, 0.22))
-			_fill(vb, 3, 3, -2, -1, 1, 1, Color(0.2, 0.2, 0.22))
-			vb.set_v(Vector3i(1, 6, 1), Color(0.98, 0.8, 0.25))
-			vb.set_v(Vector3i(1, 2, 3), Color(0.98, 0.8, 0.25))
+			# Little toy robot the kids build (ref1 rug): blue body with a
+			# yellow chest light, grey head with black eyes, red antenna.
+			var g := Color(0.86, 0.87, 0.9)
+			var bl := Color(0.25, 0.47, 0.9)
+			_fill(vb, 0, 3, 0, 3, 0, 2, func(p: Vector3i) -> Color: return _sh(bl, 0.95 + 0.1 * _h(p, 41)))
+			_fill(vb, 0, 3, 4, 6, 0, 2, g)
+			vb.set_v(Vector3i(1, 5, 3), Color(0.08, 0.08, 0.1))
+			vb.set_v(Vector3i(2, 5, 3), Color(0.08, 0.08, 0.1))
+			vb.set_v(Vector3i(1, 7, 1), Color(0.3, 0.3, 0.32))
+			vb.set_v(Vector3i(1, 8, 1), Color(0.95, 0.25, 0.22))
+			_fill(vb, -1, -1, 1, 3, 1, 1, Color(0.95, 0.3, 0.25))
+			_fill(vb, 4, 4, 1, 3, 1, 1, Color(0.95, 0.3, 0.25))
+			_fill(vb, 0, 1, -2, -1, 0, 2, Color(0.2, 0.2, 0.24))
+			_fill(vb, 2, 3, -2, -1, 0, 2, Color(0.2, 0.2, 0.24))
+			vb.set_v(Vector3i(1, 2, 3), Color(0.98, 0.82, 0.25))
+			vb.set_v(Vector3i(2, 2, 3), Color(0.98, 0.82, 0.25))
 			origin = Vector3(2, 2, 1.5)
+			size = 0.038
 		"mug":
 			_fill(vb, 0, 2, 0, 3, 0, 2, Color(0.95, 0.93, 0.88))
 			vb.set_v(Vector3i(1, 3, 1), Color(0.35, 0.2, 0.1))

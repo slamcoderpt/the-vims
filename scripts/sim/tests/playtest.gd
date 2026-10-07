@@ -17,6 +17,7 @@ var _bubbles: Array = []    # data dicts
 var _t0 := 0
 var _notes: Array = []      # Game.notify texts
 const Careers := preload("res://scripts/sim/careers.gd")
+const ActionAnims := preload("res://scripts/world/actors/action_anims.gd")
 
 
 func _ready() -> void:
@@ -45,7 +46,7 @@ func _run() -> void:
 	var only: Array = []
 	if args.has("only"):
 		only = (args.only as String).split(",")
-	for sec in ["boot", "loop", "money", "unlocks", "mood", "queue", "autonomy", "meal", "wishes", "clock", "gohere", "build", "social", "townies", "travel", "career", "save"]:
+	for sec in ["boot", "loop", "anims", "money", "unlocks", "mood", "queue", "autonomy", "meal", "wishes", "clock", "gohere", "build", "social", "townies", "travel", "career", "save"]:
 		if only.is_empty() or sec in only or sec == "boot":
 			await call("_s_" + sec)
 
@@ -531,6 +532,165 @@ func _s_wishes() -> void:
 		"Lily LTH %d -> %d, wishes now %s" % [lth0, Game.lth(lily.index), str(Game.wishes(lily.index).map(func(w): return w.label))])
 
 
+# ------------------------------------------------------------------ action anims
+## Anim recorder: every frame, what each watched sim shows (anim layer, beat,
+## props, effects, base pose, position) whenever it changes.
+var _alog := {}
+var _awatch: Array = []
+
+
+func _process(_d: float) -> void:
+	for ag in _awatch:
+		if ag == null or not is_instance_valid(ag.actor):
+			continue
+		var aa = ActionAnims.of(ag.actor)
+		var snap := {"anim": ag.anim, "active": aa.active if aa else "", "beat": ag.beat, "phase": ag.phase,
+			"props": aa.visible_props() if aa else [], "fx": aa.fx_active() if aa else [], "pose": ag.actor.pose,
+			"pos": ag.actor.global_position, "react": ag.react}
+		var key := "%s|%s|%s|%s|%s|%s|%s" % [snap.anim, snap.active, snap.beat, snap.phase, str(snap.props), str(snap.fx), snap.pose]
+		var lst: Array = _alog.get(ag.display_name(), [])
+		if lst.is_empty() or lst[-1].key != key:
+			snap["key"] = key
+			lst.append(snap)
+			_alog[ag.display_name()] = lst
+
+
+## First recorded snapshot of `ag` matching cond (or {}).
+func _seen(ag, cond: Callable) -> Dictionary:
+	for snap in _alog.get(ag.display_name(), []):
+		if cond.call(snap):
+			return snap
+	return {}
+
+
+## Per-action animation layer: each action plays its own keyframed pose with
+## its own hand props / effects, with enter and exit beats and a reaction.
+func _s_anims() -> void:
+	_top_up()
+	var jack = _agent("Jack")
+	var lily = _agent("Lily")
+	var maya = _agent("Maya")
+	for a in [jack, lily, maya]:
+		a.autonomy = false
+		a.cancel_all()
+	_awatch = [jack, lily, maya]
+	_alog.clear()
+	Game.speed = 1
+	var jaa = ActionAnims.of(jack.actor)
+	var laa = ActionAnims.of(lily.actor)
+	var maa = ActionAnims.of(maya.actor)
+	# --- Group 1: shower (Jack), eat at the table (Lily), toilet (Maya).
+	var sh = _find_it("Shower")
+	var table = _find_it("Dining Table")
+	var wc = _find_it("Toilet")
+	jack.command({"action": _action_of(sh, jack, "shower"), "target": sh})
+	lily.command({"action": _action_of(table, lily, "eat"), "target": table})
+	maya.command({"action": _action_of(wc, maya, "use_toilet"), "target": wc})
+	var in_loop := func(ag, an): return ag.phase == "act" and ag.anim == an and ag.beat == ""
+	await _until_game(func(): return in_loop.call(jack, "shower"), 120.0)
+	Game.selected = jack.index
+	await _frame_actor(jack.actor, -35.0)
+	await _frames(6)
+	await _shot("anim_shower")
+	await _until_game(func(): return in_loop.call(lily, "eat"), 120.0)
+	Game.selected = lily.index
+	await _frame_actor(lily.actor, 22.0)
+	await _frames(6)
+	await _shot("anim_eat")
+	await _until_game(func(): return jack.phase == "idle" and lily.phase == "idle" and maya.phase == "idle", 120.0)
+	var shc: Vector3 = _it_center(sh)
+	var shh: Vector3 = sim._box_half(sh)
+	var sw: Dictionary = _seen(jack, func(x): return x.active == "shower" and x.beat == "" and "sponge" in x.props and "water" in x.fx)
+	var inside: bool = not sw.is_empty() and _flat(sw.pos, shc) < minf(shh.x, shh.z) + 0.05
+	var entered: bool = not _seen(jack, func(x): return x.beat == "enter" and x.active == "step_in").is_empty()
+	_step("anim_shower", not sw.is_empty() and inside and entered,
+		"shower snap=%s inside=%s (%.2f m from stall centre), stepped in=%s" % [str(sw.get("props", [])) + str(sw.get("fx", [])), str(inside), _flat(sw.get("pos", Vector3.ZERO), shc), str(entered)])
+	var ex: Dictionary = _seen(jack, func(x): return x.beat == "exit")
+	var rs: Dictionary = _seen(jack, func(x): return x.beat == "react" and x.active == "react_shake" and x.props.is_empty())
+	var out_ok: bool = not rs.is_empty() and _flat(rs.pos, shc) > minf(shh.x, shh.z) - 0.05
+	_step("anim_exit_react", not ex.is_empty() and out_ok, "beats=%s react=%s, out of the stall for the reaction=%s" % [str(jack.beats_seen), str(rs.get("active", "-")), str(out_ok)])
+	var et: Dictionary = _seen(lily, func(x): return x.active == "eat" and x.pose == "sit" and "fork" in x.props and "plate_food" in x.props)
+	var pulled: bool = not _seen(lily, func(x): return x.active == "pull_chair").is_empty()
+	var full: bool = not _seen(lily, func(x): return x.active == "react_satisfied").is_empty()
+	_step("anim_eat", not et.is_empty() and pulled and full, "eat snap=%s, pulled chair=%s, satisfied reaction=%s" % [str(et.get("props", [])), str(pulled), str(full)])
+	var wt: Dictionary = _seen(maya, func(x): return x.active == "toilet" and x.pose == "sit" and "phone" in x.props)
+	_step("anim_toilet", not wt.is_empty(), "toilet snap=%s pose=%s" % [str(wt.get("props", [])), str(wt.get("pose", "-"))])
+	_top_up()
+	# --- Group 2: cook at the stove (chop, then stir with steam), bath, wash hands.
+	var stove = _find_it("Stove")
+	var tub = _find_it("Bathtub")
+	var sink = _find_it("Sink")
+	jack.command({"action": _action_of(stove, jack, "cook"), "target": stove})
+	lily.command({"action": _action_of(tub, lily, "bath"), "target": tub})
+	maya.command({"action": _action_of(sink, maya, "wash"), "target": sink})
+	await _until_game(func(): return jack.anim == "cook" and jaa.active == "chop", 120.0)
+	Game.selected = jack.index
+	await _frame_actor(jack.actor, 22.0)
+	await _frames(6)
+	await _shot("anim_chop")
+	await _until_game(func(): return jaa.active == "stir", 60.0)
+	await _shot("anim_stir")
+	await _until_game(func(): return in_loop.call(lily, "bath"), 120.0)
+	Game.selected = lily.index
+	await _frame_actor(lily.actor, -35.0)
+	await _frames(6)
+	await _shot("anim_bath")
+	var tc: Vector3 = _it_center(tub)
+	var th: Vector3 = sim._box_half(tub)
+	var lily_in_tub: bool = _flat(lily.actor.global_position, tc) < maxf(th.x, th.z)
+	for a in [jack, lily, maya]:
+		a.cancel_all()
+	await _frames(2)
+	var ch: Dictionary = _seen(jack, func(x): return x.active == "chop" and "knife" in x.props and "board_veg" in x.props)
+	var st: Dictionary = _seen(jack, func(x): return x.active == "stir" and "spoon" in x.props and "pan" in x.props and "steam" in x.fx)
+	_step("anim_cook_stages", not ch.is_empty() and not st.is_empty(), "chop %s -> stir %s" % [str(ch.get("props", [])), str(st.get("props", [])) + str(st.get("fx", []))])
+	var wh: Dictionary = _seen(maya, func(x): return x.active == "wash_hands" and "tap" in x.fx)
+	_step("anim_wash_hands", not wh.is_empty(), "wash snap fx=%s" % str(wh.get("fx", [])))
+	var bt: Dictionary = _seen(lily, func(x): return x.active == "bath" and x.pose == "sit" and "bath_water" in x.props and "bubbles" in x.fx)
+	var bt_in: bool = not bt.is_empty() and _flat(bt.pos, tc) < maxf(th.x, th.z)
+	_step("anim_bath", bt_in and lily_in_tub, "bath snap=%s in tub=%s" % [str(bt.get("props", [])) + str(bt.get("fx", [])), str(bt_in)])
+	_step("anim_cancel_clears", jaa.visible_props().is_empty() and laa.visible_props().is_empty() and _flat(lily.actor.global_position, tc) > minf(th.x, th.z) - 0.05,
+		"after cancel: Jack props=%s, Lily props=%s, Lily back out of the tub=%s" % [str(jaa.visible_props()), str(laa.visible_props()), str(_flat(lily.actor.global_position, tc) > minf(th.x, th.z) - 0.05)])
+	# --- Group 3: socials with partner reactions (hug, joke -> laugh).
+	Game.change_rel("Jack", "Maya", 72.0 - Game.rel("Jack", "Maya"))
+	Game.add_moodlet(maya.index, "t_cheer", "Test Cheer", "star", 40.0, 0.0)
+	maya.actor.global_position = sim._open_spot(jack.actor.global_position + Vector3(1.4, 0, 0.4))
+	var hug: Dictionary = {}
+	var joke: Dictionary = {}
+	for a in preload("res://scripts/sim/sim_actions.gd").socials_for(jack, maya):
+		if a.id == "s_hug":
+			hug = a
+		if a.id == "s_joke":
+			joke = a
+	_alog.clear()
+	jack.command({"action": hug, "other": maya})
+	await _until_game(func(): return jack.anim == "hug" and jack.beat == "", 60.0)
+	var gap := _flat(jack.actor.global_position, maya.actor.global_position)
+	Game.selected = jack.index
+	await _frame_actor(jack.actor, 22.0)
+	await _frames(6)
+	await _shot("anim_hug")
+	await _until_game(func(): return jack.phase == "idle", 60.0)
+	var hj: bool = not _seen(jack, func(x): return x.active == "hug").is_empty()
+	var hm: bool = not _seen(maya, func(x): return x.active == "hug").is_empty()
+	_step("anim_hug_pair", hj and hm and gap < 0.8, "Jack hug=%s Maya hug=%s, gap %.2f m" % [str(hj), str(hm), gap])
+	jack.command({"action": joke, "other": maya})
+	await _until_game(func(): return jaa.active == "joke", 60.0)
+	await _frames(3)
+	await _shot("anim_joke")
+	await _until_game(func(): return jack.phase == "idle", 60.0)
+	var jk: bool = not _seen(jack, func(x): return x.active == "joke").is_empty()
+	var lg: bool = not _seen(maya, func(x): return x.active == "laugh").is_empty()
+	_step("anim_joke_laugh", jk and lg, "Jack joke=%s -> Maya laugh=%s" % [str(jk), str(lg)])
+	_awatch = []
+	Game.remove_moodlet(maya.index, "t_cheer")
+	for a in [jack, lily, maya]:
+		a.autonomy = true
+	_top_up()
+	main.camera_rig.apply(main.location.camera_home())
+	await _frames(2)
+
+
 func _action_of(it, ag, id: String) -> Dictionary:
 	for a in sim.actions_for(it, ag.member):
 		if a.get("id", "") == id:
@@ -681,6 +841,37 @@ func _s_townies() -> void:
 	await _until_game(func(): return jack.phase == "idle" and jack.last_done == "s_chat", 120.0)
 	_step("townie_rel_persists", Game.rel("Jack", tname) > 10.0 and not _task_done("Meet 3 Neighbors"), "Jack-%s %.1f, Meet 3 Neighbors done=%s" % [tname, Game.rel("Jack", tname), str(_task_done("Meet 3 Neighbors"))])
 	await _shot("townie_chat")
+	# Romance (adult townie): flirting builds the romance meter until Kiss
+	# unlocks; the kiss plays on both of them; then they can go steady.
+	if best and str(sim.townie_info(tname).get("kind", "adult")) == "adult":
+		Game.change_rel("Jack", tname, 40.0 - Game.rel("Jack", tname))
+		var rows: Array = sim.townie_rows(jack, best)
+		var rl0: Array = rows.map(func(a): return str(a.label))
+		var flirt: Dictionary = {}
+		for a in rows:
+			if a.get("id", "") == "s_flirt":
+				flirt = a
+		var n := 0
+		while not flirt.is_empty() and Game.romance("Jack", tname) < 35.0 and n < 4:
+			jack.command({"action": flirt, "target": best})
+			await _until_game(func(): return jack.phase == "idle" and jack.completed > 0 and jack.last_done == "s_flirt", 120.0)
+			n += 1
+		rows = sim.townie_rows(jack, best)
+		var kiss: Dictionary = {}
+		for a in rows:
+			if a.get("id", "") == "s_kiss":
+				kiss = a
+		_step("romance_flirt_unlocks_kiss", not flirt.is_empty() and "Kiss (Romance 35)" in rl0 and not kiss.is_empty() and Game.has_moodlet(jack.index, "crush"),
+			"rows before %s; %d flirts -> romance %.0f, Kiss unlocked=%s, crush=%s" % [str(rl0), n, Game.romance("Jack", tname), str(not kiss.is_empty()), str(Game.has_moodlet(jack.index, "crush"))])
+		if not kiss.is_empty():
+			jack.command({"action": kiss, "target": best})
+			var npc: Node = best.get_parent()
+			var kissing := await _until_game(func(): return jack.anim == "kiss" and jack.beat == "" and ActionAnims.of(npc) != null and ActionAnims.of(npc).active == "kiss", 120.0)
+			_step("romance_kiss_anim", kissing, "Jack %s, %s %s, romance %.0f" % [ActionAnims.of(jack.actor).active, tname, ActionAnims.of(npc).active if ActionAnims.of(npc) else "-", Game.romance("Jack", tname)])
+			await _focus(jack.actor.global_position)
+			await _frames(3)
+			await _shot("romance_kiss")
+			await _until_game(func(): return jack.phase == "idle", 60.0)
 
 
 func _s_clock() -> void:
@@ -1325,10 +1516,22 @@ func _cam() -> Camera3D:
 
 
 ## Centre the camera on p (keeps the camera height relative to the floor).
-func _focus(p: Vector3) -> void:
+func _focus(p: Vector3, yaw = null, dist = null) -> void:
 	var rig = main.camera_rig
 	var dy: float = rig.target.y - (sim.nav.floor_y(rig.target) if sim.nav else 0.0)
-	rig.apply({"target": Vector3(p.x, p.y + clampf(dy, 0.5, 1.5), p.z)})
+	var d := {"target": Vector3(p.x, p.y + clampf(dy, 0.5, 1.5), p.z)}
+	if yaw != null:
+		d["yaw"] = float(yaw)
+	if dist != null:
+		d["distance"] = float(dist)
+	rig.apply(d)
+	await _frames(2)
+
+
+## Close action shot: look down at a sim from `yaw` (steep enough to see
+## over the cut-away walls), on its own floor.
+func _frame_actor(a: Node3D, yaw: float) -> void:
+	main.camera_rig.apply({"target": a.global_position + Vector3(0, 0.8, 0), "yaw": yaw, "pitch": 52.0, "distance": 6.5})
 	await _frames(2)
 
 

@@ -594,28 +594,33 @@ func _human_pose() -> void:
 			_sb(b_arm_l, 0.0, 0.0, 0.08)
 			_ab(b_head, -0.05, 0.0, 0.0)
 		"play":
-			# Cross-legged on the rug, turned 3/4 to the player and leaning in
-			# over the toys, both hands down on the blocks in front of the
-			# knees; the head turns back toward the camera so the face reads.
-			_sit_floor()
+			# r12 (ref1 rug): sitting on the floor in a relaxed V (knees a
+			# little up, legs splayed forward so shoes and socks read from the
+			# high camera), turned 3/4 to the player, leaning in over the toy
+			# robot held in both hands in her lap; head tipped down at the toy
+			# but turned back toward the camera so eyes and smile read.
+			_sit_v()
 			var pl := sin(t * 3.0 + _phase)
 			var pl2 := sin(t * 2.2 + _phase * 2.0)
 			var by := clampf(_cam_a * 0.7, -1.2, 1.2) - 0.65
 			_tgt_root_rot.y = by
 			var hy := clampf((_cam_a - by) * 0.6, -0.75, 0.75)
-			# Sitting up tall, shoulders back a touch so the striped top and
-			# overalls show under the big chibi head from the high Sims
-			# camera; the head tips down to the robot in her hands.
-			_ab(b_torso, -0.14, hy * 0.2, 0.0)
-			# Chin up toward the robot at chest height (not down at the rug),
-			# so the high house camera sees eyes and smile, not the hat crown.
-			_ab(b_head, -0.22 + 0.04 * pl2, hy * 0.8, 0.1 + 0.06 * sin(t * 1.1))
-			# Robot held up in front of her chest in one hand, the other hand
-			# reaching down to the blocks on the rug.
-			_sb(b_arm_l, -0.95 + 0.08 * pl, -0.3, 0.05)
-			_sb(b_fore_l, -0.75 - 0.1 * pl2, 0.0, 0.0)
-			_sb(b_arm_r, -0.75 - 0.15 * pl2, 0.3, -0.25)
-			_sb(b_fore_r, -0.3 + 0.12 * pl, 0.0, 0.0)
+			_ab(b_torso, 0.16 + 0.02 * pl2, hy * 0.2, 0.0)
+			_ab(b_head, -0.3 + 0.04 * pl2, hy * 0.8, 0.1 + 0.06 * sin(t * 1.1))
+			# Both hands forward on the robot (fiddling with it), elbows in.
+			_sb(b_arm_l, -0.75 + 0.06 * pl, -0.32, 0.12)
+			_sb(b_fore_l, -0.95 - 0.08 * pl2, 0.0, 0.0)
+			_sb(b_arm_r, -0.7 - 0.06 * pl, 0.32, -0.12)
+			_sb(b_fore_r, -0.95 + 0.1 * pl, 0.0, 0.0)
+
+
+## Floor sit with the legs in a forward V (toddler style), knees a touch up.
+func _sit_v() -> void:
+	_sb(b_thigh_l, -PI * 0.5 - 0.22, 0.42, 0.0)
+	_sb(b_thigh_r, -PI * 0.5 - 0.22, -0.42, 0.0)
+	_sb(b_shin_l, 0.5)
+	_sb(b_shin_r, 0.42)
+	_tgt_pos.y += float(_meta.leg_half) - float(_meta.hip_y)
 
 
 func _sit_chair() -> void:
@@ -811,7 +816,7 @@ const _PROPS_FOR := {
 	"paint": [["brush", "fore_r"], ["palette", "fore_l"]],
 	"grill": [["spatula", "fore_r"]],
 	"brush_teeth": [["toothbrush", "fore_r"]],
-	"play": [["block", "fore_r"], ["robot", "fore_l"]],
+	"play": [["robot", "fore_l"]],
 }
 const _DOG_PROPS_FOR := {
 	"play": [["bone", "body"]],
@@ -879,6 +884,9 @@ func _make_prop(pname: String, bone: String) -> MeshInstance3D:
 		"block":
 			mi.position = Vector3(0, hand - 0.04, 0.03)
 		"robot":
-			mi.position = Vector3(0, hand - 0.05, 0.04)
+			# Held upright between both hands in her lap (the forearm points
+			# forward, so the toy is counter-rotated to stand up).
+			mi.position = Vector3(-0.045, hand - 0.02, 0.07)
+			mi.rotation = Vector3(1.55, 0.35, 0.0)
 	att.add_child(mi)
 	return mi
