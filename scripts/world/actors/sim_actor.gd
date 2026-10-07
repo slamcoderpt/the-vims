@@ -547,17 +547,20 @@ func _human_pose() -> void:
 			var bf := b_fore_l if _brush_left else b_fore_r
 			var pi_ := b_arm_r if _brush_left else b_arm_l
 			var pf := b_fore_r if _brush_left else b_fore_l
-			# Brush arm stretched out level toward the canvas (reads as
-			# "painting" in silhouette), small dabbing strokes.
-			_sb(bi, -1.4 + 0.1 * dab, (0.05 + 0.06 * dab2) * m, -0.32 * m)
-			_sb(bf, -0.55 - 0.2 * maxf(0.0, dab), 0.0, 0.25 * m)
+			# Brush arm raised up and forward to the canvas (above shoulder
+			# height, the brush tip at the middle of the picture), elbow
+			# slightly out; small dabbing strokes. The palette rests on the
+			# lap in the far hand.
+			_sb(bi, -1.9 + 0.1 * dab, (0.08 + 0.06 * dab2) * m, -0.16 * m)
+			_sb(bf, -0.45 - 0.18 * maxf(0.0, dab), 0.0, 0.1 * m)
 			if _seated():
 				# Perch on the front edge of the stool, leaning in to the canvas.
-				_tgt_pos.z += 0.12 / _s
-			_sb(pi_, -0.75, 0.0, 0.25 * m)
-			_sb(pf, -0.9)
-			_ab(b_head, 0.02, 0.05 * dab2, 0.06 * sin(t * 0.7))
-			_ab(b_torso, 0.16, 0.0, 0.0)
+				_tgt_pos.z += 0.14 / _s
+			_sb(pi_, -0.55, 0.0, 0.12 * m)
+			_sb(pf, -1.15)
+			# Chin up to the canvas (not down at the lap), a little tilt.
+			_ab(b_head, -0.16, 0.05 * dab2, 0.06 * sin(t * 0.7))
+			_ab(b_torso, 0.2, 0.0, 0.0)
 			# Body square to the canvas; the head turns part way toward the
 			# player (stopping ~50 deg short) so eyes and smile read in 3/4.
 			var py := _present(0.85, 0.9, 0.03, 0.07)
@@ -717,25 +720,18 @@ func _dog_pose() -> void:
 			_sb(b_ear_l, 0.05 * chew, 0.0, 0.3)
 			_sb(b_ear_r, 0.05 * chew, 0.0, -0.3)
 		"play":
-			# Play bow facing the player in 3/4 (ref1 "Play"): chest and
-			# outstretched front paws down on the rug either side of the
-			# chew bone, rump and white-tipped tail up and wagging, head
-			# raised looking at the camera with the drop ears framing the
-			# white blaze. The long side shows (saddle, tan flank).
+			# ref1 "Play": belly-down on the rug in 3/4 front view, front paws
+			# stretched out either side of the blue chew bone, head lowered
+			# over it gnawing (small chewing bob), eyes still up at the
+			# player; the drop ears hang beside the white blaze, saddle and
+			# tan flank show along the back, tail thumps on the floor.
 			var ly := _dog_lie(true)
-			var perk := smoothstep(0.55, 1.0, sin(t * 0.8 + _phase))
-			var hop := pow(maxf(0.0, sin(t * 2.4 + _phase)), 4.0)
-			var pitch := 0.3
-			_sb(b_body, pitch, 0.0, 0.0)
-			_tgt_pos.y = -1.7 * vs + 0.015 * hop
-			_sb(b_leg_fl, -1.42, 0.0, 0.12)
-			_sb(b_leg_fr, -1.42, 0.0, -0.12)
-			_sb(b_leg_bl, -pitch - 0.02, 0.05, 0.0)
-			_sb(b_leg_br, -pitch - 0.02, -0.05, 0.0)
-			_sb(b_head, -pitch - 0.42 - 0.05 * perk + 0.02 * breath, ly, 0.2 * sin(t * 0.6 + _phase) * (0.4 + 0.6 * perk))
-			_sb(b_tail, -0.35, 0.0, 0.7 * sin(t * 15.0))
-			_sb(b_ear_l, 0.1 + 0.05 * perk, 0.0, 0.05 + 0.06 * hop)
-			_sb(b_ear_r, 0.1 + 0.05 * perk, 0.0, -0.05 - 0.06 * hop)
+			var chew := sin(t * 7.0)
+			var perk := smoothstep(0.6, 1.0, sin(t * 0.7 + _phase))
+			_sb(b_head, -0.12 + 0.05 * maxf(0.0, chew) - 0.08 * perk, ly * (0.6 + 0.25 * perk), 0.12 + 0.05 * sin(t * 1.3))
+			_sb(b_tail, -0.75, 0.0, 0.6 * sin(t * 13.0))
+			_sb(b_ear_l, 0.05 * chew, 0.0, 0.06)
+			_sb(b_ear_r, 0.05 * chew, 0.0, -0.06)
 		"bow":
 			var hop := absf(sin(t * 5.0))
 			_sb(b_body, 0.32)
@@ -779,13 +775,16 @@ func _dog_lie(front := false) -> float:
 					# Long side toward the player (body length, saddle and
 					# tail read), nose to screen-right and a little toward
 					# the viewer, head swung round to look at the camera.
-					want = (r * 1.0 + c * 0.12).normalized()
+					# 3/4 front (ref1): nose toward the viewer and screen-left,
+					# body trailing back to the right so the face, blaze,
+					# both ears, the saddle and the tail all read.
+					want = (-r * 0.86 + c * 0.5).normalized()
 				var want_yaw := atan2(want.x, want.z)
 				_tgt_root_rot.y = wrapf(want_yaw - global_rotation.y, -PI, PI)
 				look_yaw = clampf(wrapf(atan2(c.x, c.z) - want_yaw, -PI, PI), -0.9, 0.9)
 	# A lying dog's anchor sits at its haunches: the chest, paws and head
 	# reach forward (toward the toy) instead of centring on the spot.
-	_tgt_root_pos = Basis(Vector3.UP, _tgt_root_rot.y) * Vector3(0.0, 0.0, (17.0 if front else 6.0) * vs)
+	_tgt_root_pos = Basis(Vector3.UP, _tgt_root_rot.y) * Vector3(0.0, 0.0, (9.0 if front else 6.0) * vs)
 	_tgt_pos.y = -float(_meta.leg) + 0.3 * vs
 	if front:
 		# Paws splayed a little so the bone sits between them.
@@ -815,7 +814,7 @@ const _PROPS_FOR := {
 	"play": [["block", "fore_r"], ["robot", "fore_l"]],
 }
 const _DOG_PROPS_FOR := {
-	"play": [["bone", "root"]],
+	"play": [["bone", "body"]],
 	"chew": [["bone", "head"]],
 }
 

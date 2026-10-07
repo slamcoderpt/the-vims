@@ -58,8 +58,8 @@ void fragment() {
 	vec3 fg = t.rgb / max(t.a, 0.001);
 	// A touch more saturation + contrast so skin stays warm, not chalky.
 	float l = dot(fg, vec3(0.299, 0.587, 0.114));
-	fg = clamp(mix(vec3(l), fg, 1.04), 0.0, 1.0);
-	fg = clamp((fg - 0.5) * 1.03 + 0.5, 0.0, 1.0);
+	fg = clamp(mix(vec3(l), fg, 1.05), 0.0, 1.0);
+	fg = clamp((fg - 0.5) * 1.08 + 0.5, 0.0, 1.0);
 	// Soft studio key from the upper left: a gentle falloff across the bust.
 	fg *= mix(1.07, 0.9, clamp(dot(UV, vec2(0.4, 0.6)), 0.0, 1.0));
 	vec3 c = mix(bg, fg, t.a);
@@ -103,11 +103,11 @@ void fragment() {
 ## Portrait backdrop gradients per look (top, bottom), like the soft room
 ## blur behind each head in the refs.
 const BG_TINTS := {
-	"dad": [Color("fbe6cf"), Color("e3b48c")],
-	"bunny_girl": [Color("fde8ee"), Color("efc0cc")],
-	"cat_girl": [Color("e9e6fb"), Color("c3c2ea")],
-	"beagle": [Color("eef2f8"), Color("cfd9e6")],
-	"default": [Color("fde9d2"), Color("e9b993")],
+	"dad": [Color("e9cfae"), Color("b08560")],
+	"bunny_girl": [Color("c9d3e6"), Color("8e9cba")],
+	"cat_girl": [Color("d3e8e0"), Color("86ab9f")],
+	"beagle": [Color("bfd6ea"), Color("7f9fc0")],
+	"default": [Color("e9cfae"), Color("b08560")],
 }
 
 static var _shader: Shader
@@ -144,15 +144,19 @@ var _plane_h := 1.0
 
 ## Framing (fractions of the head height neck->top-of-hat), tuned so the face
 ## fills the card like the refs.
-const PERSON_YAW := -12.0
+const PERSON_YAW := -8.0
 const PERSON_PITCH := -5.0
-const DOG_YAW := -70.0
-const DOG_PITCH := -8.0
-const DOG_HEAD_YAW := -65.0
-const W_FRAC_ADULT := 0.8
-const W_FRAC_KID := 0.84
-const CHIN_ADULT := 0.64
-const CHIN_KID := 0.74
+const DOG_YAW := -34.0
+const DOG_PITCH := -6.0
+const DOG_HEAD_YAW := -22.0
+## Sitting tilts the body back; the head pitches forward to level out.
+const DOG_HEAD_PITCH := -4.0
+const W_FRAC_ADULT := 0.84
+const W_FRAC_KID := 0.92
+const CHIN_ADULT := 0.72
+const CHIN_KID := 0.87
+const W_FRAC_DOG := 0.78
+const CHIN_DOG := 0.64
 
 
 func _ready() -> void:
@@ -307,7 +311,8 @@ func _spawn_actor() -> void:
 	_apply_bust_material(a)
 	var dog: bool = member.get("kind", "") == "dog"
 	if a.has_method("set_pose"):
-		a.set_pose("idle")
+		# Pet card: sitting up, chest out, like a pet photo.
+		a.set_pose("sit" if dog else "idle")
 	# Let the actor build its meshes and snap into its pose, then freeze it:
 	# a portrait is a still (eyes open, no idle sway), rendered on demand.
 	for i in 3:
@@ -363,7 +368,16 @@ func _neutralize_pose() -> void:
 		# Pet card (ref): body in 3/4 profile, head turned to the lens.
 		var hb = _actor.get("b_head")
 		if hb != null and int(hb) >= 0:
-			sk.set_bone_pose_rotation(int(hb), Quaternion.from_euler(Vector3(deg_to_rad(-6.0), deg_to_rad(DOG_HEAD_YAW), 0.0)))
+			# Level head in skeleton space (the sitting body tilts back):
+			# undo the parent's rotation, then yaw toward the lens.
+			var par: int = sk.get_bone_parent(int(hb))
+			var pb: Basis = sk.get_bone_global_pose(par).basis.orthonormalized() if par >= 0 else Basis()
+			var want := Basis(Vector3.UP, deg_to_rad(DOG_HEAD_YAW)) * Basis(Vector3.RIGHT, deg_to_rad(DOG_HEAD_PITCH))
+			sk.set_bone_pose_rotation(int(hb), (pb.inverse() * want).get_rotation_quaternion())
+		# Close-up pet card: tuck the tail away so the head reads alone.
+		var tb = _actor.get("b_tail")
+		if tb != null and int(tb) >= 0:
+			sk.set_bone_pose_scale(int(tb), Vector3.ONE * 0.001)
 	var eb = _actor.get("b_eyes")
 	if eb != null and int(eb) >= 0:
 		sk.set_bone_pose_scale(int(eb), Vector3.ONE)
@@ -405,26 +419,43 @@ func _frame_camera(measure := false) -> void:
 	# and where a grid corner lands, for pixel-exact framing.
 	var snap_unit := 0.0
 	var snap_o := Vector2.ZERO
-	if sk is Skeleton3D and hb >= 0 and meta is Dictionary and not meta.is_empty() and not dog:
+	if sk is Skeleton3D and hb >= 0 and meta is Dictionary and not meta.is_empty():
 		# Head-and-shoulders close-up: the head (hair included) fills ~62% of
 		# the card width, a small margin over the hair / hat, chin at ~62%
 		# of the height and the shoulders below, like the ref cards.
 		var vs := 0.05
 		var g := _bone_xf(sk, hb)
 		var hh := 9.0 if kid else 10.0
+		# Head-bone local extents (voxels): people's heads sit on the neck
+		# joint; the beagle's head bone is mid-skull with the floppy ears
+		# hanging to the jaw (sim_rig_builder _build_dog).
+		var y_mid := 1.0 + hh * 0.5
+		var y_top := hh + 2.0
+		var y_chin := 0.5
+		var half_w := 6.2
+		var z_face := 0.0
+		if dog:
+			hh = 10.0
+			y_mid = 3.0
+			y_top = 8.5
+			y_chin = -2.5
+			half_w = 7.2
+			z_face = 9.0
 		origin = g * Vector3(0, meta.get("head_h", 0.6), 0)
 		var pr := func(v: Vector3) -> Vector2:
 			var d: Vector3 = g * (v * vs) - origin
 			return Vector2(d.dot(right), d.dot(up))
-		var mid: Vector2 = pr.call(Vector3(0, 1.0 + hh * 0.5, 0))
+		var mid: Vector2 = pr.call(Vector3(0, y_mid, z_face))
 		snap_o = pr.call(Vector3.ZERO)
 		snap_unit = absf((pr.call(Vector3(1, 0, 0)) as Vector2).x - snap_o.x)
-		var l: Vector2 = pr.call(Vector3(-6.2, 1.0 + hh * 0.5, 0))
-		var r: Vector2 = pr.call(Vector3(6.2, 1.0 + hh * 0.5, 0))
+		var l: Vector2 = pr.call(Vector3(-half_w, y_mid, 0))
+		var r: Vector2 = pr.call(Vector3(half_w, y_mid, 0))
 		var head_w := absf(r.x - l.x)
-		var skull_top: float = pr.call(Vector3(0, hh + 2.0, 0)).y
-		var chin: float = pr.call(Vector3(0, 0.5, 0)).y
-		_head_band = Vector2(chin, skull_top)
+		var skull_top: float = pr.call(Vector3(0, y_top, 0)).y
+		var chin: float = pr.call(Vector3(0, y_chin, 0)).y
+		# Dog: measure the head above the muzzle only (its back sits behind
+		# the jaw at a 3/4 view and would widen the band).
+		_head_band = Vector2(mid.y if dog else chin, skull_top)
 		cx = mid.x
 		if _head_span != Vector2.ZERO and not measure:
 			# The real head width from the measure render (hair tufts, hat
@@ -438,7 +469,7 @@ func _frame_camera(measure := false) -> void:
 		# Hat ears may rise ~6 voxels above the skull; taller tips get cropped
 		# by the frame edge (like the ref bunny ears) instead of shrinking
 		# the face.
-		var top := skull_top + unit * (14.0 if kid else 5.0)
+		var top := skull_top + unit * (17.0 if kid else (1.0 if dog else 5.0))
 		if _measured.size != Vector2.ZERO and not measure:
 			top = minf(_measured.end.y, top)
 			top = maxf(top, skull_top)
@@ -449,9 +480,9 @@ func _frame_camera(measure := false) -> void:
 		# Fit by height (hair / hat top near the card top, chin about 2/3
 		# down so collar and shoulders show), then widen only if the head
 		# would overflow the card sideways.
-		var w_frac := W_FRAC_KID if kid else W_FRAC_ADULT
-		var top_m := 0.04 if kid else 0.05
-		var chin_frac := CHIN_KID if kid else CHIN_ADULT
+		var w_frac := W_FRAC_KID if kid else (W_FRAC_DOG if dog else W_FRAC_ADULT)
+		var top_m := 0.03 if kid else (0.12 if dog else 0.05)
+		var chin_frac := CHIN_KID if kid else (CHIN_DOG if dog else CHIN_ADULT)
 		view_h = maxf((top - chin) / (chin_frac - top_m), head_w / w_frac / aspect)
 		cy = top + view_h * top_m - view_h * 0.5
 		if measure:
@@ -556,7 +587,7 @@ func _measure_silhouette() -> void:
 	var y_top := _plane_c.y - (used.position.y - H * 0.5) * k
 	var y_bot := _plane_c.y - (used.end.y - H * 0.5) * k
 	_measured = Rect2(x0, y_bot, x1 - x0, y_top - y_bot)
-	if _head_band != Vector2.ZERO and member.get("kind", "") != "dog":
+	if _head_band != Vector2.ZERO:
 		# Widest row of the head between eye level and the skull top (above
 		# beard and shoulders): that is what must fit the card.
 		var ya := _head_band.x + (_head_band.y - _head_band.x) * 0.05

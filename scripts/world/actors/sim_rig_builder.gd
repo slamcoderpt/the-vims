@@ -22,7 +22,7 @@ const BODY := {
 	"big": {"lw": 5, "shin": 6, "thigh": 6, "tw": 12, "td": 7, "th": 10, "aw": 3, "ua": 6, "fa": 6, "hw": 10, "hh": 10, "hd": 10},
 	"slim": {"lw": 4, "shin": 6, "thigh": 6, "tw": 10, "td": 6, "th": 10, "aw": 3, "ua": 6, "fa": 6, "hw": 10, "hh": 10, "hd": 10},
 	# Chibi child: head (with hat) ~38% of total height.
-	"child": {"lw": 4, "shin": 5, "thigh": 4, "tw": 10, "td": 6, "th": 8, "aw": 3, "ua": 5, "fa": 5, "hw": 10, "hh": 10, "hd": 10},
+	"child": {"lw": 4, "shin": 5, "thigh": 4, "tw": 10, "td": 6, "th": 8, "aw": 3, "ua": 5, "fa": 5, "hw": 12, "hh": 11, "hd": 11},
 }
 
 static var _cache := {}
@@ -468,7 +468,9 @@ static func _human_head(L: Dictionary, D: Dictionary) -> Dictionary:
 	if not child and not girl:
 		by = E + eh + 1   # a row of skin between brow and eye so both read
 	if child:
-		by = E + eh
+		# A row of skin between eye and brow (open, happy look; brows tucked
+		# just under the hat cuff), short soft 2-wide arcs.
+		by = E + eh + 1 if H >= 11 else E + eh
 		for ei in exs.size():
 			var ex: int = exs[ei]
 			_paint_front(vb, ex, by, _sh(brow, 1.05), fz)
@@ -507,12 +509,15 @@ static func _human_head(L: Dictionary, D: Dictionary) -> Dictionary:
 	var mouth := Color(0.55, 0.18, 0.2)
 	var lip := Color(0.85, 0.42, 0.45)
 	if child:
-		_paint_front(vb, cxl, M - 1, mouth, fz)
-		_paint_front(vb, cxr, M - 1, Color(0.93, 0.45, 0.5), fz)
+		# Open "D" smile: a 4-wide dark top lip line with the corners tucked
+		# up, a pink tongue below it, so it reads as one happy mouth (not
+		# two stray dots) at phone size.
 		_paint_front(vb, cxl - 1, M, mouth, fz)
+		_paint_front(vb, cxl, M, mouth, fz)
+		_paint_front(vb, cxr, M, mouth, fz)
 		_paint_front(vb, cxr + 1, M, mouth, fz)
-		_paint_front(vb, cxl, M, _sh(skin, 0.97), fz)
-		_paint_front(vb, cxr, M, _sh(skin, 0.97), fz)
+		_paint_front(vb, cxl, M - 1, Color(0.9, 0.4, 0.45), fz)
+		_paint_front(vb, cxr, M - 1, Color(0.9, 0.4, 0.45), fz)
 	elif beard != "full":
 		_paint_front(vb, cxl, M, mouth if not girl else Color(0.78, 0.3, 0.34), fz)
 		_paint_front(vb, cxr, M, mouth if not girl else Color(0.78, 0.3, 0.34), fz)

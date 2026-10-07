@@ -21,11 +21,11 @@ func _initialize() -> void:
 	]
 	for i in members.size():
 		var big := Portrait.new()
-		big.position = Vector2(20 + i * 340, 20)
+		big.position = Vector2(20 + i * 260, 200)
 		root.add_child(big)
-		big.setup(i, members[i], i == 0, Vector2(300, 390))
+		big.setup(i, members[i], i == 0, Vector2(226, 292))
 		var small := Portrait.new()
-		small.position = Vector2(20 + i * 130, 450)
+		small.position = Vector2(20 + i * 130, 20)
 		root.add_child(small)
 		small.setup(i, members[i], i == 0, [Vector2(113, 146), Vector2(100, 110), Vector2(100, 110), Vector2(100, 92)][i])
 	for f in 40:
