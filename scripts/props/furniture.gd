@@ -28,17 +28,19 @@ static func m_desk(vb: VoxelBuilder, v: int) -> void:
 		V.b(vb, 1, 7, 0, 14, 2, 1, PAINT_W)
 		return
 	# Work desk 1.75 x 0.75 m, 0.75 m high, two drawer pedestals.
+	# v2: long home-office desk (2.5 m) for a two-monitor + laptop setup (ref1).
+	var dl := 36 if v == 2 else 28
 	var top := V.wood(WOOD, 0, 3)
-	V.b(vb, 0, 11, 0, 28, 1, 12, top)
-	V.b(vb, 0, 10, 11, 28, 1, 1, V.shade(WOOD_D, 1.05))
-	for px: int in [0, 20]:
+	V.b(vb, 0, 11, 0, dl, 1, 12, top)
+	V.b(vb, 0, 10, 11, dl, 1, 1, V.shade(WOOD_D, 1.05))
+	for px: int in [0, dl - 8]:
 		V.b(vb, px, 0, 0, 8, 10, 11, V.wood(WOOD_D, 1, 3, 0.05))
 		for k in 3:
 			var y0 := 1 + k * 3
 			V.b(vb, px, y0, 11, 8, 3, 1, V.shade(WOOD, 1.0 - k * 0.03))
 			V.b(vb, px, y0 + 2, 11, 8, 1, 1, V.shade(WOOD_D, 0.85))
 			V.p(vb, px + 3, y0 + 1, 12, Color("e6d3a0")); V.p(vb, px + 4, y0 + 1, 12, Color("e6d3a0"))
-	V.b(vb, 8, 4, 0, 12, 6, 1, WOOD_D)
+	V.b(vb, 8, 4, 0, dl - 16, 6, 1, WOOD_D)
 
 
 static func m_office_chair(vb: VoxelBuilder, v: int) -> void:
