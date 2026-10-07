@@ -8,7 +8,7 @@ extends Node3D
 ##   sun_elev       fixed daytime sun elevation (deg) instead of the arc
 ##   sun_energy, ambient_energy, ambient_day, ambient_night (Color), sky_day, sky_night (Color)
 ##   fog_day, fog_night (Color), fog_density
-##   exposure, shadow_distance, tonemap_white
+##   exposure, shadow_distance, shadow_blur, tonemap_white
 ##   sun_color_day  midday sun colour (default near-white; dawn/dusk stay amber)
 ##   post: Dictionary for post_fx.configure (focus_y, band, blur_px, ...)
 ##   post_day / post_night: overrides merged by time of day
@@ -111,6 +111,8 @@ func _apply() -> void:
 	# Compatibility (phones / WebGL2) for little visible gain under the dim
 	# night key light: off unless a location asks for them.
 	moon.shadow_enabled = moon.visible and not sun.visible and profile.get("moon_shadows", false)
+	# Softer penumbra on request (home: no blotchy hard sun patches).
+	sun.shadow_blur = profile.get("shadow_blur", 1.6)
 	if profile.has("shadow_distance"):
 		sun.directional_shadow_max_distance = profile.shadow_distance
 		moon.directional_shadow_max_distance = profile.shadow_distance

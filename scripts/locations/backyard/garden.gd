@@ -9,7 +9,7 @@ const M := 8    # cells per metre at 0.125
 const F := 16   # cells per metre at 0.0625
 const T := 4    # cells per metre at 0.25
 ## Height of the neighbours' lots behind the yard (they sit lower than ours).
-const LOT_Y := -2.6
+const LOT_Y := -1.9
 
 const Party := preload("res://scripts/locations/backyard/party.gd")
 
@@ -610,7 +610,7 @@ func _neighbours() -> void:
 	var spots := [[-28.0, -46.0, 4.6], [-16.0, -45.0, 4.2], [-3.0, -46.0, 6.2], [9.0, -52.0, 6.8],
 		[21.0, -58.0, 5.0], [-40.0, -48.0, 4.8], [33.0, -60.0, 5.0],
 		[-20.0, -66.0, 7.0], [-6.0, -72.0, 7.4], [10.0, -78.0, 7.0], [24.0, -76.0, 6.6],
-		[-33.0, -37.0, 3.4], [-21.0, -36.5, 3.0], [-9.5, -37.5, 3.6], [1.5, -36.0, 3.0], [12.0, -37.0, 3.4]]
+		[-24.0, -40.0, 3.0], [-12.0, -39.0, 2.6], [1.0, -41.0, 3.2], [12.8, -42.0, 2.8], [24.2, -44.0, 3.0]]
 	for i in spots.size():
 		var sp: Array = spots[i]
 		var tx: float = sp[0] + _rng.randf_range(-0.8, 0.8)
@@ -651,6 +651,14 @@ func _house(vb: VoxelBuilder, hd: Array, wall: Color, roof: Color) -> void:
 		for k in half + 1:
 			V.b(vb, x0 - 1, h + k, z0 - 1 + k, w + 2, 1, d + 2 - 2 * k, V.shade(roof, 0.94 + 0.03 * (k % 3)))
 		V.b(vb, x0 + w - 6, h + 2, z0 + d / 2, 3, half + 2, 3, Color("4a3a40"))
+		# Lit dormers on the front slope: when only the roof peeks over our
+		# own house / hedges, these still read as a lived-in house at dusk.
+		var nd := 2 if w >= 32 else 1
+		for j in nd:
+			var dx := x0 + (w * (j + 1)) / (nd + 1) - 3
+			V.b(vb, dx, h + 1, z0 + d - 4, 6, 6, 4, wall)
+			V.b(vb, dx - 1, h + 7, z0 + d - 4, 8, 1, 5, V.shade(roof, 0.9))
+			V.b(vb, dx + 1, h + 2, z0 + d - 1, 4, 4, 1, Color("ffc76e"), true)
 	else:
 		var half := w / 2 + 1
 		for k in half + 1:
@@ -659,7 +667,11 @@ func _house(vb: VoxelBuilder, hd: Array, wall: Color, roof: Color) -> void:
 			if k > 0 and w - 2 * k + 2 > 0:
 				V.b(vb, x0 + k - 1, h + k - 1, z0 + d - 1, w - 2 * k + 2, 1, 1, wall)
 		# Attic window.
-		V.b(vb, x0 + w / 2 - 1, h + 1, z0 + d, 2, 2, 1, Color("ffc76e"), true)
+		# Big lit attic window high in the gable (the lower wall is often
+		# hidden behind our own roof from the bbq camera).
+		V.b(vb, x0 + w / 2 - 3, h + 3, z0 + d + 1, 6, 6, 1, V.shade(wall, 1.45))
+		V.b(vb, x0 + w / 2 - 2, h + 4, z0 + d + 1, 4, 4, 1, Color("ffc76e"), true)
+		V.b(vb, x0 + w / 2, h + 4, z0 + d + 1, 1, 4, 1, V.shade(wall, 1.3))
 	# Lit windows on the front (+z) face.
 	# Window rows hang from the eaves down, so the top row still shows over
 	# the hedges when a house sits low behind the yard.

@@ -115,7 +115,7 @@ func _cobbles(w: int, h: int) -> Image:
 		for cx in cw:
 			var mx := X0 + (cx * 8 + 4.0) / PPM
 			var mz := Z0 + (cy * 8 + 4.0) / PPM
-			var dens := 0.018 + 0.05 * smoothstep(5.0, 10.0, absf(mx - 0.5))
+			var dens := 0.018 + 0.05 * smoothstep(5.0, 10.0, absf(mx - 0.5)) + 0.07 * smoothstep(0.8, 3.0, mz)  # r14: leafier foreground (ref2)
 			for sp: Vector2 in litter_spots:
 				var d := Vector2(mx, mz).distance_to(sp)
 				dens += 0.2 * (1.0 - smoothstep(0.8, 3.0, d))
@@ -135,6 +135,7 @@ func _cobbles(w: int, h: int) -> Image:
 				var sid := ids[k] + (tx / TILE) * 997 + tiy * 7919
 				c = K.pick(tones, K.hs(sid, 1, 3))
 				c = K.shade(c, f * (0.82 + K.hs(tx, ty, 5) * 0.05))
+				c = Color(c.r * 1.03, c.g * 1.0, c.b * 0.93)  # r14: warmer beige paving
 			# Painted leaf litter (denser towards the edges and under trees).
 			var dens := dmap[(ty / 8) * cw + tx / 8]
 			var lh := K.hs(tx / 2, ty / 2, 31)
@@ -162,7 +163,7 @@ func _leaves(parent: Node3D) -> void:
 	]
 	var n := 0
 	var i := 0
-	while n < 240 and i < 4000:
+	while n < 210 and i < 5000:
 		i += 1
 		var x := -9.0 + K.hs(i, 1, 2) * 19.0
 		var z := -9.0 + K.hs(i, 3, 4) * 17.0

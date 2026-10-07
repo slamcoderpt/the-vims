@@ -6,6 +6,8 @@ const K := preload("res://scripts/locations/festival/kit.gd")
 const U := 1.0 / 16.0
 
 var actors := {}      # key -> SimActor
+## Festival preset camera position (ShotPresets target/yaw/pitch/distance).
+const CAM_POS := Vector3(1.2, 8.9, 9.0)
 var npc_keys: Array[String] = []
 var _prop_meshes := {}
 
@@ -44,15 +46,16 @@ func _life_size(a: SimActor) -> void:
 
 
 func build(parent: Node3D, stalls, stage) -> void:
+	preload("res://scripts/locations/festival/townsfolk_looks.gd").register()
 	# --- Family (positions match the reference composition).
 	var vendor_pos: Vector3 = stalls.vendor_spot
 	# Heroes ~1/4 screen tall and spaced apart so faces never overlap:
 	# Jack at the treats counter, Biscuit in front of him, Lily centre, Maya right.
-	var jack := spawn(parent, "Jack", "dad", Vector3(-2.75, 0, 0.15), Vector3(-1.6, 0, 7.4), "talk")
-	var lily := spawn(parent, "Lily", "bunny_girl", Vector3(-0.45, 0, -0.4), Vector3(1.6, 0, 8.4), "talk")
+	var jack := spawn(parent, "Jack", "dad", Vector3(-2.7, 0, 0.45), Vector3(-1.6, 0, 7.4), "talk")
+	var lily := spawn(parent, "Lily", "bunny_girl", Vector3(-0.45, 0, 0.2), Vector3(1.6, 0, 8.4), "talk")
 	_hold(lily, "candy_apple", "fore_r")
-	var dog := spawn(parent, "Biscuit", "beagle", Vector3(-1.75, 0, 0.6), Vector3(2.4, 0, 3.4), "idle")
-	var maya := spawn(parent, "Maya", "cat_girl", Vector3(1.85, 0, 0.15), Vector3(-1.6, 0, 10.4), "talk")
+	var dog := spawn(parent, "Biscuit", "beagle", Vector3(-1.75, 0, 1.2), Vector3(2.4, 0, 3.4), "idle")
+	var maya := spawn(parent, "Maya", "cat_girl", Vector3(1.75, 0, 0.75), Vector3(-1.6, 0, 10.4), "talk")
 	_hold(maya, "fox_plush", "torso")
 	# The standard game camera looks down ~35-40 deg at the heroes; a slight
 	# lean back (pivot at the feet) lifts the faces out from under the hats.
@@ -60,44 +63,59 @@ func build(parent: Node3D, stalls, stage) -> void:
 	jack.rotation.x = deg_to_rad(-5.0)
 	lily.rotation.x = deg_to_rad(-4.0)
 	# --- Stall keepers.
-	spawn(parent, "vendor", "npc_6", vendor_pos, jack.position, "talk")
+	spawn(parent, "vendor", "fest_vendor", vendor_pos, jack.position, "talk")
 	var g: Node3D = stalls.game
-	spawn(parent, "game_host", "npc_5", g.transform * Vector3(0.0, 0, -0.35), g.transform * Vector3(0, 0, 3.0), "wave")
+	spawn(parent, "game_host", "fest_striped_teen", g.transform * Vector3(0.0, 0, -0.35), g.transform * Vector3(0, 0, 3.0), "wave")
 	var cr: Node3D = stalls.crafts
-	spawn(parent, "crafter", "npc_6", cr.transform * Vector3(0.1, 0, -0.85), cr.transform * Vector3(0, 0, 3.0), "talk")
+	spawn(parent, "crafter", "fest_grandma", cr.transform * Vector3(0.1, 0, -0.85), cr.transform * Vector3(0, 0, 3.0), "talk")
 	# --- Guitarist on stage.
 	# Faces the camera (front-on, guitar across the body), lit by the stage wash.
-	var gt := spawn(parent, "guitarist", "npc_1", stage.performer_spot, Vector3(0.0, 0, 14.0), "stand_type")
+	var gt := spawn(parent, "guitarist", "fest_guitarist", stage.performer_spot, Vector3(0.0, 0, 14.0), "stand_type")
 	_hold(gt, "guitar", "torso")
 	# --- Townsfolk.
 	# Animated townsfolk spaced along the walkway and round the stalls (three
 	# depth bands; nobody stands on the open path between Lily and the fountain).
 	var folk := [
-		["npc_7", Vector3(-1.0, 0, -6.6), Vector3(-0.2, 0, 6.0), "walk"],
-		["npc_5", Vector3(-3.9, 0, -5.6), Vector3(-5.2, 0, -3.4), "talk"],
-		["npc_3", Vector3(5.9, 0, -5.0), Vector3(5.1, 0, -5.7), "talk"],
-		["npc_0", Vector3(5.1, 0, -5.7), Vector3(5.9, 0, -5.0), "idle"],
-		["npc_4", Vector3(0.9, 0, -9.0), Vector3(1.4, 0, 6.0), "walk"],
+		["fest_teal_bun", Vector3(-1.0, 0, -6.6), Vector3(-0.2, 0, 6.0), "walk", "cup"],
+		["fest_long_woman", Vector3(-3.9, 0, -5.6), Vector3(-5.2, 0, -3.4), "talk", ""],
+		["fest_grandpa", Vector3(5.9, 0, -5.0), Vector3(5.1, 0, -5.7), "talk", ""],
+		["fest_mustard_cardigan", Vector3(5.1, 0, -5.7), Vector3(5.9, 0, -5.0), "idle", "cup"],
+		["fest_kid_boy", Vector3(0.9, 0, -9.0), Vector3(1.4, 0, 6.0), "walk", "candy_apple"],
 		# r12: a chatting pair between the game booth and the stage crowd.
-		["npc_2", Vector3(2.85, 0, -4.75), Vector3(3.6, 0, -4.2), "talk"],
-		["npc_4", Vector3(3.55, 0, -4.3), Vector3(2.8, 0, -4.9), "talk"],
+		["fest_grandma", Vector3(2.85, 0, -4.75), Vector3(3.6, 0, -4.2), "talk", ""],
+		["fest_kid_girl", Vector3(3.55, 0, -4.3), Vector3(2.8, 0, -4.9), "talk", "candy_apple"],
 		# r13: more townsfolk on the open cobbles (fill the mid ground).
-		["npc_4", Vector3(0.45, 0, -2.75), Vector3(0.9, 0, -4.4), "wave"],
-		["npc_0", Vector3(-5.75, 0, -0.55), Vector3(-4.3, 0, -2.0), "talk"],
-		["npc_7", Vector3(-2.2, 0, -3.4), Vector3(-2.6, 0, -6.0), "walk"],
-		["npc_1", Vector3(5.7, 0, -2.0), Vector3(4.6, 0, -1.2), "talk"],
+		["fest_kid_boy", Vector3(0.45, 0, -2.75), Vector3(0.9, 0, -4.4), "wave", ""],
+		["fest_long_woman", Vector3(-5.75, 0, -0.55), Vector3(-4.3, 0, -2.0), "talk", "cup"],
+		["fest_striped_teen", Vector3(-2.2, 0, -3.4), Vector3(-2.6, 0, -6.0), "walk", ""],
+		["fest_blue_plaid", Vector3(5.7, 0, -2.0), Vector3(4.6, 0, -1.2), "talk", "cup"],
+		# r14: the open cobbles behind the family read empty once the
+		# heroes moved forward: a girl with a candy apple + her dad.
+		["fest_kid_girl", Vector3(-1.75, 0, -1.2), Vector3(0.3, 0, -1.6), "talk", "candy_apple"],
+		["fest_plaid_green", Vector3(0.45, 0, -1.65), Vector3(-1.35, 0, -1.95), "talk", "cup"],
 	]
 	_far_folk(parent, stage.node.transform)
 	var i := 1
 	for f: Array in folk:
 		var key := "neighbor_%d" % i
-		spawn(parent, key, f[0], K.dv(f[1]), K.dv(f[2]), f[3])
+		# r14: every villager turns about 3/4 towards the game camera so
+		# faces read (pairs still angle towards each other).
+		var pos := K.dv(f[1])
+		var to := K.dv(f[2])
+		var d := (to - pos)
+		d.y = 0.0
+		var dc := CAM_POS - pos
+		dc.y = 0.0
+		var dir := d.normalized() * 0.55 + dc.normalized() * 0.75 if f[3] != "walk" else d.normalized() * 0.4 + dc.normalized() * 0.6
+		var na := spawn(parent, key, f[0], pos, pos + dir * 3.0, f[3])
+		if f[4] != "":
+			_hold(na, f[4], "fore_r")
 		npc_keys.append(key)
 		i += 1
 	# Seated at the picnic table (bench tops at 0.5 m).
 	var seated := [
 		# r13: a couple on the bench by the fountain.
-		["npc_5", Vector3(-5.05, 0, -4.32), Vector3(-5.05, 0, 2.0)],
+		["fest_plaid_green", Vector3(-5.05, 0, -4.32), Vector3(-5.05, 0, 2.0)],
 	]
 	for s: Array in seated:
 		var key := "neighbor_%d" % i
@@ -119,7 +137,12 @@ func _far_folk(parent: Node3D, stage_xf: Transform3D) -> void:
 	for p in [[-1.1, 2.2, 0], [-0.2, 2.5, 10], [0.6, 2.3, -8], [1.7, 2.1, 15],
 			[-1.1, 3.3, 25], [0.2, 3.5, 0], [1.3, 3.2, -30], [2.4, 3.0, 60]]:
 		var w: Vector3 = stage_xf.origin + sb * Vector3(p[0], 0, p[1])
-		F.add(w.x, w.z, 180.0 + sy + p[2], seed % 4 == 0, seed)
+		# r14: most of the audience stands side-on (chatting, turned to
+		# the stage) so the camera sees faces, not a row of hair blocks.
+		var ay: float = 180.0 + sy + p[2]
+		if seed % 3 != 0:
+			ay = 90.0 if p[0] < 0.4 else 270.0
+		F.add(w.x, w.z, ay, seed % 4 == 0, seed)
 		seed += 1
 	# Around the fountain (0.2, -9.6) and across the back of the square.
 	for p in [[-4.9, -9.0, 60], [0.2, -9.6, 300], [-3.4, -11.2, 20], [2.0, -12.4, 90],
@@ -129,29 +152,37 @@ func _far_folk(parent: Node3D, stage_xf: Transform3D) -> void:
 		# r13: nobody past z -9.4 (they would stand at the foot of the
 		# forced-perspective town hall and dwarf it, or hide behind it).
 		if K.dz(p[1]) > -9.4 and not _on_stage(stage_xf, p[0], K.dz(p[1])):
-			F.add(p[0], K.dz(p[1]), p[2], seed % 5 == 0, seed)
+			F.add(p[0], K.dz(p[1]), _front(p[2]), seed % 5 == 0, seed)
 		seed += 1
 	# Mid ground: browsing the side stalls, queueing at the game booth,
 	# chatting in pairs at the edges of the walkway.
 	for p in [[-6.4, -5.6, 90, false], [-7.0, -7.4, 0, false], [-6.7, -6.6, 270, true],
 			[7.2, -4.0, 270, false],
-			[9.4, -6.0, 300, false], [9.8, -9.6, 270, false],
 			[-0.6, -7.4, 135, true], [6.3, -8.4, 200, false], [7.0, -9.0, 30, true],
 			# Round 9 (wider camera): a scattered, smaller crowd filling the
 			# open cobbles between the heroes, fountain, game booth and stage.
-			[8.2, -4.0, 200, false], [9.0, -4.6, 120, false],
+			[8.2, -4.0, 200, false],
 			[4.4, -6.4, 0, false],
 			[0.2, -13.6, 180, false],
-			[-4.6, -11.6, 220, false], [10.4, -8.0, 300, true],
+			[-4.6, -11.6, 220, false],
 			# r13: visible gaps of the standard camera: fountain rim, behind
 			# the game booth, right of the crafts table, left walkway.
 			[-1.0, -5.75, 0, false], [-3.6, -5.6, 90, true], [1.7, -6.1, 0, false],
-			[6.4, -1.0, 270, false], [6.6, -3.6, 180, true], [-3.0, -7.9, 0, false],
+			[6.4, -1.0, 0, false], [6.6, -3.6, 180, true], [-3.0, -7.9, 0, false],
 			[-6.5, -2.4, 90, false], [-7.4, -1.2, 0, true]]:
 		if K.dz(p[1]) > -9.4 and not _on_stage(stage_xf, p[0], K.dz(p[1])):
-			F.add(p[0], K.dz(p[1]), p[2], p[3], seed)
+			F.add(p[0], K.dz(p[1]), _front(p[2]), p[3], seed)
 		seed += 1
-	F.build(parent, U * 1.0)
+	F.build(parent, U * 1.1)
+
+
+## Never show the camera a back: a figure snapped to face -Z (away) turns
+## sideways instead, alternating left / right.
+func _front(yaw: float) -> float:
+	var q := posmod(roundi(yaw / 90.0), 4)
+	if q == 2:
+		return 90.0 if posmod(roundi(yaw), 2) == 0 else 270.0
+	return yaw
 
 
 ## True when (x, z) falls on the stage footprint (plus a small margin).
@@ -186,6 +217,8 @@ func _hold(a: SimActor, prop: String, bone: String) -> void:
 	var meta: Dictionary = a._meta
 	var hand: float = -float(meta.get("fore_len", 0.22)) + 0.02
 	match prop:
+		"cup":
+			mi.position = Vector3(0.0, hand - 0.02, 0.05)
 		"candy_apple":
 			# Held up beside the face (not in front of the mouth).
 			mi.position = Vector3(0.03, hand - 0.03, 0.05)
@@ -214,6 +247,11 @@ func _prop_mesh(prop: String) -> ArrayMesh:
 			vb.set_v(Vector3i(-1, 5, 1), Color("ff6a6a"))
 			vb.set_v(Vector3i(0, 6, 0), Color("6a3a1a"))
 			origin = Vector3(0.5, 0, 0.5)
+		"cup":
+			K.box(vb, -1, 0, -1, 3, 4, 3, Color("f4ecdc"))
+			K.box(vb, -1, 1, -1, 3, 1, 3, Color("c8642a"))
+			K.box(vb, 0, 4, 0, 1, 1, 1, Color("7a4a2a"))
+			origin = Vector3(0.5, 1.5, 0.5)
 		"fox_plush":
 			var o := Color("ec7a26")
 			var od := Color("c85e1a")

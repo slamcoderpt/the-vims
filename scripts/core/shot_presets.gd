@@ -7,7 +7,7 @@ const PRESETS := {
 	"home_day": {
 		"ref": "refs/ref1_home_office_day.png",
 		"location": "home", "day": 1, "hour": 14, "minute": 16, "season": 1,
-		"camera": {"target": Vector3(-5.0, 3.6, -1.9), "yaw": 20.0, "pitch": 35.0, "distance": 8.6, "fov": 40.0},
+		"camera": {"target": Vector3(-4.9, 3.25, -1.3), "yaw": 24.0, "pitch": 37.0, "distance": 9.9, "fov": 40.0},
 		"tasks": [
 			{"title": "Answer Emails", "icon": "laptop", "done": true},
 			{"title": "Practice Creativity", "icon": "palette"},
@@ -59,7 +59,7 @@ const PRESETS := {
 	"market": {
 		"ref": "refs/ref5_grocery_market.png",
 		"location": "market", "day": 0, "hour": 8, "minute": 24, "season": 1,
-		"camera": {"target": Vector3(0.3, 0.6, -1.7), "yaw": 15.0, "pitch": 35.0, "distance": 12.5, "fov": 40.0},
+		"camera": {"target": Vector3(0.2, 0.6, -1.8), "yaw": 15.0, "pitch": 35.0, "distance": 12.0, "fov": 40.0},
 		"tasks": [
 			{"title": "Buy Groceries", "icon": "cart", "done": true},
 			{"title": "Meet a Neighbor", "icon": "people"},

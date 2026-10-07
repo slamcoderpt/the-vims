@@ -390,7 +390,7 @@ func _props(parent: Node3D) -> void:
 	K.pumpkin(near, int(-5.3 * C), 0, int(2.0 * C), 3.6, 22, 1)
 	K.pumpkin(near, int(-4.7 * C), 0, int(2.5 * C), 2.6, 23, 2)
 	_ground_lantern(near, int(-6.3 * C), int(1.6 * C))
-	_ground_lantern(near, int(1.45 * C), int(1.75 * C))
+	_ground_lantern(near, int(1.2 * C), int(2.45 * C))
 	# A bench by the fountain + mums along the walkway edges.
 	_bench(near, int(-5.6 * C), int(-4.6 * C))
 	_barrel_planter(near, int(0.9 * C), int(-2.2 * C), 5.0, 0, 41)
@@ -429,7 +429,13 @@ func _foreground(parent: Node3D) -> void:
 	# Bottom-right: mums and pumpkins between Maya and the HANDMADE board.
 	K.mums(vb, 2.55 * C, 0, 1.35 * C, 3.4, 0, 45)
 	K.pumpkin(vb, int(2.1 * C), 0, int(1.5 * C), 2.0, 7, 2)
-	K.inst(parent, vb, FV, Vector3.ZERO, 0.0, true, Vector3.ZERO, "Foreground")
+	# r14: fill the bare bottom band (ref2: mums, pumpkins and lanterns run
+	# right along the lower edge, softened by the tilt-shift).
+	K.mums(vb, 1.0 * C, 0, 2.1 * C, 3.4, 2, 60)
+	K.mums(vb, 3.7 * C, 0, 1.7 * C, 4.0, 1, 61)
+	K.pumpkin(vb, int(-0.4 * C), 0, int(2.3 * C), 2.2, 13, 1)
+	K.pumpkin(vb, int(2.9 * C), 0, int(2.2 * C), 2.6, 14, 0)
+	K.inst(parent, vb, FV, Vector3(0, 0, 0.7), 0.0, true, Vector3.ZERO, "Foreground")  # r14: heroes moved 0.6 m forward
 
 
 func _apple_pile(vb: VoxelBuilder, x: int, y: int, z: int) -> void:

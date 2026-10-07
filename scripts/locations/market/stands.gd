@@ -224,7 +224,9 @@ static func _fridges(root: Node3D, halo_pts: Array) -> void:
 	# Soft cool bloom along the lit header strips and inside the cases.
 	for i in 16:
 		var hx := -4.0 + i * 0.75
-		halo_pts.append([Vector3(hx, 2.42, -7.9), 0.9, Color(0.45, 0.6, 0.85, 1.0)])
+		halo_pts.append([Vector3(hx, 2.42, -7.9), 1.0, Color(0.5, 0.66, 0.9, 1.0)])
+		# faint cool haze over the lit shelves (glass glow), goods stay readable
+		halo_pts.append([Vector3(hx, 1.3, -7.85), 1.3, Color(0.2, 0.27, 0.38, 1.0)])
 	Interactable.attach(root, "Dairy Fridge", [
 		_act("buy", "Buy Milk", "milk", 2.0, {"money": -2, "item": "Milk"}),
 		_act("compare", "Compare", "scale", 3.0),
@@ -473,6 +475,8 @@ static func _foreground(root: Node3D) -> void:
 	# stacked boxed goods (bottom centre, soft in the tilt-shift band).
 	Floor.flowers(vb, Vector3(1.75, 0, 2.45), 0)
 	Floor.pallet(vb, Vector3(0.2, 0, 3.0), 3)
+	# mid-store promo pallet between the snack end caps and the checkout
+	Floor.pallet(vb, Vector3(3.45, 0, -1.75), 1)
 	Kit.add(root, vb, P, "Foreground", false, null, Vector3.ZERO, Vector3.ZERO, false)
 
 

@@ -340,7 +340,10 @@ static func fridge(width: int, seed: int, stocked := true, dairy := true) -> Vox
 	# cavity
 	vb.clear_box(Vector3i(1, 3, 2), Vector3i(width - 2, CT - 3, D - 2))
 	# glowing back + glowing ceiling strip inside
-	vb.box(Vector3i(1, 3, 1), Vector3i(width - 2, CT - 3, 1), Color("a9d2f5"), true)
+	vb.box(Vector3i(1, 3, 1), Vector3i(width - 2, CT - 3, 1), Color("d6ecff"), true)
+	# lit side walls of the cavity (cool white light boxes)
+	vb.box(Vector3i(1, 3, 2), Vector3i(1, CT - 3, D - 4), Color("c4e2fb"), true)
+	vb.box(Vector3i(width - 2, 3, 2), Vector3i(1, CT - 3, D - 4), Color("c4e2fb"), true)
 	vb.box(Vector3i(1, CT - 1, 2), Vector3i(width - 2, 1, D - 3), Color("f4fbff"), true)
 	# top header light box + brand stripe
 	vb.box(Vector3i(0, CT, D - 1), Vector3i(width, 3, 1), Color("f4fbff"), true)
@@ -353,7 +356,7 @@ static func fridge(width: int, seed: int, stocked := true, dairy := true) -> Vox
 	for si in shelves.size():
 		var y: int = shelves[si]
 		var top: int = (shelves[si + 1] if si + 1 < shelves.size() else CT - 1) - y - 1
-		vb.box(Vector3i(1, y, 2), Vector3i(width - 2, 1, D - 3), Color("aab5bf"))
+		vb.box(Vector3i(1, y, 2), Vector3i(width - 2, 1, D - 3), Color("cfe3f2"), true)
 		vb.box(Vector3i(1, y, D - 2), Vector3i(width - 2, 1, 1), Color("f2f4f6"))
 		if not stocked:
 			# hidden behind the aisles: flat coloured rows (cheap)

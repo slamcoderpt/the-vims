@@ -68,6 +68,7 @@ const SEATS := {
 	"near_l": Vector3(-20, 16, PI),
 	"near_m": Vector3(0, 16, PI),
 	"near_r": Vector3(20, 16, PI),
+	"end_r": Vector3(47, 1, -PI * 0.5),
 }
 ## Seats with a thick booster cushion so seated kids sit up above the table
 ## edge (their faces would otherwise drop behind the food). Seat top in m.
@@ -134,7 +135,7 @@ func build(parent: Node3D) -> void:
 	# Candle-warm key on the far-side diners' faces (from the camera side of
 	# the table, above head height so it reads as the candle/string glow).
 	for fx in [-1.3, 1.3]:
-		V.omni(root, tb * Vector3(fx, 1.45, 0.75), Color(1.0, 0.76, 0.5), 0.75, 2.4)
+		V.omni(root, tb * Vector3(fx, 1.45, 0.75), Color(1.0, 0.8, 0.6), 1.1, 2.6)
 	V.omni(root, GRILL_POS + Vector3(0.5, 2.0, 1.3), Color(1.0, 0.74, 0.46), 0.85, 3.6)
 	V.omni(root, Vector3(-1.0, 2.6, -1.0), Color(1.0, 0.78, 0.5), 1.1, 6.5)
 	V.omni(root, Vector3(3.6, 2.6, 0.2), Color(1.0, 0.78, 0.5), 0.9, 6.0)
@@ -212,6 +213,14 @@ func _table() -> void:
 		var s: Vector3 = SEATS[key]
 		var px := int(s.x)
 		var pz := -D + 4 if s.y < 0 else D - 5
+		if absf(s.x) > TL:
+			# Head of the table: setting at the end, glass to its right.
+			px = L - 5 if s.x > 0 else -L + 4
+			pz = int(s.y)
+			_plate(vb, px, y, pz, foods[fi % foods.size()])
+			fi += 1
+			_glass(vb, px - 1, y, pz + 5)
+			continue
 		_plate(vb, px, y, pz, foods[fi % foods.size()])
 		fi += 1
 		_glass(vb, px + 5, y, pz + (-1 if s.y < 0 else 1))
@@ -356,6 +365,8 @@ func _chair(vb: VoxelBuilder, cx: int, cz: int, key: String) -> void:
 		V.b(vb, x0 + 1, 7, z0 + 1, 6, 2, 6, func(q: Vector3i) -> Color:
 			return V.shade(cc, 0.92 + V.h1(q, 4) * 0.12) if q.y < 8 else V.shade(cc, 1.08))
 	var back_axis_x := key.begins_with("end")
+	if back_axis_x:
+		x0 = cx - 3
 	var top := 15
 	if back_axis_x:
 		var bx := x0 if key == "end_l" else x0 + 7

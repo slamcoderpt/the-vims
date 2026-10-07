@@ -51,7 +51,7 @@ const CAP := Color("2e3450")
 const FOUND := Color("8c8378")
 const W_OFFICE := Color("f1dcc3")
 const W_PINK := Color("f2bfcc")
-const W_BLUE := Color("8399d8")
+const W_BLUE := Color("6680d0")
 const W_HALL := Color("efe1c6")
 const W_LIVING := Color("e9dcc2")
 const W_KITCHEN := Color("dfe8d6")
@@ -121,14 +121,14 @@ func camera_home() -> Dictionary:
 
 func lighting_profile() -> Dictionary:
 	return {
-		"sun_heading": 205.0, "sun_elev": 34.0, "sun_energy": 1.75,
+		"sun_heading": 205.0, "sun_elev": 34.0, "sun_energy": 1.55,
 		"sun_color_day": Color(1.0, 0.83, 0.6),
-		"ambient_day": Color(0.9, 0.86, 0.82), "ambient_energy": 0.52,
+		"ambient_day": Color(0.92, 0.86, 0.8), "ambient_energy": 0.6,
 		"ambient_night": Color(0.66, 0.54, 0.52), "ambient_night_energy": 0.34, "lamp_night_mult": 3.8,
 		"sky_day": Color(0.64, 0.8, 0.94), "sky_night": Color(0.07, 0.09, 0.22),
 		"fog_day": Color(0.94, 0.88, 0.8), "fog_night": Color(0.12, 0.15, 0.32), "fog_density": 0.004,
 		"moon_heading": 150.0, "moon_energy": 0.45, "glow_boost_night": 1.2,
-		"shadow_distance": 40.0,
+		"shadow_distance": 40.0, "shadow_blur": 3.2,
 		"post_day": {"focus_y": 0.5, "band": 0.35, "falloff": 0.18, "blur_px": 4.0, "top_boost": 1.0,
 			"saturation": 1.14, "contrast": 1.1, "tint": Vector3(1.02, 1.0, 0.955),
 			"vignette": 0.24},
@@ -413,7 +413,11 @@ func _wall_col(room: String) -> Variant:
 				return W_PINK if posmod(q.x + q.z + q.y, 6) != 0 else Color("f9dbe2")
 		"blue":
 			return func(q: Vector3i) -> Color:
-				return Color("f3e7b0") if VoxelBuilder.hash3(q) > 0.985 else W_BLUE
+				# Star wallpaper: sparse little yellow stars on deep blue (ref3).
+				var hb := VoxelBuilder.hash3(q)
+				if hb > 0.975:
+					return Color("f6df8a")
+				return W_BLUE if hb > 0.25 else W_BLUE.darkened(0.06)
 		"hall": return W_HALL
 		"bath":
 			return func(q: Vector3i) -> Color:
@@ -762,19 +766,25 @@ func _workstation(at: Vector3, deg: float) -> Dictionary:
 	wf.jitter = 0.03
 	var wm := VoxelBuilder.new()
 	wm.jitter = 0.025
-	PropLib.place(wf, "desk", Vector3i.ZERO, 1)          # 12 x 28 cells (0.84 x 1.96 m)
+	PropLib.place(wf, "desk", Vector3i.ZERO, 1, 2)       # 12 x 36 cells (0.84 x 2.52 m)
 	var top := 24                                           # desk top in MU cells
-	PropLib.place(wm, "keyboard_hd", Vector3i(13, top, 14), 1)
-	PropLib.place(wm, "laptop_hd", Vector3i(7, top, 41), 1)
-	PropLib.place(wm, "mug_hd", Vector3i(18, top, 50), 0, 1)
-	PropLib.place(wm, "pencil_cup_hd", Vector3i(3, top, 2))
-	PropLib.place(wm, "desk_plant_hd", Vector3i(9, top, 1), 0, 0)
-	PropLib.place(wm, "sticky_stack_hd", Vector3i(16, top, 4), 1)
-	PropLib.place(wf, "desk_lamp", Vector3i(1, 12, 1), 1)
+	# Far end: printer, pen cup, plant; middle: keyboard under the two
+	# monitors; near end: laptop, mug, sticky notes, a little plant (ref1).
+	PropLib.place(wm, "printer_hd", Vector3i(2, top, 1), 1)
+	PropLib.place(wm, "pencil_cup_hd", Vector3i(16, top, 3))
+	PropLib.place(wm, "sticky_stack_hd", Vector3i(15, top, 10), 1)
+	PropLib.place(wm, "keyboard_hd", Vector3i(13, top, 30), 1)
+	PropLib.place(wm, "mug_hd", Vector3i(17, top, 24), 0, 2)
+	PropLib.place(wm, "laptop_hd", Vector3i(7, top, 52), 1)
+	PropLib.place(wm, "mug_hd", Vector3i(18, top, 64), 0, 1)
+	PropLib.place(wm, "desk_plant_hd", Vector3i(3, top, 66), 0, 1)
+	PropLib.place(wm, "pencil_cup_hd", Vector3i(5, top, 47))
+	PropLib.place(wf, "book_stack", Vector3i(1, 12, 11), 1, 1)
+	PropLib.place(wf, "desk_lamp", Vector3i(1, 12, 8), 1)
 	var cs := PropLib.rotated_size("office_chair_hd", 3, 1)
-	var chair_c := Vector3(0.84 + 0.34, 0, 0.98 + 0.12)          # local metres (desk min corner = 0)
+	var chair_c := Vector3(0.84 + 0.34, 0, 1.36)          # local metres (desk min corner = 0)
 	PropLib.place(wm, "office_chair_hd", Vector3i(roundi(chair_c.x / MU) - cs.x / 2, 0, roundi(chair_c.z / MU) - cs.z / 2), 3, 1)
-	var ctr := Vector3(0.42, 0, 0.98)
+	var ctr := Vector3(0.42, 0, 1.26)
 	var node := Node3D.new()
 	node.name = "Workstation"
 	node.position = at
@@ -792,16 +802,16 @@ func _workstation(at: Vector3, deg: float) -> Dictionary:
 	# camera) like a real two-screen setup.
 	for k in 2:
 		var mon := PropLib.instance("monitor_hd", k)
-		mon.position = Vector3(0.22, top * MU, [0.55, 1.28][k]) - ctr
+		mon.position = Vector3(0.22, top * MU, [0.82, 1.55][k]) - ctr
 		mon.rotation.y = deg_to_rad(90.0 - [52.0, 30.0][k])
 		# A touch larger than life (ref1's two big bright screens read at phone size).
 		mon.scale = Vector3.ONE * 1.3
 		node.add_child(mon)
 	var xf := node.transform
 	var seat := xf * (chair_c - ctr)
-	var look := xf * (Vector3(0.1, 0, 0.98) - ctr)
-	var lamp := xf * (Vector3(0.45, 1.25, 0.15) - ctr)
-	var dbox := AABB(at - Vector3(0.9, 0, 0.9), Vector3(1.8, 1.3, 1.8))
+	var look := xf * (Vector3(0.1, 0, 1.3) - ctr)
+	var lamp := xf * (Vector3(0.45, 1.25, 0.6) - ctr)
+	var dbox := AABB(at - Vector3(1.0, 0, 1.0), Vector3(2.0, 1.3, 2.0))
 	var cbox := AABB(seat - Vector3(0.32, 0, 0.32), Vector3(0.64, 1.0, 0.64))
 	return {"desk": dbox, "chair": cbox, "seat": seat, "look": look, "lamp": lamp}
 
@@ -829,7 +839,7 @@ func _build_office() -> void:
 	_wallput(R, "poster", "-x", fx, -1.8, y + 1.5, 4)
 	_lamp(Vector3(fx + 1.6, y + 1.7, -2.2), 0.6, 2.6, 0.35, Color(0.75, 0.85, 1.0), 0.0)
 	var fcab := _put(R, "filing_cabinet", Vector3(fx, y, -1.25), 1, 1)
-	_putm(R, "printer_hd", Vector3(fx + 0.02, fcab.end.y, fcab.position.z - 0.05), 1)
+	_put(R, "plant", Vector3(fx + 0.05, fcab.end.y, fcab.position.z + 0.02), 0, 6)
 	_put(R, "book_stack", Vector3(fx + 0.06, fcab.end.y, fcab.end.z - 0.02), 1, 2)
 	# Reading corner by the railing: beanbag, floor lamp, a leafy plant.
 	_putm(R, "plant", Vector3(fx + 0.1, y, 0.0), 0, 5)
@@ -842,6 +852,7 @@ func _build_office() -> void:
 	var bs2 := _wallput(R, "bookshelf", "-z", bz, bs1.end.x + 0.02, y, 0)
 	_put(R, "trophy", Vector3(bs1.position.x + 0.2, y + 30 * PU, bz + 0.12))
 	_put(R, "plant", Vector3(bs2.end.x - 0.5, y + 30 * PU, bz + 0.04), 0, 2)
+	_put(R, "globe", Vector3(bs2.position.x + 0.15, y + 30 * PU, bz + 0.08))
 	_put(R, "ivy", Vector3(bs2.end.x - 0.4, y + 2.4, bz + 0.03), 0, 1)
 	_put(R, "plant", Vector3(fx + 0.06, y, -4.2), 0, 1)
 	_lamp(Vector3(bs2.get_center().x, y + 2.3, bz + 0.9), 0.7, 3.0, 0.4)
@@ -870,10 +881,11 @@ func _build_office() -> void:
 	_lamp(Vector3(-3.2, y + 1.25, -2.6), 0.45, 2.4, 0.6, Color(1.0, 0.7, 0.4), 0.45)
 	_sconce(R, "-z", bz, -6.32, y + 1.95, 0.8, 1)
 	# --- Music corner: keyboard piano under the second window, guitar beside it.
-	var piano := _putc(R, "piano", -2.6, y, bz + 0.4, 0)
-	var bench := _putc(R, "piano_bench", -2.6, y, -3.55, 0)
-	var guitar := _put(R, "guitar", Vector3(-4.12, y, bz + 0.1), 0)
-	_put(R, "plant", Vector3(-1.62, y, bz + 0.05), 0, 1)
+	var piano := _putc(R, "piano", -2.32, y, bz + 0.4, 0)
+	var bench := _putc(R, "piano_bench", -2.32, y, -3.55, 0)
+	# Guitar on its stand between the easel and the keyboard (ref1).
+	var guitar := _put(R, "guitar", Vector3(-3.72, y, bz + 0.1), 0)
+	_put(R, "plant", Vector3(-1.55, y, bz + 0.05), 0, 1)
 	_wallput(R, "frame", "+x", rx, -4.3, y + 1.75, 3)
 	_lamp(Vector3(-2.6, y + 2.2, bz + 0.6), 0.8, 3.0, 0.45)
 	# --- Divider wall, office side (only standing in the "office_in" view):
@@ -926,6 +938,10 @@ func _build_office() -> void:
 	_put(R, "plant", Vector3(-1.6, y, 3.3), 0, 1)
 	_put(R, "plant", Vector3(-4.3, y, 4.1), 0, 4)
 	_put(R, "toy_blocks", Vector3(-2.75, y, 3.85), 0, 0)
+	# Beanbag + pouf by the railing corner so the foreground floor is lived-in.
+	_put(R, "beanbag", Vector3(-3.95, y, 1.25), 2, 2)
+	_put(R, "pouf", Vector3(-2.95, y, 1.55), 0, 1)
+	_put(R, "book_stack", Vector3(-2.9, y + 5 * PU, 1.62), 0, 0)
 	# --- Balcony railing over the living room, with trailing planters on it.
 	PropLib.railing(_g(R), Vector3i(fc(-8.75), fc(y), fc(1.5) - 2), fc(4.25) + 2, 0, 16)
 	PropLib.railing(_g(R), Vector3i(fc(-4.5), fc(y), fc(1.5) - 2), fc(3.25) + 2, 2, 16)
@@ -1093,6 +1109,11 @@ func _build_pink() -> void:
 	_use(lsh, "Bookcase", [_act("read_book", "Read a Book", "book", 30, {"fun": 0.1}, {"pose": "sit_read", "who": ["child"]})])
 
 
+## Blue room lamps burn a softer, whiter warm so the deep blue star walls
+## stay blue at night instead of greying under amber light (ref3).
+const BLUE_LAMP := Color(1.0, 0.86, 0.74)
+
+
 func _build_blue() -> void:
 	var R := "blue"
 	var y := UF
@@ -1107,7 +1128,7 @@ func _build_blue() -> void:
 	var bed := _put(R, "bed", Vector3(ns.end.x + 0.08, y, bz + 0.02), 0, 1)
 	_put(R, "rocket_lamp", Vector3(ns.position.x + 0.06, y + 10 * PU, bz + 0.15), 0)
 	_put(R, "lamp_table", Vector3(ns.position.x + 0.3, y + 10 * PU, bz + 0.1), 0, 2)
-	_lamp(Vector3(ns.get_center().x + 0.1, y + 1.25, bz + 0.6), 1.7, 3.6, 0.2, Color(1.0, 0.72, 0.44))
+	_lamp(Vector3(ns.get_center().x + 0.1, y + 1.25, bz + 0.6), 1.7, 3.6, 0.2, BLUE_LAMP)
 	_put(R, "plush", Vector3(bed.position.x + 0.25, y + 10 * PU, bz + 0.35), 0, 1)
 	_wallput(R, "poster", "-z", bz, lx + 0.02, y + 1.15, 1)
 	_wallput(R, "poster", "-z", bz, bed.position.x + 0.1, y + 1.55, 2)
@@ -1124,7 +1145,7 @@ func _build_blue() -> void:
 	_put(R, "globe", Vector3(rx - 0.45, y + 10 * PU, -2.85))
 	_put(R, "book_stack", Vector3(rx - 0.55, y + 10 * PU, -2.25), 1, 2)
 	_put(R, "lamp_table", Vector3(rx - 0.5, y + 10 * PU, -2.0), 0, 2)
-	_lamp(Vector3(rx - 0.6, y + 1.35, -1.85), 1.1, 3.0, 0.2)
+	_lamp(Vector3(rx - 0.6, y + 1.35, -1.85), 1.1, 3.0, 0.2, BLUE_LAMP)
 	_put(R, "chair", Vector3(desk.position.x - 0.6, y, -2.75), 1, 3)
 	_wallput(R + "@bed", "shelf_unit", "+x", rx, -3.0, y + 1.5, 1)
 	_sconce(R + "@bed", "+x", rx, -1.0, y + 1.7, 1.5)
@@ -1140,7 +1161,7 @@ func _build_blue() -> void:
 	_put(R, "beanbag", Vector3(6.6, y, -1.05), 2, 1)
 	_put(R, "plant", Vector3(rx - 0.6, y, -0.65), 0, 1)
 	_put(R, "plant", Vector3(lx + 0.1, y, -0.6), 0, 4)
-	_lamp(Vector3(6.2, y + 2.5, -2.2), 1.3, 4.4, 0.0, Color(1.0, 0.74, 0.46), 0.0)
+	_lamp(Vector3(6.2, y + 2.5, -2.2), 1.3, 4.4, 0.0, BLUE_LAMP, 0.0)
 	_use(bed, "Star Bed", [
 		_act("sleep", "Sleep", "bed", 480, {"energy": 1.0}, {"pose": "sleep", "task": "Go to Sleep"}),
 		_act("story", "Read Story", "book_open", 20, {"social": 0.2}, {"pose": "sit_read", "who": ["adult"]}),
@@ -1344,7 +1365,7 @@ func _build_exterior() -> void:
 	var o := VoxelBuilder.new()
 	var trees := [
 		Vector3(-8.5, 0, -8.0), Vector3(-3.5, 0, -7.6), Vector3(1.5, 0, -8.2), Vector3(6.5, 0, -7.7),
-		Vector3(-13.5, 0, -2.0), Vector3(-13.0, 0, 5.5), Vector3(12.6, 0, 6.6), Vector3(11.6, 0, 1.6),
+		Vector3(-13.5, 0, -2.0), Vector3(-13.0, 0, 5.5), Vector3(17.0, 0, 4.0), Vector3(12.2, 0, 3.75),
 		Vector3(-18.5, 0, -17.0), Vector3(-6.5, 0, -16.8), Vector3(5.5, 0, -17.2), Vector3(17.0, 0, -16.6),
 		Vector3(-24.0, 0, -6.0), Vector3(22.0, 0, -8.0), 
 		Vector3(-12.0, 0, 9.5), Vector3(11.6, 0, 11.0), Vector3(-6.0, 0, 11.5), Vector3(7.5, 0, 12.0),
@@ -1389,7 +1410,7 @@ func _build_exterior() -> void:
 		var gp := Vector3(10.15, 0, -1.2 + k * 3.4)
 		PropLib.place(_g("ext"), "lantern", Vector3i(fc(gp.x), 0, fc(gp.z)), 0)
 		_halo_pts.append({"pos": gp + Vector3(0.16, 0.25, 0.16), "size": 1.3, "color": STREET_HALO})
-	for lp: Vector3 in [Vector3(-1.2, 0, -7.4), Vector3(4.6, 0, -7.4), Vector3(11.4, 0, -4.2), Vector3(11.4, 0, 2.0), Vector3(11.4, 0, 8.2)]:
+	for lp: Vector3 in [Vector3(-1.2, 0, -7.4), Vector3(4.6, 0, -7.4), Vector3(10.4, 0, -4.6), Vector3(10.5, 0, 0.6), Vector3(10.5, 0, 8.0)]:
 		PropLib.place(o, "street_lamp", Vector3i(cc(lp.x), 0, cc(lp.z)), 0, 1)
 		_halo_pts.append({"pos": lp + lh, "size": 2.6, "color": STREET_HALO})
 	var bushes := [Vector3(-9.8, 0, -3.0), Vector3(-9.8, 0, 1.0), Vector3(9.4, 0, -3.5), Vector3(9.4, 0, 0.5),
@@ -1531,7 +1552,7 @@ func _ensure_neighbourhood(lit: bool) -> void:
 			Vector3(10.6, 0, -7.4),
 			# Houses across the side lawn on the right, lit fronts turned to
 			# the house (ref3's right edge: homes, trees and lamps).
-			Vector3(11.6, 0, -2.6), Vector3(11.8, 0, 5.2)]
+			Vector3(9.6, 0, -3.4), Vector3(9.8, 0, 4.4)]
 		var styles := [1, 4, 2, 0, 5, 3, 2, 5, 3, 0, 4, 1, 2, 4, 1, 3]
 		var rots := [0, 0, 0, 0, 0, 0, 1, 3, 0, 0, 0, 0, 0, 0, 3, 3]
 		# Neighbour houses drawn a little smaller than authored (0.2 m cells):
@@ -1927,7 +1948,7 @@ func _stage(preset: String) -> void:
 		var st: AABB = _spots["step"]
 		var maya := _place("cat_girl", Vector3(st.get_center().x, y + 6 * PU, st.get_center().z), Vector3(st.get_center().x - 0.6, y, st.get_center().z + 1.3), "brush_teeth")
 		var cu: AABB = _spots["dog_cushion"]
-		var dog := _place("beagle", Vector3(cu.get_center().x, y + 3 * PU, cu.get_center().z), Vector3(cu.get_center().x + 1.0, y, cu.get_center().z + 1.2), "sleep")
+		var dog := _place("beagle", Vector3(cu.get_center().x, y + 3 * PU, cu.get_center().z), Vector3(cu.get_center().x + 0.45, y, cu.get_center().z + 1.2), "sleep")
 		Game.show_bubble(jack, {"text": "Read Story", "icon": "book_open", "kind": "action", "id": "action", "progress": -1})
 		Game.show_bubble(maya, {"text": "Brush Teeth", "icon": "brush", "kind": "action", "id": "action", "progress": -1})
 		Game.show_bubble(dog, {"icon": "zzz", "kind": "emote", "id": "action"})

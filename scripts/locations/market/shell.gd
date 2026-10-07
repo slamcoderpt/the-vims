@@ -13,8 +13,8 @@ const Z0 := -8.75
 const ZF := 6.6
 const H := 5.0
 
-const WALL := Color("dcc29a")
-const PLASTER := Color("efe4cd")
+const WALL := Color("ead9bb")
+const PLASTER := Color("f6f1e6")
 const WAINSCOT := Color("a87449")
 const CEIL := Color("c9a77c")
 const BEAM := Color("7a5232")
@@ -164,23 +164,23 @@ static func _ceiling(root: Node3D, halo_pts: Array) -> void:
 			var cord := int((H - 0.25 - p.y) / U) - 7
 			Fx.pendant(lamps, Vector3i(int(round(p.x / U)), int(round(p.y / U)), int(round(p.z / U))), cord)
 			# warm bloom around the bulb: a wide soft amber glow + a hot core
-			halo_pts.append([p + Vector3(0.03, 0.02, 0.03), 1.9, Color(1.0, 0.7, 0.38, 1.0)])
-			halo_pts.append([p + Vector3(0.03, 0.0, 0.03), 0.7, Color(1.0, 0.92, 0.72, 1.0)])
+			halo_pts.append([p + Vector3(0.03, 0.02, 0.03), 1.3, Color(0.85, 0.62, 0.36, 1.0)])
+			halo_pts.append([p + Vector3(0.03, 0.0, 0.03), 0.6, Color(1.0, 0.94, 0.8, 1.0)])
 			if r[3] == true:
 				# warm cone straight down: a pool on the tiles / crates below
-				Kit.spot(root, p + Vector3(0, -0.05, 0), Color(1.0, 0.8, 0.55), 3.4, 5.5, 36.0)
+				Kit.spot(root, p + Vector3(0, -0.05, 0), Color(1.0, 0.86, 0.66), 2.2, 5.0, 30.0)
 			elif r[3] == false:
 				Kit.light(root, p + Vector3(0, -0.4, 0), Color(1.0, 0.86, 0.66), 1.1, 4.0)
-			pools.append([Vector3(x, 0.012, r[0] + 0.25), Vector2(3.4, 3.4), Color(1.0, 0.68, 0.36, 0.62 if r[3] == true else 0.4)])
+			pools.append([Vector3(x, 0.012, r[0] + 0.25), Vector2(3.4, 3.4), Color(1.0, 0.74, 0.44, 0.3 if r[3] == true else 0.2)])
 	Kit.add(root, lamps, U, "Pendants", false, Kit.glow_mat("warm"), Vector3.ZERO, Vector3.ZERO, true, false)
 	# Cool spill from the fridge bank + its reflection streak on the tiles.
 	for fx: float in [-4.6, -1.4, 1.8, 5.0]:
-		Kit.light(root, Vector3(fx, 1.4, -7.45), Color(0.78, 0.88, 1.0), 1.15, 5.0)
-	pools.append([Vector3(-1.0, 0.014, -7.6), Vector2(11.0, 2.6), Color(0.6, 0.8, 1.0, 0.6)])
-	pools.append([Vector3(5.2, 0.014, -7.6), Vector2(4.6, 2.2), Color(0.6, 0.8, 1.0, 0.5)])
+		Kit.light(root, Vector3(fx, 1.4, -7.3), Color(0.82, 0.9, 1.0), 1.6, 5.0)
+	pools.append([Vector3(-1.0, 0.014, -7.6), Vector2(11.0, 2.8), Color(0.55, 0.75, 1.0, 0.5)])
+	pools.append([Vector3(5.2, 0.014, -7.6), Vector2(4.6, 2.4), Color(0.55, 0.75, 1.0, 0.45)])
 	# Spill pools in the front walkway (from the pendants above the camera).
 	for wp: Vector3 in [Vector3(-1.0, 0.012, 0.9), Vector3(1.3, 0.012, 0.6), Vector3(0.2, 0.012, 2.4)]:
-		pools.append([wp, Vector2(3.0, 3.0), Color(1.0, 0.7, 0.4, 0.38)])
+		pools.append([wp, Vector2(2.6, 2.6), Color(1.0, 0.8, 0.55, 0.16)])
 	root.add_child(Kit.pools(pools))
 
 

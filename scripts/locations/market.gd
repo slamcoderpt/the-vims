@@ -49,22 +49,24 @@ func camera_home() -> Dictionary:
 
 
 func lighting_profile() -> Dictionary:
-	# Indoors, cosy and warm-neutral: a dim skylight key for soft shadow
-	# direction and a low warm ambient so the store is NOT flat. The pendant
-	# lamps (bright emissive bulbs + warm omni/spot lights) paint amber pools
-	# on the cream tiles and crates; the fridge cases glow cool blue-white.
+	# Bright, airy, neutral-white store (ref5): a clean white ambient /
+	# ceiling fill and a neutral skylight key, so the near-white tile floor
+	# stays white and coloured produce / packaging pops. Warm light only as
+	# local accents (pendant bulbs + their small pools); the fridge wall glows
+	# cool white. Grade is neutral, no global amber tint.
 	return {
-		"sun_heading": 200.0, "sun_elev": 64.0, "sun_energy": 0.32,
-		"ambient_day": Color(1.0, 0.92, 0.82), "ambient_energy": 0.48,
-		"ambient_night": Color(0.85, 0.74, 0.62), "ambient_night_energy": 0.4,
-		"lamp_night_mult": 1.2,
-		"sky_day": Color(0.8, 0.84, 0.9), "sky_night": Color(0.2, 0.18, 0.2),
-		"fog_day": Color(0.95, 0.89, 0.8), "fog_night": Color(0.4, 0.32, 0.26), "fog_density": 0.006,
-		"exposure": 0.92,
+		"sun_heading": 200.0, "sun_elev": 64.0, "sun_energy": 0.55,
+		"sun_color_day": Color(1.0, 0.99, 0.97),
+		"ambient_day": Color(0.97, 0.97, 0.98), "ambient_energy": 0.62,
+		"ambient_night": Color(0.9, 0.88, 0.86), "ambient_night_energy": 0.62,
+		"lamp_night_mult": 1.1,
+		"sky_day": Color(0.86, 0.9, 0.95), "sky_night": Color(0.2, 0.2, 0.24),
+		"fog_day": Color(0.95, 0.95, 0.95), "fog_night": Color(0.4, 0.38, 0.38), "fog_density": 0.004,
+		"exposure": 0.97, "tonemap_white": 4.5,
 		"shadow_distance": 24.0,
 		"post": {"focus_y": 0.53, "band": 0.3, "falloff": 0.28, "blur_px": 3.4, "top_boost": 0.2,
-			"saturation": 1.3, "contrast": 1.1, "tint": Vector3(1.03, 0.97, 0.92),
-			"lift": Vector3(0.006, 0.006, 0.008), "vignette": 0.18},
+			"saturation": 1.18, "contrast": 1.06, "tint": Vector3(1.0, 1.0, 1.0),
+			"lift": Vector3(0.008, 0.008, 0.01), "vignette": 0.14},
 	}
 
 
