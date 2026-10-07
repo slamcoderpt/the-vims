@@ -102,10 +102,10 @@ func build(parent: Node3D) -> void:
 	var tb := Transform3D(Basis(Vector3.UP, TABLE_ROT), TABLE_POS)
 	for cq in [Vector2(-16, -2), Vector2(6, -1), Vector2(25, 3)]:
 		halos.add(tb * Vector3(cq.x / 16.0, 1.08, cq.y / 16.0), 0.55, Color(1.0, 0.65, 0.3, 0.9))
-	for wx in [50.5 / 16.0, 164.5 / 16.0]:
+	for wx in [29.5 / 16.0, 193.5 / 16.0]:
 		halos.add(Vector3(wx, 2.4, -5.9), 0.9, Color(1.0, 0.7, 0.35, 0.6))
-	for dx in [4.2, 5.8, 7.4, 9.0]:
-		halos.add(Vector3(dx, 1.5, -5.7), 2.4, Color(1.0, 0.62, 0.3, 0.16))
+	for dx in [3.4, 5.2, 7.0, 8.8, 10.6]:
+		halos.add(Vector3(dx, 1.5, -5.7), 2.4, Color(1.0, 0.62, 0.3, 0.14))
 	halos.build(root)
 	for i in LIT_LANTERNS:
 		var lp: Vector3i = LANTERNS[i]
@@ -521,7 +521,7 @@ func _posts(vb: VoxelBuilder) -> void:
 		V.b(vb, x - 1, h, z - 1, 3, 1, 3, Color("5a3620"))
 
 
-func _strand(vb: VoxelBuilder, a: Vector3, b: Vector3, sag: float, spacing := 0.42) -> void:
+func _strand(vb: VoxelBuilder, a: Vector3, b: Vector3, sag: float, spacing := 0.62) -> void:
 	var length := a.distance_to(b)
 	var steps := int(length * F * 1.6)
 	var next_bulb := 0.2
@@ -534,13 +534,15 @@ func _strand(vb: VoxelBuilder, a: Vector3, b: Vector3, sag: float, spacing := 0.
 		if t * length >= next_bulb and t * length < length - 0.15:
 			next_bulb += spacing
 			vb.set_v(q + Vector3i(0, -1, 0), Color("3a3530"))
-			# Small pear-shaped bulb: amber skin, hot core, rounded tip.
-			V.b(vb, q.x, q.y - 2, q.z, 1, 1, 1, Color("3a3530"))
-			V.b(vb, q.x - 1, q.y - 4, q.z, 3, 2, 1, Color("ffc35a"), true)
-			V.b(vb, q.x, q.y - 4, q.z - 1, 1, 2, 3, Color("ffc35a"), true)
-			V.b(vb, q.x, q.y - 4, q.z, 1, 2, 1, Color("fff0c0"), true)
-			V.b(vb, q.x, q.y - 5, q.z, 1, 1, 1, Color("ffd27a"), true)
-			halos.add(Vector3((q.x + 0.5) / F, (q.y - 3.0) / F, (q.z + 0.5) / F), 0.62, Color(1.0, 0.66, 0.28, 0.95))
+			# Pear-shaped Edison bulb under a dark socket: amber skin, hot
+			# core, rounded tip (big enough to read as bulbs from the yard).
+			V.b(vb, q.x, q.y - 2, q.z, 1, 1, 1, Color("2a2622"))
+			V.b(vb, q.x - 1, q.y - 3, q.z - 1, 3, 1, 3, Color("3a3530"))
+			V.b(vb, q.x - 1, q.y - 6, q.z - 1, 3, 3, 3, Color("ffc35a"), true)
+			V.b(vb, q.x - 1, q.y - 5, q.z, 3, 1, 1, Color("fff0c0"), true)
+			V.b(vb, q.x, q.y - 5, q.z - 1, 1, 1, 3, Color("fff0c0"), true)
+			V.b(vb, q.x, q.y - 7, q.z, 1, 1, 1, Color("ffd27a"), true)
+			halos.add(Vector3((q.x + 0.5) / F, (q.y - 4.5) / F, (q.z + 0.5) / F), 0.8, Color(1.0, 0.66, 0.28, 0.95))
 
 
 func _string_lights(vb: VoxelBuilder) -> void:

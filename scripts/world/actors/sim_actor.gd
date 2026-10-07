@@ -17,8 +17,9 @@ extends Node3D
 ##   "type" and "read" are seated by default; the rest stand.
 ##   lie/sleep: place the actor at the middle of the mattress; the head points
 ##   along the actor's local -Z (use face() towards the foot end).
-##   Dog poses: idle, walk, sit, lie, sleep, play/chew (lying, gnawing a chew
-##   bone), bow (play bow), talk (bark);
+##   Dog poses: idle, walk, sit, lie, sleep, play (belly down facing the
+##   camera in 3/4, head up, chew bone between the front paws), chew (lying
+##   side-on gnawing the bone), bow (play bow), talk (bark);
 ##   anything else falls back to idle.
 ##
 ## Rendering: every body part is its own voxel model on its own bone; the parts
@@ -490,11 +491,15 @@ func _human_pose() -> void:
 				# Office chairs swivel: the whole body turns part way toward
 				# the player and the head the rest, so beard, nose and eye
 				# read in profile / 3/4 even from behind the desk.
-				body_yaw = _glance(1.7, 0.18, 0.15)
-				# Scoot to the front of the seat, lean in toward the screen.
-				_tgt_pos.z += 0.1 / _s
-				_ab(b_torso, 0.2, 0.0, 0.0)
-				_ab(b_head, -0.14, 0.0, 0.0)
+				body_yaw = _glance(2.1, 0.3, 0.16)
+				# Scoot to the front of the seat, lean in toward the screen,
+				# and lean out to the player's side so head and shoulder
+				# clear a tall chair back (Sims-style presentation cheat).
+				var sd := signf(_cam_a) if absf(_cam_a) > 0.3 else 0.0
+				_tgt_pos.z += 0.12 / _s
+				_tgt_pos.x += sd * 0.07 / _s
+				_ab(b_torso, 0.16, 0.0, -sd * 0.14)
+				_ab(b_head, -0.2, 0.0, sd * 0.1)
 			_sb(b_arm_l, -1.0, -0.12 - body_yaw, -0.06)
 			_sb(b_arm_r, -1.0, 0.12 - body_yaw, 0.06)
 			_sb(b_fore_l, -0.62 + 0.08 * maxf(0.0, tap), 0.0, 0.0)
@@ -524,16 +529,20 @@ func _human_pose() -> void:
 			var bf := b_fore_l if _brush_left else b_fore_r
 			var pi_ := b_arm_r if _brush_left else b_arm_l
 			var pf := b_fore_r if _brush_left else b_fore_l
-			_sb(bi, -1.95 + 0.07 * dab, (0.08 + 0.05 * dab2) * m, 0.1 * m)
-			_sb(bf, -0.06 - 0.12 * dab)
+			# Brush arm stretched out level toward the canvas (reads as
+			# "painting" in silhouette), small dabbing strokes.
+			_sb(bi, -1.62 + 0.08 * dab, (0.1 + 0.06 * dab2) * m, 0.08 * m)
+			_sb(bf, -0.12 - 0.14 * maxf(0.0, dab))
 			if _seated():
 				# Perch on the front edge of the stool, leaning in to the canvas.
-				_tgt_pos.z += 0.09 / _s
-			_sb(pi_, -0.42, 0.0, 0.26 * m)
-			_sb(pf, -1.1)
-			_ab(b_head, 0.04, 0.05 * dab2, 0.06 * sin(t * 0.7))
-			_ab(b_torso, 0.16, 0.0, 0.0)
-			var py := _glance(1.2, 0.05, 0.13)
+				_tgt_pos.z += 0.12 / _s
+			_sb(pi_, -0.5, 0.0, 0.3 * m)
+			_sb(pf, -1.15)
+			_ab(b_head, 0.02, 0.05 * dab2, 0.06 * sin(t * 0.7))
+			_ab(b_torso, 0.24, 0.0, 0.0)
+			# Mostly in profile, looking at her canvas; the head turns only
+			# part way so eyes and smile still read.
+			var py := _glance(0.95, 0.04, 0.1)
 			_ab(bi, 0.0, -py, 0.0)
 			_ab(pi_, 0.0, -py, 0.0)
 		"talk":
@@ -670,16 +679,31 @@ func _dog_pose() -> void:
 				_sb(b_head, 0.35 + 0.02 * breath, 0.55 + ly * 0.5, 0.15)
 				_sb(b_tail, -1.4, 0.9, 0.0)
 				_sb(b_body, 0.0, 0.0, 0.0)
-		"play", "chew":
+		"chew":
 			# Lying on the rug gnawing a chew toy held across the mouth.
 			var ly := _dog_lie()
 			var chew := sin(t * 7.0)
-			# Head up and turned to the player so the blaze, both eyes and the
-			# nose read; ears splay out so they frame the face, not cover it.
 			_sb(b_head, -0.04 + 0.05 * maxf(0.0, chew), ly + 0.1 * sin(t * 0.9 + _phase), 0.1 * sin(t * 1.7))
 			_sb(b_tail, -0.9, 0.0, 0.55 * sin(t * 14.0))
 			_sb(b_ear_l, 0.05 * chew, 0.0, 0.3)
 			_sb(b_ear_r, 0.05 * chew, 0.0, -0.3)
+		"play":
+			# Belly down facing the player in a 3/4 front view (ref1): front
+			# paws stretched forward either side of the chew bone, head up
+			# looking at the camera with the ears framing the white blaze,
+			# rump and wagging white-tipped tail up behind.
+			var ly := _dog_lie(true)
+			var perk := smoothstep(0.55, 1.0, sin(t * 0.8 + _phase))
+			var paw := pow(maxf(0.0, sin(t * 1.9 + _phase)), 6.0)
+			_sb(b_head, -0.38 - 0.05 * perk + 0.02 * breath, ly, 0.22 * sin(t * 0.6 + _phase) * (0.4 + 0.6 * perk))
+			_sb(b_tail, -0.75, 0.0, 0.6 * sin(t * 13.0))
+			_ab(b_leg_fl, -0.25 * paw, 0.0, 0.0)
+			# Head is tipped up, so tip the ears back down to hang beside the
+			# cheeks (framing the face) instead of sticking out.
+			_sb(b_ear_l, 0.3 + 0.05 * perk, 0.0, 0.1 + 0.04 * perk)
+			_sb(b_ear_r, 0.3 + 0.05 * perk, 0.0, -0.1 - 0.04 * perk)
+			# Rump slightly raised (playful), chest low.
+			_sb(b_body, 0.06)
 		"bow":
 			var hop := absf(sin(t * 5.0))
 			_sb(b_body, 0.32)
@@ -698,17 +722,16 @@ func _dog_pose() -> void:
 			_sb(b_tail, -0.6, 0.0, 0.5 * sin(t * 15.0))
 
 
-func _dog_lie() -> float:
+func _dog_lie(front := false) -> float:
 	# Sphinx pose: belly on the floor, front legs stretched forward, hind legs
 	# folded out to the sides.
 	var vs: float = RigBuilder.VS
 	var look_yaw := 0.0
-	# Present the long side to the camera (a lying dog seen head-on is a
-	# shapeless blob): swivel so the camera sits ~65-95 degrees off the nose,
-	# then the head looks back toward the player.
-	# Present the long side: nose toward screen-right and a little toward
-	# the viewer, the body + upright tail trailing off to the left, head
-	# turned toward the player so both eyes and the white blaze read.
+	# Presentation (a lying dog seen nose-on from above is a shapeless blob):
+	# side: nose toward screen-right and a little toward the viewer, body and
+	#   tail trailing left, head turned back toward the player.
+	# front: nose toward the viewer and to screen-right (ref1 3/4 front view,
+	#   mirrored), body trailing back-left, head looking straight at the camera.
 	if camera_cheat and is_inside_tree():
 		var cam := get_viewport().get_camera_3d()
 		if cam:
@@ -720,15 +743,22 @@ func _dog_lie() -> float:
 				r = r.normalized()
 				c = c.normalized()
 				var want := (r * 0.95 + c * 0.25).normalized()
+				if front:
+					want = (c * 0.68 + r * 0.74).normalized()
 				var want_yaw := atan2(want.x, want.z)
 				_tgt_root_rot.y = wrapf(want_yaw - global_rotation.y, -PI, PI)
 				look_yaw = clampf(wrapf(atan2(c.x, c.z) - want_yaw, -PI, PI), -0.85, 0.85)
 	# A lying dog's anchor sits at its haunches: the chest, paws and head
 	# reach forward (toward the toy) instead of centring on the spot.
-	_tgt_root_pos = Basis(Vector3.UP, _tgt_root_rot.y) * Vector3(0.0, 0.0, 6.0 * vs)
+	_tgt_root_pos = Basis(Vector3.UP, _tgt_root_rot.y) * Vector3(0.0, 0.0, (2.0 if front else 6.0) * vs)
 	_tgt_pos.y = -float(_meta.leg) + 0.3 * vs
-	_sb(b_leg_fl, -1.5, 0.1, 0.0)
-	_sb(b_leg_fr, -1.5, -0.1, 0.0)
+	if front:
+		# Paws splayed a little so the bone sits between them.
+		_sb(b_leg_fl, -1.52, 0.0, 0.16)
+		_sb(b_leg_fr, -1.52, 0.0, -0.16)
+	else:
+		_sb(b_leg_fl, -1.5, 0.1, 0.0)
+		_sb(b_leg_fr, -1.5, -0.1, 0.0)
 	_sb(b_leg_bl, -1.45, 0.55, 0.0)
 	_sb(b_leg_br, -1.45, -0.55, 0.0)
 	_sb(b_tail, -1.25, 0.0, 0.15 * sin(_t * 11.0))
@@ -747,7 +777,7 @@ const _PROPS_FOR := {
 	"play": [["block", "fore_r"], ["robot", "fore_l"]],
 }
 const _DOG_PROPS_FOR := {
-	"play": [["bone", "head"]],
+	"play": [["bone", "body"]],
 	"chew": [["bone", "head"]],
 }
 
@@ -782,7 +812,12 @@ func _make_prop(pname: String, bone: String) -> MeshInstance3D:
 	var mi := MeshInstance3D.new()
 	mi.mesh = RigBuilder.prop_mesh(pname)
 	if _dog:
-		mi.position = _meta.mouth
+		if bone == "body":
+			# On the floor between the outstretched front paws.
+			mi.position = _meta.paws
+			mi.rotation = Vector3(0.0, 0.35, 0.0)
+		else:
+			mi.position = _meta.mouth
 		att.add_child(mi)
 		return mi
 	var hand: float = -float(_meta.fore_len) + 0.03

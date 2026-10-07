@@ -23,6 +23,8 @@ const X1 := 104     # 13 m
 const WALL_Z := -48 # -6 m (outer face)
 const UX0 := 44     # 5.5 m: left edge of the two-storey block
 const DECK_Z1 := -21
+const DOOR_X0 := 20  # 2.5 m
+const DOOR_X1 := 92  # 11.5 m
 
 var root: Node3D
 
@@ -46,9 +48,42 @@ func build(parent: Node3D) -> void:
 	_interior(fine)
 	_deck_decor(fine)
 	V.inst(fine, root, V.SIZE_FINE, Vector3.ZERO, 0.0, Vector3.ZERO, true, true, "HouseDecor")
-	# Warm interior light spilling out + porch fill.
-	V.omni(root, Vector3(6.5, 2.0, -8.2), Color(1.0, 0.72, 0.42), 4.2, 7.0)
-	V.omni(root, Vector3(5.8, 2.5, -3.2), Color(1.0, 0.76, 0.5), 3.0, 6.0)
+	# Warm interior light (two lamps filling the room) spilling out + porch fill.
+	V.omni(root, Vector3(4.5, 2.4, -8.0), Color(1.0, 0.74, 0.46), 3.2, 6.0)
+	V.omni(root, Vector3(9.5, 2.4, -8.0), Color(1.0, 0.74, 0.46), 3.2, 6.0)
+	V.omni(root, Vector3(7.0, 2.6, -3.6), Color(1.0, 0.76, 0.5), 2.6, 6.0)
+	_glass(root)
+
+
+const GLASS_SHADER := """
+shader_type spatial;
+render_mode blend_mix, unshaded, depth_draw_never, cull_disabled, shadows_disabled;
+// Sliding-door glass: a faint warm sheen with soft diagonal reflection
+// streaks, so the panes read as glass while the lit room shows through.
+void fragment() {
+	float s = fract((UV.x * 9.0 + UV.y * 3.2));
+	float streak = smoothstep(0.0, 0.08, s) * (1.0 - smoothstep(0.1, 0.22, s));
+	float edge = smoothstep(0.75, 1.0, UV.y);
+	ALBEDO = mix(vec3(1.0, 0.9, 0.75), vec3(1.0), streak);
+	ALPHA = 0.05 + streak * 0.1 + edge * 0.06;
+}
+"""
+
+
+func _glass(parent: Node3D) -> void:
+	var q := QuadMesh.new()
+	q.size = Vector2(float(DOOR_X1 - DOOR_X0) / M, 21.0 / M)
+	var mat := ShaderMaterial.new()
+	var sh := Shader.new()
+	sh.code = GLASS_SHADER
+	mat.shader = sh
+	q.material = mat
+	var mi := MeshInstance3D.new()
+	mi.name = "DoorGlass"
+	mi.mesh = q
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mi.position = Vector3(float(DOOR_X0 + DOOR_X1) * 0.5 / M, (3.0 + 10.5) / M, float(WALL_Z) / M - 0.12)
+	parent.add_child(mi)
 
 
 func _siding(q: Vector3i) -> Color:
@@ -69,14 +104,17 @@ func _shell(vb: VoxelBuilder) -> void:
 	V.b(vb, X0, 3, zb, 2, 25, WALL_Z - zb, _siding)
 	V.b(vb, UX0, 28, zb, 2, 20, WALL_Z - zb, _siding)
 	V.b(vb, X1 - 2, 3, zb, 2, 45, WALL_Z - zb, _siding)
-	# Interior back wall: warm lamp-lit plaster (soft emissive so the room
-	# reads as glowing through the open sliding doors at dusk).
+	# Interior back wall: warm lamp-lit cream plaster (soft emissive so the
+	# room glows through the glass wall at dusk), brightest around the lamps.
 	var lit_wall := func(q: Vector3i) -> Color:
-		var hot := 1.0 - clampf(absf(float(q.y) - 14.0) / 16.0, 0.0, 1.0) * 0.35
-		var lamp := maxf(0.0, 1.0 - absf(float(q.x) - 47.0) / 22.0) * 0.18 + maxf(0.0, 1.0 - absf(float(q.x) - 70.0) / 18.0) * 0.12
-		return V.shade(Color("c99a66"), (0.78 + lamp) * hot + V.h1(q, 3) * 0.04)
+		var hot := 1.0 - clampf(absf(float(q.y) - 12.0) / 18.0, 0.0, 1.0) * 0.3
+		var lamp := maxf(0.0, 1.0 - absf(float(q.x) - 40.0) / 20.0) * 0.12 + maxf(0.0, 1.0 - absf(float(q.x) - 86.0) / 16.0) * 0.12
+		return V.shade(Color("f1d7a8"), (0.8 + lamp) * hot + V.h1(q, 3) * 0.03)
 	V.b(vb, X0, 3, zb, UX0 - X0, 25, 2, lit_wall, true)
 	V.b(vb, UX0, 3, zb, X1 - UX0, 24, 2, lit_wall, true)
+	# Inner faces of the side walls, also lamp-lit.
+	V.b(vb, X0 + 2, 3, zb + 2, 1, 24, WALL_Z - zb - 4, V.shade(Color("e8c896"), 0.8), true)
+	V.b(vb, X1 - 3, 3, zb + 2, 1, 24, WALL_Z - zb - 4, V.shade(Color("e8c896"), 0.8), true)
 	V.b(vb, UX0, 27, zb, X1 - UX0, 21, 2, Color("e8d2b0"))
 	# Corner trim boards.
 	V.b(vb, X0 - 1, 3, WALL_Z - 2, 1, 25, 3, TRIM)
@@ -93,19 +131,21 @@ func _shell(vb: VoxelBuilder) -> void:
 	V.b(vb, X0, 27, zb, X1 - X0, 1, WALL_Z - zb - 2, Color("f0e4cc"))
 	# Trim band between floors.
 	V.b(vb, X0, 27, WALL_Z - 2, X1 - X0, 1, 3, TRIM)
-	# Sliding doors: x 28..76, y 3..22.
-	vb.clear_box(Vector3i(28, 3, WALL_Z - 2), Vector3i(48, 19, 2))
-	V.b(vb, 27, 3, WALL_Z - 2, 1, 20, 3, FRAME)
-	V.b(vb, 76, 3, WALL_Z - 2, 1, 20, 3, FRAME)
-	V.b(vb, 27, 22, WALL_Z - 2, 50, 1, 3, FRAME)
-	V.b(vb, 27, 3, WALL_Z - 2, 50, 1, 3, V.shade(FRAME, 0.8))
-	for mx in [39, 51, 52, 64]:
-		V.b(vb, mx, 4, WALL_Z - 1, 1, 18, 1, FRAME)
-	# Transom glow strip over the doors.
-	V.b(vb, 28, 21, WALL_Z - 1, 48, 1, 1, GLASS_LIT, true)
-	# Ground floor side window (lit).
-	_window(vb, 84, 9, 14, 12)
-	_window(vb, 15, 9, 9, 12)
+	# Wide sliding glass wall: x DOOR_X0..DOOR_X1, y 3..24, chunky dark
+	# frames every 12 cells (ref4's floor-to-ceiling panels).
+	vb.clear_box(Vector3i(DOOR_X0, 3, WALL_Z - 2), Vector3i(DOOR_X1 - DOOR_X0, 21, 2))
+	V.b(vb, DOOR_X0 - 1, 3, WALL_Z - 2, 2, 22, 3, FRAME)
+	V.b(vb, DOOR_X1 - 1, 3, WALL_Z - 2, 2, 22, 3, FRAME)
+	V.b(vb, DOOR_X0 - 1, 24, WALL_Z - 2, DOOR_X1 - DOOR_X0 + 2, 1, 3, FRAME)
+	V.b(vb, DOOR_X0, 3, WALL_Z - 2, DOOR_X1 - DOOR_X0, 1, 3, V.shade(FRAME, 0.8))
+	var mx := DOOR_X0 + 12
+	while mx < DOOR_X1 - 2:
+		V.b(vb, mx, 4, WALL_Z - 2, 1, 20, 2, FRAME)
+		mx += 12
+	# Trim around the opening.
+	V.b(vb, DOOR_X0 - 2, 3, WALL_Z, 1, 23, 1, TRIM)
+	V.b(vb, DOOR_X1 + 1, 3, WALL_Z, 1, 23, 1, TRIM)
+	V.b(vb, DOOR_X0 - 2, 25, WALL_Z, DOOR_X1 - DOOR_X0 + 4, 1, 1, TRIM)
 	# Upper floor windows.
 	_window(vb, 56, 32, 12, 10)
 	_window(vb, 80, 32, 14, 10)
@@ -180,60 +220,102 @@ func _porch(vb: VoxelBuilder) -> void:
 
 
 func _interior(vb: VoxelBuilder) -> void:
-	# Fine grid (16/m). Room behind the doors: x 1.75..12.75, z -10..-6.25, floor y 0.375.
+	# Fine grid (16/m). Room behind the glass wall: x 1.75..12.75 m,
+	# z -10.25..-6.25 m, floor y 0.375 m (6), ceiling 3.375 m (54).
 	var fy := 6
-	var bz := -160  # back wall inner face z = -10 m
-	# Rug.
-	V.b(vb, 70, fy, -140, 50, 1, 30, func(q: Vector3i) -> Color:
+	var bz := -160  # back wall inner face
+	# Fluffy pink rug.
+	V.b(vb, 70, fy, -134, 84, 1, 30, func(q: Vector3i) -> Color:
 		var u := q.x - 70
-		var w := q.z + 140
-		if u < 2 or u > 47 or w < 2 or w > 27:
-			return Color("f2e6d0")
-		return Color("c9584e") if (u + w) % 6 < 3 else Color("e48a6a"))
-	# Sofa against the back wall (facing the doors).
-	var sc := Color("8b9bbd")
-	V.b(vb, 66, fy, bz, 58, 7, 18, V.noisy(sc, 0.05))
-	V.b(vb, 66, fy + 7, bz, 58, 9, 6, V.noisy(V.shade(sc, 0.95), 0.05))
-	V.b(vb, 62, fy, bz, 4, 11, 18, V.noisy(sc, 0.05))
-	V.b(vb, 124, fy, bz, 4, 11, 18, V.noisy(sc, 0.05))
-	V.b(vb, 70, fy + 7, bz + 6, 6, 6, 2, Color("f3e3c3"))
-	V.b(vb, 112, fy + 7, bz + 6, 6, 6, 2, Color("e78a6f"))
-	# Coffee table.
-	V.b(vb, 82, fy + 5, -134, 26, 1, 12, V.wood(Color("b07a46"), 0, 2))
-	V.b(vb, 83, fy, -133, 1, 5, 1, Color("7d4f2b")); V.b(vb, 106, fy, -133, 1, 5, 1, Color("7d4f2b"))
-	V.b(vb, 83, fy, -124, 1, 5, 1, Color("7d4f2b")); V.b(vb, 106, fy, -124, 1, 5, 1, Color("7d4f2b"))
-	V.b(vb, 88, fy + 6, -130, 4, 3, 4, Color("f1ede4"))
-	# Picture frames above the sofa.
-	for i in 3:
-		var fx := 74 + i * 16
-		V.b(vb, fx, 30, bz, 12, 10, 1, Color("5b3b26"))
-		V.b(vb, fx + 1, 31, bz + 1, 10, 8, 1, func(q: Vector3i) -> Color:
-			var t := float(q.y - 31) / 8.0
-			return [Color("8fb7d9"), Color("e6b56a"), Color("8fc48a")][i].lerp(Color("f6e7c9"), t * 0.5))
+		var w := q.z + 134
+		if u < 2 or u > 81 or w < 2 or w > 27:
+			return Color("f3dfe4")
+		return V.shade(Color("f0b8c8"), 0.92 + V.h1(q, 6) * 0.14))
+	# Light grey sofa against the back wall (facing the glass), with cushions.
+	var sc := Color("d9d4cf")
+	V.b(vb, 82, fy, bz, 72, 7, 18, V.noisy(sc, 0.04))
+	V.b(vb, 82, fy + 7, bz, 72, 12, 6, V.noisy(V.shade(sc, 0.94), 0.04))
+	V.b(vb, 78, fy, bz, 4, 12, 18, V.noisy(V.shade(sc, 0.9), 0.04))
+	V.b(vb, 154, fy, bz, 4, 12, 18, V.noisy(V.shade(sc, 0.9), 0.04))
+	for k in 3:
+		V.b(vb, 84 + k * 23, fy + 7, bz + 6, 22, 2, 11, V.noisy(V.shade(sc, 1.04), 0.03))
+	V.b(vb, 88, fy + 9, bz + 6, 8, 8, 2, Color("6f86a8"))
+	V.b(vb, 140, fy + 9, bz + 6, 8, 8, 2, Color("e2b456"))
+	V.b(vb, 114, fy + 9, bz + 6, 8, 7, 2, Color("8a8f9c"))
+	# Mustard armchair on the left, angled to the room.
+	var ac := Color("d9a441")
+	V.b(vb, 50, fy, -136, 16, 7, 16, V.noisy(ac, 0.05))
+	V.b(vb, 46, fy, -136, 4, 16, 16, V.noisy(V.shade(ac, 0.88), 0.05))
+	V.b(vb, 50, fy, -138, 16, 11, 2, V.noisy(V.shade(ac, 0.92), 0.05))
+	V.b(vb, 50, fy, -120, 16, 11, 2, V.noisy(V.shade(ac, 0.92), 0.05))
+	# Coffee table with a lamp-lit bowl + books.
+	V.b(vb, 96, fy + 6, -134, 40, 2, 14, V.wood(Color("9a6a3e"), 0, 2))
+	for lq in [Vector2i(97, -133), Vector2i(134, -133), Vector2i(97, -122), Vector2i(134, -122)]:
+		V.b(vb, lq.x, fy, lq.y, 1, 6, 1, Color("6d4426"))
+	V.b(vb, 104, fy + 8, -130, 6, 2, 6, Color("f1ede4"))
+	V.b(vb, 105, fy + 10, -129, 4, 1, 4, Color("e85a3a"))
+	V.b(vb, 120, fy + 8, -130, 8, 1, 6, Color("2f5e8f")); V.b(vb, 120, fy + 9, -130, 7, 1, 6, Color("e0b44c"))
+	V.b(vb, 130, fy + 8, -128, 2, 4, 2, Color("ffd890"), true)
+	# Big framed plant print above the sofa + two small frames.
+	V.b(vb, 106, 32, bz, 22, 18, 1, Color("6b4428"))
+	V.b(vb, 108, 34, bz + 1, 18, 14, 1, Color("f4ead6"))
+	for i in 9:
+		var ly := 36 + i
+		var lw := 2 + (4 - absi(i - 4))
+		V.b(vb, 117 - lw / 2, ly, bz + 1, lw, 1, 1, Color("4f8f44") if i % 2 == 0 else Color("3a7034"))
+	V.b(vb, 117, 35, bz + 1, 1, 10, 1, Color("2f5a2a"))
+	for fx in [88, 136]:
+		V.b(vb, fx, 36, bz, 10, 10, 1, Color("5b3b26"))
+		V.b(vb, fx + 1, 37, bz + 1, 8, 8, 1, func(q: Vector3i) -> Color:
+			return Color("8fb7d9").lerp(Color("f6c98f"), float(q.y - 37) / 8.0))
 	# Wall sconces (glowing).
-	for sx in [56, 134]:
-		V.b(vb, sx, 30, bz, 4, 5, 2, Color("ffe1a0"), true)
-	# Bookshelf on the left.
-	V.b(vb, 32, fy, bz, 20, 34, 8, V.wood(Color("94592f"), 1, 2))
-	for sh in 4:
-		var sy := fy + 2 + sh * 8
-		V.b(vb, 33, sy, bz + 2, 18, 6, 6, Color(0, 0, 0, 0))
-		vb.clear_box(Vector3i(33, sy, bz + 2), Vector3i(18, 6, 6))
-		var bx := 33
-		while bx < 50:
-			var bw := 1 + int(V.hs(bx, sy, 3) * 2.0)
-			var bh := 4 + int(V.hs(bx, sy, 4) * 2.5)
-			var bc: Color = [Color("b8403a"), Color("2f5e8f"), Color("e0b44c"), Color("3f7f4f"), Color("7a4b8c"), Color("e88a3a"), Color("d9d2bf")][int(V.hs(bx, sy, 5) * 7) % 7]
-			V.b(vb, bx, sy, bz + 3, bw, bh, 4, bc)
-			bx += bw
-	# Floor lamp (glowing shade) + standing plant.
-	V.b(vb, 140, fy, -150, 1, 22, 1, Color("3b3e47"))
-	V.b(vb, 137, fy + 22, -153, 7, 6, 7, Color("ffe1a8"), true)
-	_pot_plant(vb, 48, fy, -138, 12, 1)
-	_pot_plant(vb, 150, fy, -140, 16, 2)
-	# Pendant lamp.
-	V.b(vb, 94, 40, -136, 1, 4, 1, Color("2d2d33"))
-	V.b(vb, 90, 36, -140, 9, 4, 9, Color("ffdc95"), true)
+	for sx in [72, 162]:
+		V.b(vb, sx, 34, bz, 4, 6, 2, Color("ffe1a0"), true)
+		V.b(vb, sx, 33, bz, 4, 1, 3, Color("3a3030"))
+	# Tall bookshelves with books + ceramics, left and right.
+	for bx0 in [32, 172]:
+		V.b(vb, bx0, fy, bz, 24, 44, 9, V.wood(Color("94592f"), 1, 2))
+		for sh in 5:
+			var sy := fy + 2 + sh * 8
+			vb.clear_box(Vector3i(bx0 + 1, sy, bz + 2), Vector3i(22, 6, 7))
+			var bx := bx0 + 1
+			while bx < bx0 + 23:
+				var kind := int(V.hs(bx, sy, 9) * 5.0)
+				if kind == 0 and bx < bx0 + 19:
+					# Ceramic vase / jar.
+					var vc: Color = [Color("f1ede4"), Color("8fb7d9"), Color("e48a6a")][int(V.hs(bx, sy, 7) * 3.0) % 3]
+					V.b(vb, bx, sy, bz + 4, 3, 4, 3, vc)
+					V.p(vb, bx + 1, sy + 4, bz + 5, vc)
+					bx += 4
+					continue
+				if kind == 1 and bx < bx0 + 19:
+					V.b(vb, bx, sy, bz + 4, 3, 2, 3, Color("d98a5a"))
+					V.blob(vb, Vector3(bx + 1.5, sy + 3.5, bz + 5.5), Vector3(2.2, 1.6, 2.0), V.leaves(bx, 0, sy), 0.3, bx)
+					bx += 4
+					continue
+				var bw := 1 + int(V.hs(bx, sy, 3) * 2.0)
+				var bh := 4 + int(V.hs(bx, sy, 4) * 2.5)
+				var bc: Color = [Color("b8403a"), Color("2f5e8f"), Color("e0b44c"), Color("3f7f4f"), Color("7a4b8c"), Color("e88a3a"), Color("d9d2bf")][int(V.hs(bx, sy, 5) * 7) % 7]
+				V.b(vb, bx, sy, bz + 3, bw, bh, 6, bc)
+				bx += bw
+	# Floor lamp (glowing shade) between sofa and shelf + big leafy plants.
+	V.b(vb, 66, fy, -152, 1, 26, 1, Color("3b3e47"))
+	V.b(vb, 62, fy + 26, -156, 9, 7, 9, Color("ffe1a8"), true)
+	_pot_plant(vb, 164, fy, -146, 18, 2)
+	_pot_plant(vb, 40, fy, -112, 14, 1)
+	_pot_plant(vb, 196, fy, -112, 12, 3)
+	# Side table + table lamp by the sofa.
+	V.b(vb, 160, fy, -134, 10, 9, 10, V.wood(Color("b07a46"), 0, 2))
+	V.b(vb, 164, fy + 9, -130, 2, 4, 2, Color("3a3030"))
+	V.b(vb, 161, fy + 13, -133, 8, 6, 8, Color("ffe6b0"), true)
+	# Pendant lamps + a hanging lantern near the glass (ref4).
+	for px in [116]:
+		V.b(vb, px, 44, -128, 1, 10, 1, Color("2d2d33"))
+		V.b(vb, px - 5, 40, -133, 11, 4, 11, Color("ffdc95"), true)
+	V.b(vb, 186, 46, -110, 1, 8, 1, Color("2d2d33"))
+	V.b(vb, 182, 36, -114, 9, 1, 9, Color("2a2a30"))
+	V.b(vb, 183, 37, -113, 7, 8, 7, Color("ffd27a"), true)
+	V.b(vb, 182, 45, -114, 9, 1, 9, Color("2a2a30"))
 
 
 func _pot_plant(vb: VoxelBuilder, x: int, y: int, z: int, h: int, seed: int) -> void:
@@ -255,7 +337,7 @@ func _deck_decor(vb: VoxelBuilder) -> void:
 		var px: int = [26, 84, 112, 138, 176, 196, 152][i]
 		V.flower_pot(vb, px, fy, -46 + (i % 2) * 2, 11 + i * 7, i % 3 == 0)
 	# Wall lanterns either side of the doors.
-	for lx in [48, 162]:
+	for lx in [27, 191]:
 		V.b(vb, lx, 34, -97, 5, 1, 4, Color("2a2a30"))
 		V.b(vb, lx, 35, -97, 1, 6, 4, Color("2a2a30"))
 		V.b(vb, lx + 4, 35, -97, 1, 6, 4, Color("2a2a30"))

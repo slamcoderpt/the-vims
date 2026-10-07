@@ -7,7 +7,8 @@ const K := preload("res://scripts/locations/festival/kit.gd")
 const U := 1.0 / 16.0
 const W := 96
 const D := 44
-const DECK := 18
+const DECK := 28
+const SCALE := 0.82
 
 var node: Node3D
 var glow_points: Array = []
@@ -20,6 +21,8 @@ func build(parent: Node3D, pos: Vector3, rot: float) -> void:
 	node.name = "Stage"
 	node.position = pos
 	node.rotation.y = deg_to_rad(rot)
+	# Slightly smaller than life so the roof stays in frame (critic r5).
+	node.scale = Vector3.ONE * SCALE
 	parent.add_child(node)
 	var vb := VoxelBuilder.new()
 	vb.jitter = 0.0
@@ -39,11 +42,11 @@ func build(parent: Node3D, pos: Vector3, rot: float) -> void:
 	for p: Vector3i in vb.glow:
 		if p.y > 70 and posmod(p.x, 2) == 0:
 			glow_points.append([xf * ((Vector3(p) + Vector3(0.5, 0.5, 0.5) - origin) * U), 0.45, Color(1.0, 0.75, 0.4)])
-	performer_spot = xf * Vector3(-1.25, DECK * U, 0.5)
+	performer_spot = xf * Vector3(-1.5, DECK * U, 0.6)
 	_notes(node)
 	# Stage wash: a warm key light in front of the performer so he reads
 	# front-lit against the backdrop (round 3: guitarist was a dark blob).
-	K.light(node, Vector3(-1.1, DECK * U + 1.8, 2.2), Color(1.0, 0.82, 0.6), 2.6, 3.6, 1.0)
+	K.light(node, Vector3(-1.4, DECK * U + 1.8, 2.4), Color(1.0, 0.82, 0.6), 2.6, 3.6, 1.0)
 
 
 ## Little floating music notes beside the guitarist.
@@ -53,9 +56,8 @@ func _notes(n: Node3D) -> void:
 	var note := ["..##", "..#.", "..#.", "###.", "###."]
 	var dbl := ["#####", "#...#", "#...#", "#..##", "##.##", "##..."]
 	K.pattern(vb, note, 0, 0, 0, {"#": Color("fffaf0")}, true)
-	K.pattern(vb, dbl, 6, 7, 0, {"#": Color("fffaf0")}, true)
-	K.pattern(vb, note, 13, 3, 0, {"#": Color("fffaf0")}, true)
-	var mi := K.inst(n, vb, 0.07, Vector3(-2.35, DECK * U + 1.75, 1.0), 0.0, false)
+	K.pattern(vb, dbl, 4, 7, 0, {"#": Color("fffaf0")}, true)
+	var mi := K.inst(n, vb, 0.09, Vector3(-2.95, DECK * U + 1.5, 1.3), 0.0, false)
 	mi.name = "MusicNotes"
 
 
@@ -74,9 +76,10 @@ func _deck(vb: VoxelBuilder) -> void:
 
 func _steps(vb: VoxelBuilder) -> void:
 	# Front steps.
-	for st in 5:
-		K.box(vb, W / 2 - 10, st * 3, D + 4 - st * 2, 20, 3, 2 + st * 0, K.wood(Color("9a6a40"), 0, 2))
-		K.box(vb, W / 2 - 10, 0, D + 4 - st * 2, 20, st * 3, 2, Color("3a2a20"))
+	var rise := DECK / 6
+	for st in 6:
+		K.box(vb, W / 2 - 10, st * rise, D + 10 - st * 2, 20, rise, 2, K.wood(Color("9a6a40"), 0, 2))
+		K.box(vb, W / 2 - 10, 0, D + 10 - st * 2, 20, st * rise, 2, Color("3a2a20"))
 
 
 func _truss(vb: VoxelBuilder) -> void:
@@ -132,35 +135,42 @@ func _truss(vb: VoxelBuilder) -> void:
 
 func _backdrop(vb: VoxelBuilder) -> void:
 	# Dark plank back wall with a cream banner + red maple leaf in the middle.
-	K.box(vb, 3, DECK, 2, W - 6, 74 - DECK, 1, func(q: Vector3i) -> Color:
+	K.box(vb, 3, DECK, 2, W - 6, 82 - DECK, 1, func(q: Vector3i) -> Color:
 		var plank := q.x / 4
 		var f := 0.85 + K.hs(plank, 3, 7) * 0.25
 		if posmod(q.x, 4) == 0:
 			f *= 0.75
-		return K.shade(Color("5a3a26"), f))
-	# Banner sits right of centre so the guitarist (left) reads against the
-	# dark planks and drapes rather than a flat light backdrop.
+		return K.shade(Color("3e2a1e"), f))
+	# Banner across the top half only (critic r5: the stage read as a red/cream
+	# blob); the lower wall stays dark so the guitarist pops against it.
 	var bx0 := W / 2 - 4
-	var bx1 := W / 2 + 34
+	var bx1 := W / 2 + 36
+	var by0 := 62
 	for x in range(bx0, bx1):
-		for y in range(DECK + 7, 76):
-			var c := Color("f4e6c8")
-			if x < bx0 + 2 or x >= bx1 - 2 or y >= 74:
-				c = Color("d2541e")
-			elif x < bx0 + 4 or x >= bx1 - 4 or y >= 72:
+		for y in range(by0, 80):
+			var c := K.shade(Color("f4e6c8"), 0.94 + K.hs(x / 3, y / 3, 2) * 0.08)
+			if x < bx0 + 2 or x >= bx1 - 2 or y >= 78:
+				c = Color("c8461e")
+			elif x < bx0 + 3 or x >= bx1 - 3 or y >= 77:
 				c = Color("f2a43a")
 			vb.set_v(Vector3i(x, y, 3), c)
-	# Pointed (pennant) bottom edge of the banner.
+	# Pennant bottom edge.
 	for x in range(bx0, bx1):
 		var k := posmod(x - bx0, 8)
 		var drop := 3 - absi(k - 4) if absi(k - 4) < 3 else 0
 		for d in drop:
-			vb.set_v(Vector3i(x, DECK + 6 - d, 3), Color("d2541e"))
-	K.maple(vb, W / 2 + 14, 38, 4, Color("c8301a"), 3)
-	# Side drapes.
-	for x in [3, W - 9]:
-		K.box(vb, x, DECK, 3, 6, 68, 2, func(q: Vector3i) -> Color:
-			return K.shade(Color("8a2a24"), 0.85 + 0.15 * float(posmod(q.x, 2))))
+			vb.set_v(Vector3i(x, by0 - 1 - d, 3), Color("c8461e"))
+	K.maple(vb, W / 2 + 9, 63, 4, Color("c8301a"), 2)
+	# Small orange leaves either side of the big one.
+	for side in [-1, 1]:
+		K.maple(vb, W / 2 + 16 + side * 13 - 3, 66, 4, Color("e07a24"), 1)
+	# Warm uplight strip at the foot of the back wall (stage glow).
+	for x in range(6, W - 6, 3):
+		vb.set_v(Vector3i(x, DECK, 3), Color("ffcf70"), true)
+	# Side drapes: deep wine, narrow.
+	for x in [3, W - 7]:
+		K.box(vb, x, DECK, 3, 4, 84 - DECK, 2, func(q: Vector3i) -> Color:
+			return K.shade(Color("5a1e1e"), 0.8 + 0.2 * float(posmod(q.x, 2))))
 
 
 func _gear(vb: VoxelBuilder) -> void:

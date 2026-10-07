@@ -122,7 +122,7 @@ static func _ceiling(root: Node3D, halo_pts: Array) -> void:
 	var lamps := VoxelBuilder.new()
 	lamps.jitter = 0.02
 	var pools := []
-	var rows := [[3.4, 3.95, [-4.0, -1.3, 1.5, 4.4], true], [0.6, 3.85, [-4.3, -0.8, 1.3, 5.3], true],
+	var rows := [[3.4, 4.55, [-4.0, -1.3, 1.5, 4.4], true], [0.6, 4.4, [-4.3, -0.8, 1.3, 5.3], true],
 		[-2.3, 3.75, [-4.4, -1.6, 1.2, 3.5, 6.0], true], [-5.2, 3.65, [-4.1, -1.5, 1.2, 3.5, 6.0], true],
 		[-8.0, 3.55, [-4.0, -1.4, 1.2, 3.5, 6.0], false], [-10.5, 3.5, [-3.0, -0.2, 2.4, 5.0], false]]
 	for r: Array in rows:
@@ -202,8 +202,8 @@ static func _signs(root: Node3D) -> void:
 	Fx.leaf_icon(lv2, Vector3i(0, 0, 0), Color("6cbf45"), Color("2f7a2a"))
 	Kit.add(mk, lv2, U * 0.75, "Leaf", false, null, Vector3(1.15, 0.0, 0.11), Vector3(3.5, 4, 0))
 	# Aisle signs hanging over the aisles, deeper in the store.
-	var aisles := [["Dairy", Vector3(0.0, 2.6, -8.2), 0.0, 1.05], ["Snacks", Vector3(3.7, 2.45, -4.6), -6.0, 1.15],
-		["Beverages", Vector3(6.0, 2.8, -7.4), -8.0, 1.5], ["Bakery", Vector3(6.6, 2.95, -2.2), -24.0, 1.25]]
+	var aisles := [["Dairy", Vector3(0.9, 2.6, -8.2), 0.0, 1.05], ["Snacks", Vector3(4.2, 2.7, -3.6), -6.0, 1.15],
+		["Beverages", Vector3(6.3, 3.0, -8.0), -8.0, 1.5], ["Bakery", Vector3(5.9, 2.95, -2.2), -24.0, 1.25]]
 	for a in aisles:
 		var b := _board(root, "Sign" + a[0], a[1], a[2], a[3], 0.42, Color("3b2a1f"), Color("7a5130"))
 		_text(b, a[0], Vector3(0, 0.0, z), a[3] - 0.26, 0.26, Color("f6efe0"))

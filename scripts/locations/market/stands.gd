@@ -63,7 +63,7 @@ static func _crate(fix: VoxelBuilder, prod: VoxelBuilder, at: Vector3, size: Vec
 	var ps := Vector3i(w * 2 - 4, 8, d * 2 - 4)
 	# fill below the heap so the crate looks full
 	prod.box(Vector3i(po.x, o.y * 2 + 2, po.z), Vector3i(ps.x, hh * 2 - 6, ps.z), Kit.shade(_kind_col(kind), 0.55))
-	Produce.heap(prod, kind, po, ps, layers, seed)
+	Produce.heap2(prod, kind, po, ps, layers + 1, seed)
 
 
 static func _kind_col(kind: String) -> Color:
@@ -294,8 +294,8 @@ static func _aisles(root: Node3D) -> void:
 static func _checkout(root: Node3D, _halo_pts: Array) -> void:
 	var vb := VoxelBuilder.new()
 	vb.jitter = 0.035
-	var x0 := u(2.15)
-	var z0 := u(1.2)
+	var x0 := u(2.45)
+	var z0 := u(1.9)
 	var W := u(0.85)
 	var L := u(4.2)
 	var Hc := u(0.92)
@@ -372,8 +372,8 @@ static func _checkout(root: Node3D, _halo_pts: Array) -> void:
 			if p.x % 2 == 0 and p.y % 2 == 0:
 				vb.set_v(Vector3i(x0 - 3, u(0.1) + 1 + p.y / 2, tz + 1 + p.x / 2), lv.vox[p])
 	# back counter behind the cashier
-	var bx := u(4.15)
-	var bz := u(1.1)
+	var bx := u(4.55)
+	var bz := u(1.8)
 	var bh := u(0.9)
 	vb.box(Vector3i(bx, 0, bz), Vector3i(u(0.6), bh, u(2.2)), Kit.wood(Fx.WOOD_D, 2))
 	vb.box(Vector3i(bx - 1, bh, bz - 1), Vector3i(u(0.6) + 1, 1, u(2.2) + 2), Color("e8ddc8"))
@@ -416,7 +416,7 @@ static func _checkout(root: Node3D, _halo_pts: Array) -> void:
 	Interactable.attach(root, "Checkout", [
 		_act("pay", "Pay", "register", 3.0, {"task": "Pay at Checkout"}),
 		_act("bag", "Bag Groceries", "bag", 2.0),
-	], Vector3(0.85, 1.0, 4.2), Vector3(2.57, 0.5, 3.3), Vector3(1.75, 0, 2.6))
+	], Vector3(0.85, 1.0, 4.2), Vector3(2.87, 0.5, 4.0), Vector3(2.0, 0, 3.3))
 
 
 # ------------------------------------------------------------------ foreground dressing

@@ -106,7 +106,10 @@ func _apply() -> void:
 	moon.light_energy = profile.get("moon_energy", 0.32) * night
 	moon.visible = night > 0.05
 	sun.shadow_enabled = sun.visible
-	moon.shadow_enabled = moon.visible and not sun.visible
+	# Moon shadows cost a whole extra pass per mesh plus a shadow map on GL
+	# Compatibility (phones / WebGL2) for little visible gain under the dim
+	# night key light: off unless a location asks for them.
+	moon.shadow_enabled = moon.visible and not sun.visible and profile.get("moon_shadows", false)
 	if profile.has("shadow_distance"):
 		sun.directional_shadow_max_distance = profile.shadow_distance
 		moon.directional_shadow_max_distance = profile.shadow_distance

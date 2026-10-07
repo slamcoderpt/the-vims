@@ -83,7 +83,25 @@ func _ready() -> void:
 		add_child(pt)
 
 
+## Live play: which storey the camera looks at (0 = ground). A location that
+## implements set_view_floor(level) hides the floors above it, like the Sims
+## floor up / down buttons; the camera follows the selected sim between floors.
+var view_floor := -1
+
+
+func _process(_delta: float) -> void:
+	if sim == null or location == null or not location.has_method("set_view_floor"):
+		return
+	var lv := 0
+	if sim.nav and sim.nav.level_y.size() > 1:
+		lv = sim.nav.level_of(camera_rig.target - Vector3(0, 0.8, 0))
+	if lv != view_floor:
+		view_floor = lv
+		location.set_view_floor(lv)
+
+
 func load_location(loc_name: String) -> void:
+	view_floor = -1
 	if location:
 		# Drop every bubble anchored to the old lot's people before they are freed.
 		for n in location.find_children("*", "Node3D", true, false):

@@ -19,7 +19,8 @@ const LAMPS := [
 const FOUNTAIN := Vector3(0.2, 0, -10.2)
 const FOUNTAIN_SCALE := 1.6
 const LAMP_TOP := 4.2
-const SU := 0.06  # string-light cell size
+const SU := 0.06  # string-light wire cell size
+const BU := 0.085  # bulb cell size
 
 var glow_points: Array = []
 var lamp_heads: Array = []
@@ -68,14 +69,14 @@ func _lamp_model(banner: bool) -> VoxelBuilder:
 			var bx0 := 3 if side > 0 else -11
 			for x in range(bx0, bx0 + 8):
 				for y in range(33, 58):
-					var c := Color("f0b440")
+					var c := K.shade(Color("f6dc98"), 0.96 + K.hs(x, y / 3, 4) * 0.06)
 					if x == bx0 or x == bx0 + 7:
 						c = Color("d8822a")
 					vb.set_v(Vector3i(x, y, 0), c)
 			# Fringe.
 			for x in range(bx0, bx0 + 8):
 				if posmod(x, 2) == 0:
-					vb.set_v(Vector3i(x, 32, 0), Color("f2b33a"))
+					vb.set_v(Vector3i(x, 32, 0), Color("d8822a"))
 			K.maple(vb, bx0 + 1 - 1 + 1, 46, 1, Color("c8381a"))
 			K.maple(vb, bx0 + 1, 46, -1, Color("c8381a"))
 			# Small second leaf lower down, like the reference banners.
@@ -97,7 +98,7 @@ func _lamps(parent: Node3D) -> void:
 		all.stamp(with_banner if l[2] else plain, Vector3i(roundi(l[0] * 16.0), 0, roundi(l[1] * 16.0)))
 		var head := Vector3(roundi(l[0] * 16.0) * U, 67.5 * U, roundi(l[1] * 16.0) * U)
 		lamp_heads.append(head)
-		glow_points.append([head, 1.5, Color(1.0, 0.72, 0.36)])
+		glow_points.append([head, 2.2, Color(1.0, 0.7, 0.34)])
 		glow_points.append([head, 0.6, Color(1.0, 0.85, 0.6)])
 		i += 1
 	K.inst(parent, all, U, Vector3.ZERO, 0.0, true, Vector3.ZERO, "LampPosts")
@@ -171,14 +172,15 @@ func _fountain(parent: Node3D) -> void:
 
 # ------------------------------------------------------------------ string lights
 
-func _catenary(vb: VoxelBuilder, a: Vector3, b: Vector3, sag: float, bunting := false, bulbs := true) -> void:
-	# a, b in metres. Wire + bulbs every ~0.45 m + optional bunting flags.
+func _catenary(vb: VoxelBuilder, bv: VoxelBuilder, a: Vector3, b: Vector3, sag: float, bunting := false, bulbs := true) -> void:
+	# a, b in metres. Thin wire + round-ish glowing bulbs every ~0.42 m
+	# (bulbs live in their own coarser builder) + optional bunting flags.
 	var ca := a / SU
 	var cb := b / SU
 	var n := maxi(int((cb - ca).length()), 2)
-	var wire := Color("3a3530")
-	var bulb_every := 6
-	var flag_cols := [Color("e2662a"), Color("f2b33a"), Color("c8401e"), Color("f6efe0"), Color("d8902a")]
+	var wire := Color("2e2a26")
+	var bulb_every := 7
+	var flag_cols := [Color("e2662a"), Color("f6efe0"), Color("c8401e"), Color("7a4a2e"), Color("f2a33a")]
 	for i in n + 1:
 		var t := float(i) / n
 		var p := ca.lerp(cb, t)
@@ -187,12 +189,13 @@ func _catenary(vb: VoxelBuilder, a: Vector3, b: Vector3, sag: float, bunting := 
 		vb.set_v(q, wire)
 		if bulbs and i % bulb_every == 3 and i > 2 and i < n - 2:
 			vb.set_v(q + Vector3i(0, -1, 0), Color("2a2622"))
+			var m := (Vector3(q) + Vector3(0.5, -1.0, 0.5)) * SU   # socket bottom (m)
+			var bq := Vector3i(floori(m.x / BU - 1.0), floori(m.y / BU) - 2, floori(m.z / BU - 1.0))
 			for bx in 2:
 				for bz in 2:
-					vb.set_v(q + Vector3i(bx, -2, bz), Color("ffd070"), true)
-					vb.set_v(q + Vector3i(bx, -3, bz), Color("ffc050"), true)
-			vb.set_v(q + Vector3i(0, -4, 0), Color("ffb848"), true)
-			glow_points.append([(Vector3(q) + Vector3(1.0, -2.5, 1.0)) * SU, 0.75, Color(1.0, 0.72, 0.36)])
+					bv.set_v(bq + Vector3i(bx, 1, bz), Color("ffd27a"), true)
+					bv.set_v(bq + Vector3i(bx, 0, bz), Color("ffc456"), true)
+			glow_points.append([(Vector3(bq) + Vector3(1.0, 1.0, 1.0)) * BU, 0.95, Color(1.0, 0.74, 0.38)])
 		if bunting and i % 8 == 0 and i > 3 and i < n - 3:
 			var c: Color = flag_cols[(i / 8) % flag_cols.size()]
 			var dir := (cb - ca).normalized()
@@ -209,27 +212,30 @@ func _strings(parent: Node3D) -> void:
 	var L := []
 	for l: Array in LAMPS:
 		L.append(Vector3(l[0], LAMP_TOP + 0.1, l[1]))
-	var stage_fl := Vector3(4.1, 5.2, -14.2)   # stage truss front-left corner
+	var stage_fl := Vector3(4.7, 4.4, -14.3)   # stage truss front-left corner
 	var runs := [
 		# [a, b, sag, bunting]
 		[L[0], L[1], 0.5, true],
 		[L[0], L[5], 0.7, false],
 		[L[2], L[0], 0.55, false],
 		[L[1], stage_fl, 0.45, false],
-		[L[5], L[1], 0.6, true],
+		[L[5], L[1], 0.6, false],
 		[L[5], Vector3(10.6, 3.6, -3.4), 0.4, false],
-		[L[5], Vector3(8.6, 3.2, 1.8), 0.45, true],
+		[L[5], Vector3(8.6, 3.2, 1.8), 0.45, false],
 		[L[4], L[0], 0.5, false],
-		[L[4], L[1], 0.8, true],
+		[L[4], L[1], 0.8, false],
 		[L[4], L[6], 0.4, false],
 		[L[3], Vector3(11.5, 4.6, -12.0), 0.4, true],
 		[L[3], L[1], 0.6, false],
 		[L[2], Vector3(-10.0, 4.4, -7.0), 0.4, false],
 		[Vector3(-10.0, 4.4, -7.0), L[4], 0.5, true],
 	]
+	var bv := VoxelBuilder.new()
+	bv.jitter = 0.0
 	for r: Array in runs:
-		_catenary(vb, r[0], r[1], r[2], r[3])
+		_catenary(vb, bv, r[0], r[1], r[2], r[3])
 	K.inst(parent, vb, SU, Vector3.ZERO, 0.0, false, Vector3.ZERO, "StringLights")
+	K.inst(parent, bv, BU, Vector3.ZERO, 0.0, false, Vector3.ZERO, "StringBulbs")
 
 
 # ------------------------------------------------------------------ props
@@ -257,7 +263,8 @@ func _ground_lantern(vb: VoxelBuilder, x: int, z: int) -> void:
 	K.box(vb, x - 4, 10, z - 4, 8, 1, 8, iron)
 	K.box(vb, x - 3, 11, z - 3, 6, 1, 6, iron)
 	K.box(vb, x - 1, 12, z - 1, 2, 2, 2, iron)
-	glow_points.append([Vector3(x, 6, z) * U, 1.0, Color(1.0, 0.7, 0.35)])
+	glow_points.append([Vector3(x, 6, z) * U, 1.5, Color(1.0, 0.7, 0.35)])
+	glow_points.append([Vector3(x, 5, z) * U, 0.6, Color(1.0, 0.86, 0.6)])
 
 
 func _picnic_table(vb: VoxelBuilder, x: int, z: int) -> void:

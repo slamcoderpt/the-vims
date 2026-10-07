@@ -224,6 +224,34 @@ func _ready() -> void:
 				d.set_pose(p)
 				x += 2.0
 			rig.apply({"target": Vector3(0, 0.5, 0), "yaw": 10.0, "pitch": 22.0, "distance": 10.0, "fov": 30.0})
+		"dogplay":
+			var x := -1.6
+			for yy in [55.0, -120.0, 180.0]:
+				var d := SimActor.create("beagle")
+				d.position = Vector3(x, 0, 0)
+				d.rotation_degrees.y = yy
+				add_child(d)
+				d.body_scale = 1.18
+				d.set_pose("play")
+				x += 1.6
+			var h := SimActor.create("dad")
+			h.position = Vector3(-1.5, 0, -2.0)
+			h.rotation_degrees.y = 180.0
+			h.seat_height = 0.5
+			add_child(h)
+			h.set_pose("type")
+			var g := SimActor.create("bunny_girl")
+			g.position = Vector3(0.5, 0, -2.0)
+			g.rotation_degrees.y = 126.0
+			g.seat_height = 0.45
+			add_child(g)
+			g.set_pose("sit_paint")
+			var k := SimActor.create("cat_girl")
+			k.position = Vector3(2.0, 0, -1.6)
+			k.rotation_degrees.y = 8.0
+			add_child(k)
+			k.set_pose("play")
+			rig.apply({"target": Vector3(0, 0.5, -0.8), "yaw": 33.0, "pitch": 28.0, "distance": 6.5, "fov": 40.0})
 		"dogcheck":
 			var x := -1.5
 			for p in ["play", "idle", "sleep"]:
@@ -271,7 +299,7 @@ func _ready() -> void:
 			rig.apply({"target": Vector3(0.0, 1.1, 0.0), "yaw": 28.0, "pitch": 34.0, "distance": 6.0, "fov": 30.0})
 		"faces":
 			var x := -2.0
-			for l in ["npc_6", "bunny_girl", "cat_girl", "npc_3", "npc_2"]:
+			for l in ["dad", "bunny_girl", "cat_girl", "npc_3", "npc_2"]:
 				var a := SimActor.create(l)
 				add_child(a)
 				a.position = Vector3(x, 0, 0)

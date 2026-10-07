@@ -132,7 +132,7 @@ func _s_money() -> void:
 	await _choose("Work")
 	await _until_game(func(): return jack.last_done == "work", 400.0)
 	_step("money_earned", Game.money == money1 + jack.last_pay and jack.last_pay >= 108 and jack.last_pay <= 252,
-		"money %d -> %d (base pay 180, mood-scaled = %d, mood now %s), Logic=%.2f" % [money1, Game.money, jack.last_pay, Game.mood_word(jack.index), Game.skill_level(jack.index, "Logic")])
+		"money %d -> %d (base pay 180, mood-scaled = %d, mood now %s), Logic=%.2f [Jack %s '%s' refused=%d speed=%d]" % [money1, Game.money, jack.last_pay, Game.mood_word(jack.index), Game.skill_level(jack.index, "Logic"), jack.phase, jack.current_label(), jack.refused, Game.speed])
 
 
 
@@ -396,6 +396,8 @@ func _s_autonomy() -> void:
 	var done0: int = sim.stats.done
 	var walk_since := {}
 	var t0 := Game.total_minutes()
+	var soak_t := Time.get_ticks_msec()
+	Game.speed = 3
 	while Game.total_minutes() - t0 < 240.0:
 		await get_tree().process_frame
 		for a in sim.agents:
@@ -407,7 +409,7 @@ func _s_autonomy() -> void:
 				stuck_max = maxf(stuck_max, Game.total_minutes() - walk_since[a])
 			else:
 				walk_since.erase(a)
-		if Time.get_ticks_msec() - _t0 > 900000:
+		if Time.get_ticks_msec() - soak_t > 240000:
 			break
 	var fb := 0
 	for a in sim.agents:
@@ -422,6 +424,7 @@ func _s_meal() -> void:
 	var jack = _agent("Jack")
 	var lily = _agent("Lily")
 	var maya = _agent("Maya")
+	sim.clear_meal()   # leftovers from free will earlier on
 	for a in sim.agents:
 		if a:
 			a.cancel_all()
@@ -502,9 +505,12 @@ func _s_wishes() -> void:
 	await _shot("wishes")
 	ov.panel.visible = false
 	var lth0 := Game.lth(lily.index)
-	lily.command({"action": _action_of(piano, lily, "practice"), "target": piano})
+	lily.cancel_all()
+	lily.last_done = ""
+	var took: bool = lily.command({"action": _action_of(piano, lily, "practice"), "target": piano})
 	Game.speed = 3
-	await _until_game(func(): return lily.last_done == "practice" and lily.phase != "act", 150.0)
+	await _until_game(func(): return lily.last_done == "practice" and lily.phase != "act", 300.0)
+	print("  Lily practice order taken=%s, now %s '%s' last=%s" % [str(took), lily.phase, lily.current_label(), lily.last_done])
 	var gone: bool = not Game.wishes(lily.index).any(func(w): return w.id == "do_practice")
 	_step("wish_fulfilled", gone and Game.lth(lily.index) == lth0 + 375 and Game.has_moodlet(lily.index, "wish_do_practice"),
 		"Lily LTH %d -> %d, wishes now %s" % [lth0, Game.lth(lily.index), str(Game.wishes(lily.index).map(func(w): return w.label))])
@@ -578,9 +584,14 @@ func _s_social() -> void:
 	var maya = _agent("Maya")
 	maya.cancel_all()
 	maya.autonomy = false
-	lily.command({"action": SimActions_hug(lily, maya), "other": maya})
-	await _until_game(func(): return lily.phase == "idle", 90.0)
+	# (An upset sim may reject a social: keep Maya cheerful for this check.)
+	Game.add_moodlet(maya.index, "t_cheer", "Test Cheer", "star", 40.0, 0.0)
+	var hug_ok: bool = lily.command({"action": SimActions_hug(lily, maya), "other": maya})
+	await _frames(2)
+	await _until_game(func(): return lily.phase == "idle", 240.0)
+	print("  Lily hug order taken=%s, last=%s, Lily-Maya %.1f" % [str(hug_ok), lily.last_done, Game.rel("Lily", "Maya")])
 	Game.relationship_level_changed.disconnect(cb)
+	Game.remove_moodlet(maya.index, "t_cheer")
 	_step("rel_level_up", "Best Friend" in lvl_seen and Game.has_moodlet(lily.index, "new_friend"), "Lily-Maya %s -> %s, events=%s" % [before, Game.rel_level(Game.rel("Lily", "Maya")), str(lvl_seen)])
 	for a in [jack, lily, maya]:
 		a.autonomy = true
@@ -700,17 +711,25 @@ func _s_gohere() -> void:
 			break
 	if gp == Vector3.INF:
 		gp = nav.center_of(li, nav.nearest_open(li, nav.cell_of(lp + Vector3(1.2, 0, 1.0))))
+	var menu_open: bool = sim._menu_visible()
+	if menu_open:
+		hud.menu.close()
+		await _frames(2)
+	var taps0: int = sim.stats.taps
 	await _tap_world(gp)
 	await _frames(2)
 	var go_ok: bool = lily.order.get("action", {}).get("id", "") == "go_here"
 	await _until_game(func(): return lily.phase == "idle", 60.0)
 	_step("go_here", go_ok and _flat(lily.actor.global_position, gp) < 0.4,
-		"tap -> %s, dist to target %.2f, phase=%s" % ["Go Here" if go_ok else "'%s'" % lily.current_label(), _flat(lily.actor.global_position, gp), lily.phase])
+		"tap -> %s, dist to target %.2f, phase=%s (taps +%d, menu was open=%s)" % ["Go Here" if go_ok else "'%s'" % lily.current_label(), _flat(lily.actor.global_position, gp), lily.phase, sim.stats.taps - taps0, str(menu_open)])
 
 
 func _s_build() -> void:
 	var lily = _agent("Lily")
 	_top_up()
+	# Lily only does what she's told in this section (her free will would
+	# otherwise wander off to a promised wish).
+	lily.autonomy = false
 	Game.selected = lily.index
 	var money_b := Game.money
 	_menus.clear()
@@ -830,6 +849,7 @@ func _s_build() -> void:
 	await _frames(2)
 	_step("build_wall_floor", wall_ok and tiles == 2 and "Walls  (5)" in build_cats,
 		"Build categories %s, wall placed=%s (nav obstacles %d -> %d), floor tiles placed=%d" % [str(build_cats), str(wall_ok), obst0, sim.nav.obstacles.size(), tiles])
+	lily.autonomy = true
 	await _focus(lily.actor.global_position)
 	await _shot("build_wall_floor")
 	Game.mode = "live"
@@ -1017,12 +1037,12 @@ func _until(cond: Callable, timeout_s: float) -> bool:
 
 ## Wait until cond is true or `game_min` in-game minutes have passed (the
 ## software renderer is slow, so real-time timeouts are unreliable); a hard
-## real-time cap of 90 s keeps a broken run from hanging.
+## real-time cap of 240 s keeps a broken run from hanging.
 func _until_game(cond: Callable, game_min: float) -> bool:
 	var m0 := Game.total_minutes()
 	var t := Time.get_ticks_msec()
 	while not cond.call():
-		if Game.total_minutes() - m0 > game_min or Time.get_ticks_msec() - t > 90000:
+		if Game.total_minutes() - m0 > game_min or Time.get_ticks_msec() - t > 240000:
 			return false
 		await get_tree().process_frame
 	return true

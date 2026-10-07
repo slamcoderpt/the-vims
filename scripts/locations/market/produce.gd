@@ -280,3 +280,268 @@ static func _mini_col(kind: String, r: float) -> Color:
 		"broccoli": return Color("2f6e2a") if r > 0.5 else Color("3d8a33")
 		"grapes", "eggplant": return Color("6b2f7a") if r > 0.4 else Color("4b2463")
 	return RED
+
+
+# ================================================================== chunky heaps
+# Bigger, rounder produce for crates seen from the eye-level camera: true
+# voxel spheres with a lit top, a specular pixel and a dark base, packed in
+# staggered layers that dome above the crate rim and spill over the front.
+
+## Voxel sphere of diameter d at min corner o.
+static func sphere(vb: VoxelBuilder, o: Vector3i, d: int, col: Color, s: int, squash := 1.0) -> void:
+	var r := d * 0.5
+	var k := 0.88 + 0.22 * Kit.h(o, s)
+	var base := Kit.shade(col, k)
+	var hy := int(ceil(d * squash))
+	for x in d:
+		for y in hy:
+			for z in d:
+				var dx := x + 0.5 - r
+				var dy := (y + 0.5 - hy * 0.5) / squash
+				var dz := z + 0.5 - r
+				if dx * dx + dy * dy + dz * dz > r * r * 1.08:
+					continue
+				var p := o + Vector3i(x, y, z)
+				var f := 0.78 + 0.32 * (float(y) / maxf(1.0, hy - 1))
+				if dz > 0.0 and dy > 0.0 and dx < 0.0 and dx > -r * 0.8 and dy < r * 0.8:
+					f += 0.08
+				vb.set_v(p, Kit.vary(Kit.shade(base, f), p, 0.035, s))
+	# specular glint on the upper-front-left
+	vb.set_v(o + Vector3i(maxi(0, int(r) - 1), hy - 1, mini(d - 1, int(r) + 1)), Kit.shade(base, 1.45))
+
+
+static func big_tomato(vb: VoxelBuilder, o: Vector3i, s: int) -> void:
+	var col := RED if Kit.h(o, 11 + s) > 0.2 else Color("e8502c")
+	sphere(vb, o, 5, col, s, 0.9)
+	# star-shaped calyx
+	var t := o + Vector3i(2, 4, 2)
+	vb.set_v(t + Vector3i(0, 1, 0), LEAF)
+	for dd: Vector3i in [Vector3i(1, 0, 0), Vector3i(-1, 0, 0), Vector3i(0, 0, 1), Vector3i(0, 0, -1)]:
+		vb.set_v(t + dd, LEAF2 if Kit.h(o + dd, 3) > 0.5 else LEAF)
+
+
+static func big_apple(vb: VoxelBuilder, o: Vector3i, s: int, green := false) -> void:
+	var col := Color("d42a2a") if not green else Color("98cc45")
+	if not green and Kit.h(o, 5 + s) < 0.3:
+		col = Color("b81f2a")
+	sphere(vb, o, 5, col, s)
+	vb.set_v(o + Vector3i(2, 5, 2), STEM)
+	if Kit.h(o, 9) > 0.45:
+		vb.set_v(o + Vector3i(3, 5, 2), LEAF2)
+	if not green:
+		vb.set_v(o + Vector3i(0, 3, 3), Color("f2a03a"))
+
+
+static func big_orange(vb: VoxelBuilder, o: Vector3i, s: int, lemon := false) -> void:
+	sphere(vb, o, 5 if not lemon else 4, ORANGE if not lemon else YELLOW, s, 1.0 if not lemon else 0.85)
+	vb.set_v(o + Vector3i(2, 5 if not lemon else 3, 2), LEAF if not lemon else Color("b0a83a"))
+
+
+static func big_pepper(vb: VoxelBuilder, o: Vector3i, s: int, col: Color) -> void:
+	for x in 4:
+		for z in 4:
+			for y in 5:
+				var cx := x == 0 or x == 3
+				var cz := z == 0 or z == 3
+				if cx and cz:
+					continue
+				if (cx or cz) and y == 0:
+					continue
+				var p := o + Vector3i(x, y, z)
+				var f := 0.82 + 0.06 * y
+				if (x == 1 or x == 2) and (z == 1 or z == 2) and y == 4:
+					f = 0.7
+				if (x + z) % 3 == 0:
+					f *= 0.9
+				vb.set_v(p, Kit.vary(Kit.shade(col, f), p, 0.04, s))
+	vb.set_v(o + Vector3i(1, 5, 2), Color("3e7a23"))
+	vb.set_v(o + Vector3i(1, 6, 2), Color("4f8f2a"))
+	vb.set_v(o + Vector3i(1, 3, 3), Kit.shade(col, 1.4))
+
+
+static func big_lettuce(vb: VoxelBuilder, o: Vector3i, s: int, curly := false) -> void:
+	var d := 8
+	var r := 4.0
+	for x in d:
+		for z in d:
+			for y in 6:
+				var dx := x + 0.5 - r
+				var dz := z + 0.5 - r
+				var dy := (y + 0.5) * 1.15
+				if dx * dx + dz * dz + (dy - 1.6) * (dy - 1.6) * 0.8 > r * r:
+					continue
+				var p := o + Vector3i(x, y, z)
+				var rr := sqrt(dx * dx + dz * dz)
+				var col: Color
+				if rr < 1.6 and y >= 3:
+					col = Color("b9e06a")
+				elif Kit.h(p, 3 + s) > 0.55:
+					col = Color("3b8a2a") if curly else LEAF2
+				else:
+					col = Color("2f7424") if curly else Color("5aa834")
+				# frilly outer edge: drop some rim voxels
+				if rr > 3.2 and Kit.h(p, 7 + s) < 0.3:
+					continue
+				vb.set_v(p, Kit.vary(Kit.shade(col, 0.82 + 0.05 * y), p, 0.07, s))
+
+
+static func big_broccoli(vb: VoxelBuilder, o: Vector3i, s: int) -> void:
+	for y in 3:
+		vb.set_v(o + Vector3i(3, y, 3), Color("8fb85a"))
+		vb.set_v(o + Vector3i(3, y, 2), Color("7aa64a"))
+	# three florets clusters
+	for c: Vector3i in [Vector3i(1, 3, 1), Vector3i(3, 4, 3), Vector3i(1, 3, 3), Vector3i(3, 3, 0), Vector3i(4, 3, 2)]:
+		for x in 3:
+			for y in 2:
+				for z in 3:
+					if (x == 0 or x == 2) and (z == 0 or z == 2) and y == 1:
+						continue
+					var p := o + c + Vector3i(x, y, z)
+					var col := Color("2a6a26") if Kit.h(p, 6 + s) > 0.5 else Color("3f8f34")
+					vb.set_v(p, Kit.vary(Kit.shade(col, 0.85 + 0.15 * y), p, 0.08, s))
+
+
+## Carrot pointing toward +z (tip at the front), leafy tuft at the back.
+static func big_carrot(vb: VoxelBuilder, o: Vector3i, s: int, ln := 11) -> void:
+	for i in ln:
+		var thick := 2 if i < ln - 3 else 1
+		var p0 := o + Vector3i(0, 0, i)
+		var cc := ORANGE if (i + s) % 3 != 0 else Color("e8740f")
+		for x in thick:
+			for y in thick:
+				var p := p0 + Vector3i(x, y, 0)
+				vb.set_v(p, Kit.vary(Kit.shade(cc, 0.9 + 0.12 * y), p, 0.05, s))
+	# leafy top at the back: a fan of bright green
+	for k in 5:
+		var lp := o + Vector3i(k % 2 - (1 if k == 4 else 0) + (k / 3), 1 + k / 2, -1 - k / 2)
+		vb.set_v(lp, LEAF2 if k % 2 == 0 else LEAF)
+		vb.set_v(lp + Vector3i(0, 1, -1), Color("7cc84a") if k % 2 == 0 else LEAF)
+	vb.set_v(o + Vector3i(0, 4, -3), LEAF2)
+	vb.set_v(o + Vector3i(1, 3, -2), Color("7cc84a"))
+
+
+## Curved banana bunch along +x: n fingers side by side (z), each 2 thick.
+static func big_bananas(vb: VoxelBuilder, o: Vector3i, s: int, n := 4) -> void:
+	var curve := [4, 3, 2, 1, 1, 0, 0, 0, 1, 1, 2, 3]
+	for f in n:
+		var lift := 1 if f == 1 or f == n - 2 else 0
+		for i in curve.size():
+			var p := o + Vector3i(i, curve[i] + lift, f * 3)
+			var cc := YELLOW
+			if i == 0:
+				cc = Color("9aa53a")
+			elif i == 1:
+				cc = Color("d9cf3a")
+			elif i == curve.size() - 1:
+				cc = Color("4a3a1c")
+			elif (i + f) % 4 == 0 and Kit.h(o + Vector3i(i, 0, f), s) > 0.6:
+				cc = Color("e2b52a")
+			vb.set_v(p, Kit.vary(Kit.shade(cc, 0.86), p, 0.04, s))
+			vb.set_v(p + Vector3i(0, 1, 0), Kit.vary(Kit.shade(cc, 1.06), p, 0.04, s + 1))
+			if i > 1 and i < curve.size() - 1:
+				vb.set_v(p + Vector3i(0, 0, 1), Kit.vary(Kit.shade(cc, 0.95), p, 0.04, s + 2))
+				vb.set_v(p + Vector3i(0, 1, 1), Kit.vary(Kit.shade(cc, 1.12), p, 0.04, s + 3))
+	# crown stem joining the fingers
+	for z in n * 3 - 1:
+		vb.set_v(o + Vector3i(-1, 5, z), Color("6d7a2a"))
+	vb.set_v(o + Vector3i(-2, 6, n), Color("5a4a22"))
+
+
+static func big_grapes(vb: VoxelBuilder, o: Vector3i, s: int) -> void:
+	for y in 6:
+		var r := 3 - y / 2
+		for x in range(-r, r + 1):
+			for z in range(-1, 2):
+				if Kit.h(o + Vector3i(x, y, z), 7 + s) < 0.15:
+					continue
+				var p := o + Vector3i(x + 3, 5 - y, z + 1)
+				var cc := Color("6b2f7a") if (x + y + z) % 2 == 0 else Color("8a46a0")
+				vb.set_v(p, Kit.vary(Kit.shade(cc, 0.85 + 0.04 * (5 - y)), p, 0.06, s))
+	vb.set_v(o + Vector3i(3, 6, 1), STEM)
+	vb.set_v(o + Vector3i(4, 6, 1), LEAF2)
+
+
+## Stamp one chunky item; returns its pitch (x, layer height, z) in cells.
+static func big_item(vb: VoxelBuilder, kind: String, o: Vector3i, s: int, rnd: float) -> Vector3i:
+	match kind:
+		"tomato":
+			big_tomato(vb, o, s); return Vector3i(5, 4, 5)
+		"apple":
+			big_apple(vb, o, s, rnd < 0.1); return Vector3i(5, 4, 5)
+		"green_apple":
+			big_apple(vb, o, s, true); return Vector3i(5, 4, 5)
+		"orange":
+			big_orange(vb, o, s); return Vector3i(5, 4, 5)
+		"lemon":
+			big_orange(vb, o, s, true); return Vector3i(4, 3, 4)
+		"pepper_red":
+			big_pepper(vb, o, s, Color("d9261c")); return Vector3i(4, 4, 4)
+		"pepper_mix":
+			var cols := [Color("d9261c"), Color("f2c12e"), Color("3f9a2e"), Color("f07f1c")]
+			big_pepper(vb, o, s, cols[int(rnd * 4.0) % 4]); return Vector3i(4, 4, 4)
+		"lettuce":
+			big_lettuce(vb, o, s); return Vector3i(7, 4, 7)
+		"greens":
+			if rnd < 0.5:
+				big_lettuce(vb, o, s, true)
+			else:
+				big_broccoli(vb, o, s)
+			return Vector3i(7, 4, 7)
+		"broccoli":
+			big_broccoli(vb, o, s); return Vector3i(6, 4, 6)
+		"grapes":
+			big_grapes(vb, o, s); return Vector3i(7, 5, 4)
+		"eggplant":
+			eggplant(vb, o + Vector3i(1, 0, 0)); return Vector3i(7, 2, 3)
+		"carrot":
+			big_carrot(vb, o + Vector3i(0, 0, 3), s); return Vector3i(3, 2, 14)
+		"banana":
+			big_bananas(vb, o + Vector3i(2, 0, 0), s); return Vector3i(14, 3, 12)
+	big_tomato(vb, o, s)
+	return Vector3i(5, 4, 5)
+
+
+## Heap chunky items into a bin interior (cells, P grid). Layers are
+## staggered by half a pitch and shrink towards a dome, so the pile rises
+## well above the rim; the front row hangs over the front lip (+z).
+static func heap2(vb: VoxelBuilder, kind: String, from: Vector3i, size: Vector3i, layers := 3, seed := 0) -> void:
+	var probe := VoxelBuilder.new()
+	var pitch := big_item(probe, kind, Vector3i.ZERO, 0, 0.0)
+	var nx := maxi(1, size.x / pitch.x)
+	var nz := maxi(1, size.z / pitch.z)
+	if kind == "banana" or kind == "carrot":
+		layers = mini(layers, 2)
+	for L in layers + 1:
+		var cnx := nx - (L % 2)
+		var cnz := nz - (L % 2)
+		if cnx < 1 or cnz < 1:
+			cnx = maxi(1, cnx)
+			cnz = maxi(1, cnz)
+			if L > 1 and nx * nz <= 2:
+				continue
+		var ox := (size.x - cnx * pitch.x) / 2
+		var oz := (size.z - cnz * pitch.z) / 2
+		for ix in cnx:
+			for iz in cnz:
+				var u := ((float(ix) + 0.5) / cnx - 0.5) * 2.0
+				var v := ((float(iz) + 0.5) / cnz - 0.5) * 2.0
+				# dome: higher layers keep only the middle; the back stays a bit higher
+				var reach := 1.0 - float(L) / (layers + 0.6)
+				if L > 0 and (absf(u) > reach + 0.15 or v > reach + 0.35):
+					continue
+				var key := Vector3i(ix, L, iz + seed * 31)
+				var r := Kit.h(key, 17 + seed)
+				var jx := int(r * 3.0) - 1
+				if kind == "banana" and L % 2 == 1:
+					jx += 3
+				var jz := int(Kit.h(key, 19) * 3.0) - 1
+				var jy := 1 if Kit.h(key, 29) > 0.7 else 0
+				var o := from + Vector3i(ox + ix * pitch.x + jx, L * pitch.y + jy, oz + iz * pitch.z + jz)
+				big_item(vb, kind, o, seed + ix * 3 + iz * 7 + L, Kit.h(key, 23))
+	# spill: a few items tumbling over the front lip
+	if kind in ["tomato", "apple", "orange", "green_apple", "pepper_mix", "pepper_red", "lemon"]:
+		for i in maxi(1, nx / 2):
+			if Kit.h(Vector3i(i, seed, 5), 41) < 0.45:
+				continue
+			var sx := from.x + int(Kit.h(Vector3i(i, seed, 1), 43) * (size.x - pitch.x))
+			big_item(vb, kind, Vector3i(sx, from.y - 1, from.z + size.z - pitch.z / 2), seed + 90 + i, 0.5)

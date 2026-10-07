@@ -498,11 +498,11 @@ static func m_bathtub(vb: VoxelBuilder, _v: int) -> void:
 	for q in [Vector2i(1, 1), Vector2i(L - 2, 1), Vector2i(1, D - 2), Vector2i(L - 2, D - 2)]:
 		V.b(vb, q.x, 0, q.y, 1, 1, 1, Color("c9a35a"))
 	vb.clear_box(Vector3i(2, 4, 2), Vector3i(L - 4, 5, D - 4))
-	V.b(vb, 2, 4, 2, L - 4, 3, D - 4, V.noisy(Color("8fcbe6"), 0.05))
-	for k in 6:
-		var bx := 4 + int(V.hs(k, 1, 2) * (L - 9))
-		var bz := 3 + int(V.hs(k, 3, 4) * (D - 7))
-		V.b(vb, bx, 7, bz, 2, 1, 2, Color("ffffff"))
+	V.b(vb, 2, 4, 2, L - 4, 3, D - 4, V.noisy(Color("5aa8dc"), 0.06))
+	for k in 9:
+		var bx := 3 + int(V.hs(k, 1, 2) * (L - 7))
+		var bz := 3 + int(V.hs(k, 3, 4) * (D - 6))
+		V.p(vb, bx, 7, bz, Color("ffffff"))
 	V.b(vb, 1, 9, 5, 2, 1, 2, METAL); V.b(vb, 1, 9, 5, 1, 4, 1, METAL)
 	V.b(vb, L - 7, 9, 0, 6, 2, 3, Color("f2b5c6"))
 

@@ -1262,6 +1262,9 @@ static func _build_dog(L: Dictionary) -> Dictionary:
 		"head_h": (HH - 2) * VS,
 		"leg": LEG * VS,
 		"mouth": Vector3(0, -1.0, HD + MZ - 1.0 - h_origin.z) * VS,
+		# Body-bone local spot on the floor between the stretched front paws
+		# (body lowered by LEG - 0.3 voxels in lying poses).
+		"paws": Vector3(0, -0.3 + 1.0, BL * 0.5 + 5.5) * VS,
 	}
 	return acc.finish(meta)
 

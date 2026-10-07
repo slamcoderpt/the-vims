@@ -41,7 +41,7 @@ func build() -> void:
 
 
 func camera_home() -> Dictionary:
-	return {"target": Vector3(0.3, 1.0, -1.0), "yaw": 0.0, "pitch": 11.5, "distance": 10.5, "fov": 50.0}
+	return {"target": Vector3(0.4, 1.1, -2.6), "yaw": 0.0, "pitch": 12.0, "distance": 13.5, "fov": 46.0}
 
 
 func lighting_profile() -> Dictionary:
@@ -119,35 +119,38 @@ func _place(key: String, pos: Vector3, face_to: Vector3, pose: String) -> SimAct
 func _stage() -> void:
 	if actors.is_empty():
 		return
-	var cam := Vector3(0.3, 0, 9.3)
-	# The family is spread across the main aisle with clear tile between them
-	# (ref5): Lily at the produce crates (left), Jack pushing the cart with
-	# Biscuit riding in it (centre), Maya with a cereal box (centre-right).
-	var jack := _place("dad", Vector3(-0.85, 0, 1.6), cam + Vector3(4.2, 0, 0), "idle")
+	var cam := Vector3(0.4, 0, 10.6)
+	# The family stands in the mid-ground of the main aisle (about a quarter
+	# of the frame tall) with clear tile between them, so the aisle, fridges
+	# and signs stay readable behind (ref5): Lily at the produce island
+	# (left), Jack pushing the cart with Biscuit riding in it (centre), Maya
+	# with a cereal box (centre-right).
+	var jack := _place("dad", Vector3(-0.3, 0, 0.0), cam + Vector3(7.5, 0, 0), "idle")
 	var cart_yaw := jack.rotation.y
 	var fwd := Vector3(sin(cart_yaw), 0, cos(cart_yaw))
-	_cart.position = jack.position + fwd * 0.5
+	_cart.position = jack.position + fwd * 0.55
 	_cart.rotation.y = cart_yaw
 	var dog := _place("beagle", _cart.position + fwd * 0.55 + Vector3(0, 13 * P * 1.45, 0), cam + Vector3(-1.5, 0, 0), "sit")
 	dog.body_scale = 1.0
 	dog.rotation.y = lerp_angle(cart_yaw, dog.rotation.y, 0.6)
 	# The "type" pose turns the head ~0.9 rad to the sim's left, so the
 	# girls' bodies are turned the other way to keep their faces on camera.
-	var lily := _place("bunny_girl", Vector3(-2.3, 0, 1.05), cam, "stand_type")
+	var lily := _place("bunny_girl", Vector3(-1.5, 0, 1.15), cam, "stand_type")
 	lily.rotation.y -= 0.75
-	var maya := _place("cat_girl", Vector3(1.45, 0, 1.45), cam, "stand_type")
+	var maya := _place("cat_girl", Vector3(1.9, 0, 0.8), cam, "stand_type")
 	maya.rotation.y -= 0.8
-	lily.body_scale = 1.25
-	maya.body_scale = 1.25
+	lily.body_scale = 1.0
+	maya.body_scale = 1.0
 	_hold(lily, "carrots")
 	_hold(maya, "cereal")
-	_place("cashier", Vector3(3.6, 0, 2.4), Vector3(0.6, 0, 7.0), "idle")
+	var cashier := _place("cashier", Vector3(3.95, 0, 2.7), Vector3(1.0, 0, 8.0), "idle")
+	cashier.body_scale = 1.12
 	# Background shoppers spread down the aisles, in the gaps between the family.
 	_place("npc_2", Vector3(-3.0, 0, -3.4), Vector3(-5.0, 0, -4.2), "idle")
 	_place("npc_5", Vector3(0.9, 0, -8.6), Vector3(0.6, 0, -11.0), "idle")
-	_place("npc_4", Vector3(-0.9, 0, -5.6), Vector3(-0.4, 0, -11.0), "idle")
-	_place("npc_0", Vector3(1.45, 0, -4.6), Vector3(2.4, 0, -4.8), "stand_read")
-	_place("npc_6", Vector3(3.8, 0, -6.2), Vector3(4.6, 0, -6.6), "idle")
+	_place("npc_4", Vector3(-0.7, 0, -5.4), Vector3(-0.4, 0, -11.0), "idle")
+	_place("npc_0", Vector3(1.55, 0, -5.6), Vector3(2.4, 0, -6.0), "stand_read")
+	_place("npc_6", Vector3(4.0, 0, -6.2), Vector3(4.6, 0, -6.6), "idle")
 	_hold(actors["npc_4"], "basket")
 	_hold(actors["npc_2"], "basket")
 	_hold(actors["npc_6"], "basket")

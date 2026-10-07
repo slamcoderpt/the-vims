@@ -179,7 +179,8 @@ static func lit_window_material(boost := 1.6) -> ShaderMaterial:
 render_mode unshaded, cull_back;
 uniform float boost = 1.6;
 void fragment() {
-	ALBEDO = COLOR.rgb * boost;
+	// Vertex colours are sRGB; linearise so warm glass stays amber, not cream.
+	ALBEDO = pow(COLOR.rgb, vec3(2.2)) * boost;
 }
 """
 		_lit_window_mat = ShaderMaterial.new()
