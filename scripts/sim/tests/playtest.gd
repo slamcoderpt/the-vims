@@ -88,18 +88,18 @@ func _s_loop() -> void:
 	Game.speed = 2
 	await _wait(1.2)
 	await _shot("walk")
-	var ok_walk := await _until(func(): return lily.phase == "act", 40.0)
+	var ok_walk := await _until_game(func(): return lily.phase == "act", 60.0)
 	var moved: float = start.distance_to(lily.actor.global_position)
 	_step("sim_walks", ok_walk and moved > 0.5, "moved=%.2f m via %d waypoints, phase=%s" % [moved, lily.path.size(), lily.phase])
 	_step("action_pose", lily.actor.pose == "sit_type", "pose=%s seat=%.2f" % [lily.actor.pose, lily.actor.seat_height])
 
 	# ---------------------------------------------------------------- need / skill
 	Game.speed = 3
-	await _until(func(): return lily.elapsed > 25.0 or lily.phase != "act", 20.0)
+	await _until_game(func(): return lily.elapsed > 25.0 or lily.phase != "act", 60.0)
 	await _shot("acting")
 	var fun1: float = lily.member.needs.fun
 	_step("need_rises", fun1 > fun0, "fun %.3f -> %.3f" % [fun0, fun1])
-	await _until(func(): return lily.phase != "act", 30.0)
+	await _until_game(func(): return lily.phase != "act", 90.0)
 	var music1: float = Game.skill_level(lily.index, "Music")
 	var chips := _bubbles.filter(func(d): return d.get("kind", "") == "skill" and "Music" in str(d.get("text", "")))
 	_step("skill_rises", music1 > music0 and chips.size() > 0, "Music %.3f -> %.3f, chips=%d" % [music0, music1, chips.size()])
@@ -123,14 +123,14 @@ func _s_money() -> void:
 	await _frames(3)
 	await _choose("Pay Bills")
 	Game.speed = 3
-	await _until(func(): return jack.last_done == "bills", 90.0)
+	await _until_game(func(): return jack.last_done == "bills", 240.0)
 	_step("money_spent", Game.money == money0 - 120 and _task_done("Pay Bills"), "money %d -> %d, Pay Bills done=%s" % [money0, Game.money, str(_task_done("Pay Bills"))])
 	var money1 := Game.money
 	_menus.clear()
 	await _tap_world(_it_center(comp))
 	await _frames(3)
 	await _choose("Work")
-	await _until(func(): return jack.last_done == "work", 150.0)
+	await _until_game(func(): return jack.last_done == "work", 400.0)
 	_step("money_earned", Game.money == money1 + jack.last_pay and jack.last_pay >= 108 and jack.last_pay <= 252,
 		"money %d -> %d (base pay 180, mood-scaled = %d, mood now %s), Logic=%.2f" % [money1, Game.money, jack.last_pay, Game.mood_word(jack.index), Game.skill_level(jack.index, "Logic")])
 
@@ -773,7 +773,7 @@ func _s_build() -> void:
 		await _tap_world(b.nodes[uid].global_position + Vector3(0, 0.45, 0), false)
 		await _frames(2)
 		await _choose("Relax")
-		await _until(func(): return lily.phase == "act", 30.0)
+		await _until_game(func(): return lily.phase == "act", 90.0)
 	_step("use_bought_item", lily.phase == "act" and lily.current_label() == "Relax", "phase=%s action=%s pose=%s" % [lily.phase, lily.current_label(), lily.actor.pose])
 	await _shot("use_bought")
 
@@ -870,7 +870,7 @@ func _s_travel() -> void:
 		await _frames(2)
 		await _choose("Pay at Checkout")
 		Game.speed = 3
-		await _until(func(): return jack.last_done == "pay", 40.0)
+		await _until_game(func(): return jack.last_done == "pay", 120.0)
 	_step("market_checkout", Game.money == money_m - 52 and _task_done("Pay at Checkout"), "money %d -> %d task=%s" % [money_m, Game.money, str(_task_done("Pay at Checkout"))])
 	await _shot("market_checkout")
 
