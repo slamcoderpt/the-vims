@@ -50,7 +50,7 @@ func _run() -> void:
 	var only: Array = []
 	if args.has("only"):
 		only = (args.only as String).split(",")
-	for sec in ["boot", "loop", "life", "anims", "money", "unlocks", "mood", "queue", "autonomy", "meal", "wishes", "clock", "gohere", "build", "social", "townies", "travel", "career", "save"]:
+	for sec in ["boot", "loop", "life", "anims", "money", "unlocks", "mood", "queue", "autonomy", "meal", "wishes", "clock", "gohere", "build", "social", "townies", "crowds", "travel", "solo", "career", "save"]:
 		if only.is_empty() or sec in only or sec == "boot":
 			await call("_s_" + sec)
 
@@ -876,6 +876,204 @@ func _s_townies() -> void:
 			await _frames(3)
 			await _shot("romance_kiss")
 			await _until_game(func(): return jack.phase == "idle", 60.0)
+
+
+func _go(loc: String, label: String) -> void:
+	if Game.location == loc:
+		return
+	Game.speed = 1
+	_menus.clear()
+	Game.mode = "manage"
+	await _frames(3)
+	await _choose(label)
+	await _frames(6)
+
+
+## Townies on every lot: each staged person who isn't family gets a stable
+## identity (hand-written or generated from lot / node / look) and can be
+## tapped and talked to, so new crowd looks never break the social, romance,
+## move-in and baby loop. Names stay the same on a second visit.
+func _s_crowds() -> void:
+	var first := {}
+	var stable := true
+	var stable_detail := ""
+	for pass_n in 2:
+		for dest in [["festival", "Autumn Festival"], ["market", "Grocery Market"], ["backyard", "Backyard BBQ"]]:
+			await _go(dest[0], dest[1])
+			var total := 0
+			var tagged := 0
+			var tappable := 0
+			var names := {}
+			var women := 0
+			var men := 0
+			var looks := {}
+			for n in sim.location.find_children("*", "Node3D", true, false):
+				if not n is SimActor or sim.is_household_actor(n) or sim._family_stand_in(n):
+					continue
+				total += 1
+				looks[str(n.get("look"))] = true
+				if n.has_meta("townie"):
+					tagged += 1
+					var tn := str(n.get_meta("townie"))
+					names[sim._townie_key(n)] = tn
+					if Game.can_romance("Jack", tn) and Game.stage_of(tn) != "elder":
+						if Game.sex_of(tn) == "f":
+							women += 1
+						else:
+							men += 1
+				for c in n.get_children():
+					if c is Interactable and c in sim.interactables:
+						tappable += 1
+						break
+			var uniq := {}
+			for k in names:
+				uniq[names[k]] = true
+			if pass_n == 0:
+				first[dest[0]] = names
+				var ok := tagged == total and tappable == total and uniq.size() == names.size()
+				if dest[0] != "backyard":
+					ok = ok and total > 0
+				if dest[0] == "festival":
+					ok = ok and women >= 2 and men >= 2
+				_step("townies_" + dest[0], ok, "%d people (%d looks), %d townies, %d tappable, %d unique names; eligible for Jack: %d women, %d men" % [total, looks.size(), tagged, tappable, uniq.size(), women, men])
+				if dest[0] == "festival":
+					await _meet_three()
+			else:
+				var before: Dictionary = first.get(dest[0], {})
+				for k in before:
+					if names.get(k, "") != before[k]:
+						stable = false
+						stable_detail += " %s: %s -> %s;" % [k, before[k], names.get(k, "-")]
+	_step("townie_names_stable", stable and not first.is_empty(), "second visit to every lot: %s" % ("same names" if stable else stable_detail))
+
+
+## The festival's "Meet 3 Neighbors" task: Jack introduces himself around.
+func _meet_three() -> void:
+	var jack = _agent("Jack")
+	if jack == null:
+		return
+	Game.selected = jack.index
+	_top_up()
+	Game.speed = 3
+	var met: Array = []
+	for round_n in 6:
+		if _task_done("Meet 3 Neighbors") or met.size() >= 3:
+			break
+		var best = null
+		var bd := INF
+		for it in sim.interactables:
+			var tn: String = sim.townie_of(it)
+			if tn == "" or tn in met or Game.kind_of(tn) == "dog" or Game.has_met("Jack", tn):
+				continue
+			var d := _flat(it.global_position, jack.actor.global_position)
+			if d < bd:
+				bd = d
+				best = it
+		if best == null:
+			break
+		var tname: String = sim.townie_of(best)
+		var pick: Dictionary = {}
+		for a in sim.townie_rows(jack, best):
+			if a.get("id", "") == "s_introduce" and not a.get("locked", false):
+				pick = a
+		if pick.is_empty():
+			met.append(tname)
+			continue
+		jack.command({"action": pick, "target": best})
+		await _until_game(func(): return jack.phase == "idle" and jack.last_done == "s_introduce", 120.0)
+		met.append(tname)
+		_top_up()
+	_step("festival_meet_3", _task_done("Meet 3 Neighbors") or sim.met_here.size() >= 3, "Jack met %s (met here %d), task done=%s" % [str(met), sim.met_here.size(), str(_task_done("Meet 3 Neighbors"))])
+	await _shot("festival_neighbors")
+
+
+## Sims 3 travel: one sim goes to another lot on their own while the rest of
+## the family keeps living at home; the view follows whoever is selected.
+func _s_solo() -> void:
+	await _go("home", "Go Home")
+	var jack = _agent("Jack")
+	var lily = _agent("Lily")
+	if jack == null or lily == null:
+		_step("solo_travel", false, "family not at home")
+		return
+	var ji: int = jack.index
+	var li: int = lily.index
+	_top_up()
+	Game.selected = ji
+	await _frames(3)
+	_menus.clear()
+	Game.mode = "manage"
+	await _frames(3)
+	var rows: Array = _menus[-1][1].map(func(a): return str(a.label)) if not _menus.is_empty() else []
+	await _choose("Go Alone")
+	await _frames(4)
+	var sub: Array = _menus[-1][1].map(func(a): return str(a.label)) if not _menus.is_empty() else []
+	await _choose("Grocery Market")
+	Game.speed = 2
+	var walked := await _until_game(func(): return jack.phase == "walk", 20.0)
+	await _until_game(func(): return Game.lot_of(ji) == "market", 120.0)
+	await _until(func(): return Game.location == "market", 20.0)
+	await _frames(8)
+	var here: Array = []
+	for a in sim.agents:
+		if a:
+			here.append(a.display_name())
+	var j2 = _agent("Jack")
+	var arrived := j2 != null and int(sim.stats.get("arrivals", 0)) > 0
+	_step("solo_travel", Game.location == "market" and here == ["Jack"] and Game.lot_of(li) == "home" and walked and arrived,
+		"menu %s -> %s; view %s, on lot %s, Lily on %s, dropped off=%s" % [str(rows), str(sub), Game.location, str(here), Game.lot_of(li), str(arrived)])
+	if j2:
+		await _focus(j2.actor.global_position)
+	await _shot("solo_market")
+	# Meanwhile at home, Lily looks after herself (off screen).
+	Game.household[li].needs.hunger = 0.2
+	var h0: float = Game.household[li].needs.hunger
+	Game.speed = 3
+	await _until_game(func(): return false, 90.0)
+	var h1: float = Game.household[li].needs.hunger
+	var q: Array = Game.household[li].get("queue_view", [])
+	var qlabel: String = str(q[0].get("label", "")) if not q.is_empty() else "-"
+	_step("off_lot_life", h1 > h0 and qlabel == "At Home", "Lily at home (off screen): hunger %.2f -> %.2f, queue strip '%s'" % [h0, h1, qlabel])
+	# Tap Lily's portrait: the view jumps home, where Jack is missing.
+	Game.speed = 1
+	await _tap_portrait(li)
+	await _until(func(): return Game.location == "home" and sim.loc_name == "home", 20.0)
+	await _frames(8)
+	var home_here: Array = []
+	for a in sim.agents:
+		if a:
+			home_here.append(a.display_name())
+	var jack_body = sim.find_actor("Jack", "dad")
+	_step("view_follows_selection", Game.location == "home" and not "Jack" in home_here and "Lily" in home_here and jack_body == null,
+		"view %s, on lot %s, Jack's body here=%s" % [Game.location, str(home_here), str(jack_body != null)])
+	await _shot("solo_home_without_jack")
+	# Back to Jack (portrait) and send him home alone: the family is whole again.
+	await _tap_portrait(ji)
+	await _until(func(): return Game.location == "market" and sim.loc_name == "market", 20.0)
+	await _frames(6)
+	jack = _agent("Jack")
+	if jack:
+		Game.selected = jack.index
+		_menus.clear()
+		Game.mode = "manage"
+		await _frames(3)
+		var rows2: Array = _menus[-1][1].map(func(a): return str(a.label)) if not _menus.is_empty() else []
+		if not "Go Alone (Jack)..." in rows2:
+			# Jack is the only one here: no "alone" row, the plain trip is his.
+			print("  travel menu with Jack alone: %s" % str(rows2))
+		await _choose("Go Home")
+		await _until(func(): return Game.location == "home" and sim.loc_name == "home", 30.0)
+		await _frames(8)
+	var n_home := 0
+	for a in sim.agents:
+		if a:
+			n_home += 1
+	var all_home := true
+	for i in Game.household.size():
+		if Game.lot_of(i) != "home":
+			all_home = false
+	_step("solo_return_home", Game.location == "home" and n_home == Game.household.size() and all_home, "home with %d agents, all lots home=%s" % [n_home, str(all_home)])
+	Game.speed = 1
 
 
 ## Sims 3 generational loop: a birthday cake ages a kid up (new body),

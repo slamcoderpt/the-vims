@@ -151,6 +151,7 @@ func bind_location(loc: Node3D, p_name: String) -> void:
 		var a := ensure_actor(i)
 		if a == null:
 			agents.append(null)
+			_clear_off_lot(i)
 			continue
 		var ag = SimAgent.new()
 		ag.setup(self, i, a)
@@ -176,7 +177,41 @@ func bind_location(loc: Node3D, p_name: String) -> void:
 			# Mid home-shift (save / travel): sit back down if it's still on.
 			w.state = ""
 			ag.member.get("career", {})["last_day"] = -1
+	_arrive_by_car()
 	roll_wishes()
+
+
+## Member i lives on another lot right now: the location's staged body of
+## them goes, and their queue strip says where they are.
+func _clear_off_lot(i: int) -> void:
+	var m: Dictionary = Game.household[i]
+	if not Game.is_off_lot(i):
+		return
+	var st := find_actor(str(m.name), str(m.get("look", "")))
+	if st != null and not is_household_actor(st):
+		_retire_actor(st)
+	var lot := Game.lot_of(i)
+	Game.set_queue_view(i, [{"label": "At %s" % Game.LOCATION_NAMES.get(lot, lot), "icon": TRAVEL_ICONS.get(lot, "home"),
+		"progress": -1.0, "auto": false, "current": true, "forced": true}])
+
+
+## Whoever came on their own (send_alone) is dropped off at the lot's curb.
+func _arrive_by_car() -> void:
+	for ag in agents:
+		if ag == null or not ag.member.has("arriving"):
+			continue
+		ag.member.erase("arriving")
+		var drop: Vector3 = exit_spot(ag.actor.global_position)
+		ag.actor.global_position = drop
+		ag.actor.visible = true
+		ag.actor.set_pose("idle")
+		if camera_rig:
+			var cp: Vector3 = camera_rig.global_position
+			ag.actor.face(Vector3(cp.x, drop.y, cp.z))
+		carpool(drop, "car", 1.5)
+		stats["arrivals"] = int(stats.get("arrivals", 0)) + 1
+		if OS.has_environment("VIMS_PLAYTEST"):
+			print("  arrive: %s dropped off at %s on %s" % [ag.display_name(), str(drop), loc_name])
 
 
 func roll_wishes() -> void:
@@ -194,10 +229,18 @@ func _on_skill(i: int, skill: String, level: int) -> void:
 ## Give every non-household person on the lot a townie identity (name,
 ## persistent relationship) and make sure each one can be tapped.
 func _setup_townies() -> void:
+	# Every staged person who isn't family becomes a townie: hand-written
+	# TOWNIES looks keep their person, any other look (new crowd looks on any
+	# lot) gets a stable generated identity, so the social / romance / move-in
+	# loop never depends on a fixed look list.
+	var taken := {}
+	var people: Array = []
 	for n in location.find_children("*", "Node3D", true, false):
-		if not n is SimActor or is_household_actor(n):
-			continue
-		var info := Game.townie_by_look(str(n.get("look")))
+		if n is SimActor and not is_household_actor(n) and not _family_stand_in(n):
+			people.append(n)
+	for n in people:
+		var meta: Dictionary = n.get("_meta") if n.get("_meta") is Dictionary else {}
+		var info := Game.register_townie(str(n.get("look")), loc_name, _townie_key(n), meta, taken)
 		if info.is_empty() or Game.is_family(str(info.name)):
 			# (A townie who moved in is family now: lookalikes stay extras.)
 			continue
@@ -207,7 +250,38 @@ func _setup_townies() -> void:
 			if c is Interactable:
 				has_it = true
 		if not has_it:
-			Interactable.attach(n, "Neighbor", [], Vector3(0.6, 1.7, 0.6), Vector3(0, 0.85, 0), Vector3(0, 0, 0.9))
+			var kid := str(info.get("kind", "adult")) != "adult"
+			var dog := str(info.get("kind", "")) == "dog"
+			var h := 0.75 if dog else (1.25 if kid else 1.7)
+			Interactable.attach(n, "Neighbor", [], Vector3(0.6, h, 0.6), Vector3(0, h * 0.5, 0), Vector3(0, 0, 0.9))
+	if OS.has_environment("VIMS_PLAYTEST"):
+		var names: Array = []
+		for n in people:
+			if n.has_meta("townie"):
+				var t := Game.townie_info(str(n.get_meta("townie")))
+				names.append("%s(%s %s %s)" % [t.name, t.get("sex", "?"), t.get("stage", "?"), n.get("look")])
+		print("  townies on %s: %d -> %s" % [loc_name, names.size(), ", ".join(names)])
+
+
+## A staged body of a household member (or of someone who passed away)
+## that isn't driven right now: never a townie.
+func _family_stand_in(n: Node) -> bool:
+	var nm := str(n.name)
+	var look := str(n.get("look"))
+	if look in ["dad", "bunny_girl", "cat_girl", "beagle"]:
+		return true
+	for m in Game.household:
+		if str(m.name) == nm or str(m.get("look", "")) == look.get_slice("@", 0):
+			return true
+	for g in Game.graves:
+		if g is Dictionary and str(g.get("name", "")) == nm:
+			return true
+	return false
+
+
+## Stable per-lot key for a staged actor: its path under the location.
+func _townie_key(n: Node) -> String:
+	return str(location.get_path_to(n)).replace("/", ".")
 
 
 ## Townie name of an Interactable that sits on a townie ("" otherwise).
@@ -224,10 +298,7 @@ func townie_of(it) -> String:
 
 
 func townie_info(tname: String) -> Dictionary:
-	for k in Game.TOWNIES:
-		if Game.TOWNIES[k].name == tname:
-			return Game.TOWNIES[k]
-	return {}
+	return Game.townie_info(tname)
 
 
 ## Menu rows for a townie: the lot's own non-chat actions (Pay at Checkout,
@@ -766,11 +837,22 @@ func _on_action_chosen(title: String, action: Dictionary) -> void:
 				if other:
 					sel.command({"action": action, "other": other})
 					stats.orders += 1
+		"travel_solo":
+			var ag_t = ctx.get("agent")
+			var dest_s: String = action.get("loc", "")
+			if ag_t != null and dest_s != "":
+				send_alone(ag_t, dest_s)
 		"travel":
 			var dest: String = action.get("loc", "")
-			if action.get("id", "") == "save_game":
+			if action.get("id", "") == "solo_menu":
+				var sel_t = selected_agent()
+				if sel_t != null:
+					open_menu.call_deferred("%s goes to..." % sel_t.display_name(), solo_rows(sel_t), {"type": "travel_solo", "agent": sel_t}, Vector2(450, 520))
+			elif action.get("id", "") == "save_game":
 				if Game.save_game():
 					Game.notify.emit("Game saved · %s" % Game.clock_text(), "star")
+			elif action.has("view"):
+				view_lot(str(action.view))
 			elif dest != "":
 				travel(dest)
 		"catalog", "ghost", "placed":
@@ -784,8 +866,95 @@ func travel_menu(screen := Vector2(450, 520)) -> void:
 			continue
 		var label: String = "Go Home" if l == "home" else Game.LOCATION_NAMES[l]
 		rows.append({"id": "go_" + l, "label": label, "icon": TRAVEL_ICONS.get(l, "house_white"), "loc": l})
+	# Sims 3: send just the selected sim (the rest of the family stays).
+	var sel = selected_agent()
+	if sel != null and sel.kind != "baby" and _on_lot_count() > 1:
+		rows.append({"id": "solo_menu", "label": "Go Alone (%s)..." % sel.display_name(), "icon": "people"})
+	# Family members out on other lots: jump the view to them.
+	var shown := {}
+	for i in Game.household.size():
+		var lot := Game.lot_of(i)
+		if lot != Game.location and not shown.has(lot) and Game.household[i].get("kind", "") != "baby":
+			shown[lot] = true
+			rows.append({"id": "view_" + lot, "label": "View %s (%s)" % [Game.LOCATION_NAMES.get(lot, lot), Game.household[i].name],
+				"icon": TRAVEL_ICONS.get(lot, "home"), "view": lot})
 	rows.append({"id": "save_game", "label": "Save Game", "icon": "star"})
 	open_menu("Travel", rows, {"type": "travel"}, screen)
+
+
+func _on_lot_count() -> int:
+	var n := 0
+	for ag in agents:
+		if ag != null and ag.kind != "baby":
+			n += 1
+	return n
+
+
+## Destinations one sim can go to on their own.
+func solo_rows(ag) -> Array:
+	var rows: Array = []
+	var how := "by car" if ag.kind == "adult" else "on foot"
+	for l in Game.LOCATIONS:
+		if l == loc_name:
+			continue
+		var label: String = ("Go Home" if l == "home" else Game.LOCATION_NAMES[l]) + " · " + how
+		rows.append({"id": "solo_" + l, "label": label, "icon": TRAVEL_ICONS.get(l, "house_white"), "loc": l})
+	return rows
+
+
+## Sims 3 travel: one sim walks out to the curb and is driven to another lot;
+## everyone else carries on here. If they were selected, the view follows.
+func send_alone(ag, dest: String) -> bool:
+	if ag == null or dest == loc_name or not dest in Game.LOCATIONS or ag.kind == "baby":
+		return false
+	var exit: Vector3 = exit_spot(ag.actor.global_position)
+	var a := {"id": "leave_lot", "label": "Go to %s" % ("Home" if dest == "home" else Game.LOCATION_NAMES[dest]),
+		"icon": TRAVEL_ICONS.get(dest, "home"), "minutes": 0.0, "dest": dest}
+	return ag.command({"action": a, "point": exit}, true)
+
+
+## The traveller reached the curb: into the car, off to `dest`.
+func depart(ag, dest: String) -> void:
+	var i: int = ag.index
+	var follow: bool = Game.selected == i
+	var actor: Node3D = ag.actor
+	carpool(actor.global_position, "car", 1.2)
+	Game.clear_bubble(actor, "")
+	if ag._reserved != null:
+		release(ag._reserved, ag)
+		ag._reserved = null
+	agents[i] = null
+	ag.queue.clear()
+	Game.send_member(i, dest)
+	Game.notify.emit("%s left for %s" % [ag.display_name(), "home" if dest == "home" else Game.LOCATION_NAMES[dest]], TRAVEL_ICONS.get(dest, "home"))
+	stats["departures"] = int(stats.get("departures", 0)) + 1
+	if OS.has_environment("VIMS_PLAYTEST"):
+		print("  depart: %s leaves %s for %s (view follows=%s)" % [ag.display_name(), loc_name, dest, str(follow)])
+	# Hop in: the body goes once the car has pulled up.
+	get_tree().create_timer(0.9).timeout.connect(func():
+		if is_instance_valid(actor) and actor.is_inside_tree():
+			_retire_actor(actor))
+	if follow:
+		get_tree().create_timer(1.4).timeout.connect(func():
+			if Game.lot_of(i) == dest and Game.location != dest:
+				view_lot(dest))
+	elif _on_lot_count() == 0:
+		# Nobody left here: follow whoever is out.
+		Game.selected = i
+
+
+## Show another lot (nobody moves).
+func view_lot(dest: String) -> void:
+	if dest == Game.location:
+		return
+	for ag in agents:
+		if ag:
+			Game.clear_bubble(ag.actor, "")
+	if location:
+		for n in location.find_children("*", "Node3D", true, false):
+			if n is SimActor:
+				Game.clear_bubble(n, "")
+	Game.view_lot(dest)
 
 
 func travel(dest: String) -> void:
@@ -821,6 +990,11 @@ func _on_mode(m: String) -> void:
 
 
 func _on_selected(i: int) -> void:
+	# Sims 3: picking a sim who is out on another lot takes the view there.
+	if i >= 0 and i < Game.household.size() and (i >= agents.size() or agents[i] == null) \
+			and Game.is_off_lot(i) and Game.mode == "live" and not Game.frozen:
+		(func(): if Game.selected == i and Game.is_off_lot(i): view_lot(Game.lot_of(i))).call_deferred()
+		return
 	if _select_by_tap or camera_rig == null or not camera_rig.has_method("glide_to"):
 		return
 	if i >= 0 and i < agents.size() and agents[i] != null:
@@ -872,7 +1046,7 @@ func release_object(it: Node) -> void:
 ## Where an agent should stand for an order: {spot: Vector3, face: Vector3} or {}.
 func approach(ag, o: Dictionary) -> Dictionary:
 	var a: Dictionary = o.get("action", {})
-	if a.get("id", "") == "go_here" or o.get("work", false):
+	if a.get("id", "") in ["go_here", "leave_lot"] or o.get("work", false):
 		return {"spot": _open_spot(o.point)}
 	var other = o.get("other")
 	if other != null:

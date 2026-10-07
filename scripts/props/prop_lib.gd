@@ -205,7 +205,9 @@ void fragment() {
 static func night_exterior_material() -> StandardMaterial3D:
 	if _night_ext_mat == null:
 		_night_ext_mat = VoxelBuilder.solid_material().duplicate()
-		_night_ext_mat.albedo_color = Color(0.78, 0.84, 1.0)
+		# Moonlit blue lift: lawns, trees and roofs read as cool mid-tones
+		# around the warm cut-away (ref3), not black voids.
+		_night_ext_mat.albedo_color = Color(1.0, 1.12, 1.5)
 	return _night_ext_mat
 
 

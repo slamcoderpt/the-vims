@@ -68,7 +68,10 @@ static func in_skull(c: Ctx, x: int, y: int, z: int, grow := 0.0, top_grow := 0.
 		dy = (y - top0) / (top + 0.7 - top0)
 	elif y < bot0:
 		dy = (bot0 - y) / (bot0 - B + 0.8)
-	return pow(dx, 3.2) + pow(dz, 3.2) + pow(dy, 2.4) <= 1.0
+	# r15b: boxier skull (ref1: heads are cubes with one soft bevel), so the
+	# face is one big flat plane and the sides don't step into AO terraces
+	# that read as contour noise at phone size.
+	return pow(dx, 5.5) + pow(dz, 5.5) + pow(dy, 3.6) <= 1.0
 
 
 static func front_z(vb: VoxelBuilder, x: int, y: int, from_z: int) -> int:
@@ -507,8 +510,10 @@ static func _hair(c: Ctx) -> void:
 	var long := style == "long" or style == "curly_long"
 	match style:
 		"shaggy":
-			r = 1.1
-			bump = 0.75
+			# r15b: a tidier cap of chunky locks (ref1), not a curly bowl:
+			# thinner shell, less crown bump, the forehead left clear.
+			r = 1.0
+			bump = 0.5
 			hl = c.BR + 3
 		"curly":
 			r = 1.2
@@ -539,7 +544,19 @@ static func _hair(c: Ctx) -> void:
 			return q.y >= (B + 3 if long else ear_top)
 		return false
 	var curl := hcol
-	if style == "shaggy" or style == "curly" or style == "afro":
+	if style == "shaggy":
+		var base := c.hair
+		curl = func(p: Vector3i) -> Color:
+			# r15b: swept locks (ref1): 3-wide bands running front to back,
+			# a lighter top layer and darker undersides, no speckle.
+			var band := floori((p.x + 9 + floori(p.z / 5.0)) / 3.0)
+			var f := 0.93 + 0.1 * hh(Vector3i(band, 0, 0), 54)
+			if p.y >= c.T + 1:
+				f += 0.07
+			elif p.y < c.T - 3:
+				f -= 0.06
+			return sh(base, f)
+	elif style == "curly" or style == "afro":
 		var base := c.hair
 		curl = func(p: Vector3i) -> Color:
 			# Curls: flat shade per 2x2 clump, lit on the clump tops.
@@ -552,9 +569,9 @@ static func _hair(c: Ctx) -> void:
 		"shaggy":
 			# Fringe: chunky locks dipping onto the forehead, swept to one side.
 			for x in range(1, W - 1):
-				var drop := 1 + int(hh(Vector3i(x, 0, 3), 55) * 2.0)
-				if x < W / 2 - 2:
-					drop += 1
+				# Swept fringe: a couple of locks dip one row on the left
+				# side only, so the forehead stays a clear skin band.
+				var drop := 1 if (x < W / 2 - 1 and hh(Vector3i(x, 0, 3), 55) > 0.35) else 0
 				for k in drop:
 					var y := hl - 1 - k
 					if y <= c.BR:
@@ -564,7 +581,7 @@ static func _hair(c: Ctx) -> void:
 						vb.set_v(Vector3i(x, y, z + 1), curl.call(Vector3i(x, y, z + 1)))
 			# Volume on the crown: a couple of tufts.
 			for p: Vector3i in shell.keys():
-				if p.y >= T + 1 and hh(p, 57) > 0.82:
+				if p.y >= T + 1 and p.z >= F - 4 and hh(Vector3i(p.x / 3, 0, 0), 57) > 0.5:
 					vb.set_v(p + Vector3i(0, 1, 0), curl.call(p + Vector3i(0, 1, 0)))
 		"short", "messy":
 			for x in range(1, W - 1):
@@ -686,14 +703,14 @@ static func _hat(c: Ctx, out: Dictionary) -> void:
 		# turned-up cuff, a soft crown. The face stays clear below the cuff.
 		var cuff_c: Color = L.get("cuff_color", sh(hc, 1.04))
 		var C := c.C
-		var g := 1.3
+		var g := 1.0
 		var tg := 3.0
 		# r15: a soft block (ref1): straight sides on one rounded-rect
 		# footprint (the skull's widest section, grown), the top row inset by
 		# one and the row under it by a half, so the crown has a single bevel
 		# instead of stacked terraces.
 		var mid := B + c.H / 2
-		var top_y := T + 3
+		var top_y := T + 2
 		var inside := func(x: int, y: int, z: int) -> bool:
 			if y < C or y > top_y:
 				return false

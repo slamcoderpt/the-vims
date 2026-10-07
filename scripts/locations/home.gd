@@ -127,13 +127,13 @@ func lighting_profile() -> Dictionary:
 		"ambient_night": Color(0.66, 0.54, 0.52), "ambient_night_energy": 0.34, "lamp_night_mult": 3.8,
 		"sky_day": Color(0.64, 0.8, 0.94), "sky_night": Color(0.07, 0.09, 0.22),
 		"fog_day": Color(0.94, 0.88, 0.8), "fog_night": Color(0.12, 0.15, 0.32), "fog_density": 0.004,
-		"moon_heading": 150.0, "moon_energy": 0.45, "glow_boost_night": 1.2,
+		"moon_heading": 150.0, "moon_energy": 0.55, "glow_boost_night": 1.2,
 		"shadow_distance": 40.0, "shadow_blur": 3.2,
 		"post_day": {"focus_y": 0.5, "band": 0.35, "falloff": 0.18, "blur_px": 4.0, "top_boost": 1.0,
-			"saturation": 1.07, "contrast": 1.08, "tint": Vector3(1.02, 1.0, 0.96),
+			"saturation": 1.1, "contrast": 1.16, "gamma": 1.12, "tint": Vector3(1.035, 0.985, 0.93),
 			"vignette": 0.24},
 		"post_night": {"focus_y": 0.5, "band": 0.36, "falloff": 0.14, "blur_px": 2.8, "top_boost": 0.8, "bottom_boost": 0.45,
-			"saturation": 1.04, "contrast": 1.12, "gamma": 1.08, "tint": Vector3(1.0, 0.95, 0.94), "vignette": 0.36},
+			"saturation": 1.04, "contrast": 1.12, "gamma": 1.08, "tint": Vector3(1.0, 0.95, 0.94), "vignette": 0.26},
 	}
 
 
@@ -631,7 +631,7 @@ func _build_office_roof() -> void:
 	var base := 24 + UH          # wall top (cells)
 	var mid := (x0 + x1) * 0.5
 	var half := (x1 - x0) * 0.5
-	var slope := 0.4
+	var slope := 0.24
 	var slate := [Color("4c587c"), Color("434d6e"), Color("58658c")]
 	# Soft warm halos over the lit skylights (night only: halos are off by day).
 	for zc: int in [cc(-3.0), cc(0.2), cc(3.2)]:
@@ -644,7 +644,16 @@ func _build_office_roof() -> void:
 			var edge := z == z0 or z == z1 - 1 or x == x0 or x == x1 - 1
 			for yy in range(h - 2, h + 1):
 				var q := Vector3i(x, yy, z)
-				var c: Color = slate[posmod(floori(h / 2.0) + (1 if VoxelBuilder.hash3(Vector3i(x, 0, z / 3)) > 0.85 else 0), 3)]
+				# Shingle courses parallel to the ridge: each course a slate
+				# tone with a dark drip line at its lower edge and staggered
+				# tile seams, so the roof reads as tiles, not a dark slab.
+				var ax0 := absf(x + 0.5 - mid)
+				var course := floori(ax0 / 3.0)
+				var c: Color = slate[posmod(course + (1 if VoxelBuilder.hash3(Vector3i(x, 0, z / 3)) > 0.85 else 0), 3)]
+				if posmod(floori(ax0), 3) == 2:
+					c = c.darkened(0.22)
+				elif posmod(z + course * 2, 4) == 0:
+					c = c.darkened(0.1)
 				if yy < h:
 					c = c.darkened(0.15)
 				if edge:
@@ -654,13 +663,13 @@ func _build_office_roof() -> void:
 				# Moonlit slate: a pale ridge-line sheen on the camera-side
 				# slope so the big roof reads as tiles, not a dark slab.
 				if yy == h and not edge and x > mid and posmod(z, 4) == 0:
-					c = c.lerp(Color("8592bd"), 0.35)
+					c = c.lerp(Color("8592bd"), 0.2)
 				# Three lit skylights on the camera-side slope (warm glow +
 				# white frame), like the lit attic windows around ref3.
 				var sk := _skylight(x - mid, z)
 				if yy == h and sk > 0:
 					if sk == 2:
-						_sgroup(_zone(q), sig, "base").set_v(q, Color("ffcf7a").lerp(Color("ffe6a8"), VoxelBuilder.hash3(q) * 0.5), true)
+						_sgroup(_zone(q), sig, "base").set_v(q, Color("ffa94a").lerp(Color("ffcf7a"), VoxelBuilder.hash3(q) * 0.6), true)
 						continue
 					c = TRIM
 				_sgroup(_zone(q), sig, "base").set_v(q, c)
@@ -967,6 +976,14 @@ func _build_office() -> void:
 	_put(R, "plant", Vector3(-1.6, y, 3.3), 0, 1)
 	_put(R, "plant", Vector3(-4.3, y, 4.1), 0, 4)
 	_put(R, "toy_blocks", Vector3(-2.75, y, 3.85), 0, 0)
+	# Reading corner between the dog's rug and the nook: beanbag,
+	# water bowl by the dog bed, a tennis ball and a crate of books (ref1's
+	# foreground is never bare floor).
+	_put(R, "beanbag", Vector3(-3.75, y, 1.05), 1, 2)
+	var obowl := _put(R, "dog_bowl", Vector3(-5.05, y, 0.75), 0, 1)
+	_use(obowl, "Dog Bowl", [_act("feed_dog", "Feed Dog", "bone", 5, {}, {"pose": "idle", "task": "Feed Dog", "who": ["adult", "child"]})])
+	_put(R, "tennis_ball", Vector3(-3.05, y + PU, 0.55))
+	_put(R, "book_stack", Vector3(-3.95, y, 1.55), 1, 2)
 	# Beanbag + pouf by the railing corner so the foreground floor is lived-in.
 	_put(R, "pouf", Vector3(-2.95, y, 1.55), 0, 1)
 	_put(R, "book_stack", Vector3(-2.9, y + 5 * PU, 1.62), 0, 0)
@@ -1404,7 +1421,10 @@ func _build_exterior() -> void:
 		Vector3(24.0, 0, -5.0), Vector3(22.5, 0, -2.5), Vector3(20.5, 0, -7.5),
 		Vector3(10.5, 0, -9.0), Vector3(19.0, 0, -12.0), Vector3(23.0, 0, 3.0),
 		# Round trees between the side path and the next-door houses (ref3 right edge).
-		Vector3(12.0, 0, -1.4), Vector3(12.3, 0, 3.0), Vector3(11.8, 0, 7.4),
+		Vector3(10.9, 0, -5.6), Vector3(11.0, 0, 3.2), Vector3(11.2, 0, 11.4),
+		# Front-right lawn (bottom-right corner of the night frame): a clump
+		# of round trees instead of a next-door roof right under the lens.
+		Vector3(12.4, 0, 6.6), Vector3(15.8, 0, 9.0), Vector3(12.8, 0, 10.2), Vector3(18.0, 0, 7.6),
 	]
 	for i in trees.size():
 		var p: Vector3 = trees[i]
@@ -1442,7 +1462,7 @@ func _build_exterior() -> void:
 		var gp := Vector3(10.15, 0, -1.2 + k * 3.4)
 		PropLib.place(_g("ext"), "lantern", Vector3i(fc(gp.x), 0, fc(gp.z)), 0)
 		_halo_pts.append({"pos": gp + Vector3(0.16, 0.25, 0.16), "size": 1.3, "color": STREET_HALO})
-	for lp: Vector3 in [Vector3(-1.2, 0, -7.4), Vector3(4.6, 0, -7.4), Vector3(10.4, 0, -4.6), Vector3(10.5, 0, 0.6), Vector3(10.5, 0, 8.0)]:
+	for lp: Vector3 in [Vector3(-1.2, 0, -7.4), Vector3(4.6, 0, -7.4), Vector3(10.4, 0, -4.6), Vector3(10.5, 0, 0.6), Vector3(10.5, 0, 8.0), Vector3(14.2, 0, 7.4)]:
 		PropLib.place(o, "street_lamp", Vector3i(cc(lp.x), 0, cc(lp.z)), 0, 1)
 		_halo_pts.append({"pos": lp + lh, "size": 2.6, "color": STREET_HALO})
 	var bushes := [Vector3(-9.8, 0, -3.0), Vector3(-9.8, 0, 1.0), Vector3(9.4, 0, -3.5), Vector3(9.4, 0, 0.5),
@@ -1581,12 +1601,12 @@ func _ensure_neighbourhood(lit: bool) -> void:
 			# fill the lawn beside the bathroom in the night shot (ref3).
 			# Next-door house on the right, lit front towards the camera (ref3:
 			# the night frame's right edge is houses, trees and lamps, not lawn).
-			Vector3(10.6, 0, -7.4),
+			Vector3(11.2, 0, -9.6),
 			# Houses across the side lawn on the right, lit fronts turned to
 			# the house (ref3's right edge: homes, trees and lamps).
-			Vector3(13.4, 0, -3.0), Vector3(13.6, 0, 5.2)]
+			Vector3(12.4, 0, -1.2)]
 		var styles := [1, 4, 2, 0, 5, 3, 2, 5, 3, 0, 4, 1, 2, 4, 1, 3]
-		var rots := [0, 0, 0, 0, 0, 0, 1, 3, 0, 0, 0, 0, 0, 0, 0, 0]
+		var rots := [0, 0, 0, 0, 0, 0, 1, 3, 0, 0, 0, 0, 0, 0, 1, 1]
 		# Neighbour houses drawn a little smaller than authored (0.2 m cells):
 		# they read as a street of homes behind ours, roofs in frame (ref3).
 		var hs: float = PropLib.scale_of("house") * 0.9
@@ -1620,7 +1640,7 @@ func _ensure_neighbourhood(lit: bool) -> void:
 		# Neighbour houses sit darker than the lawn so their lit windows pop.
 		if _hood_mat == null:
 			_hood_mat = PropLib.night_exterior_material().duplicate()
-			_hood_mat.albedo_color = Color(0.82, 0.84, 1.0)
+			_hood_mat.albedo_color = Color(0.95, 1.0, 1.3)
 		_hood_night.set_surface_override_material(0, _hood_mat)
 
 

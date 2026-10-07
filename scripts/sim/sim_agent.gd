@@ -681,6 +681,13 @@ func _arrive() -> void:
 		actor.set_pose("idle")
 		_end(true)
 		return
+	if a.get("id", "") == "leave_lot":
+		actor.set_pose("idle")
+		order = {}
+		phase = "idle"
+		path = PackedVector3Array()
+		world.depart(self, str(a.get("dest", "home")))
+		return
 	if order.get("work", false):
 		_leave_for_work()
 		return

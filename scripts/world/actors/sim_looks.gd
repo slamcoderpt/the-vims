@@ -10,7 +10,7 @@ const LOOKS := {
 		# r13: flat, low-noise blocks with strong value separation: a
 		# chocolate hair cap, a slightly deeper beard mass, peach face band.
 		# r15: warmer, lighter hair over a clearly deeper beard (ref1).
-		"hair": Color(0.52, 0.30, 0.14), "hair_style": "shaggy", "beard": "full",
+		"hair": Color(0.47, 0.26, 0.12), "hair_style": "shaggy", "beard": "full",
 		"beard_color": Color(0.32, 0.17, 0.08),
 		"brow": Color(0.24, 0.12, 0.06), "eye": Color(0.2, 0.12, 0.08),
 		"top": "plaid", "top_color": Color(0.80, 0.13, 0.12), "top_color2": Color(0.16, 0.05, 0.06),
@@ -42,8 +42,8 @@ const LOOKS := {
 	},
 	"beagle": {
 		"species": "dog",
-		"tan": Color(0.82, 0.50, 0.23), "saddle": Color(0.45, 0.25, 0.11),
-		"white": Color(1.0, 0.98, 0.94), "ear": Color(0.42, 0.21, 0.09),
+		"tan": Color(0.86, 0.52, 0.23), "saddle": Color(0.56, 0.29, 0.11),
+		"white": Color(1.0, 0.98, 0.94), "ear": Color(0.60, 0.32, 0.13),
 		"collar": Color(0.86, 0.18, 0.18),
 	},
 	# --- Neighbours / townsfolk -------------------------------------------

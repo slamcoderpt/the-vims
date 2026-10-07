@@ -50,7 +50,7 @@ static func build(acc, L: Dictionary) -> Dictionary:
 	const LEG := 10
 	const BW := 20
 	const BH := 16
-	const BL := 42
+	const BL := 48
 	const HW := 20
 	const HH := 19
 	const HD := 14
@@ -90,7 +90,7 @@ static func build(acc, L: Dictionary) -> Dictionary:
 			c = saddle
 		return sh(c, 1.0 + (hh(p, 32) - 0.5) * 0.025)
 	fill(body, 0, BW - 1, 0, BH - 1, 0, BL - 1, func(p: Vector3i) -> Color:
-		if not in_rbox(p, Vector3(BW, BH, BL), 2.4, 0.9):
+		if not in_rbox(p, Vector3(BW, BH, BL), 4.5, 0.6):
 			return Color(0, 0, 0, 0)
 		return body_fn.call(p))
 	# Haunches: rounded tan thigh bumps on the flanks over the folded hind legs.
@@ -128,8 +128,8 @@ static func build(acc, L: Dictionary) -> Dictionary:
 			c = sh(tan, 0.92)
 		return sh(c, 1.0 + (hh(p, 33) - 0.5) * 0.02)
 	fill(head, 0, HW - 1, 0, HH - 1, 0, HD - 1, func(p: Vector3i) -> Color:
-		var fat := 0.9 if p.y < HH / 2 else 0.35
-		if not in_rbox(p, Vector3(HW, HH, HD), 2.3, fat):
+		var fat := 0.7 if p.y < HH / 2 else 0.3
+		if not in_rbox(p, Vector3(HW, HH, HD), 4.5, fat):
 			return Color(0, 0, 0, 0)
 		return head_fn.call(p))
 	# Muzzle: white, 12 wide x 8 tall x MZ deep, rounded front edges.
@@ -173,7 +173,7 @@ static func build(acc, L: Dictionary) -> Dictionary:
 	var eyes := VoxelBuilder.new()
 	eyes.jitter = 0.0
 	var lid := Color(0.16, 0.09, 0.06)
-	for ex: int in [3, HW - 6]:
+	for ex: int in [4, HW - 7]:
 		for dx in 3:
 			for ey in [9, 10, 11]:
 				var x := ex + dx

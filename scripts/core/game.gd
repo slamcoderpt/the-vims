@@ -28,6 +28,8 @@ signal needs_changed(index: int)
 signal notify(text: String, icon: String)
 ## A placed (bought) object was added / moved / sold in the current location.
 signal furniture_changed
+## A household member went to another lot on their own (send_member).
+signal member_lot_changed(index: int)
 ## Overall mood of member index changed (value -100..100, see mood_band()).
 signal mood_changed(index: int, mood: float)
 ## A moodlet was added / removed / expired for member index.
@@ -69,6 +71,8 @@ const DAY_NAMES := ["Mon.", "Tue.", "Wed.", "Thu.", "Fri.", "Sat.", "Sun."]
 const SEASONS := ["Spring", "Summer", "Autumn", "Winter"]
 ## Real seconds per in-game minute at speed 1.
 const SECONDS_PER_MINUTE := 0.5
+## Need refill per hour for a member living off screen on another lot.
+const OFF_LOT_CARE := 0.06
 const SPEED_MULT := [0.0, 1.0, 3.0, 8.0]
 
 ## 0 = paused, 1 = play, 2 = fast, 3 = ultra
@@ -138,6 +142,28 @@ const TOWNIES := {
 	"npc_6": {"name": "Walter Moss", "kind": "adult", "trait": "Grumpy", "sex": "m", "stage": "elder"},
 	"npc_7": {"name": "Kai Ortiz", "kind": "child", "trait": "Athletic", "sex": "m", "stage": "teen"},
 }
+## Generated townies: every other staged, non-household person on any lot
+## gets one (see register_townie), so new crowd looks never leave a lot full
+## of people you can't talk to. id ("location/node/look") -> info dictionary
+## like TOWNIES' ({name, kind, trait, sex, stage}) plus look / look_def.
+## Saved with the game, so names and relationships are stable.
+var townie_db := {}
+## name -> info for every townie (static + generated): fast lookups by name.
+var _townie_by_name := {}
+## Look tables outside sim_looks.gd (location crowds). Read for the look of a
+## generated townie so they keep their face and clothes if they move in.
+const LOOK_SOURCES := ["res://scripts/locations/festival/townsfolk_looks.gd"]
+const _T_FIRST_F := ["Ava", "Clara", "Nora", "Ivy", "Elena", "Mila", "Grace", "Zoe", "Isla", "Ruby",
+	"Lucia", "Hazel", "Iris", "Willa", "Tessa", "Priya", "Amara", "Leah", "Freya", "Esme"]
+const _T_FIRST_M := ["Leo", "Felix", "Hugo", "Theo", "Ezra", "Milo", "Owen", "Jonah", "Arlo", "Silas",
+	"Rafael", "Kenji", "Dev", "Caleb", "Emmett", "Rowan", "Nico", "Abel", "Otis", "Bruno"]
+const _T_LAST := ["Alder", "Brooks", "Calloway", "Dunn", "Ellery", "Fairweather", "Garcia", "Hollis",
+	"Ingram", "Jennings", "Kowalski", "Lindqvist", "Mendez", "Novak", "Okafor", "Pemberton",
+	"Quill", "Rowe", "Silva", "Thorne", "Underwood", "Vance", "Whitlock", "Yates"]
+const _T_TRAITS := ["Friendly", "Good Sense of Humor", "Neighborly", "Charismatic", "Artistic",
+	"Bookworm", "Natural Cook", "Athletic", "Virtuoso", "Hyper", "Couch Potato", "Grumpy"]
+
+
 ## Relationship levels (friendship value -100..100), lowest first: [max, label].
 const REL_LEVELS := [[-60.0, "Enemy"], [-20.0, "Disliked"], [25.0, "Acquaintance"],
 	[55.0, "Friend"], [80.0, "Good Friend"], [101.0, "Best Friend"]]
@@ -561,10 +587,145 @@ func townie_by_look(look: String) -> Dictionary:
 
 
 func townie_names() -> Array:
-	var out: Array = []
+	_index_townies()
+	return _townie_by_name.keys()
+
+
+## Any townie (static or generated) by name; {} if unknown.
+func townie_info(person: String) -> Dictionary:
+	_index_townies()
+	return _townie_by_name.get(person, {})
+
+
+func is_townie(person: String) -> bool:
+	return not townie_info(person).is_empty()
+
+
+func _index_townies() -> void:
+	if _townie_by_name.size() == TOWNIES.size() + townie_db.size():
+		return
+	_townie_by_name.clear()
 	for k in TOWNIES:
-		out.append(TOWNIES[k].name)
-	return out
+		var t: Dictionary = TOWNIES[k].duplicate()
+		t["look"] = k
+		_townie_by_name[t.name] = t
+	for id in townie_db:
+		_townie_by_name[townie_db[id].name] = townie_db[id]
+
+
+## The look dictionary for a look id: sim_looks.gd or a location's own table.
+func look_def_of(look: String) -> Dictionary:
+	var Looks = LifeStages.Looks
+	if Looks.LOOKS.has(look):
+		return Looks.LOOKS[look]
+	for p in LOOK_SOURCES:
+		if not ResourceLoader.exists(p):
+			continue
+		var scr = load(p)
+		if scr is GDScript:
+			var tbl = (scr as GDScript).get_script_constant_map().get("LOOKS", {})
+			if tbl is Dictionary and (tbl as Dictionary).has(look):
+				return tbl[look]
+	return {}
+
+
+## Townie identity for a staged non-household actor. Static TOWNIES looks
+## keep their hand-written person (once per lot: lookalikes get their own);
+## everyone else gets a stable generated person keyed by lot / node / look.
+## `taken` collects the names already handed out on this lot.
+## `meta` is the actor's rig meta (kind, elderly, species).
+func register_townie(look: String, loc: String, node_key: String, meta: Dictionary, taken: Dictionary) -> Dictionary:
+	if TOWNIES.has(look) and not taken.has(TOWNIES[look].name):
+		var t: Dictionary = townie_info(str(TOWNIES[look].name))
+		taken[t.name] = true
+		return t
+	var id := "%s/%s/%s" % [loc, node_key, look]
+	if townie_db.has(id):
+		var known: Dictionary = townie_db[id]
+		if not taken.has(known.name):
+			taken[known.name] = true
+			return known
+		id += "#%d" % taken.size()
+		if townie_db.has(id):
+			taken[townie_db[id].name] = true
+			return townie_db[id]
+	var h := hash(id) & 0x7fffffff
+	var L := look_def_of(look)
+	var species := str(meta.get("species", L.get("species", "human")))
+	var info := {"look": look, "home": loc, "generated": true}
+	if not L.is_empty() and not Looks_has(look):
+		info["look_def"] = L
+	if species == "dog":
+		info["sex"] = "m" if h & 1 else "f"
+		info["kind"] = "dog"
+		info["stage"] = "adult"
+		info["trait"] = "Friendly"
+		info["name"] = _fresh_name(["Pepper", "Rufus", "Daisy", "Scout", "Maple", "Bean", "Pickles", "Juniper"], [], h)
+	else:
+		var sex := _infer_sex(L, look, h)
+		var child := str(meta.get("kind", "")) == "child" or str(L.get("body", "")) == "child"
+		var stage := "adult"
+		if child:
+			stage = "teen" if "teen" in look else "child"
+		elif "teen" in look:
+			stage = "teen"
+		elif bool(meta.get("elderly", L.get("elderly", false))) or "grand" in look or "elder" in look:
+			stage = "elder"
+		else:
+			stage = "young_adult" if (h >> 3) % 3 != 0 else "adult"
+		info["sex"] = sex
+		info["stage"] = stage
+		info["kind"] = str(LifeStages.KIND.get(stage, "adult"))
+		info["trait"] = _T_TRAITS[(h >> 5) % _T_TRAITS.size()]
+		info["name"] = _fresh_name(_T_FIRST_F if sex == "f" else _T_FIRST_M, _T_LAST, h)
+	townie_db[id] = info
+	_townie_by_name[info.name] = info
+	taken[info.name] = true
+	return info
+
+
+func Looks_has(look: String) -> bool:
+	return LifeStages.Looks.LOOKS.has(look)
+
+
+## A first (+ last) name nobody in town has yet, picked from h.
+func _fresh_name(first: Array, last: Array, h: int) -> String:
+	_index_townies()
+	for k in 200:
+		var hh := (h + k * 7919) & 0x7fffffff
+		var nm: String = first[hh % first.size()]
+		if not last.is_empty():
+			nm += " " + str(last[(hh / first.size()) % last.size()])
+		if not _townie_by_name.has(nm) and member_index(nm) < 0:
+			return nm
+	return "%s %d" % [first[h % first.size()], h % 1000]
+
+
+## Best guess at a look's sex from its clothes and hair.
+func _infer_sex(L: Dictionary, look: String, h: int) -> String:
+	if L.has("sex"):
+		return str(L.sex)
+	for w in ["woman", "girl", "grandma", "lady", "mom", "aunt"]:
+		if w in look:
+			return "f"
+	for w in ["man", "boy", "grandpa", "dad", "guy", "uncle"]:
+		if w in look:
+			return "m"
+	var f := 0
+	if L.get("lashes", false):
+		f += 2
+	if str(L.get("beard", "")) != "":
+		f -= 3
+	if str(L.get("bottom", "")) in ["skirt", "dress"] or str(L.get("top", "")) == "dress":
+		f += 2
+	var hs := str(L.get("hair_style", ""))
+	if hs in ["long", "bun", "ponytail", "pigtails", "bob", "braid", "buns"]:
+		f += 1
+	elif hs in ["short", "bald", "buzz", "crew"]:
+		f -= 1
+	if f == 0:
+		return "f" if h & 1 else "m"
+	return "f" if f > 0 else "m"
 
 
 ## Everyone member i knows: [{name, value, level, family: bool, kind, look}],
@@ -588,10 +749,10 @@ func rel_list(i: int) -> Array:
 			kind = m.get("kind", "adult")
 			look = m.get("look", "")
 		else:
-			for tk in TOWNIES:
-				if TOWNIES[tk].name == other:
-					kind = TOWNIES[tk].kind
-					look = tk
+			var ti := townie_info(other)
+			if not ti.is_empty():
+				kind = str(ti.get("kind", "adult"))
+				look = str(ti.get("look", ""))
 		out.append({"name": other, "value": v, "level": rel_level(v), "family": fam, "kind": kind, "look": look,
 			"romance": float(relationships[k].get("romance", 0.0)), "status": str(relationships[k].get("status", ""))})
 	out.sort_custom(func(x, y): return x.family and not y.family or (x.family == y.family and x.value > y.value))
@@ -644,15 +805,67 @@ func request_queue_cancel(i: int, slot: int) -> void:
 	queue_cancel_requested.emit(i, slot)
 
 
-## Go to another lot. main.gd rebuilds the world on location_changed.
+## Go to another lot with everyone who is on this one (babies stay home with
+## a sitter; family members out on other lots stay where they are).
+## main.gd rebuilds the world on location_changed.
 func travel(loc: String) -> void:
 	if not loc in LOCATIONS:
 		push_warning("Game.travel: unknown location " + loc)
+		return
+	var from := location
+	for i in household.size():
+		var m: Dictionary = household[i]
+		if str(m.get("kind", "")) == "baby":
+			m["lot"] = "home"
+		elif lot_of_member(m) == from:
+			m["lot"] = loc
+			m.erase("arriving")
+	view_lot(loc)
+
+
+## Look at another lot without moving anyone (Sims 3: the camera jumps to
+## the selected sim wherever they are). main.gd rebuilds the world.
+func view_lot(loc: String) -> void:
+	if not loc in LOCATIONS:
 		return
 	location_tasks[location] = tasks.duplicate(true)
 	location = loc
 	mode = "live"
 	location_changed.emit(loc)
+
+
+## Which lot member m is on. Members without a "lot" go where the view goes
+## (older saves); babies live at home.
+func lot_of_member(m: Dictionary) -> String:
+	var l := str(m.get("lot", ""))
+	if l != "" and l in LOCATIONS:
+		return l
+	if str(m.get("kind", "")) == "baby":
+		return "home"
+	return location
+
+
+func lot_of(i: int) -> String:
+	if i < 0 or i >= household.size():
+		return location
+	return lot_of_member(household[i])
+
+
+## Is member i somewhere other than the lot being shown?
+func is_off_lot(i: int) -> bool:
+	return lot_of(i) != location
+
+
+## One sim leaves for another lot on their own (Sims 3: the rest of the family
+## keeps living at home). They arrive there by car.
+func send_member(i: int, dest: String) -> void:
+	if i < 0 or i >= household.size() or not dest in LOCATIONS:
+		return
+	household[i]["lot"] = dest
+	household[i]["arriving"] = true
+	set_queue_view(i, [{"label": "At %s" % LOCATION_NAMES.get(dest, dest), "icon": "home" if dest == "home" else "star",
+		"progress": -1.0, "auto": false, "current": true, "forced": true}])
+	member_lot_changed.emit(i)
 
 
 func next_uid() -> int:
@@ -711,6 +924,16 @@ func _process(delta: float) -> void:
 		var floor_v := 0.0
 		if s.get("kind", "") == "baby" and location != "home":
 			floor_v = 0.45   # a babysitter looks after the baby while the family is out
+		if lot_of_member(s) != location and s.get("kind", "") != "baby":
+			# Living their own life on another lot (off screen): they look
+			# after themselves, so low needs slowly come back up.
+			for k in s.needs:
+				var v: float = s.needs[k]
+				if v < 0.55:
+					s.needs[k] = minf(0.55, v + hours * OFF_LOT_CARE)
+				else:
+					s.needs[k] = maxf(0.55, v - hours * NEED_DECAY.get(k, NEED_DECAY_DEFAULT) * 0.5)
+			continue
 		for k in s.needs:
 			s.needs[k] = clampf(s.needs[k] - hours * NEED_DECAY.get(k, NEED_DECAY_DEFAULT) * float(dt.get(k, 1.0)), minf(floor_v, s.needs[k]), 1.0)
 	if autosave and live:
@@ -1067,7 +1290,8 @@ func save_data() -> Dictionary:
 		"location": location, "selected": selected, "household": hh, "relationships": relationships.duplicate(true),
 		"location_tasks": location_tasks.duplicate(true), "placed": placed.duplicate(true), "uid": _uid,
 		"bills": bills.duplicate(true), "next_bill_at": next_bill_at,
-		"graves": graves.duplicate(true), "aging": aging_enabled, "born": _born}
+		"graves": graves.duplicate(true), "aging": aging_enabled, "born": _born,
+		"townies": townie_db.duplicate(true)}
 
 
 func save_game(path := SAVE_PATH) -> bool:
@@ -1114,6 +1338,8 @@ func load_game(path := SAVE_PATH) -> bool:
 	graves = d.get("graves", [])
 	aging_enabled = bool(d.get("aging", true))
 	_born = int(d.get("born", 0))
+	townie_db = d.get("townies", {})
+	_townie_by_name.clear()
 	var lt: Array = location_tasks.get(location, [])
 	tasks.clear()
 	for t in lt:
@@ -1193,30 +1419,21 @@ func kind_of(person: String) -> String:
 	var i := member_index(person)
 	if i >= 0:
 		return str(household[i].get("kind", "adult"))
-	for k in TOWNIES:
-		if TOWNIES[k].name == person:
-			return str(TOWNIES[k].kind)
-	return "adult"
+	return str(townie_info(person).get("kind", "adult"))
 
 
 func sex_of(person: String) -> String:
 	var i := member_index(person)
 	if i >= 0:
 		return str(household[i].get("sex", "m"))
-	for k in TOWNIES:
-		if TOWNIES[k].name == person:
-			return str(TOWNIES[k].get("sex", "m"))
-	return "m"
+	return str(townie_info(person).get("sex", "m"))
 
 
 func stage_of(person: String) -> String:
 	var i := member_index(person)
 	if i >= 0:
 		return life_stage(i)
-	for k in TOWNIES:
-		if TOWNIES[k].name == person:
-			return str(TOWNIES[k].get("stage", "adult"))
-	return "adult"
+	return str(townie_info(person).get("stage", "adult"))
 
 
 func parents_of(person: String) -> Array:
@@ -1398,13 +1615,9 @@ func add_member(m: Dictionary) -> int:
 func move_in(townie_name: String) -> int:
 	if is_family(townie_name) or household.size() >= MAX_HOUSEHOLD:
 		return -1
-	var look := ""
-	var info: Dictionary = {}
-	for k in TOWNIES:
-		if TOWNIES[k].name == townie_name:
-			look = k
-			info = TOWNIES[k]
-	if look == "":
+	var info: Dictionary = townie_info(townie_name)
+	var look := str(info.get("look", ""))
+	if look == "" or str(info.get("kind", "adult")) == "dog":
 		return -1
 	var kind := str(info.get("kind", "adult"))
 	var tr: Array = []
@@ -1416,6 +1629,13 @@ func move_in(townie_name: String) -> int:
 		"life_stage": info.get("stage", "young_adult"), "age_days": 1, "parents": [],
 		"needs": {"fun": 0.7, "hunger": 0.6, "hygiene": 0.75, "energy": 0.7, "social": 0.7} if kind == "adult" else {"fun": 0.7, "hunger": 0.6, "hygiene": 0.7, "energy": 0.7},
 		"skills": {"Charisma": 2.0, "Cooking": 1.0}, "traits": tr, "moved_in": day}
+	# A generated townie wears a location's own look: carry its definition so
+	# the rig and HUD bust can be rebuilt anywhere (and after a reload).
+	if not Looks_has(look):
+		var ld: Dictionary = info.get("look_def", look_def_of(look))
+		if not ld.is_empty():
+			m["look_def"] = ld
+			LifeStages.register_look(m)
 	if kind == "child":
 		m["career"] = Careers.new_career("school")
 	var i := add_member(m)

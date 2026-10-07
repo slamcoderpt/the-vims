@@ -21,7 +21,7 @@ const BODY := {
 	# r10: smaller heads (10^3 instead of 12x11x11) and a taller torso: the
 	# head is still chibi (about 1/3.5 of the height) but no longer swallows
 	# the body, so hair/hats never dominate the silhouette.
-	"big": {"lw": 5, "shin": 6, "thigh": 6, "tw": 12, "td": 7, "th": 10, "aw": 3, "ua": 6, "fa": 6, "hw": 10, "hh": 10, "hd": 10},
+	"big": {"lw": 6, "shin": 6, "thigh": 6, "tw": 14, "td": 8, "th": 10, "aw": 4, "ua": 6, "fa": 6, "hw": 10, "hh": 10, "hd": 10},
 	"slim": {"lw": 4, "shin": 6, "thigh": 6, "tw": 10, "td": 6, "th": 10, "aw": 3, "ua": 6, "fa": 6, "hw": 10, "hh": 10, "hd": 10},
 	# Chibi child: head (with hat) ~38% of total height.
 	"child": {"lw": 4, "shin": 5, "thigh": 4, "tw": 10, "td": 6, "th": 8, "aw": 3, "ua": 5, "fa": 5, "hw": 12, "hh": 11, "hd": 11},
