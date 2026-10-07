@@ -45,4 +45,23 @@ func _ready() -> void:
 	await RenderingServer.frame_post_draw
 	get_viewport().get_texture().get_image().save_png(out)
 	print("PREVIEW_SAVED ", out)
+	# --multi=x,y,z,fov;x,y,z,fov : extra close-ups from the preset camera position.
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--multi="):
+			var pc: Dictionary = preload("res://scripts/core/shot_presets.gd").PRESETS["home_day"].camera
+			var r := Basis.from_euler(Vector3(deg_to_rad(-pc.pitch), deg_to_rad(pc.yaw), 0))
+			var P: Vector3 = pc.target + r * Vector3(0, 0, pc.distance)
+			var i := 0
+			for item in a.substr(8).split(";"):
+				var v := item.split(",")
+				var T := Vector3(float(v[0]), float(v[1]), float(v[2]))
+				var d := P - T
+				rig.apply({"target": T, "yaw": rad_to_deg(atan2(d.x, d.z)), "pitch": rad_to_deg(asin(d.y / d.length())), "distance": d.length(), "fov": float(v[3])})
+				for k in 4:
+					await get_tree().process_frame
+				await RenderingServer.frame_post_draw
+				var o := out.replace(".png", "_%d.png" % i)
+				get_viewport().get_texture().get_image().save_png(o)
+				print("PREVIEW_SAVED ", o)
+				i += 1
 	get_tree().quit()

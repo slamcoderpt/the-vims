@@ -21,7 +21,8 @@ const DECK_Y := 0.375
 const X0 := 12      # 1.5 m
 const X1 := 104     # 13 m
 const WALL_Z := -48 # -6 m (outer face)
-const UX0 := 44     # 5.5 m: left edge of the two-storey block
+const UX0 := 66     # 8.25 m: left edge of the two-storey block (kept right so
+                    # the sunset + neighbours read over the single-storey wing)
 const DECK_Z1 := -21
 const DOOR_X0 := 20  # 2.5 m
 const DOOR_X1 := 92  # 11.5 m
@@ -120,11 +121,15 @@ func _shell(vb: VoxelBuilder) -> void:
 	V.b(vb, X0 - 1, 3, WALL_Z - 2, 1, 25, 3, TRIM)
 	V.b(vb, UX0 - 1, 28, WALL_Z - 2, 1, 20, 3, TRIM)
 	V.b(vb, X1, 3, WALL_Z - 2, 1, 45, 3, TRIM)
-	# Lean-to roof over the single-storey wing, rising towards the back.
+	# Flat roof over the single-storey wing (just under the bbq camera's eye
+	# height, so it reads as a thin edge and the sunset + neighbours show
+	# above it instead of a rising roof slab).
 	for z in range(zb - 2, WALL_Z + 1):
-		var ry := 28 + int(float(WALL_Z - z) / 4.0)
+		var ry := 28
 		V.b(vb, X0 - 2, ry, z, UX0 - X0 + 2, 1, 1, func(q: Vector3i) -> Color:
 			return V.shade(SHINGLE, 0.86 + V.h1(Vector3i(q.x / 3 + posmod(q.z, 2) * 7, 0, q.z), 5) * 0.28))
+	# Pale parapet trim along the flat roof's edge.
+	V.b(vb, X0 - 2, 29, WALL_Z, UX0 - X0 + 2, 1, 1, TRIM)
 	# Floor / ceiling between storeys.
 	V.b(vb, X0, 2, zb, X1 - X0, 1, WALL_Z - zb - 2, func(q: Vector3i) -> Color:
 		return V.shade(Color("c08a58"), 0.92 + V.hs((q.x + q.z * 5) / 7, q.z, 2) * 0.16))
@@ -147,8 +152,8 @@ func _shell(vb: VoxelBuilder) -> void:
 	V.b(vb, DOOR_X1 + 1, 3, WALL_Z, 1, 23, 1, TRIM)
 	V.b(vb, DOOR_X0 - 2, 25, WALL_Z, DOOR_X1 - DOOR_X0 + 4, 1, 1, TRIM)
 	# Upper floor windows.
-	_window(vb, 56, 32, 12, 10)
-	_window(vb, 80, 32, 14, 10)
+	_window(vb, 70, 32, 12, 10)
+	_window(vb, 87, 32, 13, 10)
 	# Roof: gable along X, ridge over the house.
 	var eave_y := 48
 	for k in 22:

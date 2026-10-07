@@ -909,6 +909,12 @@ func approach(ag, o: Dictionary) -> Dictionary:
 		var chair := _free_seat_near(ag, center, maxf(_box_half(it).x, _box_half(it).z) + 1.2)
 		if chair != Vector3.INF:
 			return {"spot": chair, "face": center}
+	if inside and nav:
+		# Stand just outside the open side of the stall / tub; the action's
+		# enter beat steps in from there and the exit beat steps back out.
+		var fr := _front_of(it, ag)
+		if fr != Vector3.INF:
+			return {"spot": fr, "face": center}
 	var lying: bool = pose in ["lie", "sleep"] and ag.kind != "dog" and not inside
 	if nav and not seated and not lying and nav.in_bounds(spot):
 		# Use spots inside furniture (the fridge's own footprint, behind a
@@ -995,6 +1001,35 @@ func work_surface(it: Node, a: Dictionary) -> Node:
 		if d < bd:
 			bd = d
 			best = other
+	return best
+
+
+## Floor point just outside the most open side of a box object (shower stall,
+## bathtub) on the side reachable from the sim, or Vector3.INF.
+func _front_of(it: Node, ag) -> Vector3:
+	var half := _box_half(it)
+	var c: Vector3 = it.global_transform * it.look_at_spot
+	var li := nav.level_of(Vector3(c.x, c.y - half.y + 0.05, c.z))
+	var reg := nav.entry_region(ag.actor.global_position, li)
+	var best := Vector3.INF
+	var bo := -1
+	var b: Basis = it.global_transform.basis.orthonormalized()
+	for d: Vector3 in [Vector3(0, 0, 1), Vector3(0, 0, -1), Vector3(1, 0, 0), Vector3(-1, 0, 0)]:
+		var w := b * d
+		w.y = 0.0
+		w = w.normalized()
+		var ext := absf(d.x) * half.x + absf(d.z) * half.z
+		var p := Vector3(c.x, 0.0, c.z) + w * (ext + 0.32)
+		p.y = nav.floor_y(Vector3(p.x, c.y, p.z), li)
+		if not nav.in_bounds(p):
+			continue
+		var cell := nav.cell_of(p)
+		if not nav.is_walkable(li, cell) or (reg >= 0 and nav.region_of(li, cell) != reg):
+			continue
+		var o: int = nav.openness(li, p, w, 1.0)
+		if o > bo:
+			bo = o
+			best = p
 	return best
 
 

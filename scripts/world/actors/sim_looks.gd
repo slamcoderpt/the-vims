@@ -5,9 +5,11 @@ extends RefCounted
 const LOOKS := {
 	"dad": {
 		"body": "big", "skin": Color(0.98, 0.77, 0.63),
-		"hair": Color(0.38, 0.21, 0.11), "hair_style": "shaggy", "beard": "full",
-		"beard_color": Color(0.33, 0.18, 0.09),
-		"brow": Color(0.26, 0.14, 0.08), "eye": Color(0.3, 0.18, 0.1),
+		# r12b: warm chestnut hair, a slightly deeper (still clearly lighter
+		# than the face's shadow side) beard, so hair/beard/face separate.
+		"hair": Color(0.55, 0.32, 0.16), "hair_style": "shaggy", "beard": "full",
+		"beard_color": Color(0.47, 0.27, 0.13),
+		"brow": Color(0.30, 0.16, 0.08), "eye": Color(0.3, 0.18, 0.1),
 		"top": "plaid", "top_color": Color(0.80, 0.13, 0.12), "top_color2": Color(0.16, 0.05, 0.06),
 		"tee": Color(0.2, 0.2, 0.23), "sleeves": "long", "untucked": true,
 		"bottom": "jeans", "bottom_color": Color(0.21, 0.31, 0.55),
@@ -25,10 +27,10 @@ const LOOKS := {
 		"shoe_accent": Color(1, 1, 1),
 	},
 	"cat_girl": {
-		"body": "child", "skin": Color(0.74, 0.50, 0.35), "lashes": true,
-		"hair": Color(0.27, 0.15, 0.09), "hair_style": "long", "eye": Color(0.28, 0.16, 0.1),
-		"hat": "cat", "hat_color": Color(0.67, 0.65, 0.92),
-		"ear_color": Color(0.67, 0.65, 0.92), "ear_inner": Color(0.96, 0.7, 0.8),
+		"body": "child", "skin": Color(0.84, 0.61, 0.45), "lashes": true,
+		"hair": Color(0.33, 0.19, 0.10), "hair_style": "long", "eye": Color(0.28, 0.16, 0.1),
+		"hat": "cat", "hat_color": Color(0.62, 0.58, 0.90),
+		"ear_color": Color(0.60, 0.55, 0.89), "ear_inner": Color(0.96, 0.7, 0.8),
 		"top": "striped", "top_color": Color(0.22, 0.30, 0.58), "top_color2": Color(0.97, 0.97, 0.98),
 		"sleeves": "short",
 		"bottom": "overalls", "bottom_color": Color(0.32, 0.47, 0.78),

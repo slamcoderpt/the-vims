@@ -608,7 +608,7 @@ func _s_anims() -> void:
 	var ex: Dictionary = _seen(jack, func(x): return x.beat == "exit")
 	var rs: Dictionary = _seen(jack, func(x): return x.beat == "react" and x.active == "react_shake" and x.props.is_empty())
 	var out_ok: bool = not rs.is_empty() and _flat(rs.pos, shc) > _flat(sw.get("pos", shc), shc) + 0.25
-	_step("anim_exit_react", not ex.is_empty() and out_ok, "beats=%s react=%s, out of the stall for the reaction=%s" % [str(jack.beats_seen), str(rs.get("active", "-")), str(out_ok)])
+	_step("anim_exit_react", not ex.is_empty() and out_ok, "beats=%s react=%s, out of the stall for the reaction=%s (%.2f m from stall centre, showered at %.2f m)" % [str(jack.beats_seen), str(rs.get("active", "-")), str(out_ok), _flat(rs.get("pos", shc), shc), _flat(sw.get("pos", shc), shc)])
 	var et: Dictionary = _seen(lily, func(x): return x.active == "eat" and x.pose == "sit" and "fork" in x.props and "plate_food" in x.props)
 	var pulled: bool = not _seen(lily, func(x): return x.active == "pull_chair").is_empty()
 	var full: bool = not _seen(lily, func(x): return x.active == "react_satisfied").is_empty()
@@ -625,7 +625,7 @@ func _s_anims() -> void:
 	maya.command({"action": _action_of(sink, maya, "wash"), "target": sink})
 	await _until_game(func(): return jack.anim == "cook" and jaa.active == "chop", 120.0)
 	Game.selected = jack.index
-	await _frame_actor(jack.actor, 22.0)
+	await _frame_actor(jack.actor, 65.0)
 	await _frames(6)
 	await _shot("anim_chop")
 	await _until_game(func(): return jaa.active == "stir", 60.0)
@@ -1531,7 +1531,7 @@ func _focus(p: Vector3, yaw = null, dist = null) -> void:
 ## Close action shot: look down at a sim from `yaw` (steep enough to see
 ## over the cut-away walls), on its own floor.
 func _frame_actor(a: Node3D, yaw: float) -> void:
-	main.camera_rig.apply({"target": a.global_position + Vector3(0, 0.8, 0), "yaw": yaw, "pitch": 52.0, "distance": 6.5})
+	main.camera_rig.apply({"target": a.global_position + Vector3(0, 0.8, 0), "yaw": yaw, "pitch": 50.0, "distance": 5.6})
 	await _frames(2)
 
 

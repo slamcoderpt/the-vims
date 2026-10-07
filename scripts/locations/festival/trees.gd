@@ -9,28 +9,28 @@ const VS := [0.3, 0.3, 0.28]  # back trees finer (r10: 0.35 m cubes read as mush
 
 ## [x, z, height_m, crown_radius_m, palette (0 orange, 1 red, 2 yellow, 3 mixed), group]
 const TREES := [
-	# Left edge, behind the treats stall.
-	[-12.0, -5.8, 3.6, 2.3, 0, 0],
-	[-9.4, -9.6, 3.9, 2.2, 1, 0],
-	[-12.8, -13.5, 4.2, 2.6, 2, 0],
-	# Right edge, behind stalls / stage.
-	[14.6, -6.8, 3.6, 2.2, 2, 1],
-	[13.4, -10.4, 3.9, 2.3, 0, 1],
-	[12.2, -17.2, 4.4, 2.5, 3, 1],
-	# Back, framing the town hall.
-	[-6.2, -18.6, 4.6, 2.4, 0, 2],
-	[9.8, -20.5, 5.0, 2.8, 1, 2],
-	[14.4, -15.0, 4.4, 2.6, 2, 2],
-	[-10.4, -21.0, 4.8, 2.8, 3, 2],
-	[3.6, -22.5, 4.2, 2.0, 2, 2],
-	[-3.4, -23.0, 4.0, 1.9, 1, 2],
+	# r12 (standard high game camera, pitch 34): trunks are kept short so the
+	# canopies drop into the top band of the frame instead of above it.
+	# Left: above / behind the FALL TREATS stall (under the HUD needs panel).
+	[-7.2, -6.9, 2.6, 2.4, 0, 0],
+	[-9.8, -3.0, 2.8, 2.4, 1, 0],
+	# Right: beside the stage, behind the task panel edge.
+	[7.0, -10.4, 2.8, 2.3, 2, 1],
+	[9.4, -14.6, 3.2, 2.6, 0, 1],
+	# Back band: between the fountain and the stage, framing the town hall.
+	[-4.8, -11.9, 2.3, 2.2, 3, 2],
+	[0.1, -13.9, 2.4, 2.1, 0, 2],
+	[-5.0, -16.2, 3.0, 2.4, 2, 2],
+	[0.2, -17.8, 3.0, 2.2, 1, 2],
+	[5.0, -20.8, 3.4, 2.4, 3, 2],
+	[-9.4, -18.6, 3.4, 2.6, 3, 2],
 ]
 
 
 static func spots() -> Array:
 	var out := []
 	for t: Array in TREES:
-		out.append(Vector2(t[0], t[1]))
+		out.append(Vector2(t[0], K.dz(t[1])))
 	return out
 
 
@@ -42,7 +42,7 @@ func build(parent: Node3D) -> void:
 	var i := 0
 	for t: Array in TREES:
 		var gi: int = t[5]
-		_tree(groups[gi], occs[gi], VS[gi], t[0], t[1], t[2], t[3], t[4], i)
+		_tree(groups[gi], occs[gi], VS[gi], t[0], K.dz(t[1]), t[2], t[3], t[4], i)
 		i += 1
 	var names := ["TreesLeft", "TreesRight", "TreesBack"]
 	for gi in 3:

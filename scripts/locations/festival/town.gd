@@ -369,7 +369,7 @@ func _house_left() -> void:
 	# Brick townhouse, front gable, close to the left of the square.
 	var x0 := -14.5
 	var x1 := -5.5
-	var z := -14.5
+	var z := -19.0   # round 11: depth-compressed square (K.dz)
 	var h := 5.6
 	_wall("brick2", Vector3(x0, 0, z - 5.0), Vector3(x1 - x0, h, 5.0))
 	_band(x0 - 0.1, x1 + 0.1, 0, z - 0.1, 0.375, 0.375)
@@ -401,7 +401,7 @@ func _house_left() -> void:
 func _house_right() -> void:
 	var x0 := 8.0
 	var x1 := 19.0
-	var z := -23.0   # behind the stage once festival.gd scales the town root
+	var z := -25.0   # behind the stage once festival.gd scales the town root
 	var h := 5.4
 	_wall("grey", Vector3(x0, 0, z - 5.0), Vector3(x1 - x0, h, 5.0))
 	_band(x0 - 0.1, x1 + 0.1, 0, z - 0.1, 0.375, 0.375, GREYSTONE)

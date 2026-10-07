@@ -15,6 +15,22 @@ const CORNERS := [
 const SHADE := [0.93, 0.9, 1.0, 0.7, 0.97, 0.86]
 const AOV := [1.0, 0.8, 0.66, 0.52]
 
+## Round 11 (standard high Sims camera): the square is compressed in depth
+## behind z = -5 so the fountain, stage and town-hall front all land inside
+## the frame of the shared 35 deg game camera. Every far coordinate in the
+## festival pieces goes through dz().
+const DZ_START := -5.0
+const DZ_K := 0.52
+
+
+static func dz(z: float) -> float:
+	return z if z >= DZ_START else DZ_START + (z - DZ_START) * DZ_K
+
+
+static func dv(v: Vector3) -> Vector3:
+	return Vector3(v.x, v.y, dz(v.z))
+
+
 const FONT_PATH := "res://assets/fonts/Nunito.ttf"
 
 ## Autumn palettes.

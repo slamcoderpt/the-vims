@@ -65,6 +65,40 @@ func _update() -> void:
 	var r := Basis.from_euler(Vector3(deg_to_rad(-pitch), deg_to_rad(yaw), 0))
 	camera.global_position = target + r * Vector3(0, 0, distance)
 	camera.look_at(target, Vector3.UP)
+	_update_cut()
+
+
+## Sims-style cutaway for lower storeys: with cut_height set (the ceiling of
+## the floor being viewed), the near clip plane slices off the storey above
+## (its floor slab, walls, roof) around the target, so the room below and its
+## sims show. Pure camera trick: no materials or meshes change (GL
+## Compatibility / WebGL2 safe).
+var cut_height := INF
+
+
+func _update_cut() -> void:
+	if cut_height == INF or target.y > cut_height:
+		camera.near = 0.1
+		return
+	var cam := camera.global_position
+	var f := -camera.global_transform.basis.z
+	var fh := Vector3(f.x, 0.0, f.z)
+	if fh.length() < 0.01 or cam.y <= cut_height:
+		camera.near = 0.1
+		return
+	fh = fh.normalized()
+	# The ceiling plane a little beyond the target is cut away...
+	var q := Vector3(target.x, cut_height, target.z) + fh * 0.6
+	var d := (q - cam).dot(f)
+	# ...but never the sim standing at the target (head ~1.2 m above it).
+	var head := (target + Vector3(0, 1.1, 0) - cam).dot(f) - 0.35
+	camera.near = clampf(minf(d, head), 0.1, maxf(0.1, distance - 1.2))
+
+
+func set_cut_height(h: float) -> void:
+	cut_height = h
+	if camera:
+		_update_cut()
 
 
 func _process(delta: float) -> void:

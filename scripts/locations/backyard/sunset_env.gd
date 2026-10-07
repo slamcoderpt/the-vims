@@ -138,7 +138,7 @@ func update(hour: float) -> void:
 	sky_mat.set_shader_parameter("mid_color", mid)
 	sky_mat.set_shader_parameter("low_color", low)
 	sky_mat.set_shader_parameter("horizon_color", hor)
-	env.fog_light_color = Color(0.40, 0.25, 0.46).lerp(Color(0.2, 0.16, 0.3), n).lerp(Color(0.85, 0.85, 0.88), day)
+	env.fog_light_color = Color(0.66, 0.44, 0.58).lerp(Color(0.2, 0.16, 0.3), n).lerp(Color(0.85, 0.85, 0.88), day)
 
 
 func release() -> void:

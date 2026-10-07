@@ -438,8 +438,8 @@ static func pendant(vb: VoxelBuilder, o: Vector3i, cord: int) -> void:
 	# Black industrial cone shade (wide bottom), warm-lit inner rim, a big
 	# glowing bulb hanging below the rim so it reads from above and from the
 	# side, and a brass cap + cord.
-	var shade_c := Color("1d1a18")
-	var rim := Color("2e2926")
+	var shade_c := Color("2c4a36")
+	var rim := Color("c99a4a")
 	for y in 5:
 		var r := 5 - y
 		for x in range(-r, r + 1):

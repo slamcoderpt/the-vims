@@ -6,6 +6,7 @@ extends Node3D
 ## a crowd of townsfolk. Pieces live in scripts/locations/festival/.
 
 const K := preload("res://scripts/locations/festival/kit.gd")
+const ShotPresets := preload("res://scripts/core/shot_presets.gd")
 const Ground := preload("res://scripts/locations/festival/ground.gd")
 const Trees := preload("res://scripts/locations/festival/trees.gd")
 const Town := preload("res://scripts/locations/festival/town.gd")
@@ -14,16 +15,17 @@ const Stage := preload("res://scripts/locations/festival/stage.gd")
 const Decor := preload("res://scripts/locations/festival/decor.gd")
 const Crowd := preload("res://scripts/locations/festival/crowd.gd")
 
-## Round 11: actors are now real-world size (adult ~1.76 m, kids ~1.24 m,
-## beagle ~0.8 m), which on its own shrinks the heroes ~30 % against the
-## stalls. The camera sits between round 9 (far/top-down) and round 10
-## (close/low): ~20 deg pitch, heroes ~1/4 frame tall in the lower centre.
-const CAMERA := {"target": Vector3(-1.05, 1.2, -1.6), "yaw": 0.0, "pitch": 19.0, "distance": 9.6, "fov": 46.0}
+## Camera lock (game owner): the festival uses the same high Sims-style 3/4
+## camera as the rest of the game (pitch 32-38, fov 37-42, similar distance),
+## never the concept art's eye-level angle. The live camera and the
+## screenshot preset are the same shot (see ShotPresets "festival").
+## The square is composed for this camera: depth behind z = -5 is compressed
+## (K.dz) so the fountain, stage and town-hall front sit in the upper third.
 ## Town backdrop is scaled down so the clock tower stays in frame under the
 ## steeper (ref-like) camera; hall front lands at z ~ -26.
 const TOWN_SCALE := 0.58
-const STAGE_POS := Vector3(7.4, 0, -14.6)
-const TOWN_POS := Vector3(0.0, -0.3, -5.6)
+const STAGE_POS := Vector3(2.7, 0, -8.5)  # r12: upper centre-right, clear of the HUD task panel
+const TOWN_POS := Vector3(0.0, -0.3, 2.75)  # hall front at z ~ -14.05 (= K.dz(-22.4))
 
 var stalls
 var stage
@@ -49,8 +51,9 @@ func build() -> void:
 	stalls = Stalls.new()
 	stalls.build(self)
 	stage = Stage.new()
-	stage.build(self, STAGE_POS, -18.0)
+	stage.build(self, STAGE_POS, -8.0)
 	decor = Decor.new()
+	decor.stage_pos = STAGE_POS
 	decor.build(self)
 	crowd = Crowd.new()
 	crowd.build(self, stalls, stage)
@@ -159,7 +162,7 @@ func _debug_cam(s: String) -> void:
 
 
 func camera_home() -> Dictionary:
-	return CAMERA
+	return ShotPresets.PRESETS["festival"].camera.duplicate()
 
 
 ## Golden late-afternoon light (the shared lighting.gd reads this).
@@ -177,7 +180,7 @@ func lighting_profile() -> Dictionary:
 		"fog_day": Color(0.78, 0.8, 0.88), "fog_night": Color(0.12, 0.12, 0.26),
 		"fog_density": 0.0007, "exposure": 0.98, "shadow_distance": 45.0,
 		"lamp_night_mult": 1.6,
-		"post": {"focus_y": 0.52, "band": 0.34, "falloff": 0.15, "blur_px": 3.6, "top_boost": 0.9,
+		"post": {"focus_y": 0.49, "band": 0.35, "falloff": 0.15, "blur_px": 3.0, "top_boost": 0.6,
 			"saturation": 1.1, "contrast": 1.12, "tint": Vector3(1.02, 1.0, 0.96),
 			"lift": Vector3(0.0, 0.0, 0.0), "vignette": 0.22, "gamma": 1.04},
 	}

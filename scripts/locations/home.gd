@@ -49,13 +49,13 @@ const SIDING := Color("f3ead9")
 const TRIM := Color("fbf8f1")
 const CAP := Color("2e3450")
 const FOUND := Color("8c8378")
-const W_OFFICE := Color("f6efe4")
+const W_OFFICE := Color("f1dcc3")
 const W_PINK := Color("eaa2b6")
 const W_BLUE := Color("8399d8")
 const W_HALL := Color("efe1c6")
 const W_LIVING := Color("e9dcc2")
 const W_KITCHEN := Color("dfe8d6")
-const FLOOR_WOOD := Color("d9b27f")
+const FLOOR_WOOD := Color("d29d64")
 const FLOOR_LIGHT := Color("d9a56c")
 
 var actors := {}                 # key -> SimActor
@@ -121,15 +121,17 @@ func camera_home() -> Dictionary:
 
 func lighting_profile() -> Dictionary:
 	return {
-		"sun_heading": 205.0, "sun_elev": 34.0, "sun_energy": 2.05,
-		"ambient_day": Color(0.86, 0.88, 0.94), "ambient_energy": 0.56,
+		"sun_heading": 205.0, "sun_elev": 34.0, "sun_energy": 1.95,
+		"sun_color_day": Color(1.0, 0.87, 0.68),
+		"ambient_day": Color(0.9, 0.86, 0.82), "ambient_energy": 0.52,
 		"ambient_night": Color(0.66, 0.54, 0.52), "ambient_night_energy": 0.34, "lamp_night_mult": 3.8,
 		"sky_day": Color(0.64, 0.8, 0.94), "sky_night": Color(0.07, 0.09, 0.22),
-		"fog_day": Color(0.9, 0.9, 0.88), "fog_night": Color(0.12, 0.15, 0.32), "fog_density": 0.004,
+		"fog_day": Color(0.94, 0.88, 0.8), "fog_night": Color(0.12, 0.15, 0.32), "fog_density": 0.004,
 		"moon_heading": 150.0, "moon_energy": 0.45, "glow_boost_night": 1.2,
 		"shadow_distance": 40.0,
 		"post_day": {"focus_y": 0.5, "band": 0.35, "falloff": 0.18, "blur_px": 4.0, "top_boost": 1.0,
-			"saturation": 1.16, "contrast": 1.12, "tint": Vector3(1.0, 0.995, 0.985), "vignette": 0.22},
+			"saturation": 1.14, "contrast": 1.1, "tint": Vector3(1.02, 1.0, 0.955),
+			"vignette": 0.24},
 		"post_night": {"focus_y": 0.56, "band": 0.36, "falloff": 0.14, "blur_px": 2.8, "top_boost": 0.7,
 			"saturation": 1.12, "contrast": 1.12, "gamma": 1.08, "tint": Vector3(1.0, 0.95, 0.94), "vignette": 0.36},
 	}
@@ -669,8 +671,9 @@ var _spots := {}     # staging spots computed while building (actor poses)
 func _windows_upstairs() -> void:
 	# Office big windows (back wall, two units).
 	for wx: float in [-5.85, -3.75]:
-		PropLib.window_frame(_g("office"), Vector3i(fc(wx), fc(UF + 0.45), fc(-5.0)), fc(1.9), fc(2.1), 4, 0, 3, 1)
-	PropLib.window_frame(_g("office"), Vector3i(fc(-9.0), fc(UF + 0.9), fc(2.0)), fc(1.6), fc(1.4), 4, 2, 2, 1)
+		PropLib.window_frame(_g("office"), Vector3i(fc(wx), fc(UF + 0.45), fc(-5.0)), fc(1.9), fc(2.1), 4, 0, 3, 1, WIN_WOOD, Color("b27a45"))
+		_mullions(_g("office"), fc(wx), fc(UF + 0.45), fc(-5.0) + 2, fc(1.9), fc(2.1))
+	PropLib.window_frame(_g("office"), Vector3i(fc(-9.0), fc(UF + 0.9), fc(2.0)), fc(1.6), fc(1.4), 4, 2, 2, 1, WIN_WOOD, Color("b27a45"))
 	PropLib.window_frame(_g("pink"), Vector3i(fc(1.85), fc(UF + 0.9), fc(-5.0)), fc(1.3), fc(1.3), 4, 0, 2, 1, Color("ffffff"), Color("f3c0cf"))
 	PropLib.window_frame(_g("blue"), Vector3i(fc(6.4), fc(UF + 0.9), fc(-5.0)), fc(1.4), fc(1.3), 4, 0, 2, 1)
 	PropLib.window_frame(_g("bath"), Vector3i(fc(8.75), fc(UF + 1.0), fc(3.3)), fc(1.15), fc(1.3), 4, 2, 2, -1)
@@ -682,6 +685,25 @@ func _windows_upstairs() -> void:
 	_up_glass("pink", 0, -5.0, 1.85, 3.15, UF + 0.9, UF + 2.2)
 	_up_glass("blue", 0, -5.0, 6.4, 7.8, UF + 0.9, UF + 2.2)
 	_up_glass("bath", 2, 8.75, 3.3, 4.45, UF + 1.0, UF + 2.3)
+
+
+const WIN_WOOD := Color("8f5a31")
+
+
+## Chunky wooden glazing bars over a back-wall window (ref1's divided panes):
+## two-cell-wide verticals at thirds, one horizontal at 62% height.
+func _mullions(vb: VoxelBuilder, x0: int, y0: int, z: int, w: int, h: int) -> void:
+	for k in [1, 2]:
+		var mx := x0 + int(w * k / 3.0)
+		for yy in range(y0 + 1, y0 + h - 1):
+			for dx in 2:
+				vb.set_v(Vector3i(mx - 1 + dx, yy, z), WIN_WOOD)
+				vb.set_v(Vector3i(mx - 1 + dx, yy, z + 1), WIN_WOOD.darkened(0.12))
+	var ty := y0 + int(h * 0.62)
+	for xx in range(x0 + 1, x0 + w - 1):
+		vb.set_v(Vector3i(xx, ty, z), WIN_WOOD)
+		vb.set_v(Vector3i(xx, ty, z + 1), WIN_WOOD.darkened(0.12))
+		vb.set_v(Vector3i(xx, ty + 1, z + 1), WIN_WOOD.lightened(0.08))
 
 
 var _upg_day := VoxelBuilder.new()
@@ -717,15 +739,15 @@ func _foliage(a: int, yy: int, t: float, h: float) -> Color:
 	if h1 < leafy:
 		var lit := VoxelBuilder.hash3(Vector3i(a, yy, 3))
 		if lit > 0.82:
-			return Color("c9e87a")
+			return Color("b2d266")
 		if lit > 0.5:
-			return Color("8cc456")
+			return Color("78ad45")
 		if lit > 0.18:
-			return Color("6aa845")
-		return Color("4f8a3a")
+			return Color("5a9238")
+		return Color("3f742e")
 	if h > 0.965 and t < 0.6:
-		return Color("8a6440")
-	return Color("cfeaf7").lerp(Color("f6fcff"), t)
+		return Color("7a5434")
+	return Color("a9cfe2").lerp(Color("e4f1f4"), t)
 
 
 const WS_ANGLE := 40.0
@@ -1654,8 +1676,8 @@ func _place_sky() -> void:
 ## Direction matches the afternoon sun from lighting_profile().
 const SHAFT_SHADER := """shader_type spatial;
 render_mode unshaded, blend_add, depth_draw_never, cull_disabled, shadows_disabled, fog_disabled;
-uniform vec3 tint = vec3(1.0, 0.8, 0.5);
-uniform float strength = 0.085;
+uniform vec3 tint = vec3(1.0, 0.72, 0.38);
+uniform float strength = 0.1;
 void fragment() {
 	ALBEDO = tint * COLOR.a * strength;
 }

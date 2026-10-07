@@ -736,7 +736,8 @@ func _dog_pose() -> void:
 			var chew := sin(t * 7.0)
 			var perk := smoothstep(0.6, 1.0, sin(t * 0.7 + _phase))
 			_sb(b_head, -0.12 + 0.05 * maxf(0.0, chew) - 0.08 * perk, ly * (0.6 + 0.25 * perk), 0.12 + 0.05 * sin(t * 1.3))
-			_sb(b_tail, -0.75, 0.0, 0.6 * sin(t * 13.0))
+			# Curled tail held up over the back, wagging side to side.
+			_sb(b_tail, -0.42, 0.0, 0.45 * sin(t * 13.0))
 			_sb(b_ear_l, 0.05 * chew, 0.0, 0.06)
 			_sb(b_ear_r, 0.05 * chew, 0.0, -0.06)
 		"bow":

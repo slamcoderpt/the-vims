@@ -106,49 +106,21 @@ func _process(_delta: float) -> void:
 		view_floor = lv
 		if location.has_method("set_view_floor"):
 			location.set_view_floor(lv)
-		else:
-			_cut_upper_floors(lv)
-
-
-## Generic floor cut (locations without their own set_view_floor): when the
-## camera looks at a lower storey, static meshes that sit wholly above it (the
-## upstairs slab, rooms and furniture) are hidden, like the Sims floor buttons.
-var _upper_meshes: Array = []   # [MeshInstance3D, min_level]
-var _upper_for: Node = null
-
-
-func _cut_upper_floors(lv: int) -> void:
-	if _upper_for != location:
-		_upper_for = location
-		_upper_meshes.clear()
-		var ys: Array = sim.nav.level_y
-		for n in location.find_children("*", "GeometryInstance3D", true, false):
-			var skip := false
-			var p := n.get_parent()
-			while p != null and p != location:
-				if p is SimActor:
-					skip = true
-					break
-				p = p.get_parent()
-			if skip or not (n as Node3D).visible:
-				continue
-			var gi := n as GeometryInstance3D
-			var bb: AABB = gi.global_transform * gi.get_aabb()
-			var ml := -1
-			for k in range(1, ys.size()):
-				if bb.position.y >= float(ys[k]) - 0.2:
-					ml = k
-			if ml >= 1:
-				_upper_meshes.append([gi, ml])
-	for e in _upper_meshes:
-		if is_instance_valid(e[0]):
-			(e[0] as Node3D).visible = lv >= int(e[1])
+		# Looking at a lower storey: the camera cuts away the one above.
+		var ys: Array = sim.nav.level_y if sim.nav else []
+		var cut := lv + 1 < ys.size()
+		camera_rig.set_cut_height(float(ys[lv + 1]) - 0.12 if cut else INF)
+		# The home lot hides ground-floor rooms behind the upstairs in its
+		# automatic wall views; with the storey above cut away, show them.
+		if location.has_method("set_wall_view") and "_auto_view" in location:
+			location.set("_auto_view", not cut)
+			if cut:
+				location.set_wall_view("office")
 
 
 func load_location(loc_name: String) -> void:
 	view_floor = -1
-	_upper_for = null
-	_upper_meshes.clear()
+	camera_rig.set_cut_height(INF)
 	if location:
 		# Drop every bubble anchored to the old lot's people before they are freed.
 		for n in location.find_children("*", "Node3D", true, false):

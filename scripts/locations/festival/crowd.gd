@@ -48,17 +48,17 @@ func build(parent: Node3D, stalls, stage) -> void:
 	var vendor_pos: Vector3 = stalls.vendor_spot
 	# Heroes ~1/4 screen tall and spaced apart so faces never overlap:
 	# Jack at the treats counter, Biscuit in front of him, Lily centre, Maya right.
-	var jack := spawn(parent, "Jack", "dad", Vector3(-2.75, 0, 0.75), Vector3(-5.2, 0, 7.0), "talk")
-	var lily := spawn(parent, "Lily", "bunny_girl", Vector3(-0.45, 0, 0.2), Vector3(1.6, 0, 9.0), "talk")
+	var jack := spawn(parent, "Jack", "dad", Vector3(-2.75, 0, 0.15), Vector3(-1.6, 0, 7.4), "talk")
+	var lily := spawn(parent, "Lily", "bunny_girl", Vector3(-0.45, 0, -0.4), Vector3(1.6, 0, 8.4), "talk")
 	_hold(lily, "candy_apple", "fore_r")
-	var dog := spawn(parent, "Biscuit", "beagle", Vector3(-1.75, 0, 1.2), Vector3(3.0, 0, 3.4), "idle")
-	var maya := spawn(parent, "Maya", "cat_girl", Vector3(1.95, 0, 1.45), Vector3(-2.2, 0, 11.0), "talk")
+	var dog := spawn(parent, "Biscuit", "beagle", Vector3(-1.75, 0, 0.6), Vector3(0.6, 0, 4.6), "idle")
+	var maya := spawn(parent, "Maya", "cat_girl", Vector3(1.85, 0, 0.15), Vector3(-1.6, 0, 10.4), "talk")
 	_hold(maya, "fox_plush", "torso")
-	# The preset camera looks down ~30 deg at the near heroes; a slight
+	# The standard game camera looks down ~35-40 deg at the heroes; a slight
 	# lean back (pivot at the feet) lifts the faces out from under the hats.
-	maya.rotation.x = deg_to_rad(-4.0)
-	jack.rotation.x = deg_to_rad(-2.0)
-	lily.rotation.x = deg_to_rad(-2.0)
+	maya.rotation.x = deg_to_rad(-6.0)
+	jack.rotation.x = deg_to_rad(-5.0)
+	lily.rotation.x = deg_to_rad(-4.0)
 	# --- Stall keepers.
 	spawn(parent, "vendor", "npc_6", vendor_pos, jack.position, "talk")
 	var g: Node3D = stalls.game
@@ -78,22 +78,25 @@ func build(parent: Node3D, stalls, stage) -> void:
 		["npc_3", Vector3(5.9, 0, -5.0), Vector3(5.1, 0, -5.7), "talk"],
 		["npc_0", Vector3(5.1, 0, -5.7), Vector3(5.9, 0, -5.0), "idle"],
 		["npc_4", Vector3(0.9, 0, -9.0), Vector3(1.4, 0, 6.0), "walk"],
+		# r12: a chatting pair filling the open cobbles right of Lily.
+		["npc_2", Vector3(2.2, 0, -2.3), Vector3(3.1, 0, -1.6), "talk"],
+		["npc_4", Vector3(3.0, 0, -1.7), Vector3(2.0, 0, -2.1), "talk"],
 	]
-	_far_folk(parent)
+	_far_folk(parent, stage.node.transform)
 	var i := 1
 	for f: Array in folk:
 		var key := "neighbor_%d" % i
-		spawn(parent, key, f[0], f[1], f[2], f[3])
+		spawn(parent, key, f[0], K.dv(f[1]), K.dv(f[2]), f[3])
 		npc_keys.append(key)
 		i += 1
 	# Seated at the picnic table (bench tops at 0.5 m).
 	var seated := [
-		["npc_2", Vector3(-4.4, 0, -8.25), Vector3(-4.4, 0, -4.0)],
-		["npc_6", Vector3(-3.7, 0, -7.0), Vector3(-3.7, 0, -11.0)],
+		["npc_2", Vector3(-4.4, 0, K.dz(-8.0) - 0.25), Vector3(-4.4, 0, -4.0)],
+		["npc_6", Vector3(-3.7, 0, K.dz(-8.0) + 1.0), Vector3(-3.7, 0, -11.0)],
 	]
 	for s: Array in seated:
 		var key := "neighbor_%d" % i
-		spawn(parent, key, s[0], s[1], s[2], "sit_talk", 0.5)
+		spawn(parent, key, s[0], K.dv(s[1]), K.dv(s[2]), "sit_talk", 0.5)
 		npc_keys.append(key)
 		i += 1
 
@@ -101,37 +104,49 @@ func build(parent: Node3D, stalls, stage) -> void:
 ## Static crowd (one mesh, one draw call): stage audience, fountain
 ## loiterers, people strolling between the stalls (mid ground) and in front
 ## of the town hall (far). Gives the square three depth layers of people.
-func _far_folk(parent: Node3D) -> void:
+func _far_folk(parent: Node3D, stage_xf: Transform3D) -> void:
 	var F := preload("res://scripts/locations/festival/folk.gd").new()
 	var seed := 1
-	# Stage audience (backs to the camera, some turned), standing on the
-	# cobbles in front of the stage at (7.4, -14.6), clear of the guitarist.
-	for p in [[5.0, -11.4, 160], [5.8, -11.9, 180], [8.6, -11.3, 200], [9.5, -11.8, 210],
-			[10.4, -11.0, 240], [6.6, -10.7, 150], [4.3, -12.4, 120], [9.0, -10.3, 190]]:
-		F.add(p[0], p[1], p[2], seed % 4 == 0, seed)
+	# Stage audience, placed in the stage's own frame (rows on the cobbles
+	# in front of the deck, facing the guitarist; a few turned to chat).
+	var sb := stage_xf.basis.orthonormalized()
+	var sy := rad_to_deg(sb.get_euler().y)
+	for p in [[-1.1, 2.2, 0], [-0.2, 2.5, 10], [0.6, 2.3, -8], [1.7, 2.1, 15],
+			[-1.1, 3.3, 25], [0.2, 3.5, 0], [1.3, 3.2, -30], [2.4, 3.0, 60]]:
+		var w: Vector3 = stage_xf.origin + sb * Vector3(p[0], 0, p[1])
+		F.add(w.x, w.z, 180.0 + sy + p[2], seed % 4 == 0, seed)
 		seed += 1
 	# Around the fountain (0.2, -9.6) and across the back of the square.
-	for p in [[-3.3, -9.6, 60], [3.3, -10.4, 300], [-2.2, -11.9, 20], [2.0, -12.4, 90],
+	for p in [[-4.9, -9.0, 60], [0.2, -9.6, 300], [-3.4, -11.2, 20], [2.0, -12.4, 90],
 			[-3.9, -13.6, 30], [0.8, -14.8, 0], [-0.9, -16.5, 270],
 			[-5.8, -14.8, 90], [3.2, -16.6, 180], [-2.6, -18.6, 0], [1.6, -19.8, 90],
 			[-7.4, -17.6, 45], [5.6, -19.4, 270], [-4.4, -20.6, 0]]:
-		F.add(p[0], p[1], p[2], seed % 5 == 0, seed)
+		if not _on_stage(stage_xf, p[0], K.dz(p[1])):
+			F.add(p[0], K.dz(p[1]), p[2], seed % 5 == 0, seed)
 		seed += 1
 	# Mid ground: browsing the side stalls, queueing at the game booth,
 	# chatting in pairs at the edges of the walkway.
 	for p in [[-6.4, -5.6, 90, false], [-7.0, -7.4, 0, false], [-6.7, -6.6, 270, true],
 			[7.2, -4.0, 270, false],
 			[9.4, -6.0, 300, false], [9.8, -9.6, 270, false],
-			[-2.2, -8.0, 135, true], [6.3, -8.4, 200, false], [7.0, -9.0, 30, true],
+			[-0.6, -7.4, 135, true], [6.3, -8.4, 200, false], [7.0, -9.0, 30, true],
 			# Round 9 (wider camera): a scattered, smaller crowd filling the
 			# open cobbles between the heroes, fountain, game booth and stage.
 			[8.2, -4.0, 200, false], [9.0, -4.6, 120, false],
 			[4.4, -6.4, 0, false],
-			[-1.6, -12.8, 180, false],
+			[0.2, -13.6, 180, false],
 			[-4.6, -11.6, 220, false], [10.4, -8.0, 300, true]]:
-		F.add(p[0], p[1], p[2], p[3], seed)
+		if not _on_stage(stage_xf, p[0], K.dz(p[1])):
+			F.add(p[0], K.dz(p[1]), p[2], p[3], seed)
 		seed += 1
 	F.build(parent, U * 1.0)
+
+
+## True when (x, z) falls on the stage footprint (plus a small margin).
+func _on_stage(stage_xf: Transform3D, x: float, z: float) -> bool:
+	var sb := stage_xf.basis.orthonormalized()
+	var l: Vector3 = sb.inverse() * (Vector3(x, 0, z) - stage_xf.origin)
+	return absf(l.x) < 2.6 and absf(l.z) < 1.5
 
 
 func get_actor(key: String) -> Node3D:

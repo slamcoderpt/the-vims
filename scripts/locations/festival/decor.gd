@@ -8,21 +8,22 @@ const U := 1.0 / 16.0
 
 ## [x, z, banner]
 const LAMPS := [
-	[-2.3, -8.4, true],    # 0 tall lamp left of the walkway (ref: centre-left)
-	[2.6, -10.6, true],    # 1 right of the fountain
+	[-5.0, -8.6, true],    # 0 tall lamp left of the fountain (ref: centre-left)
+	[6.6, -9.0, false],    # 1 right of the stage (r11: kept clear of the stage front)
 	[-7.2, -3.4, false],   # 2 behind the FALL TREATS stall
 	[5.6, -18.2, false],   # 3 behind the stage
 	[-5.0, -15.5, false],  # 4 back left
 	[5.4, -3.0, false],    # 5 right side, by the game booth
 	[-4.4, -19.0, false],  # 6 far back by the town hall
 ]
-const FOUNTAIN := Vector3(0.2, 0, -11.3)
+const FOUNTAIN := Vector3(-2.4, 0, -6.7)  # = (-2.4, K.dz(-8.27)); r12 camera: upper centre-left
 const FOUNTAIN_SCALE := 1.25
 const LAMP_TOP := 4.2
 const SU := 0.06  # string-light wire cell size
 const BU := 0.08  # bulb cell size
 const FV := 1.5 / 16.0  # foreground dressing cell size
 
+var stage_pos := Vector3(7.4, 0, -14.6)  # set by festival.gd before build()
 var glow_points: Array = []
 var lamp_heads: Array = []
 var _wires: Array = []   # Array of PackedVector3Array polylines (metres)
@@ -99,8 +100,8 @@ func _lamps(parent: Node3D) -> void:
 	all.jitter = 0.0
 	var i := 0
 	for l: Array in LAMPS:
-		all.stamp(with_banner if l[2] else plain, Vector3i(roundi(l[0] * 16.0), 0, roundi(l[1] * 16.0)))
-		var head := Vector3(roundi(l[0] * 16.0) * U, 67.5 * U, roundi(l[1] * 16.0) * U)
+		all.stamp(with_banner if l[2] else plain, Vector3i(roundi(l[0] * 16.0), 0, roundi(K.dz(l[1]) * 16.0)))
+		var head := Vector3(roundi(l[0] * 16.0) * U, 67.5 * U, roundi(K.dz(l[1]) * 16.0) * U)
 		lamp_heads.append(head)
 		glow_points.append([head, 2.2, Color(1.0, 0.7, 0.34)])
 		glow_points.append([head, 0.6, Color(1.0, 0.85, 0.6)])
@@ -219,8 +220,8 @@ func _strings(parent: Node3D) -> void:
 	vb.jitter = 0.0
 	var L := []
 	for l: Array in LAMPS:
-		L.append(Vector3(l[0], LAMP_TOP + 0.1, l[1]))
-	var stage_fl := Vector3(4.7, 4.4, -14.3)   # stage truss front-left corner
+		L.append(Vector3(l[0], LAMP_TOP + 0.1, K.dz(l[1])))
+	var stage_fl := stage_pos + Vector3(-2.7, 4.4, 0.3)   # stage truss front-left corner
 	# Round 7: fewer, cleaner runs. Nothing crosses the walkway at head
 	# height in front of the fountain / stage any more (the old web of
 	# strings + oversized bulbs read as a yellow smear over the backdrop).
@@ -229,16 +230,16 @@ func _strings(parent: Node3D) -> void:
 		[L[2], L[0], 0.45, false],
 		[L[0], L[1], 0.3, false],
 		[L[1], stage_fl, 0.35, false],
-		[L[5], Vector3(10.6, 3.6, -3.4), 0.4, false],
+		[L[5], K.dv(Vector3(10.6, 3.6, -3.4)), 0.4, false],
 		[L[4], L[0], 0.4, false],
 		[L[4], L[6], 0.4, false],
-		[L[3], Vector3(11.5, 4.6, -12.0), 0.4, true],
-		[L[2], Vector3(-10.0, 4.4, -7.0), 0.4, false],
-		[Vector3(-10.0, 4.4, -7.0), L[4], 0.5, true],
+		[L[3], K.dv(Vector3(11.5, 4.6, -12.0)), 0.4, true],
+		[L[2], K.dv(Vector3(-10.0, 4.4, -7.0)), 0.4, false],
+		[K.dv(Vector3(-10.0, 4.4, -7.0)), L[4], 0.5, true],
 		# High runs from the lamps back towards the town hall: these read as
 		# the glowing bulb garlands across the top of the frame in the ref.
-		[L[0], Vector3(-6.4, 6.2, -16.5), 0.5, false],
-		[L[1], Vector3(6.6, 6.0, -19.5), 0.5, false],
+		[L[0], K.dv(Vector3(-6.4, 6.2, -16.5)), 0.5, false],
+		[L[1], K.dv(Vector3(6.6, 6.0, -19.5)), 0.5, false],
 	]
 	var bv := VoxelBuilder.new()
 	bv.jitter = 0.0
@@ -349,32 +350,32 @@ func _props(parent: Node3D) -> void:
 	var C := 16
 	# Flower barrels: foreground corners (framing, not blocking) + around the square.
 	var barrels := [
-		[-2.2, -6.2, 2], [2.0, -7.6, 0], [7.4, -2.0, 2],
+		[-0.4, -6.0, 2], [5.6, -6.4, 0], [7.4, -2.0, 2],
 		[-2.7, -11.6, 1], [3.1, -12.2, 2],
 	]
 	var i := 0
 	for b: Array in barrels:
-		_barrel_planter(near, int(b[0] * C), int(b[1] * C), 5.0, b[2], i)
+		_barrel_planter(near, int(b[0] * C), int(K.dz(b[1]) * C), 5.0, b[2], i)
 		i += 1
 	# Ground lanterns (small, along the walkway edges).
-	for l in [[-3.55, 0.35], [2.0, -1.3], [-2.0, -4.2], [1.9, -5.6], [-2.5, -9.0], [2.9, -9.3]]:
-		_ground_lantern(near, int(l[0] * C), int(l[1] * C))
+	for l in [[-3.55, 0.35], [2.0, -1.3], [-2.0, -4.2], [1.9, -5.6], [-4.4, -9.4], [5.2, -9.6]]:
+		_ground_lantern(near, int(l[0] * C), int(K.dz(l[1]) * C))
 	# Picnic tables.
-	_picnic_table(near, int(-5.0 * C), int(-8.0 * C))
-	_picnic_table(near, int(3.9 * C), int(-7.2 * C))
+	_picnic_table(near, int(-5.0 * C), int(K.dz(-8.0) * C))
+	_picnic_table(near, int(6.6 * C), int(K.dz(-7.0) * C))
 	# Pumpkin piles + hay.
-	var piles := [[-1.4, -5.6], [1.6, -6.3], [-1.9, -9.6], [6.0, -11.6]]
+	var piles := [[-0.2, -5.4], [6.2, -5.0], [-4.3, -10.6], [6.0, -11.6]]
 	var j := 0
 	for p: Array in piles:
 		var px := int(p[0] * C)
-		var pz := int(p[1] * C)
+		var pz := int(K.dz(p[1]) * C)
 		K.pumpkin(near, px, 0, pz, 4.0, j, j)
 		K.pumpkin(near, px + 7, 0, pz + 3, 2.8, j + 1, j + 1)
 		K.pumpkin(near, px - 4, 0, pz + 6, 2.4, j + 2, j + 3)
 		j += 1
-	K.hay(near, int(7.6 * C), 0, int(-5.6 * C), 16, 9, 9)
-	K.hay(near, int(-2.6 * C), 0, int(-6.8 * C), 16, 9, 9)
-	K.hay(near, int(1.4 * C), 0, int(-12.4 * C), 16, 9, 9)
+	K.hay(near, int(7.6 * C), 0, int(K.dz(-5.6) * C), 16, 9, 9)
+	K.hay(near, int(-5.6 * C), 0, int(K.dz(-6.2) * C), 16, 9, 9)
+	K.hay(near, int(-3.6 * C), 0, int(K.dz(-12.4) * C), 16, 9, 9)
 	# (Round 11: dressing outside the preset frame (far left under the HUD,
 	# below the frame bottom) was dropped to stay under the triangle budget.)
 	# (Round 10: the round-9 pumpkin display / far-left hay sat outside the

@@ -288,9 +288,10 @@ static func _build_human(L: Dictionary) -> Dictionary:
 	var hat: String = L.get("hat", "")
 	var ear_y := float(neck) + hh + 1.5
 	var ear_x := hw * 0.5 - 2.5
+	ear_y -= 0.8   # r12b: lower crown on the smaller beanie
 	if hat == "cat":
 		ear_x = hw * 0.5 - 3.0
-		ear_y += 1.0
+		ear_y += 1.1
 	if hat == "bunny" or hat == "cat":
 		acc.bone("ear_l", "head", Vector3(ear_x, ear_y, -0.5))
 		acc.bone("ear_r", "head", Vector3(-ear_x, ear_y, -0.5))
@@ -317,9 +318,9 @@ static func _build_human(L: Dictionary) -> Dictionary:
 
 	var top_extra := 2.0
 	if hat == "bunny":
-		top_extra = 10.0
+		top_extra = 8.0
 	elif hat == "cat":
-		top_extra = 5.0
+		top_extra = 4.0
 	var meta := {
 		"species": "human",
 		"kind": "child" if child else "adult",
@@ -574,8 +575,14 @@ static func _human_head(L: Dictionary, D: Dictionary) -> Dictionary:
 		for x in [2, W - 3]:
 			vb.erase(Vector3i(x, 0, F + 1))
 		# 4) Mouth: a warm smile showing through the beard under the moustache.
+		# r12b: a wide open smile (teeth + warm corners) that reads at phone
+		# size as a bright mark inside the beard.
 		for x in [cxl, cxr]:
-			_paint_front(vb, x, M - 1, Color(0.6, 0.22, 0.22), F + 3)
+			_paint_front(vb, x, M - 1, Color(0.97, 0.93, 0.88), F + 3)
+		for x in [cxl - 1, cxr + 1]:
+			_paint_front(vb, x, M - 1, Color(0.62, 0.22, 0.22), F + 3)
+		for x in [cxl, cxr]:
+			_paint_front(vb, x, M - 2, Color(0.86, 0.42, 0.42), F + 3)
 		# 5) Lighter moustache across the upper lip, ends curling down.
 		var muz := _front_z(vb, cxl, M, F + 3)
 		for x in range(cxl - 2, cxr + 3):
@@ -868,9 +875,11 @@ static func _human_hat(vb: VoxelBuilder, L: Dictionary, W: int, H: int, Dd: int,
 			# Rounded-box beanie: squarish sides (few terraces), soft crown.
 			# r12: a soft rounded hood (ref1): fuller crown, rounder corners,
 			# so it reads as a plush knit cap, not a flat cake.
-			var dx := absf(x - hcx) / (W * 0.5 + 0.95)
-			var dz := absf(z - hcz) / ((F + 1) * 0.5 + 0.95)
-			var dy := maxf(0.0, (y - (T - 1.0)) / 4.0)
+			# r12b: ~20% smaller (critic r11): hugs the skull closer and the
+			# crown is lower, so the face below the cuff dominates the head.
+			var dx := absf(x - hcx) / (W * 0.5 + 0.7)
+			var dz := absf(z - hcz) / ((F + 1) * 0.5 + 0.7)
+			var dy := maxf(0.0, (y - (T - 1.0)) / 3.1)
 			return pow(dx, 3.0) + pow(dz, 3.0) + pow(dy, 2.2) <= 1.0
 		# Hair can't poke through the hat above the cuff line.
 		for y in range(c0, T + 7):
@@ -911,15 +920,15 @@ static func _human_hat(vb: VoxelBuilder, L: Dictionary, W: int, H: int, Dd: int,
 		if hat == "bunny":
 			# r12: upright plush ears (ref1: about 3/4 of the head height),
 			# 3 wide, 9 tall, 2 deep, pink inner front, rounded tip, pinched base.
-			for y in range(0, 9):
+			for y in range(0, 7):
 				for x in range(0, 3):
 					for z in range(0, 2):
-						if y == 8 and x != 1:
+						if y == 6 and x != 1:
 							continue
 						if y == 0 and x != 1 and z == 0:
 							continue
 						var c := outer
-						if z == 1 and x == 1 and y >= 1 and y <= 7:
+						if z == 1 and x == 1 and y >= 1 and y <= 5:
 							c = inner
 						el.set_v(Vector3i(x, y, z), _sh(c, 1.0 + (_h(Vector3i(x, y, z), 22) - 0.5) * 0.06))
 			out["ear_origin"] = Vector3(1.5, 0.5, 1.0)
@@ -1406,10 +1415,15 @@ static func _build_dog(L: Dictionary) -> Dictionary:
 	# Tail: stands up with a forward curl, saddle base, white tip.
 	var tail := VoxelBuilder.new()
 	tail.jitter = 0.03
+	# r12b: a curled sickle (critic r11: no stiff stick): thick saddle base,
+	# tan shaft sweeping up, then hooking forward over the back with a
+	# white tip curling down.
+	var tz := [0, 0, 0, 1, 1, 2, 3, 4, 5, 6]
 	for y in range(0, 10):
-		var c := white if y >= 7 else (_sh(saddle, 1.05) if y < 3 else tan)
-		var zz := 0 if y < 5 else (1 if y < 8 else 2)
-		_fill(tail, 0, 1, y, y, zz, zz + 1, _sh(c, 1.0 + (_h(Vector3i(0, y, 0), 39) - 0.5) * 0.1))
+		var c := white if y >= 8 else (_sh(saddle, 1.05) if y < 3 else tan)
+		var zz: int = tz[y] - (1 if y >= 9 else 0)
+		var x1 := 2 if y < 3 else 1
+		_fill(tail, 0, x1, y, y, zz, zz + 1, _sh(c, 1.0 + (_h(Vector3i(0, y, 0), 39) - 0.5) * 0.1))
 	acc.part("tail", tail, Vector3(1, 0, 1))
 
 	# Legs: 3 x (LEG+1) x 3; front legs white, hind legs tan with white feet,
@@ -1437,7 +1451,7 @@ static func _build_dog(L: Dictionary) -> Dictionary:
 		"mouth": Vector3(0, -1.0, HD + MZ - 1.0 - h_origin.z) * VS,
 		# Body-bone local spot on the floor between the stretched front paws
 		# (body lowered by LEG - 0.3 voxels in lying poses).
-		"paws": Vector3(0, -0.3 + 1.0, BL * 0.5 + 5.5) * VS,
+		"paws": Vector3(0, -0.3 + 1.0, BL * 0.5 + 7.5) * VS,
 		# Root-space floor spot in front of the chest for the play bow.
 		"paws_root": Vector3(0, 1.0, BL * 0.5 + 7.0) * VS,
 	}
@@ -1507,7 +1521,7 @@ static func prop_mesh(pname: String) -> ArrayMesh:
 				_fill(vb, ex, ex + 1, 0, 1, -1, 2, bfn)
 				_fill(vb, ex, ex + 1, 2, 2, 0, 1, bfn)
 			origin = Vector3(6, 1, 1)
-			size = 0.04
+			size = 0.048
 		"robot":
 			# Little toy robot the kids build (ref1 rug): blue body with a
 			# yellow chest light, grey head with black eyes, red antenna.

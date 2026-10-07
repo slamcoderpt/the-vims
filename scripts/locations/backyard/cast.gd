@@ -144,7 +144,7 @@ const HEAD_SCALE := {"adult": 0.78, "child": 0.86, "dog": 1.0}
 ## ~70 % of that, beagle's back at a child's knee-to-hip). SimActor clamps
 ## the household to a "hero minimum" meant for the zoomed-out house view,
 ## so the resolved scale is overridden here (and seat heights compensated).
-const BODY_SCALE := {"adult": 1.0, "child": 0.86, "dog": 0.85}
+const BODY_SCALE := {"adult": 1.0, "child": 0.86, "dog": 0.6}
 const LOOK_SCALE := {"dad": 1.04}
 
 

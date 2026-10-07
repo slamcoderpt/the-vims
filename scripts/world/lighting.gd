@@ -8,7 +8,8 @@ extends Node3D
 ##   sun_elev       fixed daytime sun elevation (deg) instead of the arc
 ##   sun_energy, ambient_energy, ambient_day, ambient_night (Color), sky_day, sky_night (Color)
 ##   fog_day, fog_night (Color), fog_density
-##   exposure, shadow_distance
+##   exposure, shadow_distance, tonemap_white
+##   sun_color_day  midday sun colour (default near-white; dawn/dusk stay amber)
 ##   post: Dictionary for post_fx.configure (focus_y, band, blur_px, ...)
 ##   post_day / post_night: overrides merged by time of day
 ## Lamps: any OmniLight3D/SpotLight3D in group "vims_lamps" (PropLib.add_light)
@@ -97,7 +98,7 @@ func _apply() -> void:
 	else:
 		heading = 180.0 - t * 160.0 + profile.get("sun_yaw", 0.0)
 	sun.rotation_degrees = Vector3(-elev, heading, 0)
-	var warm := Color(1.0, 0.66, 0.4).lerp(Color(1.0, 0.94, 0.84), golden)
+	var warm := Color(1.0, 0.66, 0.4).lerp(profile.get("sun_color_day", Color(1.0, 0.94, 0.84)), golden)
 	sun.light_color = warm
 	sun.light_energy = lerpf(0.0, profile.get("sun_energy", 1.35), day)
 	sun.visible = day > 0.02
@@ -126,6 +127,7 @@ func _apply() -> void:
 	env.fog_light_color = fog_n.lerp(fog_d, day)
 	env.fog_density = profile.get("fog_density", 0.006)
 	env.tonemap_exposure = profile.get("exposure", lerpf(1.12, 0.95, day))
+	env.tonemap_white = profile.get("tonemap_white", 6.0)
 	env.adjustment_brightness = 1.0
 	env.adjustment_contrast = 1.0
 	env.adjustment_saturation = 1.0

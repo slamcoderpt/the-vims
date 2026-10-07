@@ -8,6 +8,8 @@ const FastBuilder := preload("res://scripts/locations/backyard/fast_builder.gd")
 const M := 8    # cells per metre at 0.125
 const F := 16   # cells per metre at 0.0625
 const T := 4    # cells per metre at 0.25
+## Height of the neighbours' lots behind the yard (they sit lower than ours).
+const LOT_Y := -3.2
 
 const Party := preload("res://scripts/locations/backyard/party.gd")
 
@@ -208,7 +210,15 @@ func _lawn() -> void:
 			var q := Vector3i(ix, 1, iz)
 			fimg.set_pixel(ix, iz, V.shade(GRASS[int(V.h1(q, 2) * GRASS.size()) % GRASS.size()], 0.62 + V.h1(q, 3) * 0.1))
 	# One mesh / one draw call for all the surrounding ground (texture repeats).
-	_ground_quad(fimg, Vector3(-50.0, -0.02, -80.0), Vector2(90, 100), "OuterGround", Vector2(90.0 / 44.0, 100.0 / 40.0))
+	_ground_quad(fimg, Vector3(-50.0, -0.02, -34.0), Vector2(90, 54), "OuterGround", Vector2(90.0 / 44.0, 54.0 / 40.0))
+	# The neighbours' lots beyond sit lower (LOT_Y) so their houses read as
+	# a low skyline under an open sunset sky from the fixed bbq camera.
+	var limg := Image.create(44, 40, false, Image.FORMAT_RGB8)
+	for iz in 40:
+		for ix in 44:
+			var q := Vector3i(ix, 2, iz)
+			limg.set_pixel(ix, iz, V.shade(GRASS[int(V.h1(q, 4) * GRASS.size()) % GRASS.size()], 0.5 + V.h1(q, 5) * 0.08))
+	_ground_quad(limg, Vector3(-100.0, LOT_Y, -140.0), Vector2(180, 107), "LotGround", Vector2(180.0 / 22.0, 107.0 / 20.0))
 	# Bed edging: stone border (voxels, perimeter only).
 	var vb := FastBuilder.new()
 	vb.jitter = 0.0
@@ -554,23 +564,28 @@ func _tree(vb: VoxelBuilder, base: Vector3, height: float, crown: float, tone: i
 # ------------------------------------------------------------------ neighbours
 
 func _neighbours() -> void:
-	# A row of dusky neighbour houses along the horizon (silhouettes against
-	# the sunset with warm lit windows), with dark tree clumps between them.
+	# The neighbours' lots sit on lower ground well behind the yard (a second
+	# ground plane at LOT_Y), so from the fixed bbq camera the row of houses
+	# reads as a small silhouetted skyline: dark gable roofs peaking just over
+	# the horizon, warm lit windows below the eaves, dark tree canopies in
+	# the gaps, and the open sunset gradient above them across the top of
+	# the frame (ref4 top-left). Sizes / heights are derived from the camera
+	# (eye ~3.8 m, frame top ~6 deg above horizontal) rather than the camera
+	# being moved to fit the backdrop.
 	var vb := FastBuilder.new()
 	vb.jitter = 0.0
 	vb.skip_down_below = 0
 	vb.skip_normals = [Vector3i(0, 0, -1)]
-	var walls := [Color("6a6288"), Color("74648a"), Color("5e6486"), Color("7a6886"), Color("665c80")]
-	var roofs := [Color("2a2438"), Color("32263a"), Color("262636"), Color("2e2434")]
-	# x, z, width, depth, wall height (m), style
+	var walls := [Color("a29cc2"), Color("b2a2bc"), Color("96a0c0"), Color("b8a6b8"), Color("a49ab8")]
+	var roofs := [Color("4a4c72"), Color("54476a"), Color("43506e"), Color("504868")]
+	# x, z, width, depth, wall height (m), style  (base at LOT_Y)
 	var houses := [
-		[-46.0, -40.0, 9.0, 7.0, 5.0, 0],
-		[-34.0, -44.0, 8.0, 6.0, 3.5, 1],
-		[-24.0, -40.0, 9.0, 7.0, 5.0, 2],
-		[-13.0, -43.0, 7.0, 6.0, 3.5, 3],
-		[-4.0, -40.0, 8.0, 7.0, 5.0, 4],
-		[6.0, -45.0, 8.0, 6.0, 5.0, 1],
-		[18.0, -42.0, 9.0, 7.0, 5.0, 2],
+		[-34.0, -52.0, 8.0, 6.0, 6.0, 3],
+		[-22.0, -54.0, 8.0, 6.0, 6.0, 1],
+		[-10.0, -50.0, 9.0, 6.0, 5.5, 2],
+		[3.0, -64.0, 8.0, 6.0, 5.5, 1],
+		[14.5, -68.0, 8.0, 6.0, 5.5, 3],
+		[26.0, -56.0, 9.0, 6.0, 5.5, 0],
 	]
 	for hd in houses:
 		_house(vb, hd, walls[hd[5] % walls.size()], roofs[hd[5] % roofs.size()])
@@ -580,53 +595,43 @@ func _neighbours() -> void:
 	nmi.name = "Neighbours"
 	nmi.mesh = vb.build(V.SIZE_BIG, Vector3.ZERO, false)
 	nmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	# Sunk a little so the low bbq camera sees a band of sunset sky above
-	# the roofline (the lots behind sit lower than ours).
-	nmi.position.y = -3.6
-	nmi.position.z = -24.0
+	nmi.position.y = LOT_Y
 	if not vb.glow.is_empty():
 		nmi.set_surface_override_material(nmi.mesh.get_surface_count() - 1, V.glow_soft())
 	root.add_child(nmi)
-	# Closer row right behind the back fence at full height: two-storey
-	# houses with warm lit windows rising over the hedge and trees, like the
-	# neighbours peeking over in ref4 (top-left of the bbq shot).
-	var near := FastBuilder.new()
-	near.jitter = 0.0
-	near.skip_down_below = 0
-	near.skip_normals = [Vector3i(0, 0, -1)]
-	for hd in [[-31.0, -52.0, 9.0, 7.0, 6.0, 1], [-16.0, -55.0, 10.0, 7.0, 6.5, 2], [-2.0, -54.0, 9.0, 7.0, 6.0, 4]]:
-		_house(near, hd, V.shade(walls[hd[5] % walls.size()], 1.12), roofs[hd[5] % roofs.size()])
-	var nmi2 := MeshInstance3D.new()
-	nmi2.name = "NeighboursNear"
-	nmi2.mesh = near.build(V.SIZE_BIG, Vector3.ZERO, false)
-	nmi2.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	nmi2.position.y = -0.8
-	if not near.glow.is_empty():
-		nmi2.set_surface_override_material(nmi2.mesh.get_surface_count() - 1, V.glow_soft())
-	root.add_child(nmi2)
-	# Dark tree clumps at 0.5 m: between and behind the houses.
+	# Dark, rounded tree canopies at 0.5 m between and just behind the
+	# houses; crowns stay around eave height so the sky reads in the gaps,
+	# with only a couple of taller ones breaking the roofline.
 	var tl := VoxelBuilder.new()
 	tl.jitter = 0.06
 	var dark := func(q: Vector3i) -> Color:
-		var c: Color = [Color("27402e"), Color("2f4a34"), Color("223a2a"), Color("35503a")][int(V.h1(q, 7) * 4.0) % 4]
-		return V.shade(c, 0.9 + clampf(float(q.y) * 0.015, 0.0, 0.25))
-	for i in 12:
-		var tx := -54.0 + i * 6.6 + _rng.randf_range(-1.2, 1.2)
-		var tz := -62.0 + _rng.randf_range(-3.0, 2.0)
-		var r := _rng.randf_range(1.6, 2.6)
-		var hgt := _rng.randf_range(4.0, 7.5)
-		# Trunk + layered crown (rounder tops read as deciduous silhouettes).
+		var c: Color = [Color("33533a"), Color("3d6040"), Color("2c4834"), Color("4a6c44")][int(V.h1(q, 7) * 4.0) % 4]
+		return V.shade(c, 0.85 + clampf(float(q.y) * 0.02, 0.0, 0.3))
+	var spots := [[-28.0, -46.0, 4.6], [-16.0, -45.0, 4.2], [-3.0, -46.0, 6.2], [9.0, -52.0, 6.8],
+		[21.0, -58.0, 5.0], [-40.0, -48.0, 4.8], [33.0, -60.0, 5.0],
+		[-20.0, -66.0, 7.0], [-6.0, -72.0, 7.4], [10.0, -78.0, 7.0], [24.0, -76.0, 6.6],
+		[-33.0, -37.0, 3.4], [-21.0, -36.5, 3.0], [-9.5, -37.5, 3.6], [1.5, -36.0, 3.0], [12.0, -37.0, 3.4]]
+	for i in spots.size():
+		var sp: Array = spots[i]
+		var tx: float = sp[0] + _rng.randf_range(-0.8, 0.8)
+		var tz: float = sp[1]
+		var hgt: float = sp[2]
+		var r := _rng.randf_range(1.7, 2.4)
 		V.b(tl, int(tx * 2), 0, int(tz * 2), 1, int(hgt * 2 * 0.6), 1, Color("2a2224"))
-		V.blob(tl, Vector3(tx * 2, hgt * 2, tz * 2), Vector3(r * 2, r * 2 * 1.1, r * 2), dark, 0.32, i)
-		if i % 3 == 0:
-			V.blob(tl, Vector3(tx * 2 + r, hgt * 2 - r * 0.8, tz * 2), Vector3(r * 1.3, r * 1.2, r * 1.3), dark, 0.32, i + 40, true)
-	# A couple of tall conifers for variety in the skyline.
-	for cx in [-29.0, 12.0]:
-		var cz := -60.0
-		for k in 10:
-			var rr := maxf(0.5, 3.4 - k * 0.32)
-			V.blob(tl, Vector3(cx * 2, 2.0 + k * 1.6, cz * 2), Vector3(rr, 1.0, rr), dark, 0.25, k)
-	V.inst(tl, root, 0.5, Vector3(0, -3.0, 0), 0.0, Vector3.ZERO, false, false, "TreeLine")
+		V.blob(tl, Vector3(tx * 2, hgt * 2, tz * 2), Vector3(r * 2, r * 2 * 1.05, r * 2), dark, 0.32, i)
+		if i % 2 == 0:
+			V.blob(tl, Vector3(tx * 2 + r * 1.2, hgt * 2 - r * 0.9, tz * 2 + 1), Vector3(r * 1.3, r * 1.2, r * 1.3), dark, 0.32, i + 40, true)
+	# Warm street lamps dotted along the neighbours' lots.
+	for lp in [[-25.0, -44.0], [-4.5, -43.0], [7.0, -48.0]]:
+		V.b(tl, int(lp[0] * 2), 0, int(lp[1] * 2), 1, 8, 1, Color("2a2630"))
+		tl.set_v(Vector3i(int(lp[0] * 2), 8, int(lp[1] * 2)), Color("ffd08a"), true)
+	# One slim conifer for variety in the skyline.
+	var ccx := 0.0
+	var ccz := -54.0
+	for k in 10:
+		var rr := maxf(0.5, 2.8 - k * 0.27)
+		V.blob(tl, Vector3(ccx * 2, 2.0 + k * 1.5, ccz * 2), Vector3(rr, 1.0, rr), dark, 0.25, k)
+	V.inst(tl, root, 0.5, Vector3(0, LOT_Y, 0), 0.0, Vector3.ZERO, false, false, "TreeLine")
 
 
 func _house(vb: VoxelBuilder, hd: Array, wall: Color, roof: Color) -> void:
@@ -659,17 +664,25 @@ func _house(vb: VoxelBuilder, hd: Array, wall: Color, roof: Color) -> void:
 	# Window rows hang from the eaves down, so the top row still shows over
 	# the hedges when a house sits low behind the yard.
 	var floors := 2 if h >= 18 else 1
+	var trim := V.shade(wall, 1.45)
 	for f in floors:
-		var wy := h - 6 - f * 9
-		var n := w / 6
+		var wy := h - 7 - f * 10
+		var n := maxi(1, (w - 2) / 10)
 		for i in n:
-			var wx := x0 + 2 + i * 6
-			var lit := V.hs(wx, wy, z0) < 0.85
-			var gc := Color("ffc76e") if lit else Color("3a3850")
-			V.b(vb, wx, wy, z0 + d, 3, 4, 1, gc, lit)
-			V.b(vb, wx - 1, wy - 1, z0 + d, 5, 1, 1, V.shade(wall, 1.35))
+			var wx := x0 + 3 + i * 10
+			var lit := V.hs(wx, wy, z0) < 0.8
+			var gc := Color("ffc76e") if lit else Color("4a4868")
+			# White-trimmed two-pane window (~1.5 x 1.25 m) with a sill.
+			V.b(vb, wx - 1, wy - 1, z0 + d, 8, 7, 1, trim)
+			V.b(vb, wx, wy, z0 + d, 6, 5, 1, gc, lit)
+			V.b(vb, wx + 3, wy, z0 + d, 1, 5, 1, trim)
+			V.b(vb, wx - 1, wy - 2, z0 + d, 8, 1, 2, V.shade(trim, 0.85))
 			if lit:
-				V.b(vb, wx + 1, wy, z0 + d, 1, 4, 1, V.shade(gc, 0.75), true)
+				V.b(vb, wx, wy + 3, z0 + d, 3, 2, 1, V.shade(gc, 1.1), true)
+	# Corner boards + fascia: pale trim edges that keep the silhouettes crisp.
+	V.b(vb, x0 - 1, h, z0 + d, w + 2, 1, 2, trim)
+	V.b(vb, x0, 0, z0 + d, 1, h, 1, trim)
+	V.b(vb, x0 + w - 1, 0, z0 + d, 1, h, 1, trim)
 	# Front door with a porch light.
 	V.b(vb, x0 + w - 6, 0, z0 + d, 3, 6, 1, Color("2c2430"))
 	V.b(vb, x0 + w - 7, 6, z0 + d, 1, 1, 1, Color("ffd38a"), true)
