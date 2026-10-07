@@ -83,15 +83,10 @@ var _plane_h := 1.0
 
 ## Framing (fractions of the head height neck->top-of-hat), tuned so the face
 ## fills the card like the refs.
-const ADULT_TOP := 0.26
-const ADULT_BELOW := 0.56
-const KID_TOP := -0.05
-const KID_BELOW := 0.16
-const PERSON_YAW := -14.0
-const PERSON_PITCH := -2.0
-const DOG_YAW := -42.0
-const DOG_PITCH := -8.0
-const DOG_ZOOM := 1.2
+const PERSON_YAW := -10.0
+const PERSON_PITCH := -4.0
+const DOG_YAW := -14.0
+const DOG_PITCH := -9.0
 
 
 func _ready() -> void:
@@ -241,7 +236,7 @@ func _spawn_actor() -> void:
 	_vp.add_child(a)
 	var dog: bool = member.get("kind", "") == "dog"
 	if a.has_method("set_pose"):
-		a.set_pose("idle")
+		a.set_pose("sit" if dog else "idle")
 	# Let the actor build its meshes and snap into its pose, then freeze it:
 	# a portrait is a still (eyes open, no idle sway), rendered on demand.
 	for i in 3:
@@ -311,97 +306,112 @@ func _frame_camera(measure := false) -> void:
 	var dir := Vector3(sin(yaw) * cos(pitch), -sin(pitch), cos(yaw) * cos(pitch))
 	var right := Vector3.UP.cross(dir).normalized()
 	var up := dir.cross(right).normalized()
-	var pts := PackedVector3Array()
-	var top_pad := 0.0
-	var bot_pad := 0.0
-	var side_pad := 0.0
 	var sk = _actor.get("skeleton")
 	var hb := int(_actor.get("b_head")) if _actor.get("b_head") != null else -1
 	var meta = _actor.get("_meta")
-	if sk is Skeleton3D and hb >= 0 and meta is Dictionary and not meta.is_empty():
-		var s: float = sk.global_transform.basis.get_scale().y
+	var cx := 0.0
+	var cy := 0.0
+	var view_h := 1.0
+	var origin := _actor.global_position
+	if sk is Skeleton3D and hb >= 0 and meta is Dictionary and not meta.is_empty() and not dog:
+		# Head-and-shoulders close-up: the head (hair included) fills ~62% of
+		# the card width, a small margin over the hair / hat, chin at ~62%
+		# of the height and the shoulders below, like the ref cards.
 		var vs := 0.05
 		var g := _bone_xf(sk, hb)
-		var head_h: float = meta.get("head_h", 0.6)
-		if dog:
-			# Whole sitting dog: paws, rump, tail tip, head top, nose, ears.
-			pts.append(_actor.global_position)
-			for bn in ["b_body", "b_tail", "b_leg_fl", "b_leg_fr", "b_leg_bl", "b_leg_br", "b_ear_l", "b_ear_r"]:
+		var hh := 9.0 if kid else 10.0
+		origin = g * Vector3(0, meta.get("head_h", 0.6), 0)
+		var pr := func(v: Vector3) -> Vector2:
+			var d: Vector3 = g * (v * vs) - origin
+			return Vector2(d.dot(right), d.dot(up))
+		var mid: Vector2 = pr.call(Vector3(0, 1.0 + hh * 0.5, 0))
+		var l: Vector2 = pr.call(Vector3(-6.2, 1.0 + hh * 0.5, 0))
+		var r: Vector2 = pr.call(Vector3(6.2, 1.0 + hh * 0.5, 0))
+		var head_w := absf(r.x - l.x)
+		var skull_top: float = pr.call(Vector3(0, hh + 2.0, 0)).y
+		var chin: float = pr.call(Vector3(0, 0.5, 0)).y
+		var unit := absf(skull_top - chin) / (hh + 1.5)
+		# Hat ears may rise ~6 voxels above the skull; taller tips get cropped
+		# by the frame edge (like the ref bunny ears) instead of shrinking
+		# the face.
+		var top := skull_top + unit * (8.0 if kid else 4.0)
+		if _measured.size != Vector2.ZERO and not measure:
+			top = minf(_measured.end.y, top)
+			top = maxf(top, skull_top)
+		var w_frac := 0.7 if kid else 0.62
+		view_h = head_w / w_frac / aspect
+		var top_m := 0.0 if kid else 0.045
+		var chin_frac := 0.76 if kid else 0.64
+		if (top - chin) > (chin_frac - top_m) * view_h:
+			view_h = (top - chin) / (chin_frac - top_m)
+		cy = top + view_h * top_m - view_h * 0.5
+		cx = mid.x
+		if measure:
+			view_h *= 2.2
+			cy = (top + chin) * 0.5
+	else:
+		var pts := PackedVector3Array()
+		if sk is Skeleton3D and hb >= 0:
+			var vs := 0.05
+			var g := _bone_xf(sk, hb)
+			# Pet close-up: head, ears and chest (front legs' tops), so the
+			# face fills the card like the ref beagle card.
+			pts.append(g * (Vector3(0, 9.0, 4.0) * vs))
+			for bn in ["b_leg_fl", "b_leg_fr", "b_ear_l", "b_ear_r"]:
 				var bi = _actor.get(bn)
 				if bi != null and int(bi) >= 0:
 					pts.append(_bone_pos(sk, int(bi)))
-			for cx in [-7.5, 7.5]:
-				for cy in [-3.0, 9.0]:
-					for cz in [-3.0, 11.0]:
-						pts.append(g * (Vector3(cx, cy, cz) * vs))
-			var tb = _actor.get("b_tail")
-			if tb != null and int(tb) >= 0:
-				pts.append(_bone_xf(sk, int(tb)) * (Vector3(0, 6, 0) * vs))
-			top_pad = 0.07
-			bot_pad = 0.05
-			side_pad = 0.05
+			for qx in [-7.5, 7.5]:
+				for qy in [-6.0, 9.0]:
+					for qz in [-3.0, 11.0]:
+						pts.append(g * (Vector3(qx, qy, qz) * vs))
 		else:
-			# Head + hat + shoulders: neck row up to the hat top, the
-			# head's width, and the chest below the chin.
-			var hh := 9.0 if kid else 10.0
-			var face := (hh + 1.0) * vs
-			pts.append(g * Vector3(0, head_h, 0))
-			pts.append(g * Vector3(0, -face * (0.36 if kid else 0.42), 0))
-			for sx in [-1.0, 1.0]:
-				pts.append(g * Vector3(sx * 6.0 * vs, face * 0.5, 0))
-			top_pad = 0.09 if kid else 0.08
-			bot_pad = 0.0
-			side_pad = 0.02
-	else:
-		var box := _actor_aabb()
-		if box.size == Vector3.ZERO:
-			box = AABB(Vector3(-0.3, 0, -0.3), Vector3(0.6, 1.8, 0.6))
-		for i in 8:
-			pts.append(box.get_endpoint(i))
-	var minx := INF
-	var maxx := -INF
-	var miny := INF
-	var maxy := -INF
-	var origin := pts[0]
-	for p in pts:
-		var d := p - origin
-		var px := d.dot(right)
-		var py := d.dot(up)
-		minx = minf(minx, px)
-		maxx = maxf(maxx, px)
-		miny = minf(miny, py)
-		maxy = maxf(maxy, py)
-	if _measured.size != Vector2.ZERO and not measure:
-		if dog:
+			var box := _actor_aabb()
+			if box.size == Vector3.ZERO:
+				box = AABB(Vector3(-0.3, 0, -0.3), Vector3(0.6, 1.8, 0.6))
+			for i in 8:
+				pts.append(box.get_endpoint(i))
+		origin = pts[0]
+		var minx := INF
+		var maxx := -INF
+		var miny := INF
+		var maxy := -INF
+		for p in pts:
+			var d := p - origin
+			minx = minf(minx, d.dot(right))
+			maxx = maxf(maxx, d.dot(right))
+			miny = minf(miny, d.dot(up))
+			maxy = maxf(maxy, d.dot(up))
+		if _measured.size != Vector2.ZERO and not measure and not dog:
 			minx = _measured.position.x
 			maxx = _measured.end.x
 			miny = _measured.position.y
 			maxy = _measured.end.y
-		else:
-			# people: real top of hair / hat ears; keep the chest crop line
-			maxy = maxf(maxy, _measured.end.y)
-	var w := maxx - minx
-	var h := maxy - miny
-	var view_h := maxf(h * (1.0 + top_pad + bot_pad), w * (1.0 + side_pad * 2.0) / aspect)
-	# Centre horizontally; vertically keep the requested top margin and let
-	# any extra height fall below (more chest / floor, never empty sky).
-	var cy := maxy + h * top_pad - view_h * 0.5
-	if dog:
-		cy = (maxy + miny) * 0.5 + h * (top_pad - bot_pad) * 0.5
-	var cx := (minx + maxx) * 0.5
-	if measure:
-		view_h *= 1.9
-		cy = (maxy + miny) * 0.5 + h * 0.2
+		cx = (minx + maxx) * 0.5
+		if dog and sk is Skeleton3D and hb >= 0:
+			# Centre on the face, not on the whole silhouette.
+			var fc: Vector3 = _bone_xf(sk, hb) * (Vector3(0, 2.0, 6.0) * 0.05) - origin
+			cx = fc.dot(right)
+			var half := maxf(maxx - cx, cx - minx)
+			minx = cx - half
+			maxx = cx + half
+		var w := maxx - minx
+		var h := maxy - miny
+		view_h = maxf(h * (1.1 if dog else 1.14), w * (1.2 if dog else 1.12) / aspect)
+		cy = (maxy + miny) * 0.5 + h * 0.01
+		if measure:
+			view_h *= 1.9
 	var center := origin + right * cx + up * cy
 	_plane_c = Vector2(cx, cy)
 	_plane_h = view_h
 	_cam.size = view_h
 	_cam.global_position = center + dir * 6.0
 	_cam.look_at(center, Vector3.UP)
-	# Key light follows the camera so every portrait gets the same look.
-	_key.rotation = Vector3(deg_to_rad(-28.0), yaw - deg_to_rad(35.0), 0)
-	_fill.rotation = Vector3(deg_to_rad(-10.0), yaw + deg_to_rad(60.0), 0)
-	_rim_l.rotation = Vector3(deg_to_rad(-20.0), yaw + deg_to_rad(160.0), 0)
+	# Soft front key from just above-left of the lens (faces read evenly,
+	# like a studio portrait), a cool fill and a warm rim on the hair.
+	_key.rotation = Vector3(deg_to_rad(-22.0), yaw - deg_to_rad(22.0), 0)
+	_fill.rotation = Vector3(deg_to_rad(-8.0), yaw + deg_to_rad(55.0), 0)
+	_rim_l.rotation = Vector3(deg_to_rad(-25.0), yaw + deg_to_rad(165.0), 0)
 	_request_render()
 
 

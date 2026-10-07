@@ -30,7 +30,7 @@ func _ready() -> void:
 				if not nav.last_ok:
 					bad.append(str(p))
 			print("%-16s %-12s spot=%s  %s" % [it.title, act.get("pose", ""), str(r.spot), "OK" if bad.is_empty() else "FAIL from " + ", ".join(bad)])
-	for sp in [Vector3(5.4, 2.97, -3.51), Vector3(6.39, 2.97, 3.42)]:
+	for sp in [Vector3(-2.61, 2.97, -3.51)]:
 		var li := nav.level_of(sp)
 		var c := nav.cell_of(sp)
 		print("around ", sp, " cell ", c, " region of approach ", nav.region_of(li, nav.approach_cell(li, c, -1, 48)))
@@ -48,4 +48,11 @@ func _ready() -> void:
 					ch = "X"
 				row += ch
 			print(row)
+	var col := AABB(Vector3(-3.4, 3.2, -3.4), Vector3(1.6, 1.2, 1.2))
+	for mi: MeshInstance3D in sim.location.find_children("*", "MeshInstance3D", true, false):
+		if mi.mesh == null:
+			continue
+		var ab: AABB = mi.global_transform * mi.get_aabb()
+		if ab.intersects(col):
+			print("MESH ", mi.get_path(), " aabb ", ab, " nav_ignore=", mi.has_meta("nav_ignore"), " vis=", mi.visible)
 	get_tree().quit()

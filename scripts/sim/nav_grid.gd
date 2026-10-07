@@ -129,7 +129,7 @@ func _collect(root: Node3D) -> PackedFloat32Array:
 	for mi: MeshInstance3D in root.find_children("*", "MeshInstance3D", true, false):
 		if mi.mesh == null or mi.skin != null or _under_actor(mi, root):
 			continue
-		if mi.has_meta("nav_ignore"):
+		if mi.has_meta("nav_ignore") or _is_effect(mi):
 			continue
 		var xf := mi.global_transform
 		var ab := xf * mi.get_aabb()
@@ -203,6 +203,34 @@ func _collect(root: Node3D) -> PackedFloat32Array:
 				out.append(minx); out.append(maxx); out.append(miny); out.append(maxy)
 				out.append(minz); out.append(maxz); out.append(kind)
 	return out
+
+
+## Light shafts, glows, sky cards, glass: drawn with an unshaded / additive /
+## see-through material. They are not something to walk around.
+static func _is_effect(mi: MeshInstance3D) -> bool:
+	var mats: Array = [mi.material_override]
+	if mi.mesh:
+		for si in mi.mesh.get_surface_count():
+			mats.append(mi.get_active_material(si))
+	var any := false
+	for m in mats:
+		if m == null:
+			continue
+		any = true
+		if m is ShaderMaterial:
+			var sh: Shader = (m as ShaderMaterial).shader
+			var code: String = sh.code if sh else ""
+			if not ("unshaded" in code or "blend_add" in code or "depth_draw_never" in code):
+				return false
+		elif m is BaseMaterial3D:
+			var bm := m as BaseMaterial3D
+			if bm.transparency == BaseMaterial3D.TRANSPARENCY_DISABLED and bm.shading_mode != BaseMaterial3D.SHADING_MODE_UNSHADED:
+				return false
+		else:
+			return false
+		if m == mi.material_override:
+			return true
+	return any
 
 
 static func _under_actor(n: Node, root: Node) -> bool:

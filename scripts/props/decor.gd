@@ -118,25 +118,25 @@ static func m_lamp_floor(vb: VoxelBuilder, _v: int) -> void:
 	V.b(vb, 1, 27, 1, 5, 2, 5, LAMP, true)
 
 
-## Wall sconce / lantern, back on the wall at z=0. A small glass lantern
-## (iron or brass corner posts) whose glowing panes also show from above, so
-## it reads lit in the high Sims camera (ref3 wall lanterns).
+## Wall sconce, back on the wall at z=0: a small metal bracket holding a warm
+## frosted-glass shade that glows on every face (top included), so it reads
+## as a lit lamp from the high Sims camera (ref3's warm hallway sconces).
+## v0 dark iron, v1 brass.
 static func m_sconce(vb: VoxelBuilder, v: int) -> void:
-	var metal := Color("2e2a28") if v == 0 else Color("b8893f")
-	var glow := Color("ffb85e")
-	V.b(vb, 1, 0, 0, 2, 6, 1, metal)
-	V.b(vb, 1, 3, 1, 2, 1, 1, metal)
-	# Lantern body 4 x 4 x 3: glowing panes, dark corner posts.
-	V.b(vb, 0, 1, 2, 4, 4, 3, glow, true)
-	V.b(vb, 1, 2, 3, 2, 2, 1, Color("ffe2a6"), true)
-	for c in [Vector2i(0, 2), Vector2i(3, 2), Vector2i(0, 4), Vector2i(3, 4)]:
-		V.b(vb, c.x, 1, c.y, 1, 4, 1, metal)
-	V.b(vb, 0, 1, 2, 4, 1, 3, metal)
-	# Open cap ring (the lit top still shows) + finial.
-	V.b(vb, 0, 5, 2, 4, 1, 1, metal); V.b(vb, 0, 5, 4, 4, 1, 1, metal)
-	V.p(vb, 0, 5, 3, metal); V.p(vb, 3, 5, 3, metal)
-	V.b(vb, 1, 5, 3, 2, 1, 1, Color("ffd890"), true)
-	V.p(vb, 1, 6, 3, metal)
+	var metal := Color("3a3330") if v == 0 else Color("c0914a")
+	var glow := Color("ffc56e")
+	var hot := Color("ffe9b8")
+	# Back plate + arm.
+	V.b(vb, 1, 0, 0, 2, 4, 1, metal)
+	V.b(vb, 1, 1, 1, 2, 1, 1, metal)
+	# Shade: 4 wide, 3 tall, 3 deep, all glowing; hot core on the front/top.
+	V.b(vb, 0, 2, 1, 4, 3, 3, glow, true)
+	V.b(vb, 1, 3, 3, 2, 1, 1, hot, true)
+	V.b(vb, 1, 4, 2, 2, 1, 1, hot, true)
+	# Thin cap + drip bottom in metal (corners only, so the glow shows).
+	V.p(vb, 0, 5, 2, metal); V.p(vb, 3, 5, 2, metal)
+	V.b(vb, 1, 5, 2, 2, 1, 1, metal)
+	V.b(vb, 1, 1, 2, 2, 1, 1, metal)
 
 
 static func m_desk_lamp(vb: VoxelBuilder, _v: int) -> void:
@@ -352,17 +352,19 @@ static func m_telescope(vb: VoxelBuilder, _v: int) -> void:
 # ------------------------------------------------------------------ kids / pet
 
 static func m_dog_bed(vb: VoxelBuilder, _v: int) -> void:
-	# Wooden crate bed with a bone on the front (ref1).
+	# Small wooden crate bed with a cushion and a bone on the front (ref1),
+	# 0.84 x 0.7 m: a beagle curls up in it, it never dominates the room.
 	var w := V.wood(Color("9a5f34"), 0, 2)
-	V.b(vb, 0, 0, 0, 16, 1, 13, w)
-	V.b(vb, 0, 1, 0, 16, 5, 1, w); V.b(vb, 0, 1, 12, 16, 5, 1, w)
-	V.b(vb, 0, 1, 0, 1, 5, 13, w); V.b(vb, 15, 1, 0, 1, 5, 13, w)
-	V.b(vb, 1, 1, 1, 14, 2, 11, V.noisy(Color("efe4cf"), 0.05))
-	V.b(vb, 2, 3, 2, 12, 1, 9, V.noisy(Color("f6eedd"), 0.04))
-	# Bone emblem.
-	for q in [Vector2i(5, 2), Vector2i(6, 2), Vector2i(7, 2), Vector2i(8, 2), Vector2i(9, 2), Vector2i(10, 2),
-			Vector2i(4, 1), Vector2i(4, 3), Vector2i(11, 1), Vector2i(11, 3)]:
-		V.p(vb, q.x, q.y + 1, 13, Color("f3ead8"))
+	V.b(vb, 0, 0, 0, 12, 1, 10, w)
+	V.b(vb, 0, 1, 0, 12, 3, 1, w); V.b(vb, 0, 1, 9, 12, 3, 1, w)
+	V.b(vb, 0, 1, 0, 1, 3, 10, w); V.b(vb, 11, 1, 0, 1, 3, 10, w)
+	V.b(vb, 0, 4, 0, 12, 1, 1, V.shade(Color("9a5f34"), 1.12)); V.b(vb, 0, 4, 0, 1, 1, 10, V.shade(Color("9a5f34"), 1.12))
+	V.b(vb, 11, 4, 0, 1, 1, 10, V.shade(Color("9a5f34"), 1.12))
+	V.b(vb, 1, 1, 1, 10, 2, 8, V.noisy(Color("efe4cf"), 0.05))
+	V.b(vb, 2, 3, 2, 8, 1, 6, V.noisy(Color("f6eedd"), 0.04))
+	# Bone emblem on the low front.
+	for q in [Vector2i(4, 2), Vector2i(5, 2), Vector2i(6, 2), Vector2i(7, 2), Vector2i(3, 1), Vector2i(3, 3), Vector2i(8, 1), Vector2i(8, 3)]:
+		V.p(vb, q.x, q.y, 10, Color("f3ead8"))
 
 
 ## Round dog cushion (ref3 hallway).

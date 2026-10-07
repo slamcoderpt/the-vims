@@ -28,6 +28,7 @@ func _ready() -> void:
 	rig.apply(cam)
 	for i in 20:
 		await get_tree().process_frame
+	print("SPOTS desk=", loc._spots.get("desk"), " chair=", loc._spots.get("office_chair"))
 	for k in ["dad", "bunny_girl", "cat_girl", "beagle"]:
 		var a: SimActor = loc.get_actor(k)
 		if a:

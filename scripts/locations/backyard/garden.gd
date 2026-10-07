@@ -18,7 +18,7 @@ const PINKS := [Color("ee7fb4"), Color("f59cc6"), Color("d95c98"), Color("ffb6d4
 const WHITES := [Color("fbf7f0"), Color("f1ece6"), Color("fffdf8")]
 const YELLOWS := [Color("f7cf3e"), Color("ffdf63"), Color("f0b62c")]
 const REDS := [Color("e2513f"), Color("f07a3a")]
-const PICKET := Color("f4efe6")
+const PICKET := Color("e2dce0")
 
 ## Rects (metres): x0, z0, x1, z1
 const BEDS := [
@@ -502,9 +502,9 @@ func _trees() -> void:
 	# Canopies at 0.25 m: chunky leaves, a fraction of the triangles.
 	var vb := VoxelBuilder.new()
 	vb.jitter = 0.08
-	_tree(vb, Vector3(-10.5, 0, -8.6), 3.4, 1.9, 0)
+	_tree(vb, Vector3(-12.0, 0, -8.6), 2.8, 1.6, 0)
 	_tree(vb, Vector3(-15.0, 0, -3.0), 4.0, 2.5, 1)
-	_tree(vb, Vector3(-5.5, 0, -10.0), 3.6, 1.9, 2)
+	_tree(vb, Vector3(-4.5, 0, -10.5), 3.0, 1.6, 2)
 	_tree(vb, Vector3(15.5, 0, -4.0), 4.2, 2.5, 0)
 	# Hedge along the back fence (outside).
 	var x := -13.0
@@ -582,7 +582,8 @@ func _neighbours() -> void:
 	nmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	# Sunk a little so the low bbq camera sees a band of sunset sky above
 	# the roofline (the lots behind sit lower than ours).
-	nmi.position.y = -2.8
+	nmi.position.y = -3.6
+	nmi.position.z = -14.0
 	if not vb.glow.is_empty():
 		nmi.set_surface_override_material(nmi.mesh.get_surface_count() - 1, V.glow_soft())
 	root.add_child(nmi)
@@ -593,13 +594,13 @@ func _neighbours() -> void:
 	near.jitter = 0.0
 	near.skip_down_below = 0
 	near.skip_normals = [Vector3i(0, 0, -1)]
-	for hd in [[-16.5, -21.0, 8.0, 6.0, 5.0, 1], [-7.5, -23.0, 9.0, 6.0, 5.5, 2], [1.5, -24.0, 8.0, 6.0, 5.0, 3]]:
-		_house(near, hd, walls[hd[5] % walls.size()], roofs[hd[5] % roofs.size()])
+	for hd in [[-22.0, -36.0, 9.0, 7.0, 6.0, 1], [-10.5, -38.0, 10.0, 7.0, 6.5, 2], [0.5, -40.0, 9.0, 7.0, 6.0, 3]]:
+		_house(near, hd, V.shade(walls[hd[5] % walls.size()], 1.12), roofs[hd[5] % roofs.size()])
 	var nmi2 := MeshInstance3D.new()
 	nmi2.name = "NeighboursNear"
 	nmi2.mesh = near.build(V.SIZE_BIG, Vector3.ZERO, false)
 	nmi2.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	nmi2.position.y = -0.6
+	nmi2.position.y = -0.4
 	if not near.glow.is_empty():
 		nmi2.set_surface_override_material(nmi2.mesh.get_surface_count() - 1, V.glow_soft())
 	root.add_child(nmi2)

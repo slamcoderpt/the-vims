@@ -20,13 +20,15 @@ extends RefCounted
 
 const U := 0.0625
 ## Display cell size for furniture + decor: models are authored in 1/16 m cells
-## but shown 1.25x bigger (chibi proportions: the household's big-headed sims
-## need chunkier furniture, like the reference shots). Outdoor models keep
-## their own SCALE.
-const FU := 0.078125
+## and shown at 1.12x (0.07 m cells): close to real-world size (desk top
+## 0.84 m, chair seat 0.49 m, door-height shelves) so a 1.75 m adult reads at
+## the right scale, a touch chunky for the voxel look. Outdoor models keep
+## their own SCALE; detail.gd models are authored in half cells (FU * 0.5).
+const FU := 0.07
 const Furn := preload("res://scripts/props/furniture.gd")
 const Decor := preload("res://scripts/props/decor.gd")
 const Outdoor := preload("res://scripts/props/outdoor.gd")
+const Detail := preload("res://scripts/props/detail.gd")
 const VU := preload("res://scripts/props/vox_util.gd")
 const Mesher := preload("res://scripts/props/mesher.gd")
 
@@ -42,7 +44,7 @@ static var _night_ext_mat: StandardMaterial3D
 static func _ensure_index() -> void:
 	if not _index.is_empty():
 		return
-	for lib in [Furn, Decor, Outdoor]:
+	for lib in [Furn, Decor, Outdoor, Detail]:
 		for m in lib.get_script_method_list():
 			var n: String = m.name
 			if n.begins_with("m_"):
@@ -61,6 +63,8 @@ static func has_model(name: String) -> bool:
 
 ## Cell size (metres) a model is authored in.
 static func scale_of(name: String) -> float:
+	if name.ends_with("_hd"):
+		return FU * 0.5
 	return Outdoor.SCALE.get(name, FU)
 
 

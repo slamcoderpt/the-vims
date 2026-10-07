@@ -37,6 +37,33 @@ func _ready() -> void:
 				a.position = Vector3(x, 0, 0)
 				x += 0.95
 			rig.apply({"target": Vector3(0, 0.8, 0), "yaw": 0.0, "pitch": 12.0, "distance": 13.0, "fov": 30.0})
+		"faces", "faces34":
+			var fl := ["dad", "bunny_girl", "cat_girl", "npc_2", "npc_3", "npc_1", "npc_6"]
+			var x := -3.3
+			for l in fl:
+				var a := SimActor.create(l)
+				a.camera_cheat = false
+				add_child(a)
+				a.position = Vector3(x, 0, 0)
+				a.rotation_degrees.y = 35.0 if mode == "faces34" else 0.0
+				a._blink_t = 99.0
+				x += 1.1
+			rig.apply({"target": Vector3(-2.2 + float(OS.get_environment("FX") if OS.get_environment("FX") != "" else "0"), 1.75, 0), "yaw": 0.0, "pitch": 22.0, "distance": 9.5, "fov": 13.0})
+		"typeview":
+			# Dad typing at a desk on the far side, camera behind-right (home_day).
+			var a := SimActor.create("dad")
+			add_child(a)
+			a.rotation_degrees.y = 200.0
+			a.seat_height = 0.55
+			a.set_meta("dbg_cam_a", -2.95)
+			a.set_pose("type")
+			var desk := VoxelBuilder.new()
+			desk.box(Vector3i(-10, 0, -22), Vector3i(20, 15, 8), Color(0.6, 0.4, 0.25))
+			desk.box(Vector3i(-4, 15, -16), Vector3i(8, 1, 3), Color(0.9, 0.9, 0.9))
+			var dmi := desk.build_instance(0.0625)
+			dmi.rotation_degrees.y = 20.0
+			add_child(dmi)
+			rig.apply({"target": Vector3(0, 0.9, -0.5), "yaw": -70.0, "pitch": 30.0, "distance": 5.5, "fov": 30.0})
 		"closeup":
 			var specs := [["dad", Vector3(-1.2, 0, 0)], ["bunny_girl", Vector3(-0.1, 0, 0)], ["cat_girl", Vector3(0.8, 0, 0)], ["beagle", Vector3(1.7, 0, 0.2)]]
 			for s in specs:

@@ -7,7 +7,7 @@ const PRESETS := {
 	"home_day": {
 		"ref": "refs/ref1_home_office_day.png",
 		"location": "home", "day": 1, "hour": 14, "minute": 16, "season": 1,
-		"camera": {"target": Vector3(-5.45, 3.85, -1.9), "yaw": 40.0, "pitch": 37.0, "distance": 9.1, "fov": 42.0},
+		"camera": {"target": Vector3(-6.0, 3.3, -1.5), "yaw": 42.0, "pitch": 40.0, "distance": 9.5, "fov": 52.0},
 		"tasks": [
 			{"title": "Answer Emails", "icon": "laptop", "done": true},
 			{"title": "Practice Creativity", "icon": "palette"},
@@ -33,7 +33,7 @@ const PRESETS := {
 	"home_night": {
 		"ref": "refs/ref3_home_night_cutaway.png",
 		"location": "home", "day": 0, "hour": 21, "minute": 18, "season": 1,
-		"camera": {"target": Vector3(3.7, 3.0, -0.8), "yaw": 12.0, "pitch": 42.0, "distance": 14.8, "fov": 40.0},
+		"camera": {"target": Vector3(2.9, 2.6, -0.2), "yaw": 16.0, "pitch": 44.0, "distance": 17.0, "fov": 40.0},
 		"tasks": [
 			{"title": "Take Bath", "icon": "bath"},
 			{"title": "Brush Teeth", "icon": "brush", "done": true},
@@ -46,7 +46,7 @@ const PRESETS := {
 	"bbq": {
 		"ref": "refs/ref4_backyard_bbq_sunset.png",
 		"location": "backyard", "day": 0, "hour": 19, "minute": 36, "season": 1,
-		"camera": {"target": Vector3(1.1, 0.9, -0.9), "yaw": -14.0, "pitch": 24.0, "distance": 8.8, "fov": 48.0},
+		"camera": {"target": Vector3(0.9, 1.3, -1.2), "yaw": -14.0, "pitch": 15.0, "distance": 10.5, "fov": 48.0},
 		"tasks": [
 			{"title": "Grill Dinner", "icon": "burger", "done": true},
 			{"title": "Talk to Neighbors", "icon": "people"},

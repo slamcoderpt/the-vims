@@ -39,8 +39,12 @@ func build(parent: Node3D, party) -> void:
 	# Jack at the grill.
 	# Beside the grill (its right end, table side) so his whole body reads in
 	# 3/4 view instead of hiding behind the firebox.
-	var gf: Vector3 = Party.GRILL_POS + Vector3(0.8, 0.0, -0.5)
-	_spawn("Jack", gf, 0.0, "grill").face(Party.GRILL_POS + Vector3(0.0, 0.0, 0.45))
+	# Behind the grill (its control-panel side faces away from the camera),
+	# turned toward the viewer in 3/4 so his face reads over the lid.
+	var gdir := Basis(Vector3.UP, Party.GRILL_ROT) * Vector3(0, 0, 1)
+	var gside := Basis(Vector3.UP, Party.GRILL_ROT) * Vector3(-1, 0, 0)
+	var gf: Vector3 = Party.GRILL_POS + gside * 0.98 + gdir * 0.36
+	_spawn("Jack", gf, -0.32, "grill")
 	# Table: diners turned toward the camera on the far side and the ends,
 	# two guests with their backs to us on the near side (ref4).
 	# Four on the far side facing us, two on the near side (staggered

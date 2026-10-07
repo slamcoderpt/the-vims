@@ -425,13 +425,16 @@ func _grill() -> void:
 	V.b(vb, -16, 14, -3, 5, 1, 1, steel)
 	V.b(vb, -16, 14, 0, 4, 2, 2, Color("d02a24"))
 	grill_node = V.inst(vb, root, V.SIZE_FINE, GRILL_POS, GRILL_ROT, Vector3.ZERO, true, true, "Grill")
+	# Real-world kettle-cart height (~0.9 m to the grate) so Jack's chest
+	# and arms read above it.
+	grill_node.scale = Vector3.ONE * 0.86
 	coal_light = V.omni(grill_node, Vector3(0, 1.05, -0.35), Color(1.0, 0.62, 0.35), 0.45, 2.2)
 	# Smoke.
 	smoke = CPUParticles3D.new()
 	smoke.name = "Smoke"
 	# Rises off the right end of the grate (between Jack and the table) and
 	# drifts back, so it never veils his face.
-	smoke.position = Vector3(-0.2, 1.15, 0.0)
+	smoke.position = Vector3(0.38, 1.15, -0.05)
 	smoke.amount = 44
 	smoke.lifetime = 4.0
 	smoke.preprocess = 4.0
@@ -440,7 +443,7 @@ func _grill() -> void:
 	smoke.emission_box_extents = Vector3(0.3, 0.02, 0.12)
 	smoke.direction = Vector3(0, 1, 0)
 	smoke.spread = 12.0
-	smoke.gravity = Vector3(0.05, 0.22, -0.2)
+	smoke.gravity = Vector3(-0.16, 0.24, -0.04)
 	smoke.initial_velocity_min = 0.25
 	smoke.initial_velocity_max = 0.45
 	smoke.scale_amount_min = 1.0

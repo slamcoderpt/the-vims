@@ -19,7 +19,8 @@ extends Node3D
 ##      get_actor(name) -> SimActor, set_wall_view(view).
 
 const U := 0.0625          # fine grid (windows, railings, stairs)
-const PU := 0.09           # furniture display grid (1.44 x U; PropLib.FU is 1.25 x U)
+const PU := 0.07           # furniture display grid (= PropLib.FU: ~real-world furniture)
+const MU := 0.035          # micro grid for detail.gd "_hd" props (half a furniture cell)
 const FS := 1.25           # furniture display scale
 const UH := 28             # upstairs wall height in structure cells (3.5 m: ref1 tall walls)
 const C := 0.125           # structure grid
@@ -30,9 +31,12 @@ const VIEWS := ["office", "office_in", "bed"]
 ## Household display scale relative to the rig's life size (dad ~1.4 m, kids
 ## ~1.0 m, beagle about the size of its bed). SimActor clamps body_scale to a
 ## hero minimum, so the remainder is applied as a node scale (see _spawn_household).
-const ACTOR_SCALE := {"dad": 0.9, "bunny_girl": 0.84, "cat_girl": 0.84, "beagle": 0.62}
+## Art direction: adult ~1.75 m, kids ~70 % of that, beagle's back at a kid's knee-to-hip.
+const ACTOR_SCALE := {"dad": 0.946, "bunny_girl": 0.76, "cat_girl": 0.76, "beagle": 0.58}
 ## Ground-floor front facade windows (x0, x1 metres), y 0.9..2.1.
 const FRONT_WINDOWS := [[-8.2, -6.8], [-5.6, -4.2], [-3.0, -1.6], [2.0, 3.0], [5.9, 7.3], [7.6, 8.5]]
+## Upstairs office front windows (only standing in the "bed" view), x0, x1.
+const UP_FRONT_WINDOWS := [[-7.7, -6.2], [-3.5, -2.0]]
 const HALO_NIGHT := 0.55
 const ShotPresets := preload("res://scripts/core/shot_presets.gd")
 const PropLib := preload("res://scripts/props/prop_lib.gd")
@@ -57,6 +61,7 @@ var wall_view := "office"
 var _sb := {}                    # structure groups "zone|sig|part" -> VoxelBuilder
 var _fb := {}                    # furniture builders room -> VoxelBuilder (PU grid)
 var _gb := {}                    # fine builders room -> VoxelBuilder (U grid)
+var _mb := {}                    # micro builders room -> VoxelBuilder (MU grid, "_hd" props)
 var _wall_nodes := {}            # sig -> {part -> Array[MeshInstance3D]}
 var _view_meshes := []           # [MeshInstance3D, view]: props on walls that are only tall in that view
 var _hood_day: MeshInstance3D
@@ -209,6 +214,44 @@ func _g(room: String) -> VoxelBuilder:
 		vb.jitter = 0.05
 		_gb[room] = vb
 	return _gb[room]
+
+
+## Micro-grid builder (MU cells) for the detail.gd "_hd" props.
+func _m(room: String) -> VoxelBuilder:
+	if not _mb.has(room):
+		var vb := VoxelBuilder.new()
+		vb.jitter = 0.025
+		_mb[room] = vb
+	return _mb[room]
+
+
+## Place an "_hd" prop (min corner at `pos`, metres) on the micro grid.
+func _putm(room: String, pname: String, pos: Vector3, rot := 0, v := 0) -> AABB:
+	var at := Vector3i(roundi(pos.x / MU), roundi(pos.y / MU), roundi(pos.z / MU))
+	var bb := PropLib.place(_m(room), pname, at, rot, v)
+	return AABB(bb.position * MU, bb.size * MU)
+
+
+## Centred variant of _putm.
+func _putmc(room: String, pname: String, x: float, y: float, z: float, rot := 0, v := 0) -> AABB:
+	var rs := PropLib.rotated_size(pname, rot, v)
+	return _putm(room, pname, Vector3(x - rs.x * MU * 0.5, y, z - rs.z * MU * 0.5), rot, v)
+
+
+## Wall-mounted "_hd" prop (see _wallput).
+func _wallputm(room: String, pname: String, side: String, face: float, along: float, y: float, v := 0) -> AABB:
+	var rs: Vector3i
+	match side:
+		"-x":
+			return _putm(room, pname, Vector3(face, y, along), 1, v)
+		"+x":
+			rs = PropLib.rotated_size(pname, 3, v)
+			return _putm(room, pname, Vector3(face - rs.x * MU, y, along), 3, v)
+		"+z":
+			rs = PropLib.rotated_size(pname, 2, v)
+			return _putm(room, pname, Vector3(along, y, face - rs.z * MU), 2, v)
+		_:
+			return _putm(room, pname, Vector3(along, y, face), 0, v)
 
 
 ## Place a prop with its footprint min corner at `pos` (metres). Returns its box in metres.
@@ -510,8 +553,14 @@ func _build_structure() -> void:
 	# Left exterior (office L wall).
 	_wall(2, -9.0, -4.75, 5, 1, "ext", "office", both_tall, [[2.0, 3.6, 0.9, 2.3]])
 	# Front exterior: always cut.
-	_wall(0, 4.75, -9, -4.5, 1, "office", "ext", {"office": "none", "bed": "low"})
-	_wall(0, 4.75, -4.5, 9, 1, "office", "ext", both_low)
+	# In the night/bedroom view the office wing is closed (walls up + roof):
+	# the shot reads as a lit house beside the cut-away bedrooms (ref3).
+	var up_front := []
+	for w: Array in UP_FRONT_WINDOWS:
+		up_front.append([w[0], w[1], 0.9, 2.2])
+	_wall(0, 4.75, -9, -4.5, 1, "office", "ext", {"office": "none", "bed": "tall"}, up_front)
+	_wall(0, 4.75, -4.5, -1.0, 1, "office", "ext", {"office": "low", "bed": "tall"}, up_front)
+	_wall(0, 4.75, -1.0, 9, 1, "hall", "ext", both_low)
 	# Right exterior.
 	var bed_tall := {"office": "low", "bed": "tall"}
 	_wall(2, 8.75, -4.75, 0.0, 1, "blue", "ext", bed_tall)
@@ -527,6 +576,51 @@ func _build_structure() -> void:
 	# divider would hide the bedside story scene behind it.
 	_wall(2, 3.5, -4.75, 0.0, 1, "pink", "blue", both_low)
 	_wall(2, 5.5, 0.25, 4.75, 1, "hall", "bath", {"office": "low", "bed": "tall"}, [[3.4, 4.4, 0.0, 2.1]])
+	_build_office_roof()
+
+
+## Gable roof over the office wing, standing only in the "bed" view. Ridge
+## along Z; the front gable end (siding + a lit attic window) faces the
+## night camera, stepped slate slopes either side.
+func _build_office_roof() -> void:
+	var sig := _sig({"office": "none", "office_in": "none", "bed": "tall"})
+	var x0 := cc(-9.4)
+	var x1 := cc(-0.75)
+	var z0 := cc(-5.3)
+	var z1 := cc(5.05)
+	var base := 24 + UH          # wall top (cells)
+	var mid := (x0 + x1) * 0.5
+	var half := (x1 - x0) * 0.5
+	var slope := 0.62
+	var slate := [Color("3c4562"), Color("343c56"), Color("444e6c")]
+	for x in range(x0, x1):
+		var h := base + floori((half - absf(x + 0.5 - mid)) * slope)
+		for z in range(z0, z1):
+			var edge := z == z0 or z == z1 - 1 or x == x0 or x == x1 - 1
+			for yy in range(h - 2, h + 1):
+				var q := Vector3i(x, yy, z)
+				var c: Color = slate[posmod(floori(h / 2.0) + (1 if VoxelBuilder.hash3(Vector3i(x, 0, z / 3)) > 0.85 else 0), 3)]
+				if yy < h:
+					c = c.darkened(0.15)
+				if edge:
+					c = TRIM if yy == h else CAP
+				if absf(x + 0.5 - mid) < 1.0:
+					c = CAP
+				_sgroup(_zone(q), sig, "base").set_v(q, c)
+		# Gable ends (siding up to the roof line), front and back.
+		for gz: int in [cc(-5.0), cc(-5.0) + 1, cc(4.75), cc(4.75) + 1]:
+			if x < cc(-9.0) or x >= cc(-1.0):
+				continue
+			for yy in range(base, h - 2):
+				var q := Vector3i(x, yy, gz)
+				var c := SIDING if posmod(yy, 2) == 0 else SIDING.darkened(0.06)
+				var ax := absf(x + 0.5 - mid)
+				if ax < 3.2 and yy >= base + 5 and yy <= base + 11 and gz >= cc(4.75):
+					if ax < 2.2 and yy > base + 5 and yy < base + 11:
+						_sgroup(_zone(q), sig, "base").set_v(q, Color("ffcf7a"), true)
+						continue
+					c = TRIM
+				_sgroup(_zone(q), sig, "base").set_v(q, c)
 
 
 # =================================================================== rooms
@@ -572,14 +666,86 @@ func _up_glass(room: String, axis: int, at: float, a0: float, a1: float, y0: flo
 				continue
 			var t := float(yy - fc(y0)) / maxf(1.0, float(fc(y1) - fc(y0)))
 			var h := VoxelBuilder.hash3(q)
-			var day := Color("bfe0f2").lerp(Color("f2fbff"), t)
-			if h > 0.93:
-				day = Color("ffffff")
+			var day := _foliage(a, yy, t, h)
 			_upg_day.set_v(q, day, true)
 			var night := Color("1b2550").lerp(Color("2a3a74"), 1.0 - t)
 			if h > 0.985:
 				night = Color("e8ecff")
 			_upg_night.set_v(q, night, true)
+
+
+## Sunlit garden seen through the day glass: leafy clusters (denser low
+## down) over a pale sky, a few branches; like the trees outside ref1's windows.
+func _foliage(a: int, yy: int, t: float, h: float) -> Color:
+	var h1 := VoxelBuilder.hash3(Vector3i(floori(a / 3.0), floori(yy / 3.0), 7))
+	var h2 := VoxelBuilder.hash3(Vector3i(floori(a / 7.0) + 11, floori(yy / 6.0), 1))
+	var leafy := 0.3 + 0.45 * (1.0 - t) + (h2 - 0.5) * 0.6
+	if h1 < leafy:
+		var lit := VoxelBuilder.hash3(Vector3i(a, yy, 3))
+		if lit > 0.82:
+			return Color("c9e87a")
+		if lit > 0.5:
+			return Color("8cc456")
+		if lit > 0.18:
+			return Color("6aa845")
+		return Color("4f8a3a")
+	if h > 0.965 and t < 0.6:
+		return Color("8a6440")
+	return Color("cfeaf7").lerp(Color("f6fcff"), t)
+
+
+const WS_ANGLE := 40.0
+
+
+## The work desk with all its gear as one turned group (two merged meshes:
+## furniture grid + micro grid). `at` = desk centre on the floor, `deg` =
+## turn about Y (the desk front, local +X, swings towards -Z). Returns world
+## boxes / points: desk, chair (AABBs), seat, look, lamp (Vector3).
+func _workstation(at: Vector3, deg: float) -> Dictionary:
+	var wf := VoxelBuilder.new()
+	wf.jitter = 0.03
+	var wm := VoxelBuilder.new()
+	wm.jitter = 0.025
+	PropLib.place(wf, "desk", Vector3i.ZERO, 1)          # 12 x 28 cells (0.84 x 1.96 m)
+	var top := 24                                           # desk top in MU cells
+	PropLib.place(wm, "keyboard_hd", Vector3i(13, top, 14), 1)
+	PropLib.place(wm, "laptop_hd", Vector3i(7, top, 41), 1)
+	PropLib.place(wm, "mug_hd", Vector3i(18, top, 50), 0, 1)
+	PropLib.place(wm, "pencil_cup_hd", Vector3i(3, top, 2))
+	PropLib.place(wm, "desk_plant_hd", Vector3i(9, top, 1), 0, 0)
+	PropLib.place(wm, "sticky_stack_hd", Vector3i(16, top, 4), 1)
+	PropLib.place(wf, "desk_lamp", Vector3i(1, 12, 25), 1)
+	var cs := PropLib.rotated_size("office_chair_hd", 3, 1)
+	var chair_c := Vector3(0.84 + 0.34, 0, 0.98 + 0.12)          # local metres (desk min corner = 0)
+	PropLib.place(wm, "office_chair_hd", Vector3i(roundi(chair_c.x / MU) - cs.x / 2, 0, roundi(chair_c.z / MU) - cs.z / 2), 3, 1)
+	var ctr := Vector3(0.42, 0, 0.98)
+	var node := Node3D.new()
+	node.name = "Workstation"
+	node.position = at
+	node.rotation.y = deg_to_rad(deg)
+	add_child(node)
+	var mf := MeshInstance3D.new()
+	mf.name = "DeskF"
+	mf.mesh = Mesher.build(wf, PU, ctr / PU)
+	node.add_child(mf)
+	var mm := MeshInstance3D.new()
+	mm.name = "DeskM"
+	mm.mesh = Mesher.build(wm, MU, ctr / MU)
+	node.add_child(mm)
+	# Dual monitors as their own instances, angled towards the room (and the
+	# camera) like a real two-screen setup.
+	for k in 2:
+		var mon := PropLib.instance("monitor_hd", k)
+		mon.position = Vector3(0.24, top * MU, [0.62, 1.3][k]) - ctr
+		mon.rotation.y = deg_to_rad(90.0 - [52.0, 30.0][k])
+		node.add_child(mon)
+	var xf := node.transform
+	var seat := xf * (chair_c - ctr)
+	var look := xf * (Vector3(0.1, 0, 0.98) - ctr)
+	var lamp := xf * (Vector3(0.45, 1.25, 1.85) - ctr)
+	var dbox := AABB(at - Vector3(0.9, 0, 0.9), Vector3(1.8, 1.3, 1.8))
+	var cbox := AABB(seat - Vector3(0.32, 0, 0.32), Vector3(0.64, 1.0, 0.64))
+	return {"desk": dbox, "chair": cbox, "seat": seat, "look": look, "lamp": lamp}
 
 
 func _build_office() -> void:
@@ -594,35 +760,29 @@ func _build_office() -> void:
 	# with two bright monitors, printer cabinet), tall bookshelves with globe
 	# and trophies stand in the corner on the back wall, and the window wall
 	# (easel, piano + guitar) runs off to the right.
-	var desk := _put(R, "desk", Vector3(fx + 0.02, y, -3.05), 1)
-	var dy := y + 12 * PU
-	_put(R, "monitor", Vector3(fx + 0.06, dy, desk.position.z + 0.3), 1, 0)
-	_put(R, "monitor", Vector3(fx + 0.1, dy, desk.position.z + 1.5), 1, 1)
-	_put(R, "keyboard", Vector3(fx + 0.6, dy, desk.position.z + 0.55), 1)
-	_put(R, "laptop", Vector3(fx + 0.3, dy, desk.end.z - 0.85), 1)
-	_put(R, "mug", Vector3(fx + 0.75, dy, desk.end.z - 0.25), 0, 0)
-	_put(R, "pencil_cup", Vector3(fx + 0.12, dy, desk.position.z + 0.06))
-	_put(R, "book_stack", Vector3(fx + 0.08, dy, desk.end.z - 0.35), 1, 1)
-	_put(R, "plant", Vector3(fx + 0.06, dy, desk.position.z + 1.1), 0, 3)
-	_put(R, "desk_lamp", Vector3(fx + 0.1, dy, desk.end.z - 0.62), 1)
-	_lamp(Vector3(fx + 0.55, dy + 0.4, desk.end.z - 0.5), 0.5, 2.2, 0.6, Color(1.0, 0.7, 0.4), 0.5)
-	var chair := _putc(R, "office_chair", desk.end.x + 0.42, y, desk.get_center().z + 0.15, 3, 2)
-	_wallput(R, "corkboard", "-x", fx, desk.position.z + 0.1, y + 1.45, 1)
-	_wallput(R, "frame", "-x", fx, desk.end.z - 0.15, y + 1.6, 0)
-	_wallput(R, "frame", "-x", fx, desk.end.z + 1.35, y + 1.8, 1)
-	_wallput(R, "wall_clock", "-x", fx, desk.position.z + 1.0, y + 2.75, 1)
-	_lamp(Vector3(desk.end.x + 0.2, y + 1.7, desk.get_center().z), 0.6, 2.6, 0.35, Color(0.75, 0.85, 1.0), 0.0)
-	_put(R, "filing_cabinet", Vector3(fx, y, desk.end.z + 0.08), 1)
-	_put(R, "printer", Vector3(fx + 0.02, y + 12 * PU, desk.end.z + 0.12), 1)
-	_put(R, "plant", Vector3(fx + 0.04, y, desk.end.z + 1.05), 0, 5)
-	_sconce(R, "-x", fx, desk.end.z + 0.95, y + 2.2, 1.0)
+	# Corner workstation, turned WS_ANGLE off the left wall so the seated
+	# dad's face reads in 3/4 from the shot camera (ref1) instead of his back.
+	var ws := _workstation(Vector3(fx + 1.02, y, -2.55), WS_ANGLE)
+	var desk: AABB = ws.desk
+	var chair: AABB = ws.chair
+	_lamp(ws.lamp, 0.5, 2.2, 0.6, Color(1.0, 0.7, 0.4), 0.5)
+	_wallputm(R, "corkboard_hd", "-x", fx, -4.2, y + 1.55, 0)
+	_wallput(R, "frame", "-x", fx, -2.55, y + 1.8, 0)
+	_wallput(R, "frame", "-x", fx, -1.0, y + 1.85, 1)
+	_wallput(R, "wall_clock", "-x", fx, -1.85, y + 2.55, 1)
+	_lamp(Vector3(fx + 1.6, y + 1.7, -2.2), 0.6, 2.6, 0.35, Color(0.75, 0.85, 1.0), 0.0)
+	var fcab := _put(R, "filing_cabinet", Vector3(fx, y, -1.25), 1)
+	_putm(R, "printer_hd", Vector3(fx + 0.02, fcab.end.y, fcab.position.z - 0.05), 1)
+	_put(R, "book_stack", Vector3(fx + 0.06, fcab.end.y, fcab.end.z - 0.02), 1, 2)
+	_put(R, "plant", Vector3(fx + 0.04, y, -0.55), 0, 5)
+	_sconce(R, "-x", fx, -0.45, y + 2.2, 1.0)
 	# Corner bookshelves on the back wall (globe, trophies, books, plants).
 	var bs1 := _wallput(R, "bookshelf", "-z", bz, fx + 0.04, y, 4)
 	var bs2 := _wallput(R, "bookshelf", "-z", bz, bs1.end.x + 0.02, y, 0)
 	_put(R, "trophy", Vector3(bs1.position.x + 0.2, y + 30 * PU, bz + 0.12))
 	_put(R, "plant", Vector3(bs2.end.x - 0.5, y + 30 * PU, bz + 0.04), 0, 2)
 	_put(R, "ivy", Vector3(bs2.end.x - 0.4, y + 2.4, bz + 0.03), 0, 1)
-	_put(R, "plant", Vector3(fx + 0.06, y, desk.position.z - 0.75), 0, 1)
+	_put(R, "plant", Vector3(fx + 0.06, y, -4.2), 0, 1)
 	_lamp(Vector3(bs2.get_center().x, y + 2.3, bz + 0.9), 0.7, 3.0, 0.4)
 	# --- Window wall: two big multi-pane windows, curtains, sill plants, ivy.
 	for cx: float in [-3.82, -1.7]:
@@ -666,7 +826,7 @@ func _build_office() -> void:
 	_put(R, "plant", Vector3(-1.5, y + 18 * PU, -1.4), 0, 6)
 	# --- Play area (dog + cat girl), pulled in front of the work/art/music
 	# corners so the ref1 framing shows them all with breathing room.
-	_rug(R, -7.4, y, -1.9, 3.0, 2.5, "check_blue")
+	_rug(R, -6.6, y, -1.0, 2.5, 2.0, "check_blue")
 	_rug(R, -3.9, y, -1.75, 2.6, 2.6, "blue_braid")
 	var ball := _put(R, "tennis_ball", Vector3(-4.35, y + PU, -0.85))
 	var dogbed := _putc(R, "dog_bed", -5.55, y, 0.35, 0)
@@ -687,6 +847,8 @@ func _build_office() -> void:
 	_put(R, "plant", Vector3(-4.68, y + 17 * U, 3.2), 0, 2)
 	_spots["office_chair"] = chair
 	_spots["desk"] = desk
+	_spots["dad_seat"] = ws.seat
+	_spots["dad_look"] = ws.look
 	_spots["stool"] = stool
 	_spots["easel"] = easel
 	_spots["ball"] = ball
@@ -769,53 +931,51 @@ func _build_pink() -> void:
 	var fx := -0.75   # left wall face (divider with the office)
 	var bz := -4.75
 	var rx := 3.5     # right wall face (divider with the blue room)
-	# ref3 layout: bunny bed with its headboard on the back wall and the quilt
-	# running towards the camera, so the tucked-in girl's face reads; dad's
-	# reading chair beside the bed (right side) in the open, turned to the
-	# camera. Tall pieces stay on the back/left walls so nothing in the front
-	# right corner (the camera side) hides the story scene.
-	_rug(R, -0.3, y, -3.2, 3.5, 2.9, "patch_pink")
-	var ns := _put(R, "nightstand", Vector3(fx + 0.04, y, bz + 0.04), 0, 2)
-	var bed := _put(R, "bed", Vector3(ns.end.x - 0.1, y, bz + 0.02), 0, 3)
-	_put(R, "lamp_table", Vector3(ns.position.x + 0.12, y + 10 * PU, ns.position.z + 0.1), 0, 1)
-	_lamp(Vector3(ns.get_center().x + 0.25, y + 1.3, ns.end.z + 0.3), 0.55, 3.2, 0.2, Color(1.0, 0.6, 0.3), 0.55)
-	_put(R, "plush", Vector3(bed.end.x - 0.72, y + 11 * PU, bz + 0.62), 0, 0)
-	var chair := _putc(R, "chair", bed.end.x + 0.55, y, bed.position.z + 1.55, 3, 2)
-	var st := _put(R, "side_table", Vector3(bed.end.x + 0.12, y, bz + 0.08), 0, 2)
+	# ref3 staging: the bunny canopy bed runs ACROSS the room with its
+	# headboard on the left wall, so the tucked-in girl lies sideways to the
+	# camera (face in profile / 3/4, not foreshortened); dad's reading chair
+	# stands at the foot end, turned to the camera. Tall pieces stay on the
+	# back and left walls; the front (camera side) keeps only low things.
+	_rug(R, -0.35, y, -4.1, 3.6, 3.2, "patch_pink")
+	var ns := _put(R, "nightstand", Vector3(fx + 0.04, y, bz + 0.04), 1, 2)
+	_put(R, "lamp_table", Vector3(ns.position.x + 0.1, y + 10 * PU, ns.position.z + 0.12), 0, 1)
+	_lamp(Vector3(ns.get_center().x + 0.35, y + 1.2, ns.get_center().z + 0.3), 0.55, 3.0, 0.2, Color(1.0, 0.6, 0.3), 0.5)
+	var bed := _put(R, "bed", Vector3(fx + 0.1, y, ns.end.z + 0.04), 1, 3)
+	_put(R, "plush", Vector3(bed.position.x + 0.3, y + 10 * PU, bed.end.z - 0.5), 1, 0)
+	var chair := _putc(R, "chair", bed.end.x + 0.42, y, bed.get_center().z + 0.35, 3, 2)
+	var st := _put(R, "side_table", Vector3(bed.end.x + 0.15, y, bz + 0.08), 0, 2)
 	_put(R, "lamp_table", Vector3(st.position.x + 0.05, y + 11 * PU, bz + 0.12), 0, 1)
 	_put(R, "book_stack", Vector3(st.end.x - 0.4, y + 11 * PU, bz + 0.2), 0, 2)
 	_spots["pink_bed"] = bed
 	_spots["pink_chair"] = chair
-	# Back wall: bunny pictures above the headboard, window with pink curtains.
-	_wallput(R, "frame", "-z", bz, bed.position.x + 0.1, y + 2.1, 2)
-	_wallput(R, "frame", "-z", bz, bed.position.x + 0.95, y + 2.3, 5)
+	# Back wall: bunny pictures, window with pink curtains and sill plants.
+	_wallput(R, "frame", "-z", bz, 0.55, y + 1.9, 2)
 	_put(R, "curtain", Vector3(1.6, y, bz + 0.02), 0, 1)
 	_put(R, "curtain", Vector3(3.2 - 5 * PU, y, bz + 0.02), 0, 1)
 	_put(R, "plant", Vector3(2.05, y + 0.9, bz - 0.04), 0, 6)
 	_put(R, "plant", Vector3(2.6, y + 0.9, bz - 0.04), 0, 3)
 	_put(R, "hanging_plant", Vector3(2.3, y + 1.95, bz + 0.1), 0, 2)
-	# Left wall: plush/book shelves, frames, sconce, toy box + plushies on the floor.
-	_wallput(R + "@bed", "shelf_unit", "-x", fx, -3.15, y + 1.3, 0)
-	_wallput(R + "@bed", "wall_shelf", "-x", fx, -1.6, y + 2.15, 2)
-	_wallput(R + "@bed", "frame", "-x", fx, -1.55, y + 1.3, 2)
-	_sconce(R + "@bed", "-x", fx, -2.0, y + 1.85, 0.6)
-	var toybox := _wallput(R, "toy_box", "-x", fx, -1.2, y)
+	# Left wall in front of the bed: shelf with plushies + books, frames, a
+	# warm sconce, the toy box with plushies on the floor.
+	_wallput(R + "@bed", "shelf_unit", "-x", fx, -1.75, y + 1.35, 0)
+	_wallput(R + "@bed", "frame", "-x", fx, -2.2, y + 1.6, 2)
+	_sconce(R + "@bed", "-x", fx, -2.0, y + 2.25, 0.6, 1)
+	var toybox := _wallput(R, "toy_box", "-x", fx, -1.25, y)
 	_put(R, "plush", Vector3(fx + 0.15, y + 9 * PU, -0.95), 1, 1)
-	_put(R, "plant", Vector3(fx + 0.06, y, -2.05), 0, 0)
-	# Right wall (pink|blue divider): dresser + lamp at the back, mirror and
-	# frames above, a wall planter and a sconce; only low pieces at the front.
-	var dr := _wallput(R, "dresser", "+x", rx, -4.7, y, 2)
+	_put(R, "plant", Vector3(fx + 0.06, y, -0.55), 0, 0)
+	# Right wall (pink|blue divider): dresser with lamp and plush, frames above.
+	var dr := _wallput(R, "dresser", "+x", rx, -3.6, y, 2)
 	_put(R, "plant", Vector3(dr.position.x + 0.12, y + 14 * PU, dr.position.z + 0.08), 0, 6)
 	_put(R, "plush", Vector3(dr.position.x + 0.1, y + 14 * PU, dr.end.z - 0.45), 3, 2)
 	_put(R, "lamp_table", Vector3(dr.position.x + 0.12, y + 14 * PU, dr.end.z - 1.0), 0, 1)
-	_lamp(Vector3(dr.position.x - 0.1, y + 1.75, dr.end.z - 0.7), 0.5, 3.0, 0.2, Color(1.0, 0.62, 0.34), 0.5)
-	_sconce(R, "-z", bz, 2.55 - 0.2, y + 2.5, 0.0)
-	_lamp(Vector3(1.4, y + 2.3, -2.0), 0.35, 4.0, 0.0, Color(1.0, 0.62, 0.36), 0.0)
-	# Floor: pouf, blocks, small plants in the front corners.
-	_put(R, "pouf", Vector3(1.25, y, -1.1), 0, 0)
-	_put(R, "toy_blocks", Vector3(0.35, y + PU, -1.0), 0, 3)
+	_lamp(Vector3(dr.position.x - 0.15, y + 1.6, dr.end.z - 0.7), 0.5, 3.0, 0.2, Color(1.0, 0.62, 0.34), 0.5)
+	_sconce(R, "-z", bz, 1.1, y + 2.1, 0.0, 1)
+	_lamp(Vector3(1.2, y + 2.3, -2.2), 0.35, 4.0, 0.0, Color(1.0, 0.62, 0.36), 0.0)
+	# Floor: pouf, blocks, basket, small plants in the front corners.
+	_put(R, "pouf", Vector3(2.35, y, -1.4), 0, 0)
+	_put(R, "toy_blocks", Vector3(0.6, y + PU, -1.0), 0, 3)
 	_put(R, "plant", Vector3(rx - 0.5, y, -0.62), 0, 3)
-	_put(R, "basket", Vector3(2.2, y, -0.75), 0, 1)
+	_put(R, "basket", Vector3(1.55, y, -0.7), 0, 1)
 	_use(toybox, "Pink Toy Box", [
 		_act("play_toys", "Play", "toys", 40, {"fun": 0.3}, {"pose": "play", "who": ["child"]}),
 		_act("tidy", "Tidy Toys", "broom", 15, {"fun": -0.05}, {"pose": "play", "task": "Tidy Toys"}),
@@ -1159,6 +1319,21 @@ func _build_exterior() -> void:
 				fd.set_v(q, Color("9cc4dc").lerp(Color("e8f4fa"), tt))
 				var warm := Color("ffbf66").lerp(Color("ffe2a0"), tt * 0.6 + VoxelBuilder.hash3(q) * 0.25)
 				fn.set_v(q, warm, true)
+	# Upstairs office front windows (bed view only): frames + warm lit glass.
+	for wdef: Array in UP_FRONT_WINDOWS:
+		var ux0 := fc(wdef[0])
+		var uw := fc(wdef[1]) - ux0
+		var uy0 := fc(UF + 0.9)
+		PropLib.window_frame(_g("front@bed"), Vector3i(ux0, uy0, fc(4.75)), uw, fc(1.3), 4, 0, 2, -1)
+		var ufr := _g("front@bed")
+		for a in range(ux0 + 1, ux0 + uw - 1):
+			for yy in range(uy0 + 1, fc(UF + 2.2) - 1):
+				var q := Vector3i(a, yy, fc(4.75) + 2)
+				if ufr.has(q):
+					continue
+				var tt := float(yy - uy0) / 20.0
+				fd.set_v(q, Color("9cc4dc").lerp(Color("e8f4fa"), tt))
+				fn.set_v(q, Color("ffbf66").lerp(Color("ffe2a0"), tt * 0.6 + VoxelBuilder.hash3(q) * 0.25), true)
 	# Front door with a porch lantern.
 	var door := _g("front@bed")
 	for a in range(fc(0.55), fc(1.55)):
@@ -1443,9 +1618,15 @@ func _bake() -> void:
 		var fmi := _add_mesh(Mesher.build(vb, U), "Fine_" + room.replace("@", "_"), true)
 		if "@" in room:
 			_view_meshes.append([fmi, room.split("@")[1]])
+	for room: String in _mb:
+		var vb: VoxelBuilder = _mb[room]
+		var mmi := _add_mesh(Mesher.build(vb, MU), "Micro_" + room.replace("@", "_"), true)
+		if "@" in room:
+			_view_meshes.append([mmi, room.split("@")[1]])
 	_sb.clear()
 	_fb.clear()
 	_gb.clear()
+	_mb.clear()
 
 
 ## GL Compatibility shades each mesh with at most 8 omni lights, and when
@@ -1565,12 +1746,13 @@ func _stage(preset: String) -> void:
 	if preset == "home_night":
 		var bed: AABB = _spots["pink_bed"]
 		var bc := bed.get_center()
-		# Tucked in: head on the pillow at the headboard (back wall), feet to the camera.
-		var lily := _place("bunny_girl", Vector3(bc.x, y, bed.position.z + 0.85), Vector3(bc.x, y, bed.end.z + 2.0), "lie")
+		# Tucked in sideways: head on the pillows at the headboard (left wall),
+		# feet towards the reading chair; the rig lies centred on its position.
+		var lily := _place("bunny_girl", Vector3(bed.position.x + 0.98, y, bc.z), Vector3(bed.end.x + 2.0, y, bc.z), "lie")
 		lily.lie_height = 10 * PU / lily.scale.y
 		var ch: AABB = _spots["pink_chair"]
 		var cc3 := ch.get_center()
-		var jack := _place("dad", Vector3(cc3.x, y, cc3.z), Vector3(cc3.x - 1.0, y, cc3.z + 0.75), "sit_read", 7 * PU)
+		var jack := _place("dad", Vector3(cc3.x, y, cc3.z), Vector3(cc3.x - 1.0, y, cc3.z + 0.85), "sit_read", 7 * PU)
 		var st: AABB = _spots["step"]
 		var maya := _place("cat_girl", Vector3(st.get_center().x, y + 6 * PU, st.get_center().z), Vector3(st.get_center().x + 0.55, y, st.get_center().z + 1.6), "brush_teeth")
 		var cu: AABB = _spots["dog_cushion"]
@@ -1585,15 +1767,13 @@ func _stage(preset: String) -> void:
 			_blanket = PropLib.instance("blanket", 0)
 			_blanket.scale = Vector3.ONE * (PU / PropLib.FU)
 			add_child(_blanket)
-		_blanket.position = Vector3(bc.x, y + 10 * PU, bed.position.z + 1.5)
-		_blanket.rotation_degrees.y = 0.0
+		_blanket.position = Vector3(bed.position.x + 1.3, y + 10 * PU, bc.z)
+		_blanket.rotation_degrees.y = 90.0
 		_blanket.visible = true
 	else:
 		if _blanket:
 			_blanket.visible = false
-		var ch: AABB = _spots["office_chair"]
-		var dk: AABB = _spots["desk"]
-		var jack := _place("dad", Vector3(ch.get_center().x, y, ch.get_center().z), Vector3(dk.get_center().x - 0.1, y, dk.position.z), "type", 7 * PU)
+		var jack := _place("dad", _spots["dad_seat"], _spots["dad_look"], "type", 13 * MU)
 		actors["bunny_girl"].rotation.x = 0.0
 		var stl: AABB = _spots["stool"]
 		var lily := _place("bunny_girl", Vector3(stl.get_center().x, y, stl.get_center().z), Vector3(-4.45, y, -3.7), "sit_paint", 6 * PU)

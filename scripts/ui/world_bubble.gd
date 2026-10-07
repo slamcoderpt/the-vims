@@ -7,15 +7,15 @@ extends Control
 ## The owner (hud.gd) sets `tip` (screen point the tail touches) every frame.
 
 const UI := preload("res://scripts/ui/ui_kit.gd")
-const TAIL_H := 13.0
+const TAIL_H := 11.0
 ## Action bubble metrics (design px at 1672x941), sized to ref1's Work/Paint.
-const A_H := 60.0
-const A_H_PLAIN := 50.0
-const A_ICON := 36.0
-const A_TEXT_X := 60.0
-const A_FONT := 20
-const A_PAD_R := 18.0
-const A_MIN_W := 172.0
+const A_H := 50.0
+const A_H_PLAIN := 44.0
+const A_ICON := 31.0
+const A_TEXT_X := 51.0
+const A_FONT := 18
+const A_PAD_R := 15.0
+const A_MIN_W := 146.0
 
 var kind := "action"
 var text := ""
@@ -82,15 +82,15 @@ func _measure() -> void:
 			var tw := f.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, A_FONT).x
 			if sub != "":
 				tw = maxf(tw, UI.font(700).get_string_size(sub, HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x)
-			size = Vector2(maxf(A_MIN_W if progress >= 0.0 else 120.0, tw + A_TEXT_X + A_PAD_R + (22.0 if progress >= 0.0 else 0.0)), A_H if (progress >= 0.0 or sub != "") else A_H_PLAIN)
+			size = Vector2(maxf(A_MIN_W if progress >= 0.0 else 120.0, tw + A_TEXT_X + A_PAD_R + (16.0 if progress >= 0.0 else 0.0)), A_H if (progress >= 0.0 or sub != "") else A_H_PLAIN)
 		"speech":
-			var tw2 := UI.font(700).get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 17).x
-			size = Vector2(tw2 + (58.0 if icon_tex else 30.0), 46.0)
+			var tw2 := UI.font(700).get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x
+			size = Vector2(tw2 + (52.0 if icon_tex else 28.0), 42.0)
 		"skill":
 			var tw3 := f.get_string_size("+ " + text, HORIZONTAL_ALIGNMENT_LEFT, -1, 15).x
-			size = Vector2(tw3 + (48.0 if icon_tex else 26.0), 36.0)
+			size = Vector2(tw3 + (46.0 if icon_tex else 26.0), 34.0)
 		_:
-			size = Vector2(50.0, 46.0)
+			size = Vector2(46.0, 42.0)
 	if kind == "skill":
 		tail_frac = 0.2
 	elif kind != "action":
@@ -154,27 +154,27 @@ func _draw() -> void:
 	match kind:
 		"action":
 			if icon_tex:
-				draw_texture_rect(icon_tex, Rect2(13, (size.y - A_ICON) * 0.5, A_ICON, A_ICON), false)
+				draw_texture_rect(icon_tex, Rect2(11, (size.y - A_ICON) * 0.5, A_ICON, A_ICON), false)
 			var tall := progress >= 0.0 or sub != ""
-			var ty := 27.0 if tall else 32.0
+			var ty := 23.0 if tall else 28.0
 			draw_string(f, Vector2(A_TEXT_X, ty), text, HORIZONTAL_ALIGNMENT_LEFT, -1, A_FONT, UI.INK)
 			if sub != "" and progress < 0.0:
-				draw_string(UI.font(700), Vector2(A_TEXT_X, 47), sub, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, UI.INK_SOFT)
+				draw_string(UI.font(700), Vector2(A_TEXT_X, 41), sub, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, UI.INK_SOFT)
 			if progress >= 0.0:
 				# full-width rounded track under the label (ref1 "Work"/"Paint")
-				UI.draw_bar(self, Rect2(A_TEXT_X, 37, size.x - A_TEXT_X - A_PAD_R, 9.0), _shown_progress, bar_color, UI.TRACK)
+				UI.draw_bar(self, Rect2(A_TEXT_X, 31, size.x - A_TEXT_X - A_PAD_R, 8.0), _shown_progress, bar_color, UI.TRACK)
 		"speech":
 			var x := 14.0
 			if icon_tex:
-				draw_texture_rect(icon_tex, Rect2(11, 9, 28, 28), false)
-				x = 46.0
-			draw_string(UI.font(700), Vector2(x, 29), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 17, UI.INK)
+				draw_texture_rect(icon_tex, Rect2(10, 8, 26, 26), false)
+				x = 42.0
+			draw_string(UI.font(700), Vector2(x, 27), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, UI.INK)
 		"skill":
 			var x2 := 12.0
 			if icon_tex:
-				draw_texture_rect(icon_tex, Rect2(9, 6, 24, 24), false)
-				x2 = 37.0
-			draw_string(f, Vector2(x2, 24), "+ " + text, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, UI.INK)
+				draw_texture_rect(icon_tex, Rect2(9, 5, 24, 24), false)
+				x2 = 36.0
+			draw_string(f, Vector2(x2, 23), "+ " + text, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, UI.INK)
 		_:
 			if icon_tex:
-				draw_texture_rect(icon_tex, Rect2((size.x - 32.0) * 0.5, (size.y - 32.0) * 0.5, 32, 32), false)
+				draw_texture_rect(icon_tex, Rect2((size.x - 28.0) * 0.5, (size.y - 28.0) * 0.5, 28, 28), false)

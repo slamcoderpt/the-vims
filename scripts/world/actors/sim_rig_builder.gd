@@ -16,10 +16,10 @@ const VS := 0.05
 
 const BODY := {
 	# lw leg width, shin/thigh lengths, torso w/d/h, arm width, upper/fore arm, head w/h/d
-	"big": {"lw": 5, "shin": 6, "thigh": 6, "tw": 12, "td": 7, "th": 9, "aw": 3, "ua": 6, "fa": 6, "hw": 10, "hh": 10, "hd": 10},
-	"slim": {"lw": 4, "shin": 6, "thigh": 6, "tw": 10, "td": 6, "th": 9, "aw": 3, "ua": 6, "fa": 6, "hw": 10, "hh": 10, "hd": 10},
+	"big": {"lw": 5, "shin": 6, "thigh": 6, "tw": 12, "td": 7, "th": 9, "aw": 3, "ua": 6, "fa": 6, "hw": 12, "hh": 11, "hd": 11},
+	"slim": {"lw": 4, "shin": 6, "thigh": 6, "tw": 10, "td": 6, "th": 9, "aw": 3, "ua": 6, "fa": 6, "hw": 12, "hh": 11, "hd": 11},
 	# Chibi child: head (with hat) ~40% of total height, about 1:1.5 head:body.
-	"child": {"lw": 4, "shin": 4, "thigh": 5, "tw": 10, "td": 6, "th": 7, "aw": 3, "ua": 5, "fa": 4, "hw": 10, "hh": 9, "hd": 9},
+	"child": {"lw": 4, "shin": 4, "thigh": 4, "tw": 10, "td": 6, "th": 7, "aw": 3, "ua": 5, "fa": 4, "hw": 12, "hh": 11, "hd": 11},
 }
 
 static var _cache := {}
@@ -201,17 +201,16 @@ static func _noise_fn(base: Color, amt: float, s := 1) -> Callable:
 ## their vertical stripes.
 static func _plaid_fn(base: Color, dark: Color, w: int, d: int, ox := 0) -> Callable:
 	return func(p: Vector3i) -> Color:
+		# Buffalo check: 2-voxel dark bands both ways on 4-voxel repeats,
+		# so the flannel reads as big red/black squares at phone size.
 		var u := p.z if (p.x == 0 or p.x == w - 1) else p.x + ox
-		var vline := posmod(u, 4) == 1
-		var hline := posmod(p.y, 4) == 2
-		var thin := posmod(u, 4) == 3 or posmod(p.y, 4) == 0
+		var vb_ := posmod(u, 4) < 2
+		var hb_ := posmod(p.y, 4) < 2
 		var c := base
-		if vline and hline:
-			c = _sh(dark, 0.8)
-		elif vline or hline:
-			c = dark.lerp(base, 0.25)
-		elif thin:
-			c = _sh(base, 0.86)
+		if vb_ and hb_:
+			c = _sh(dark, 0.9)
+		elif vb_ or hb_:
+			c = base.lerp(dark, 0.5)
 		return _sh(c, 1.0 + (_h(p, 3) - 0.5) * 0.06)
 
 
@@ -334,6 +333,43 @@ static func _build_human(L: Dictionary) -> Dictionary:
 
 
 ## Head local coords: x 0..hw-1, neck row y=0, head rows 1..hh, z 0..hd-1 (+z = face).
+## The skull is a rounded box (superellipse sides, domed crown, tapered jaw),
+## so heads read as soft chibi shapes instead of cubes; facial features are
+## painted onto whatever voxel is frontmost in their column.
+static func _in_skull(x: int, y: int, z: int, W: int, B: int, T: int, F: int) -> bool:
+	if x < 0 or x >= W or z < 0 or z > F or y < B or y > T:
+		return false
+	var dx := absf(x - (W - 1) * 0.5) / (W * 0.5 + 0.15)
+	var dz := absf(z - F * 0.5) / ((F + 1) * 0.5 + 0.15)
+	var top0 := float(T) - 3.1
+	var bot0 := float(B) + 2.1
+	var dy := 0.0
+	if y > top0:
+		dy = (y - top0) / 3.6
+	elif y < bot0:
+		dy = (bot0 - y) / 2.6
+	return pow(dx, 2.8) + pow(dz, 2.8) + pow(dy, 2.5) <= 1.04
+
+
+## Frontmost occupied z in column (x, y), or -100.
+static func _front_z(vb: VoxelBuilder, x: int, y: int, from_z: int) -> int:
+	for z in range(from_z, -3, -1):
+		if vb.has(Vector3i(x, y, z)):
+			return z
+	return -100
+
+
+static func _paint_front(vb: VoxelBuilder, x: int, y: int, c: Color, from_z: int, proud := 0) -> void:
+	var z := _front_z(vb, x, y, from_z)
+	if z < -50:
+		return
+	if proud > 0:
+		for k in proud:
+			vb.set_v(Vector3i(x, y, z + 1 + k), c)
+	else:
+		vb.set_v(Vector3i(x, y, z), c)
+
+
 static func _human_head(L: Dictionary, D: Dictionary) -> Dictionary:
 	var W: int = D.hw
 	var H: int = D.hh
@@ -347,148 +383,236 @@ static func _human_head(L: Dictionary, D: Dictionary) -> Dictionary:
 	var style: String = L.get("hair_style", "short")
 	var hat: String = L.get("hat", "")
 	var girl: bool = L.get("lashes", false)
+	var beard: String = L.get("beard", "")
 	var vb := VoxelBuilder.new()
-	vb.jitter = 0.035
+	vb.jitter = 0.03
 	var eyes := VoxelBuilder.new()
 	eyes.jitter = 0.0
 	var hair_fn := _hair_fn(hair)
+	var cxl := W / 2 - 1     # left of the two centre columns
+	var cxr := W / 2
 
-	# Skull, slightly rounded.
+	# Skull: rounded box; the lower face is a touch warmer/darker (jaw shade).
 	var skin_fn := func(p: Vector3i) -> Color:
-		return _sh(skin, 1.0 + (_h(p, 2) - 0.5) * 0.04)
-	_fill(vb, 0, W - 1, B, T, 0, F, skin_fn)
-	for y in range(B, T + 1):
-		vb.erase(Vector3i(0, y, 0))
-		vb.erase(Vector3i(W - 1, y, 0))
-		vb.erase(Vector3i(0, y, F))
-		vb.erase(Vector3i(W - 1, y, F))
-	for x in [0, W - 1]:
-		for z in range(0, Dd):
-			vb.erase(Vector3i(x, B, z))
+		var f := 1.0 + (_h(p, 2) - 0.5) * 0.035
+		if p.y <= B:
+			f *= 0.95
+		return _sh(skin, f)
 	for x in range(0, W):
-		vb.erase(Vector3i(x, B, 0))
+		for y in range(B, T + 1):
+			for z in range(0, F + 1):
+				if _in_skull(x, y, z, W, B, T, F):
+					vb.set_v(Vector3i(x, y, z), skin_fn.call(Vector3i(x, y, z)))
 	# Neck.
-	_fill(vb, W / 2 - 2, W / 2 + 1, 0, 0, Dd / 2 - 2, Dd / 2 + 1, _sh(skin, 0.86))
-	# Ears.
-	var ear_skin := _sh(skin, 0.86)
-	_fill(vb, -1, -1, B + 2, B + 3, Dd / 2 - 1, Dd / 2, ear_skin)
-	_fill(vb, W, W, B + 2, B + 3, Dd / 2 - 1, Dd / 2, ear_skin)
+	_fill(vb, cxl - 1, cxr + 1, 0, 0, F / 2 - 2, F / 2 + 1, _sh(skin, 0.84))
 
-	# Face.
-	var eye_dark := Color(0.09, 0.06, 0.05)
+	# Feature rows. Adults: mouth 3, nose 4, eyes 5-6, brows 7.
+	# Kids (chibi): smile 2-3, cheeks 4, big eyes 5-7, brows 8.
+	var E := B + 4
+	var eh := 3 if child else 2
+	if girl and not child:
+		eh = 3
+	var M := B + 2
+	var exs: Array = [2, W - 4] if child else [3, W - 5]
+	# Ears (skin nubs) level with the lower eye row.
+	var ear_skin := _sh(skin, 0.88)
+	var ez := F / 2
+	var ears := style != "shaggy"
+	if ears:
+		_fill(vb, -1, -1, E - 1, E, ez - 1, ez, ear_skin)
+		_fill(vb, W, W, E - 1, E, ez - 1, ez, ear_skin)
+		vb.set_v(Vector3i(-1, E, ez), _sh(skin, 0.8))
+		vb.set_v(Vector3i(W, E, ez), _sh(skin, 0.8))
+
+	var fz := F + 2
+	var eye_dark := Color(0.07, 0.05, 0.05)
 	var eye_mid: Color = L.get("eye", Color(0.33, 0.19, 0.1))
-	var white := Color(0.98, 0.98, 0.96)
-	var lid := _sh(skin, 0.88)
-	var lash := Color(0.18, 0.1, 0.08)
-	var E := B + 2 if child else B + 3
-	var eh := 3
-	var exs := [2, 6]
-	for ex: int in exs:
+	var white := Color(1.0, 1.0, 0.98)
+	var lid := _sh(skin, 0.86)
+	var lash := Color(0.16, 0.09, 0.07)
+	for ei in exs.size():
+		var ex: int = exs[ei]
+		# Highlight on the same (screen-left / outer-top) corner of both eyes.
+		var hx := 0
 		for dx in 2:
 			for dy in eh:
-				var p := Vector3i(ex + dx, E + dy, F)
+				var x := ex + dx
+				var y := E + dy
+				var z := _front_z(vb, x, y, fz)
+				if z < -50:
+					continue
+				var p := Vector3i(x, y, z)
 				vb.erase(p)
-				vb.set_v(p - Vector3i(0, 0, 1), lash if dy == 0 else lid)
+				vb.set_v(p - Vector3i(0, 0, 1), lash if dy == eh - 1 else lid)
 				var c := eye_dark
-				if dy == eh - 1 and dx == 0:
+				if dy == eh - 1 and dx == hx:
 					c = white
-				elif dy == 0 and child:
-					c = eye_mid
-				elif dy == 0 and dx == 1:
-					c = eye_mid.lerp(eye_dark, 0.4)
+				elif dy == 0:
+					c = eye_mid.lerp(eye_dark, 0.25)
 				eyes.set_v(p, c)
+	# Lower lash line / lids: lashes flick out at the outer top corners.
 	if girl:
-		vb.set_v(Vector3i(1, E + eh - 1, F), lash)
-		vb.set_v(Vector3i(8, E + eh - 1, F), lash)
+		var lx0: int = exs[0] - 1
+		var lx1: int = exs[1] + 2
+		_paint_front(vb, lx0, E + eh - 1, lash, fz)
+		_paint_front(vb, lx1, E + eh - 1, lash, fz)
 		if not child:
-			vb.set_v(Vector3i(1, E + eh, F), lash)
-			vb.set_v(Vector3i(8, E + eh, F), lash)
-	# Mouth + cheeks + nose.
-	var mouth := Color(0.62, 0.24, 0.24)
+			_paint_front(vb, lx0, E + eh, lash, fz)
+			_paint_front(vb, lx1, E + eh, lash, fz)
+	# Brows: thick and a little proud on men, soft 2-wide arcs otherwise.
+	var brow: Color = L.get("brow", _sh(hair, 0.75))
+	var by := E + eh
+	if not child and not girl:
+		by = E + eh + 1   # a row of skin between brow and eye so both read
 	if child:
-		vb.set_v(Vector3i(4, B + 1, F), mouth)
-		vb.set_v(Vector3i(5, B + 1, F), mouth)
-		vb.set_v(Vector3i(3, B + 2, F), _sh(skin, 0.9))
-		var blush := skin.lerp(Color(0.98, 0.45, 0.5), 0.55)
-		for x in [1, 2, 7, 8]:
-			vb.set_v(Vector3i(x, B + 1, F), blush)
-		vb.set_v(Vector3i(4, B + 2, F), _sh(skin, 0.93))
-		vb.set_v(Vector3i(5, B + 2, F), _sh(skin, 0.93))
+		by = E + eh
+		for ei in exs.size():
+			var ex: int = exs[ei]
+			_paint_front(vb, ex, by, _sh(brow, 1.05), fz)
+			_paint_front(vb, ex + 1, by, _sh(brow, 1.05), fz)
+	elif girl:
+		for ei in exs.size():
+			var ex: int = exs[ei]
+			_paint_front(vb, ex, by, brow, fz)
+			_paint_front(vb, ex + 1, by, brow, fz)
 	else:
-		vb.set_v(Vector3i(4, B + 1, F), mouth)
-		vb.set_v(Vector3i(5, B + 1, F), mouth)
-		vb.set_v(Vector3i(4, B + 2, F + 1), _sh(skin, 0.92))
-		vb.set_v(Vector3i(5, B + 2, F + 1), _sh(skin, 0.92))
-		if girl:
-			var blush2 := skin.lerp(Color(0.95, 0.45, 0.45), 0.35)
-			vb.set_v(Vector3i(1, B + 2, F), blush2)
-			vb.set_v(Vector3i(8, B + 2, F), blush2)
-			vb.set_v(Vector3i(4, B + 1, F), Color(0.75, 0.3, 0.32))
-			vb.set_v(Vector3i(5, B + 1, F), Color(0.75, 0.3, 0.32))
-		# Brows.
-		var brow: Color = L.get("brow", _sh(hair, 0.8))
-		for x in [1, 2, 3, 6, 7, 8]:
-			if girl and (x == 1 or x == 8):
-				continue
-			vb.set_v(Vector3i(x, E + eh + 1, F), brow)
+		for ei in exs.size():
+			var ex: int = exs[ei]
+			var outer := ex - 1 if ei == 0 else ex + 2
+			for x in [outer, ex, ex + 1]:
+				_paint_front(vb, x, by, brow, fz)
+			# Proud ridge over the inner two so brows cast a little shadow.
+			_paint_front(vb, ex, by, _sh(brow, 1.1), fz, 1)
+			_paint_front(vb, ex + 1, by, _sh(brow, 1.1), fz, 1)
+	# Cheeks (blush) under the outer half of each eye.
+	var blush := skin.lerp(Color(0.98, 0.42, 0.45), 0.5 if child else (0.38 if girl else 0.3))
+	_paint_front(vb, exs[0], E - 1, blush, fz)
+	_paint_front(vb, exs[0] - 1 if child else exs[0], E - 1, blush, fz)
+	_paint_front(vb, exs[1] + 1, E - 1, blush, fz)
+	_paint_front(vb, exs[1] + 2 if child else exs[1] + 1, E - 1, blush, fz)
+	if child:
+		_paint_front(vb, exs[0] + 1, E - 1, blush.lerp(skin, 0.4), fz)
+		_paint_front(vb, exs[1], E - 1, blush.lerp(skin, 0.4), fz)
+	# Nose.
+	if child:
+		_paint_front(vb, cxl, E - 1, _sh(skin, 0.92), fz)
+		_paint_front(vb, cxr, E - 1, _sh(skin, 0.92), fz)
+	else:
+		_paint_front(vb, cxl, E - 1, _sh(skin, 0.94), fz, 1)
+		_paint_front(vb, cxr, E - 1, _sh(skin, 0.9), fz, 1)
+	# Mouth: a little smile (corners up), open + tongue on kids.
+	var mouth := Color(0.55, 0.18, 0.2)
+	var lip := Color(0.85, 0.42, 0.45)
+	if child:
+		_paint_front(vb, cxl, M - 1, mouth, fz)
+		_paint_front(vb, cxr, M - 1, Color(0.93, 0.45, 0.5), fz)
+		_paint_front(vb, cxl - 1, M, mouth, fz)
+		_paint_front(vb, cxr + 1, M, mouth, fz)
+		_paint_front(vb, cxl, M, _sh(skin, 0.97), fz)
+		_paint_front(vb, cxr, M, _sh(skin, 0.97), fz)
+	elif beard != "full":
+		_paint_front(vb, cxl, M, mouth if not girl else Color(0.78, 0.3, 0.34), fz)
+		_paint_front(vb, cxr, M, mouth if not girl else Color(0.78, 0.3, 0.34), fz)
+		_paint_front(vb, cxl - 1, M + 1 if girl else M, _sh(skin, 0.86), fz)
+		_paint_front(vb, cxr + 1, M + 1 if girl else M, _sh(skin, 0.86), fz)
 
 	# Beard.
-	var beard: String = L.get("beard", "")
-	var bc := _hair_fn(L.get("beard_color", _sh(hair, 0.8)))
+	var beard_c: Color = L.get("beard_color", _sh(hair, 0.8))
+	var bcell := func(p: Vector3i) -> Color:
+		# Curly clumps: shade varies per 2x2 cell, lighter on the cell tops.
+		var cell := Vector3i(floori(p.x / 2.0), floori(p.y / 2.0), floori(p.z / 2.0))
+		var f := 0.84 + 0.3 * _h(cell, 61) + (0.07 if posmod(p.y, 2) == 1 else -0.03)
+		return _sh(beard_c, f * (1.0 + (_h(p, 62) - 0.5) * 0.08))
 	if beard == "full":
-		for y in range(B, B + 3):
-			for x in range(0, W):
-				if y == B + 1 and (x == 4 or x == 5):
+		var mus := _sh(beard_c.lerp(hair, 0.45), 1.08)
+		# 1) Recolour the skull surface on the lower face / jaw / sideburns.
+		var bset := {}
+		for p: Vector3i in vb.vox.keys():
+			if p.y < B or p.x < 0 or p.x >= W:
+				continue
+			var side := p.x <= 1 or p.x >= W - 2
+			var in_beard := false
+			if p.y <= M and p.z >= 2:
+				in_beard = true
+			elif p.y == M + 1 and p.z >= 2 and (p.x <= cxl - 3 or p.x >= cxr + 3 or p.z <= F - 2):
+				in_beard = true
+			elif side and p.y <= E + 1 and p.z >= 2 and p.z <= F - 2:
+				in_beard = true
+			if in_beard:
+				bset[p] = true
+		for p: Vector3i in bset:
+			vb.set_v(p, bcell.call(p))
+		# 2) One voxel of volume outward (front + sides), so it wraps the jaw.
+		for p: Vector3i in bset:
+			for d: Vector3i in [Vector3i(0, 0, 1), Vector3i(1, 0, 0), Vector3i(-1, 0, 0)]:
+				var q := p + d
+				if vb.has(q) or q == Vector3i(-1, E, ez) or q == Vector3i(W, E, ez):
 					continue
-				vb.set_v(Vector3i(x, y, F), bc.call(Vector3i(x, y, F)))
-				if x > 0 and x < W - 1:
-					vb.set_v(Vector3i(x, y, F + 1), bc.call(Vector3i(x, y, F + 1)))
-		# Mouth recessed in beard.
-		vb.set_v(Vector3i(4, B + 1, F), mouth)
-		vb.set_v(Vector3i(5, B + 1, F), mouth)
-		vb.erase(Vector3i(4, B + 1, F + 1))
-		vb.erase(Vector3i(5, B + 1, F + 1))
-		# Moustache over the lip, nose on top.
-		for x in range(2, 8):
-			vb.set_v(Vector3i(x, B + 2, F + 1), bc.call(Vector3i(x, B + 2, F + 2)))
-		vb.set_v(Vector3i(4, B + 3, F + 1), _sh(skin, 0.9))
-		vb.set_v(Vector3i(5, B + 3, F + 1), _sh(skin, 0.9))
-		# Jaw / chin volume.
-		_fill(vb, 1, W - 2, 0, 0, 3, F + 1, bc)
-		_fill(vb, 2, W - 3, -1, -1, 5, F + 1, bc)
-		_fill(vb, 3, W - 4, -2, -2, 7, F, bc)
-		# Sideburns + cheeks: full height by the ear, lower toward the face
-		# so the cheek, eye and nose still read in profile.
-		for x in [0, W - 1]:
-			for y in range(B, B + 6):
-				for z in range(4, F + 1):
-					if z >= F - 2 and y >= B + 3:
-						continue
-					vb.set_v(Vector3i(x, y, z), bc.call(Vector3i(x, y, z)))
-		# Profile eye: a dark eye voxel on each side just behind the bevelled
-		# face corner, so the dad still has an eye when seen from the side or
-		# back three-quarter (the ref shows him in profile at the desk).
-		for x in [0, W - 1]:
-			vb.set_v(Vector3i(x, E + 1, F - 1), eye_dark)
-			vb.set_v(Vector3i(x, E + 2, F - 1), _sh(skin, 0.9))
+				if d.z == 0 and p.y > M and p.z > F - 3:
+					continue
+				vb.set_v(q, bcell.call(q))
+		if ears:
+			_fill(vb, -1, -1, E - 1, E, ez - 1, ez, ear_skin)
+			_fill(vb, W, W, E - 1, E, ez - 1, ez, ear_skin)
+		# 3) Chin volume under the jaw, rounded, hanging a little low.
+		_fill(vb, 1, W - 2, 0, 0, 2, F + 1, bcell)
+		_fill(vb, 2, W - 3, -1, -1, 4, F + 1, bcell)
+		_fill(vb, 3, W - 4, -2, -2, 6, F, bcell)
+		_fill(vb, cxl - 1, cxr + 1, -3, -3, F - 3, F, bcell)
+		for x in [1, W - 2]:
+			vb.erase(Vector3i(x, 0, F + 1))
+		for x in [2, W - 3]:
+			vb.erase(Vector3i(x, -1, F + 1))
+		# 4) Mouth: a warm smile showing through the beard under the moustache.
+		for x in [cxl, cxr]:
+			_paint_front(vb, x, M - 1, Color(0.66, 0.24, 0.24), F + 3)
+		_paint_front(vb, cxl - 1, M - 1, _sh(Color(0.66, 0.24, 0.24), 0.8), F + 3)
+		_paint_front(vb, cxr + 1, M - 1, _sh(Color(0.66, 0.24, 0.24), 0.8), F + 3)
+		# 5) Lighter moustache across the upper lip, ends curling down.
+		var muz := _front_z(vb, cxl, M, F + 3)
+		for x in range(cxl - 2, cxr + 3):
+			var z := maxi(muz, _front_z(vb, x, M, F + 3))
+			vb.set_v(Vector3i(x, M, z), _sh(mus, 0.95 + 0.1 * _h(Vector3i(x, M, 0), 63)))
+		vb.set_v(Vector3i(cxl - 2, M - 1, muz), _sh(mus, 0.92))
+		vb.set_v(Vector3i(cxr + 2, M - 1, muz), _sh(mus, 0.92))
 	elif beard == "short":
-		for y in range(B, B + 2):
-			for x in range(0, W):
-				if y == B + 1 and (x == 4 or x == 5):
+		for p: Vector3i in vb.vox.keys():
+			if p.y >= B and p.y <= M and p.z >= 3 and p.x >= 0 and p.x < W:
+				if p.y == M and p.x >= cxl - 1 and p.x <= cxr + 1 and p.z >= F - 1:
 					continue
-				vb.set_v(Vector3i(x, y, F), bc.call(Vector3i(x, y, F)))
-		for x in range(3, 7):
-			vb.set_v(Vector3i(x, B + 2, F), bc.call(Vector3i(x, B + 2, F)))
-		_fill(vb, 2, W - 3, 0, 0, 5, F, bc)
-		for x in [0, W - 1]:
-			_fill(vb, x, x, B, B + 3, 5, F - 1, bc)
+				vb.set_v(p, bcell.call(p))
+			elif (p.x <= 0 or p.x >= W - 1) and p.y <= E and p.y >= B and p.z >= 3 and p.z <= F - 2:
+				vb.set_v(p, bcell.call(p))
+		_fill(vb, 2, W - 3, 0, 0, 4, F, bcell)
+		_paint_front(vb, cxl, M, mouth, F + 2)
+		_paint_front(vb, cxr, M, mouth, F + 2)
+		for x in range(cxl - 2, cxr + 3):
+			_paint_front(vb, x, M + 1 if (x >= cxl - 1 and x <= cxr + 1) else M, bcell.call(Vector3i(x, M + 1, F)), F + 2)
+		_paint_front(vb, cxl, M + 1, bcell.call(Vector3i(cxl, M + 1, F)), F + 2, 1)
+		_paint_front(vb, cxr, M + 1, bcell.call(Vector3i(cxr, M + 1, F)), F + 2, 1)
 	elif beard == "moustache":
-		for x in range(2, 8):
-			vb.set_v(Vector3i(x, B + 2, F + 1), bc.call(Vector3i(x, B + 2, F + 1)))
-		vb.set_v(Vector3i(2, B + 1, F + 1), bc.call(Vector3i(2, B + 1, F + 1)))
-		vb.set_v(Vector3i(7, B + 1, F + 1), bc.call(Vector3i(7, B + 1, F + 1)))
+		var mus2 := _sh(beard_c, 1.0)
+		for x in range(cxl - 2, cxr + 3):
+			_paint_front(vb, x, M + 1 if x < cxl - 1 or x > cxr + 1 else M + 1, mus2, F + 1, 1)
+		_paint_front(vb, cxl - 2, M, mus2, F + 1, 1)
+		_paint_front(vb, cxr + 2, M, mus2, F + 1, 1)
 
 	_human_hair(vb, style, hair_fn, W, H, Dd, B, T, F, hat != "", child)
+	if style != "shaggy" and style != "curly" and style != "afro" and hat == "":
+		# Round off the hair's box corners and crown (soft chibi silhouette).
+		var hx := W * 0.5 + 1.6
+		var hz := (F + 1) * 0.5 + 1.6
+		var cut: Array[Vector3i] = []
+		for p: Vector3i in vb.vox.keys():
+			if p.y < T - 3:
+				continue
+			var dx := absf(p.x - (W - 1) * 0.5) / hx
+			var dz := absf(p.z - F * 0.5) / hz
+			var dy := maxf(0.0, (p.y - (T - 2.0)) / 4.2)
+			if pow(dx, 3.0) + pow(dz, 3.0) + pow(dy, 2.2) > 1.0:
+				cut.append(p)
+		for p in cut:
+			vb.erase(p)
 	# Sun-kissed crown: hair on top catches a little more light.
 	if hat == "":
 		for p: Vector3i in vb.vox.keys():
@@ -498,20 +622,19 @@ static func _human_head(L: Dictionary, D: Dictionary) -> Dictionary:
 	if hat != "":
 		_human_hat(vb, L, W, H, Dd, B, T, F, out)
 	if L.get("glasses", false):
-		# Thin warm-gold rims; the lens area stays open so the eyes read.
-		var gc := Color(0.5, 0.36, 0.24)
+		# Thin warm-gold rims standing one voxel proud; lenses stay open.
+		var gc := Color(0.55, 0.4, 0.26)
+		var gz := F + 1
 		for ex: int in exs:
 			for x in range(ex - 1, ex + 3):
-				vb.set_v(Vector3i(x, E + eh, F + 1), gc)
+				vb.set_v(Vector3i(x, E + eh, gz), gc)
+				vb.set_v(Vector3i(x, E - 1, gz), gc)
 			for y in range(E, E + eh):
-				vb.set_v(Vector3i(ex - 1, y, F + 1), gc)
-				vb.set_v(Vector3i(ex + 2, y, F + 1), gc)
-		# Bridge.
-		vb.set_v(Vector3i(W / 2 - 1, E + eh - 1, F + 1), gc)
-		vb.set_v(Vector3i(W / 2, E + eh - 1, F + 1), gc)
+				vb.set_v(Vector3i(ex - 1, y, gz), gc)
+				vb.set_v(Vector3i(ex + 2, y, gz), gc)
 		for z in range(F - 4, F + 1):
-			vb.set_v(Vector3i(-1, E + 1, z), gc)
-			vb.set_v(Vector3i(W, E + 1, z), gc)
+			vb.set_v(Vector3i(-1, E + eh - 1, z), gc)
+			vb.set_v(Vector3i(W, E + eh - 1, z), gc)
 	return out
 
 
@@ -523,48 +646,59 @@ static func _human_hair(vb: VoxelBuilder, style: String, hc: Callable, W: int, H
 		_fill(vb, 0, W - 1, B + 2, T - 3, -1, -1, hc)
 		return
 	if style == "shaggy":
-		# Big wavy mop (dad): curly shell + clumpy tufts and a swept fringe.
-		var clump := func(p: Vector3i) -> Color:
-			var c: Color = hc.call(p)
-			var k := _h(Vector3i(floori(p.x / 2.0), floori(p.y / 2.0), floori(p.z / 2.0)), 41)
-			return _sh(c, 0.84 + 0.3 * k)
-		for x in range(-2, W + 2):
-			for z in range(-2, F + 1):
-				for y in range(B + 1, T + 4):
-					var inside_head := x >= 0 and x < W and z >= 0 and z <= F and y <= T
-					if inside_head:
-						continue
-					# Low rows: only the back of the head / behind the ears.
-					if y < T - 5 and z > 2:
-						continue
-					if z >= F - 1 and y < T - 1 and (x >= 0 and x < W):
-						continue
-					if z >= F - 2 and y < T - 3:
-						continue
-					# Keep the ear + cheek clear on the sides so the face reads
-					# in profile (hair only behind the ear / above the temple).
-					var side := x < 0 or x >= W
-					if side and z >= 4 and y < T - 2:
-						continue
-					var dx := maxf(maxf(-x, x - (W - 1)), 0.0)
-					var dz := maxf(maxf(-z, z - F), 0.0)
-					var dy := maxf(float(y - T), 0.0)
-					# Clumps vary per 2x2 tuft (not per voxel) so the mop has
-					# a few chunky locks instead of a noisy, holey shell.
-					var tuft := Vector3i(floori(x / 2.0), floori(y / 2.0), floori(z / 2.0))
-					var lim := 1.15 + _h(tuft, 42) * 0.9
-					if dy > 0.0:
-						lim = 1.9 + _h(Vector3i(tuft.x, 0, tuft.z), 43) * 0.9 - (0.6 if z < 2 else 0.0)
-					if dx + dz + dy * 0.9 <= lim:
-						vb.set_v(Vector3i(x, y, z), clump.call(Vector3i(x, y, z)))
-		# Fringe swept to one side over the forehead.
-		for x in range(0, W):
-			vb.set_v(Vector3i(x, T, F + 1), clump.call(Vector3i(x, T, F + 1)))
-			if x < W - 3 and _h(Vector3i(x, 2, 2), 44) > 0.25:
-				vb.set_v(Vector3i(x, T - 1, F + 1), clump.call(Vector3i(x, T - 1, F + 1)))
-			vb.set_v(Vector3i(x, T, F), clump.call(Vector3i(x, T, F)))
-			if x < W - 4:
-				vb.set_v(Vector3i(x, T - 1, F), clump.call(Vector3i(x, T - 1, F)))
+		# Big curly mop (dad): a dark base cap over the skull, then layered
+		# round curl clumps (each with its own shade, lit on top, darker
+		# underneath) over the crown, a fringe overhanging the forehead,
+		# tufts over the tops of the ears and a full back.
+		var base := func(p: Vector3i) -> Color:
+			return _sh(hc.call(p), 0.72)
+		var E := B + 4
+		for p: Vector3i in vb.vox.keys():
+			if p.x < 0 or p.x >= W or p.y < B:
+				continue
+			if p.y >= T - 1 or (p.y >= T - 2 and p.z <= F - 2) or (p.z <= 2 and p.y >= E - 1):
+				vb.set_v(p, base.call(p))
+		var cs: Array = []
+		for ix in 4:
+			for iz in 4:
+				var q := Vector3i(ix, 0, iz)
+				var u := Vector2(ix - 1.5, iz - 1.5).length() / 2.1
+				cs.append([Vector3(0.6 + ix * 3.25, T + 2.0 - 1.3 * u * u + _h(q, 50) * 0.5, 0.4 + iz * 3.0), 2.05 + _h(q, 51) * 0.5])
+		for ix in 4:
+			var q := Vector3i(ix, 1, 0)
+			cs.append([Vector3(0.9 + ix * 3.1, T - 0.3 - _h(q, 52) * 0.5, F - 0.4), 1.7])
+		for sx: float in [-0.7, W - 0.3]:
+			for iz in 3:
+				cs.append([Vector3(sx, T - 2.0 - float(iz % 2) * 0.8, 1.0 + iz * 2.4), 1.85])
+			cs.append([Vector3(sx, E - 0.5, 1.2), 1.7])
+		for ix in 4:
+			for iy in 3:
+				cs.append([Vector3(0.7 + ix * 3.2, T - 1.0 - iy * 2.5, -0.7), 1.95])
+		var ci := 0
+		for c: Array in cs:
+			ci += 1
+			var cen: Vector3 = c[0]
+			var r: float = c[1]
+			var k := _h(Vector3i(ci, 7, 3), 53)
+			for x in range(floori(cen.x - r), ceili(cen.x + r) + 1):
+				for y in range(floori(cen.y - r), ceili(cen.y + r) + 1):
+					for z in range(floori(cen.z - r), ceili(cen.z + r) + 1):
+						var d := Vector3(x, y, z) - cen
+						if d.length_squared() > r * r:
+							continue
+						# Keep the face clear (fringe may overhang down to the
+						# row above the brows) and the cheek/eye profile open.
+						var inside_x := x >= 0 and x < W
+						if inside_x and z >= F - 3 and y <= T - 3:
+							continue
+						if not inside_x and z >= F - 3 and y <= T - 2:
+							continue
+						if not inside_x and z >= 3 and y <= E + 1 and y >= E - 2:
+							continue
+						var p := Vector3i(x, y, z)
+						var lit := clampf(d.y / r, -1.0, 1.0)
+						var f := 0.8 + 0.3 * k + 0.16 * lit
+						vb.set_v(p, _sh(hc.call(p), f))
 		return
 	var curly := style == "curly" or style == "curly_long" or style == "afro"
 	# Cap over the top of the skull.
@@ -648,7 +782,7 @@ static func _human_hair(vb: VoxelBuilder, style: String, hc: Callable, W: int, H
 				_fill(vb, W, W, B + 2, T, 0, F - 1, hc)
 			# Bangs.
 			var bang_top := T - 2 if has_hat else T
-			var bang_lo := T - 3 if has_hat else T - 3
+			var bang_lo := T - 2 if has_hat else T - 3
 			for x in range(0, W):
 				for y in range(bang_lo, bang_top + 1):
 					if y == bang_lo and not has_hat and _h(Vector3i(x, 0, 0), 16) < 0.5:
@@ -701,22 +835,19 @@ static func _human_hat(vb: VoxelBuilder, L: Dictionary, W: int, H: int, Dd: int,
 		# fully exposed below the cuff.
 		var cuff_c: Color = L.get("cuff_color", _sh(hc, 1.05))
 		var c0 := T - 1
-		var dome := [[T + 2, 0, 1]]   # [row, inset, corner cut]
+		# Rounded beanie: superellipse cuff one voxel out from the skull,
+		# then a soft dome (no stacked tiers, no box corners).
+		var hcx := (W - 1) * 0.5
+		var hcz := F * 0.5
+		var hax := W * 0.5 + 1.1
+		var haz := (F + 1) * 0.5 + 1.1
 		var in_hat := func(x: int, y: int, z: int) -> bool:
-			if y >= c0 and y <= T + 1:
-				if x < -1 or x > W or z < -1 or z > F + 1:
-					return false
-				return not ((x == -1 or x == W) and (z == -1 or z == F + 1))
-			for d: Array in dome:
-				if y == d[0]:
-					var i: int = d[1]
-					var k: int = d[2]
-					if x < i or x > W - 1 - i or z < i - 1 or z > F + 1 - i:
-						return false
-					var ex := mini(x - i, W - 1 - i - x)
-					var ez := mini(z - (i - 1), F + 1 - i - z)
-					return ex + ez >= k
-			return false
+			if y < c0 or y > T + 3:
+				return false
+			var dx := absf(x - hcx) / hax
+			var dz := absf(z - hcz) / haz
+			var dy := maxf(0.0, (y - (T - 0.5)) / 3.9)
+			return pow(dx, 3.0) + pow(dz, 3.0) + pow(dy, 2.0) <= 1.0
 		# Hair can't poke through the hat: clear anything above the cuff
 		# outside the hat volume (hair below the cuff stays: bangs, sides).
 		for y in range(c0, T + 7):
@@ -796,8 +927,20 @@ static func _human_hat(vb: VoxelBuilder, L: Dictionary, W: int, H: int, Dd: int,
 					var shell := x == -1 or x == W or z == -1 or z == F + 1
 					if shell:
 						vb.set_v(p, cc.call(p))
+		# Round the crown + corners (keep the brim).
+		var cut: Array[Vector3i] = []
+		for p: Vector3i in vb.vox.keys():
+			if p.y < T - 1 or (p.z > F + 1 and p.y == T - 1):
+				continue
+			var dx := absf(p.x - (W - 1) * 0.5) / (W * 0.5 + 1.2)
+			var dz := absf(p.z - F * 0.5) / ((F + 1) * 0.5 + 1.2)
+			var dy := maxf(0.0, (p.y - (T - 0.5)) / 3.0)
+			if pow(dx, 3.0) + pow(dz, 3.0) + pow(dy, 2.2) > 1.0:
+				cut.append(p)
+		for p in cut:
+			vb.erase(p)
 		if hat == "cap":
-			vb.set_v(Vector3i(W / 2, T + 3, F / 2), _sh(hc, 0.8))
+			vb.set_v(Vector3i(W / 2, T + 2, F / 2), _sh(hc, 0.8))
 
 
 static func _human_torso(L: Dictionary, D: Dictionary) -> VoxelBuilder:
