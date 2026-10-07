@@ -19,11 +19,15 @@ const TABLE_POS := Vector3(0.75, 0.0, 0.75)
 ## far side's diners face the camera in a row, the near side sit with their
 ## backs to us in the gaps between them, the left end is a little nearer.
 const TABLE_ROT := 0.12
-const GRILL_POS := Vector3(-3.3, 0.0, -1.25)
-const GRILL_ROT := PI + 0.55
+const GRILL_POS := Vector3(-2.8, 0.0, -0.55)
+const GRILL_ROT := 0.08
+## Where the cook stands (grill-local): behind the right end of the firebox,
+## clear of the open lid, reaching over the grate.
+const GRILL_SCALE := 1.08
+const COOK_SPOT := Vector3(0.84, 0.0, -0.46)
 const PIT_POS := Vector3(3.5, 0.0, 2.45)
 ## Lanterns (fine cells: x, y, z of the base corner; 7x7 footprint).
-const LANTERNS := [Vector3i(-66, 0, 14), Vector3i(24, 0, -38), Vector3i(122, 0, -10), Vector3i(-88, 0, -58), Vector3i(150, 0, 50),
+const LANTERNS := [Vector3i(-64, 0, 2), Vector3i(24, 0, -38), Vector3i(122, 0, -10), Vector3i(-88, 0, -58), Vector3i(150, 0, 50),
 		Vector3i(44, 6, -50), Vector3i(118, 6, -50), Vector3i(-50, 0, 44), Vector3i(70, 0, 68),
 		Vector3i(-118, 0, 42), Vector3i(100, 0, 62), Vector3i(-140, 0, -20)]
 ## Lanterns that also get a real OmniLight (the rest only bake a pool on the lawn).
@@ -81,7 +85,6 @@ var table_node: Node3D
 var grill_node: Node3D
 var pit_light: OmniLight3D
 var coal_light: OmniLight3D
-var smoke: CPUParticles3D
 var halos := Halos.new()
 var _rng := RandomNumberGenerator.new()
 
@@ -95,7 +98,7 @@ func build(parent: Node3D) -> void:
 	_grill()
 	var yard := VoxelBuilder.new()
 	yard.jitter = 0.05
-	_prep_table(yard, -28, -40)
+	_prep_table(yard, -25, -30)
 	_fire_pit(yard, int(PIT_POS.x * F), int(PIT_POS.z * F))
 	_sofa(yard, 78, 28)
 	_side_table(yard, 74, 58)
@@ -131,7 +134,7 @@ func build(parent: Node3D) -> void:
 	# the table, above head height so it reads as the candle/string glow).
 	for fx in [-1.0, 1.0]:
 		V.omni(root, tb * Vector3(fx, 1.45, 0.75), Color(1.0, 0.76, 0.5), 0.75, 2.4)
-	V.omni(root, GRILL_POS + Vector3(-0.9, 0.7, 1.1), Color(1.0, 0.7, 0.4), 1.2, 3.5)
+	V.omni(root, GRILL_POS + Vector3(0.5, 2.0, 1.3), Color(1.0, 0.74, 0.46), 0.85, 3.6)
 	V.omni(root, Vector3(-1.0, 2.6, -1.0), Color(1.0, 0.78, 0.5), 1.1, 6.5)
 	V.omni(root, Vector3(3.6, 2.6, 0.2), Color(1.0, 0.78, 0.5), 0.9, 6.0)
 
@@ -151,7 +154,7 @@ func _facing(s: Vector3) -> float:
 
 
 func grill_front() -> Vector3:
-	return GRILL_POS + Basis(Vector3.UP, GRILL_ROT) * Vector3(0, 0, 0.62)
+	return GRILL_POS + Basis(Vector3.UP, GRILL_ROT) * COOK_SPOT
 
 
 func process(t: float) -> void:
@@ -159,6 +162,7 @@ func process(t: float) -> void:
 		pit_light.light_energy = 2.4 + sin(t * 11.0) * 0.25 + sin(t * 23.7) * 0.15
 	if coal_light:
 		coal_light.light_energy = 0.45 + sin(t * 9.0) * 0.06
+	_place_puffs(t)
 
 
 # ------------------------------------------------------------------ table
@@ -400,101 +404,164 @@ func _chair(vb: VoxelBuilder, cx: int, cz: int, key: String) -> void:
 
 # ------------------------------------------------------------------ grill
 
+## Silver/black gas grill seen from the front (ref4): open lid standing up
+## behind the firebox, a visible grate with patties and corn over glowing
+## coals, stainless doors + knobs facing the camera, a side shelf with a
+## tray and a propane tank. Local cells (1/16 m), front = +z.
 func _grill() -> void:
 	var vb := VoxelBuilder.new()
 	vb.jitter = 0.05
-	var steel := Color("9aa0a8")
-	# Cart legs + wheels.
-	for q in [Vector2i(-9, -5), Vector2i(8, -5), Vector2i(-9, 3), Vector2i(8, 3)]:
-		V.b(vb, q.x, 0, q.y, 1, 3, 1, IRON)
-	# Cabinet.
-	V.b(vb, -10, 2, -6, 20, 11, 10, V.noisy(IRON, 0.05))
-	V.b(vb, -9, 4, 4, 8, 8, 1, Color("34353c")); V.b(vb, 1, 4, 4, 8, 8, 1, Color("34353c"))
-	V.b(vb, -2, 8, 5, 1, 3, 1, steel); V.b(vb, 1, 8, 5, 1, 3, 1, steel)
-	# Control panel + knobs.
-	V.b(vb, -10, 13, 4, 20, 2, 1, Color("3a3b42"))
+	var steel := Color("848b95")
+	var steel_d := Color("585e67")
+	var blk := Color("1e1f24")
+	var blk_l := Color("34363d")
+	# Cart legs + chunky wheels.
+	for q in [Vector2i(-10, -5), Vector2i(9, -5), Vector2i(-10, 4), Vector2i(9, 4)]:
+		V.b(vb, q.x, 1, q.y, 1, 2, 1, blk)
+		V.b(vb, q.x, 0, q.y - 1, 1, 1, 3, Color("1a1a1e"))
+		V.p(vb, q.x, 0, q.y, steel_d)
+	# Cabinet (black) with stainless double doors on the front.
+	V.b(vb, -10, 2, -5, 20, 10, 10, V.noisy(blk, 0.05))
+	for dx in [-9, 1]:
+		V.b(vb, dx, 3, 5, 8, 8, 1, func(q: Vector3i) -> Color:
+			return V.shade(steel, 0.78 + float(q.y - 3) * 0.035 + V.h1(q, 3) * 0.08) if q.y > 3 else steel_d)
+		V.b(vb, dx, 10, 5, 8, 1, 1, V.shade(steel, 1.08))
+	V.b(vb, -2, 5, 6, 1, 4, 1, blk_l); V.b(vb, 1, 5, 6, 1, 4, 1, blk_l)
+	V.p(vb, -2, 4, 6, steel); V.p(vb, 1, 4, 6, steel)
+	# Stainless control panel with four black knobs and a lit ignition dot.
+	V.b(vb, -10, 12, 5, 20, 2, 2, func(q: Vector3i) -> Color:
+		return V.shade(steel, 0.95 + V.h1(q, 7) * 0.1))
 	for k in 4:
-		V.p(vb, -7 + k * 4, 13, 5, Color("c9ccd2"))
-	# Firebox.
-	V.b(vb, -10, 13, -6, 20, 3, 10, IRON)
-	# Glowing coals + grate.
-	V.b(vb, -9, 15, -5, 18, 1, 8, func(q: Vector3i) -> Color:
-		return Color("ff7a2a").lerp(Color("ffcf5a"), V.h1(q, 2)), true)
-	for gz in [-5, -3, -1, 1]:
-		V.b(vb, -9, 16, gz, 18, 1, 1, Color("45464c"))
-	# Food on the grate: thick patties, sausages and corn cobs.
-	for i in 4:
-		var px := -8 + i * 4
-		V.b(vb, px, 17, -4, 3, 1, 3, V.mix([Color("9a5a2e"), Color("8a4a26"), Color("a8663a")], i))
-		V.b(vb, px, 17, -3, 3, 1, 1, Color("4a2414"))
-		if i % 2 == 0:
-			V.b(vb, px, 18, -4, 3, 1, 3, Color("f7cf3e"))
-			V.p(vb, px + 2, 18, -2, Color("ffe07a"))
-	for i in 3:
-		V.b(vb, -7 + i * 3, 17, 1, 2, 2, 1, Color("a2512e"))
-		V.b(vb, -7 + i * 3, 17, 2, 2, 1, 1, Color("8a4426"))
-	for cx in [4, 6, 8]:
-		V.b(vb, cx, 17, -1, 1, 2, 4, func(q: Vector3i) -> Color: return Color("f3d24a") if (q.z + q.y) % 2 == 0 else Color("e2b432"))
-		V.p(vb, cx, 17, 3, Color("6cb04a"))
-	# Open lid, flipped down over the back of the firebox (faces the camera,
-	# so the grate and food stay visible).
-	V.b(vb, -10, 7, -8, 20, 9, 2, V.noisy(IRON, 0.05))
-	V.b(vb, -6, 9, -9, 12, 1, 1, steel)
-	V.b(vb, -9, 11, -9, 18, 1, 1, V.shade(IRON, 1.3))
-	V.p(vb, 0, 13, -9, Color("e8e8ea"))
-	# Side shelves.
-	V.b(vb, -17, 13, -5, 7, 1, 9, V.wood(WOOD, 0, 2))
-	V.b(vb, 10, 13, -5, 7, 1, 9, V.wood(WOOD, 0, 2))
-	# Plate of buns + tongs.
-	V.b(vb, 11, 14, -3, 5, 1, 5, Color("f6f3ee"))
-	for bq in [Vector2i(11, -3), Vector2i(13, -2), Vector2i(12, 0)]:
-		V.b(vb, bq.x, 15, bq.y, 2, 1, 2, Color("e0a456"))
-	V.b(vb, -16, 14, -3, 5, 1, 1, steel)
-	V.b(vb, -16, 14, 0, 4, 2, 2, Color("d02a24"))
+		V.b(vb, -7 + k * 4, 12, 7, 2, 2, 1, blk)
+		V.p(vb, -7 + k * 4, 13, 7, Color("e04a2a") if k == 0 else Color("5a5c62"))
+	# Firebox rim (black walls) around the cooking well.
+	V.b(vb, -10, 12, -5, 20, 2, 1, blk)
+	V.b(vb, -10, 12, 4, 20, 2, 1, blk)
+	V.b(vb, -10, 12, -4, 1, 2, 8, blk)
+	V.b(vb, 9, 12, -4, 1, 2, 8, blk)
+	V.b(vb, -10, 14, 4, 20, 1, 1, steel_d)
+	# Glowing coals / burner glow under the grate.
+	V.b(vb, -9, 12, -4, 18, 1, 8, func(q: Vector3i) -> Color:
+		var h := V.h1(q, 2)
+		return Color("ff5a1a").lerp(Color("ffc24a"), h) if h > 0.25 else Color("8a2a14"), true)
+	# Grate: iron bars along x with the coal glow between them.
+	for gz in [-4, -2, 0, 2]:
+		V.b(vb, -9, 13, gz, 18, 1, 1, Color("3c3d43"))
+	for gx in [-5, 0, 5]:
+		V.b(vb, gx, 13, -4, 1, 1, 8, Color("2f3035"))
+	# Burger patties (two rows of three) with dark sear marks.
+	for r in 2:
+		for i in 3:
+			var px := -9 + i * 4
+			var pz := -4 + r * 4
+			V.b(vb, px, 14, pz, 3, 1, 3, func(q: Vector3i) -> Color:
+				return [Color("4a2a1c"), Color("553220"), Color("3e2216")][int(V.h1(q, 4) * 3.0) % 3])
+			V.b(vb, px, 15, pz, 3, 1, 3, func(q: Vector3i) -> Color:
+				return Color("2a160c") if (q.x + q.z) % 3 == 0 else Color("5c3826"))
+			V.b(vb, px, 14, pz + 1, 3, 1, 1, Color("2e160b"))
+			if (r + i) % 2 == 0:
+				# Melting cheese slice.
+				V.b(vb, px, 16, pz, 2, 1, 2, Color("f7c83a"))
+				V.p(vb, px + 2, 15, pz + 3 if pz < 0 else pz - 1, Color("ffd64a"))
+	# Corn cobs on the right third (kernels + green husk tip).
+	for ci in 2:
+		var cx := 3 + ci * 3
+		V.b(vb, cx, 14, -4, 2, 2, 7, func(q: Vector3i) -> Color:
+			return Color("f6d84a") if (q.z + q.y + q.x) % 2 == 0 else Color("e3b62e"))
+		V.p(vb, cx, 15, -4, Color("c08a26"))
+		V.b(vb, cx, 14, 3, 2, 1, 1, Color("6cb04a"))
+		V.p(vb, cx + 1, 15, 3, Color("8fd05a"))
+	# Sausages along the right edge.
+	for sz in [-4, -1, 2]:
+		V.b(vb, 8, 14, sz, 1, 1, 2, Color("8a3a22"))
+		V.p(vb, 8, 15, sz, Color("a24a2a"))
+	# Open lid: hinged at the back, standing up and leaning back slightly;
+	# its dark inner face looks at the camera over the food.
+	for y in range(14, 26):
+		var zb := -6 - int((y - 14) / 4)
+		var inset := 1 if y >= 24 else 0
+		V.b(vb, -10 + inset, y, zb, 20 - inset * 2, 1, 1, func(q: Vector3i) -> Color:
+			return V.shade(Color("3a3b41"), 0.8 + V.h1(q, 5) * 0.25 + float(q.y - 14) * 0.01))
+		V.b(vb, -10 + inset, y, zb - 1, 20 - inset * 2, 1, 1, V.noisy(blk, 0.05))
+	# Lid trim: steel band, side caps, handle on the back.
+	V.b(vb, -10, 19, -8, 1, 1, 1, steel); V.b(vb, 9, 19, -8, 1, 1, 1, steel)
+	V.b(vb, -9, 25, -9, 18, 1, 1, steel)
+	V.b(vb, -6, 22, -10, 12, 1, 1, steel)
+	V.b(vb, -10, 14, -5, 1, 4, 1, blk_l); V.b(vb, 9, 14, -5, 1, 4, 1, blk_l)
+	# Steel frame around the inner face so the hood reads as a lid.
+	for y in range(14, 26):
+		var zf := -6 - int((y - 14) / 4)
+		V.p(vb, -10, y, zf + 1, steel); V.p(vb, 9, y, zf + 1, steel)
+	V.b(vb, -9, 25, -8, 18, 1, 1, V.shade(steel, 1.1))
+	# Thermometer on the lid's inner face (reads as a detail).
+	V.p(vb, 0, 22, -8, Color("e8e8ea")); V.p(vb, 0, 23, -9 + 1, Color("d02a24"))
+	# Left side shelf (stainless) with a tray of raw patties + a spice shaker.
+	V.b(vb, -17, 12, -4, 7, 1, 8, func(q: Vector3i) -> Color:
+		return V.shade(steel, 0.92 + V.h1(q, 9) * 0.12))
+	V.b(vb, -17, 11, -4, 1, 1, 8, steel_d)
+	V.b(vb, -16, 13, -3, 5, 1, 5, Color("f6f3ee"))
+	for pq in [Vector2i(-16, -3), Vector2i(-13, -3), Vector2i(-15, 0)]:
+		V.b(vb, pq.x, 14, pq.y, 2, 1, 2, Color("c4505a"))
+	V.b(vb, -11, 13, 2, 1, 3, 1, Color("f2f2f2")); V.p(vb, -11, 16, 2, Color("d02a24"))
+	# Hanging tools on the shelf edge.
+	V.b(vb, -17, 8, 0, 1, 4, 1, steel_d); V.p(vb, -17, 7, 0, steel)
+	V.b(vb, -17, 9, 2, 1, 3, 1, steel_d); V.b(vb, -17, 8, 2, 1, 1, 1, blk)
+	# Propane tank under the shelf.
+	V.cyl(vb, -13.5, 0, 0.5, 2.6, 7, func(q: Vector3i) -> Color:
+		return V.shade(Color("c9ccd0"), 0.85 + V.h1(q, 11) * 0.1))
+	V.b(vb, -14, 7, 0, 1, 2, 1, steel_d)
+	V.b(vb, -16, 2, -4, 1, 10, 1, blk)
 	grill_node = V.inst(vb, root, V.SIZE_FINE, GRILL_POS, GRILL_ROT, Vector3.ZERO, true, true, "Grill")
-	# Real-world kettle-cart height (~0.9 m to the grate) so Jack's chest
-	# and arms read above it.
-	grill_node.scale = Vector3.ONE * 0.86
-	coal_light = V.omni(grill_node, Vector3(0, 1.05, -0.35), Color(1.0, 0.62, 0.35), 0.45, 2.2)
-	# Smoke.
-	smoke = CPUParticles3D.new()
-	smoke.name = "Smoke"
-	# Rises off the right end of the grate (between Jack and the table) and
-	# drifts back, so it never veils his face.
-	smoke.position = Vector3(0.38, 1.15, -0.05)
-	smoke.amount = 44
-	smoke.lifetime = 4.0
-	smoke.preprocess = 4.0
-	smoke.local_coords = false
-	smoke.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
-	smoke.emission_box_extents = Vector3(0.3, 0.02, 0.12)
-	smoke.direction = Vector3(0, 1, 0)
-	smoke.spread = 12.0
-	smoke.gravity = Vector3(0.03, 0.26, -0.1)
-	smoke.initial_velocity_min = 0.25
-	smoke.initial_velocity_max = 0.45
-	smoke.scale_amount_min = 1.0
-	smoke.scale_amount_max = 1.7
-	var curve := Curve.new()
-	curve.add_point(Vector2(0, 0.35))
-	curve.add_point(Vector2(0.5, 1.0))
-	curve.add_point(Vector2(1, 1.6))
-	smoke.scale_amount_curve = curve
-	var grad := Gradient.new()
-	grad.set_color(0, Color(0.86, 0.84, 0.88, 0.78))
-	grad.set_color(1, Color(0.66, 0.62, 0.74, 0.0))
-	smoke.color_ramp = grad
-	var bm := BoxMesh.new()
-	bm.size = Vector3.ONE * 0.2
-	var mat := StandardMaterial3D.new()
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.vertex_color_use_as_albedo = true
-	mat.albedo_color = Color(1, 1, 1, 1)
-	bm.material = mat
-	smoke.mesh = bm
-	smoke.rotation = Vector3(0, 0, 0)
-	grill_node.add_child(smoke)
+	# A big family gas grill (grate ~0.94 m, 1.6 m with the shelf).
+	grill_node.scale = Vector3.ONE * GRILL_SCALE
+	coal_light = V.omni(grill_node, Vector3(0, 1.15, 0.1), Color(1.0, 0.6, 0.32), 0.45, 2.2)
+	_smoke_column()
+
+
+## 4 grey voxel smoke puffs rising off the left of the grate, drifting back
+## and growing; animated in process() (one mesh, one material each).
+const PUFFS := 4
+var _puffs: Array = []
+var _puff_mats: Array = []
+
+
+func _smoke_column() -> void:
+	var holder := Node3D.new()
+	holder.name = "Smoke"
+	holder.position = Vector3(-0.02, 0.95, -0.1)
+	grill_node.add_child(holder)
+	for i in PUFFS:
+		var vb := VoxelBuilder.new()
+		vb.jitter = 0.06
+		V.blob(vb, Vector3(0, 0, 0), Vector3(3.2, 2.6, 3.2), func(q: Vector3i) -> Color:
+			var t := clampf((float(q.y) + 3.0) / 6.0, 0.0, 1.0)
+			return Color("8d8a92").lerp(Color("e4e0e6"), t * 0.8 + V.h1(q, i) * 0.2), 0.55, 31 + i)
+		V.blob(vb, Vector3(2, 1.5, 0), Vector3(2.2, 2.0, 2.2), func(q: Vector3i) -> Color:
+			return Color("d6d2da").lerp(Color("f0ecf2"), V.h1(q, 2)), 0.5, 41 + i, true)
+		var mi := MeshInstance3D.new()
+		mi.mesh = vb.build(V.SIZE_FINE, Vector3.ZERO)
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		var mat := StandardMaterial3D.new()
+		mat.vertex_color_use_as_albedo = true
+		mat.vertex_color_is_srgb = true
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mat.albedo_color = Color(0.92, 0.88, 0.92, 0.8)
+		mi.material_override = mat
+		holder.add_child(mi)
+		_puffs.append(mi)
+		_puff_mats.append(mat)
+	_place_puffs(0.0)
+
+
+func _place_puffs(t: float) -> void:
+	for i in _puffs.size():
+		var ph := fposmod(t * 0.16 + float(i) / PUFFS, 1.0)
+		var mi: MeshInstance3D = _puffs[i]
+		mi.position = Vector3(-0.3 * ph + sin(ph * 5.0 + i) * 0.05, 0.1 + ph * 1.3, -0.3 * ph)
+		mi.scale = Vector3.ONE * (0.55 + ph * 0.95)
+		var a := clampf(ph * 6.0, 0.0, 1.0) * (1.0 - smoothstep(0.7, 1.0, ph))
+		(_puff_mats[i] as StandardMaterial3D).albedo_color.a = 0.82 * a
 
 
 # ------------------------------------------------------------------ yard props (world fine grid)

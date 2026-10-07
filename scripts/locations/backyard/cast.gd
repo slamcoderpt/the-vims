@@ -36,15 +36,12 @@ func build(parent: Node3D, party) -> void:
 	root = Node3D.new()
 	root.name = "Cast"
 	parent.add_child(root)
-	# Jack at the grill.
-	# Beside the grill (its right end, table side) so his whole body reads in
-	# 3/4 view instead of hiding behind the firebox.
-	# Behind the grill (its control-panel side faces away from the camera),
-	# turned toward the viewer in 3/4 so his face reads over the lid.
-	var gdir := Basis(Vector3.UP, Party.GRILL_ROT) * Vector3(0, 0, 1)
-	var gside := Basis(Vector3.UP, Party.GRILL_ROT) * Vector3(-1, 0, 0)
-	var gf: Vector3 = Party.GRILL_POS + gside * 0.98 + gdir * 0.36
-	_spawn("Jack", gf, -0.32, "grill")
+	# Jack at the grill (ref4): behind its right end, body turned to the
+	# grate with tongs + spatula over the food, 3/4 to the camera.
+	var gb := Basis(Vector3.UP, Party.GRILL_ROT)
+	var gf: Vector3 = Party.GRILL_POS + gb * Party.COOK_SPOT
+	var gd: Vector3 = Party.GRILL_POS + gb * Vector3(0.0, 0.0, 0.0) - gf
+	_spawn("Jack", gf, atan2(gd.x, gd.z) + 0.12, "grill")
 	# Sit-down dinner (ref4): the long table runs across the picture. Four
 	# diners on the far side face the camera in 3/4, two on the near side
 	# sit with their backs to us in the gaps between them (so no head covers
@@ -67,8 +64,9 @@ func build(parent: Node3D, party) -> void:
 	gestures.add(actors.get("neighbor_6"), "drink", false, "", 0.0, 0.0)
 	gestures.add(actors.get("neighbor_4"), "toast", true, "", 0.0, 0.0)
 	gestures.add(actors.get("neighbor_7"), "drink", true, "", 0.05, 0.6)
-	# Jack glances up from the grill so his face reads over the lid.
-	gestures.add(actors.get("Jack"), "look", false, "", 0.35, 0.5)
+	# Jack works the food with tongs (left hand; the pose's spatula stays in
+	# the right) and his head turns just enough for the face to read.
+	gestures.add(actors.get("Jack"), "tongs", true, "tongs", -0.05, 0.45)
 	# On the deck, chatting with plates and drinks.
 	var a := _spawn("neighbor_1", Vector3(3.6, 0.375, -3.3), 0.0, "talk")
 	var b := _spawn("neighbor_2", Vector3(4.9, 0.375, -3.5), 0.0, "idle")

@@ -50,7 +50,7 @@ EMOJI = {
     "broom": ("\U0001F9F9", None),
     "cart": ("\U0001F6D2", None),
     "register": ("\U0001F4B3", None),
-    "music": ("\U0001F3B5", None),
+    "music": ("\U0001F3B5", (88, 96, 230)),
     "bulb": ("\U0001F4A1", None),
     "sun": ("☀️", None),
     "moon": ("\U0001F319", None),

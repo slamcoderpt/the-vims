@@ -9,13 +9,15 @@ extends Control
 const UI := preload("res://scripts/ui/ui_kit.gd")
 const TAIL_H := 11.0
 ## Action bubble metrics (design px at 1672x941), sized to ref1's Work/Paint.
-const A_H := 50.0
+const A_H := 55.0
 const A_H_PLAIN := 44.0
 const A_ICON := 31.0
 const A_TEXT_X := 51.0
 const A_FONT := 18
 const A_PAD_R := 15.0
-const A_MIN_W := 146.0
+const A_MIN_W := 150.0
+## Progress track: a mid grey so the empty part reads (ref1 Work / Practice).
+const BAR_TRACK := Color("cbd1db")
 
 var kind := "action"
 var text := ""
@@ -156,13 +158,13 @@ func _draw() -> void:
 			if icon_tex:
 				draw_texture_rect(icon_tex, Rect2(11, (size.y - A_ICON) * 0.5, A_ICON, A_ICON), false)
 			var tall := progress >= 0.0 or sub != ""
-			var ty := 23.0 if tall else 28.0
+			var ty := 25.0 if tall else 28.0
 			draw_string(f, Vector2(A_TEXT_X, ty), text, HORIZONTAL_ALIGNMENT_LEFT, -1, A_FONT, UI.INK)
 			if sub != "" and progress < 0.0:
-				draw_string(UI.font(700), Vector2(A_TEXT_X, 41), sub, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, UI.INK_SOFT)
+				draw_string(UI.font(700), Vector2(A_TEXT_X, 44), sub, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, UI.INK_SOFT)
 			if progress >= 0.0:
 				# full-width rounded track under the label (ref1 "Work"/"Paint")
-				UI.draw_bar(self, Rect2(A_TEXT_X, 31, size.x - A_TEXT_X - A_PAD_R, 8.0), _shown_progress, bar_color, UI.TRACK)
+				UI.draw_bar(self, Rect2(A_TEXT_X, 34, size.x - A_TEXT_X - A_PAD_R, 10.0), _shown_progress, bar_color, BAR_TRACK)
 		"speech":
 			var x := 14.0
 			if icon_tex:

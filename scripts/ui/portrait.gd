@@ -55,13 +55,26 @@ void fragment() {
 	bg += vec3(1.0, 0.93, 0.8) * 0.16 * smoothstep(0.2, 0.0, length(bu - vec2(0.12 * asp, 0.2 + seed * 0.2)));
 	bg += vec3(1.0, 0.97, 0.9) * 0.12 * smoothstep(0.26, 0.0, length(bu - vec2(0.92 * asp, 0.14 + seed * 0.1)));
 	bg -= vec3(0.06, 0.05, 0.03) * smoothstep(0.3, 0.0, length(bu - vec2(0.85 * asp, 0.8 - seed * 0.2)));
+	// Soft drop shadow of the bust on the backdrop (down-right, 4 taps) so
+	// the silhouette separates from the backdrop like a studio photo.
+	vec2 so = vec2(0.035, 0.025);
+	vec2 sb = vec2(0.02, 0.016);
+	float sh = (texture(TEXTURE, UV - so + vec2(sb.x, sb.y)).a + texture(TEXTURE, UV - so - vec2(sb.x, sb.y))
+		.a + texture(TEXTURE, UV - so + vec2(-sb.x, sb.y)).a + texture(TEXTURE, UV - so + vec2(sb.x, -sb.y)).a) * 0.25;
+	bg *= 1.0 - 0.2 * sh;
 	vec3 fg = t.rgb / max(t.a, 0.001);
 	// A touch more saturation + contrast so skin stays warm, not chalky.
 	float l = dot(fg, vec3(0.299, 0.587, 0.114));
-	fg = clamp(mix(vec3(l), fg, 1.05), 0.0, 1.0);
+	// Vibrance: lift dull tones (skin, hair) so faces stay warm, but calm
+	// already-loud ones (plaid red, hat pastels) so nothing looks garish.
+	float sat = max(fg.r, max(fg.g, fg.b)) - min(fg.r, min(fg.g, fg.b));
+	fg = clamp(mix(vec3(l), fg, mix(1.14, 0.9, smoothstep(0.35, 0.8, sat))), 0.0, 1.0);
 	fg = clamp((fg - 0.5) * 1.08 + 0.5, 0.0, 1.0);
 	// Soft studio key from the upper left: a gentle falloff across the bust.
-	fg *= mix(1.07, 0.9, clamp(dot(UV, vec2(0.4, 0.6)), 0.0, 1.0));
+	fg *= mix(1.06, 0.9, clamp(dot(UV, vec2(0.4, 0.6)), 0.0, 1.0));
+	// Studio falloff below the chin: shirt and shoulders sink a little so
+	// the face is the brightest, most contrasty part of the card.
+	fg *= 1.0 - 0.16 * smoothstep(0.66, 1.0, UV.y);
 	vec3 c = mix(bg, fg, t.a);
 	vec2 p = (UV - 0.5) * rect_size;
 	vec2 q = abs(p) - (rect_size * 0.5 - vec2(radius));

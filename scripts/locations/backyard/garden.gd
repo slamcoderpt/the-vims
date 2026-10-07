@@ -43,7 +43,7 @@ const MOUNDS := [
 	[6.9, 3.45, 1.5, 0.7, 1.2],      # right of the fire pit
 	[8.6, 2.0, 0.9, 1.0, 1.1],
 	[-4.4, 2.35, 1.1, 0.6, 1.2],     # left of the table, in front of the patio
-	[-3.1, 3.25, 0.8, 0.45, 1.1],
+	[-3.1, 3.75, 0.9, 0.4, 1.1],
 	[1.3, 3.35, 0.75, 0.4, 1.15],    # in front of the near chairs
 	[5.2, 4.05, 1.0, 0.5, 1.15],     # in front of the fire pit
 	[-1.4, -1.6, 0.9, 0.4, 1.0],   # behind the table, by the deck steps
@@ -438,7 +438,7 @@ func _fences() -> void:
 	_fence_side(vb, -10.0, 4.85, 7.5)
 	# Low decorative picket border along the front flower bed (the white
 	# pickets that frame the bottom of the bbq shot).
-	_fence_run(vb, -6.6, -1.2, 3.9, false, 13)
+	_fence_run(vb, -5.4, 0.2, 3.2, false, 13)
 	V.inst(vb, root, V.SIZE_FINE, Vector3.ZERO, 0.0, Vector3.ZERO, true, true, "Fence")
 
 

@@ -11,7 +11,7 @@ const LOOKS := {
 		"top": "plaid", "top_color": Color(0.80, 0.13, 0.12), "top_color2": Color(0.16, 0.05, 0.06),
 		"tee": Color(0.2, 0.2, 0.23), "sleeves": "long", "untucked": true,
 		"bottom": "jeans", "bottom_color": Color(0.21, 0.31, 0.55),
-		"shoes": Color(0.36, 0.22, 0.12), "shoe_style": "boot",
+		"shoes": Color(0.27, 0.16, 0.09), "shoe_style": "boot",
 	},
 	"bunny_girl": {
 		"body": "child", "skin": Color(0.99, 0.80, 0.68), "lashes": true,

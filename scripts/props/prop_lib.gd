@@ -29,6 +29,7 @@ const Furn := preload("res://scripts/props/furniture.gd")
 const Decor := preload("res://scripts/props/decor.gd")
 const Outdoor := preload("res://scripts/props/outdoor.gd")
 const Detail := preload("res://scripts/props/detail.gd")
+const RoomDecor := preload("res://scripts/props/room_decor.gd")
 const VU := preload("res://scripts/props/vox_util.gd")
 const Mesher := preload("res://scripts/props/mesher.gd")
 
@@ -44,7 +45,7 @@ static var _night_ext_mat: StandardMaterial3D
 static func _ensure_index() -> void:
 	if not _index.is_empty():
 		return
-	for lib in [Furn, Decor, Outdoor, Detail]:
+	for lib in [Furn, Decor, Outdoor, Detail, RoomDecor]:
 		for m in lib.get_script_method_list():
 			var n: String = m.name
 			if n.begins_with("m_"):
