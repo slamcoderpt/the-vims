@@ -189,6 +189,11 @@ func _collect(root: Node3D) -> PackedFloat32Array:
 					kind = 1
 				elif n.y < -0.7:
 					kind = 2
+				elif (maxx - minx) > 1.5 and (maxz - minz) > 1.5:
+					# A big slanted card (sky backdrop, light shaft, billboard):
+					# voxel walls are axis-aligned, so this is not geometry to
+					# walk around. (Rasterising its bbox would block the lot.)
+					continue
 				else:
 					# Vertical face: nudge into the solid so it lands in the right cell.
 					minx -= n.x * 0.01

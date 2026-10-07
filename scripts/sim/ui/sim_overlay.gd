@@ -19,8 +19,8 @@ const GAP := 7.0
 const CHIP := 34.0
 const PANEL_W := 318.0
 const TOAST_TTL := 3.2
-const TAB_W := 84.0
-const TABS := [["mood", "Mood", 12.0], ["skills", "Skills", 100.0], ["rels", "Friends", 188.0]]
+const TAB_W := 64.0
+const TABS := [["mood", "Mood", 10.0], ["skills", "Skills", 77.0], ["rels", "Friends", 144.0], ["wishes", "Wishes", 211.0]]
 const REL_ROWS := 7
 const HUE_SHADER := """
 shader_type canvas_item;
@@ -57,7 +57,7 @@ var root: Control
 var strip: Control
 var panel: Control
 var toasts: Control
-var panel_tab := "mood"   # "mood" | "skills" | "rels"
+var panel_tab := "mood"   # "mood" | "skills" | "rels" | "wishes"
 var panel_open := false
 
 var _hits: Array = []        # [Rect2 (global), kind, arg]
@@ -119,6 +119,7 @@ func _ready() -> void:
 	Game.skill_changed.connect(func(_i, _s, _l): _dirty())
 	Game.relationship_changed.connect(func(_a, _b, _v): _dirty())
 	Game.household_changed.connect(_dirty)
+	Game.wishes_changed.connect(func(_i): _dirty())
 	Game.mode_changed.connect(_on_mode)
 	Game.notify.connect(toast)
 	get_viewport().size_changed.connect(_layout)
@@ -280,6 +281,12 @@ func _on_hit(kind: String, arg) -> void:
 			open_panel("skills")
 		"rels":
 			open_panel("rels")
+		"wishes":
+			open_panel("wishes")
+		"wish":
+			var ws: Array = Game.wishes(Game.selected)
+			if int(arg) < ws.size():
+				Game.toggle_promise(Game.selected, ws[int(arg)].id)
 		"tab":
 			panel_tab = str(arg)
 			panel.queue_redraw()
@@ -407,6 +414,21 @@ func _draw_strip() -> void:
 	if ric:
 		strip.draw_texture_rect(ric, Rect2(rb.position + Vector2(6, 6), Vector2(22, 22)), false)
 	_add_hit(strip, rb, "rels")
+	# wishes button (gold star, with a count of promised wishes)
+	var wb := Rect2(rb.end.x + 6, y, 34, 34)
+	strip.draw_style_box(_card_dark, wb)
+	var wic := UI.icon("star")
+	if wic:
+		strip.draw_texture_rect(wic, Rect2(wb.position + Vector2(6, 6), Vector2(22, 22)), false)
+	var np := 0
+	for w in Game.wishes(sel):
+		if w.get("promised", false):
+			np += 1
+	if np > 0:
+		var bc := wb.position + Vector2(wb.size.x - 3, 3)
+		strip.draw_circle(bc, 8.0, Color("f0a43a"))
+		strip.draw_string(UI.font(800), bc + Vector2(-4, 4.5), str(np), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color.WHITE)
+	_add_hit(strip, wb, "wishes")
 	if panel.visible:
 		_panel_hits()
 		_add_hit(panel, Rect2(Vector2.ZERO, panel.size), "panel")
@@ -457,13 +479,18 @@ func _panel_rows() -> int:
 		return maxi(1, Game.skills_list(sel).size())
 	if panel_tab == "rels":
 		return clampi(Game.rel_list(sel).size(), 1, REL_ROWS)
+	if panel_tab == "wishes":
+		return maxi(1, Game.wishes(sel).size())
 	return maxi(1, Game.moodlets(sel).size())
 
 
 func _panel_hits() -> void:
 	for t in TABS:
 		_add_hit(panel, Rect2(t[2], 12, TAB_W, 30), "tab", t[0])
-	_add_hit(panel, Rect2(PANEL_W - 40, 12, 30, 30), "close")
+	_add_hit(panel, Rect2(PANEL_W - 36, 12, 28, 30), "close")
+	if panel_tab == "wishes":
+		for k in Game.wishes(Game.selected).size():
+			_add_hit(panel, Rect2(8, 56 + k * 44.0, PANEL_W - 16, 44.0), "wish", k)
 
 
 func _draw_panel() -> void:
@@ -483,7 +510,7 @@ func _draw_panel() -> void:
 		panel.draw_style_box(_tab_on if on else _tab_off, r)
 		panel.draw_string(f, r.position + Vector2(0, 21), t[1], HORIZONTAL_ALIGNMENT_CENTER, r.size.x, 14, UI.WHITE if on else UI.INK_SOFT)
 	# close x
-	var cc := Vector2(PANEL_W - 25, 27)
+	var cc := Vector2(PANEL_W - 21, 27)
 	panel.draw_circle(cc, 12, Color("eef1f6"))
 	panel.draw_line(cc + Vector2(-4.5, -4.5), cc + Vector2(4.5, 4.5), UI.INK_SOFT, 2.0, true)
 	panel.draw_line(cc + Vector2(-4.5, 4.5), cc + Vector2(4.5, -4.5), UI.INK_SOFT, 2.0, true)
@@ -516,6 +543,8 @@ func _draw_panel() -> void:
 		panel.draw_string(f7, Vector2(PANEL_W - 170, y + 33), "Skills & pay x%.2f" % Game.mood_mult(sel), HORIZONTAL_ALIGNMENT_RIGHT, 156, 12, UI.INK_SOFT)
 	elif panel_tab == "rels":
 		_draw_rels(sel, y, row_h)
+	elif panel_tab == "wishes":
+		_draw_wishes(sel, y, row_h)
 	else:
 		var sk: Array = Game.skills_list(sel)
 		if sk.is_empty():
@@ -577,6 +606,49 @@ func _draw_rels(sel: int, y: float, row_h: float) -> void:
 	var more := list.size() - shown
 	var foot := "Socialize to unlock new interactions" if more <= 0 else "+%d more · socialize to unlock interactions" % more
 	panel.draw_string(f7, Vector2(16, y + 33), foot, HORIZONTAL_ALIGNMENT_LEFT, PANEL_W - 32, 12, UI.INK_SOFT)
+
+
+## Wishes tab: up to three wishes; tap one to promise it (gold ring, pays
+## 1.5x). Footer: lifetime happiness.
+func _draw_wishes(sel: int, y: float, row_h: float) -> void:
+	var f := UI.font(800)
+	var f7 := UI.font(700)
+	var list: Array = Game.wishes(sel)
+	if list.is_empty():
+		panel.draw_string(f7, Vector2(16, y + 26), "%s is content right now" % Game.household[sel].name, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, UI.INK_SOFT)
+	var gold := Color("f0a43a")
+	for w in list:
+		var promised: bool = w.get("promised", false)
+		var c := Vector2(30, y + row_h * 0.5)
+		if promised:
+			panel.draw_rect(Rect2(8, y + 2, PANEL_W - 16, row_h - 4), Color(1.0, 0.85, 0.45, 0.25))
+		panel.draw_circle(c, 16.0, gold if promised else Color("b8c2d3"))
+		panel.draw_circle(c, 13.0, Color(1, 1, 1, 0.96))
+		var ic := UI.icon(w.get("icon", "star"))
+		if ic:
+			panel.draw_texture_rect(ic, Rect2(c - Vector2(10, 10), Vector2(20, 20)), false)
+		panel.draw_string(f, Vector2(54, y + 20), w.label, HORIZONTAL_ALIGNMENT_LEFT, PANEL_W - 54 - 70, 14, UI.INK)
+		var sub := "Promised!  x1.5" if promised else "Tap to promise"
+		if w.kind == "earn":
+			sub = "$%d of $%d" % [int(w.get("have", 0)), int(w.n)] + ("  · promised" if promised else "")
+		panel.draw_string(f7, Vector2(54, y + 37), sub, HORIZONTAL_ALIGNMENT_LEFT, PANEL_W - 54 - 70, 11, gold.darkened(0.2) if promised else UI.INK_SOFT)
+		var pts := int(w.get("reward", 0)) * (3 if promised else 2) / 2
+		panel.draw_string(f, Vector2(PANEL_W - 76, y + 28), "+%d" % pts, HORIZONTAL_ALIGNMENT_RIGHT, 60, 14, gold.darkened(0.15))
+		y += row_h
+	panel.draw_line(Vector2(14, y + 6), Vector2(PANEL_W - 14, y + 6), Color("e3e7ee"), 1.0)
+	var st := UI.icon("star")
+	if st:
+		panel.draw_texture_rect(st, Rect2(16, y + 16, 22, 22), false)
+	panel.draw_string(f, Vector2(44, y + 33), "Lifetime Happiness  %s" % _thousands(Game.lth(sel)), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, UI.INK)
+
+
+static func _thousands(n: int) -> String:
+	var t := str(absi(n))
+	var out := ""
+	while t.length() > 3:
+		out = "," + t.substr(t.length() - 3) + out
+		t = t.substr(0, t.length() - 3)
+	return ("-" if n < 0 else "") + t + out
 
 
 func _draw_toasts() -> void:

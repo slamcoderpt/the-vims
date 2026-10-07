@@ -39,11 +39,11 @@ func build(parent: Node3D, pos: Vector3, rot: float) -> void:
 	for p: Vector3i in vb.glow:
 		if p.y > 70 and posmod(p.x, 2) == 0:
 			glow_points.append([xf * ((Vector3(p) + Vector3(0.5, 0.5, 0.5) - origin) * U), 0.45, Color(1.0, 0.75, 0.4)])
-	performer_spot = xf * Vector3(-0.85, DECK * U, 0.45)
+	performer_spot = xf * Vector3(-1.25, DECK * U, 0.5)
 	_notes(node)
 	# Stage wash: a warm key light in front of the performer so he reads
 	# front-lit against the backdrop (round 3: guitarist was a dark blob).
-	K.light(node, Vector3(-0.6, DECK * U + 1.7, 2.0), Color(1.0, 0.82, 0.6), 2.6, 3.6, 1.0)
+	K.light(node, Vector3(-1.1, DECK * U + 1.8, 2.2), Color(1.0, 0.82, 0.6), 2.6, 3.6, 1.0)
 
 
 ## Little floating music notes beside the guitarist.
@@ -55,7 +55,7 @@ func _notes(n: Node3D) -> void:
 	K.pattern(vb, note, 0, 0, 0, {"#": Color("fffaf0")}, true)
 	K.pattern(vb, dbl, 6, 7, 0, {"#": Color("fffaf0")}, true)
 	K.pattern(vb, note, 13, 3, 0, {"#": Color("fffaf0")}, true)
-	var mi := K.inst(n, vb, 0.07, Vector3(-2.75, DECK * U + 1.55, 1.2), 0.0, false)
+	var mi := K.inst(n, vb, 0.07, Vector3(-2.65, DECK * U + 1.75, 1.2), 0.0, false)
 	mi.name = "MusicNotes"
 
 
@@ -90,6 +90,21 @@ func _truss(vb: VoxelBuilder) -> void:
 	K.box(vb, 0, top, 2, W, 3, 3, dark)
 	K.box(vb, 0, top, 2, 3, 3, D - 2, dark)
 	K.box(vb, W - 3, top, 2, 3, 3, D - 2, dark)
+	# Dark pitched roof over the truss (reads as a covered bandstand).
+	for z in range(-1, D + 3):
+		var t := float(z + 1) / float(D + 3)
+		var y := top + 3 + int(round(lerpf(7.0, 0.0, t)))
+		for x in range(-3, W + 3):
+			var c := K.shade(Color("3a2e2a"), 0.86 + K.hs(x / 3, z, 5) * 0.22)
+			if posmod(z, 4) == 0:
+				c = K.shade(c, 0.82)
+			vb.set_v(Vector3i(x, y, z), c)
+			vb.set_v(Vector3i(x, y - 1, z), Color("2a2220"))
+	# Fascia board along the front edge, with a row of warm bulbs under it.
+	K.box(vb, -3, top + 1, D + 2, W + 6, 3, 1, Color("5a2a22"))
+	for x in range(-2, W + 3, 4):
+		vb.set_v(Vector3i(x, top, D + 2), Color("ffd060"), true)
+		vb.set_v(Vector3i(x, top - 1, D + 2), Color("ffb848"), true)
 	# Zig-zag truss lacing on the front beam.
 	for x in range(0, W, 2):
 		vb.set_v(Vector3i(x, top - 1 - posmod(x / 2, 3), D - 2), Color("4a4440"))
@@ -124,8 +139,10 @@ func _backdrop(vb: VoxelBuilder) -> void:
 		if posmod(q.x, 4) == 0:
 			f *= 0.75
 		return K.shade(Color("5a3a26"), f))
-	var bx0 := W / 2 - 22
-	var bx1 := W / 2 + 22
+	# Banner sits right of centre so the guitarist (left) reads against the
+	# dark planks and drapes rather than a flat light backdrop.
+	var bx0 := W / 2 - 4
+	var bx1 := W / 2 + 34
 	for x in range(bx0, bx1):
 		for y in range(DECK + 7, 76):
 			var c := Color("f4e6c8")
@@ -140,7 +157,7 @@ func _backdrop(vb: VoxelBuilder) -> void:
 		var drop := 3 - absi(k - 4) if absi(k - 4) < 3 else 0
 		for d in drop:
 			vb.set_v(Vector3i(x, DECK + 6 - d, 3), Color("d2541e"))
-	K.maple(vb, W / 2 - 1, 38, 4, Color("c8301a"), 3)
+	K.maple(vb, W / 2 + 14, 38, 4, Color("c8301a"), 3)
 	# Side drapes.
 	for x in [3, W - 9]:
 		K.box(vb, x, DECK, 3, 6, 68, 2, func(q: Vector3i) -> Color:
@@ -159,10 +176,6 @@ func _gear(vb: VoxelBuilder) -> void:
 	# Small monitor wedge + amp.
 	K.box(vb, W / 2 + 12, DECK, D - 10, 10, 6, 6, Color("2e2a28"))
 	K.box(vb, W / 2 + 13, DECK + 1, D - 5, 8, 4, 1, Color("4a4642"))
-	# Mic stand.
-	K.box(vb, W / 2 - 8, DECK, D - 9, 3, 1, 3, Color("2a2826"))
-	K.box(vb, W / 2 - 7, DECK + 1, D - 8, 1, 22, 1, Color("6a6a6a"))
-	K.box(vb, W / 2 - 7, DECK + 23, D - 8, 1, 2, 2, Color("2a2826"))
 	# Drum kit at the back.
 	K.cyl(vb, W / 2 - 18.0, DECK, 14.0, 5.0, 8, func(q: Vector3i) -> Color:
 		return Color("c8301e") if q.y < DECK + 6 else Color("f2eee6"))

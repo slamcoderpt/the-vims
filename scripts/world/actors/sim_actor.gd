@@ -75,6 +75,7 @@ var _attach := {}      # bone name -> BoneAttachment3D
 var _frames := 0
 var _s := 1.0          # resolved body scale
 var _cam_a := 0.0      # signed yaw (rad) from the actor's forward to the camera
+var _brush_left := false  # paint: brush held in the left hand (camera on the right)
 
 # Bone indices (humans).
 var b_root := -1
@@ -177,11 +178,18 @@ func _apply_scale() -> void:
 	_s = body_scale
 	if _s <= 0.0:
 		_s = AUTO_SCALE.get(_meta.kind, 1.0)
+	else:
+		# Locations pass a "life size" scale; the hero household never drops
+		# below a legible minimum (ref1: chunky chibi sims about half the wall
+		# height, the beagle as long as a kid) so faces and silhouettes read
+		# on a phone even in a zoomed-out house view.
+		_s = maxf(_s, HERO_MIN.get(look, 0.0))
 	skeleton.scale = Vector3.ONE * _s
 	walk_speed = (1.5 if _dog else (1.1 if _meta.kind == "child" else 1.3)) * sqrt(_s)
 
 
 const AUTO_SCALE := {"adult": 1.35, "child": 1.35, "dog": 1.45}
+const HERO_MIN := {"dad": 1.22, "bunny_girl": 1.25, "cat_girl": 1.25, "beagle": 1.18}
 
 
 func kind() -> String:
@@ -479,7 +487,10 @@ func _human_pose() -> void:
 			var tap2 := sin(t * 11.0 + 1.3)
 			var body_yaw := 0.0
 			if _seated():
-				body_yaw = _glance(1.3, 0.08, 0.17)
+				# Office chairs swivel: the whole body turns part way toward
+				# the player and the head the rest, so beard, nose and eye
+				# read in profile / 3/4 even from behind the desk.
+				body_yaw = _glance(1.7, 0.18, 0.15)
 				# Scoot to the front of the seat, lean in toward the screen.
 				_tgt_pos.z += 0.1 / _s
 				_ab(b_torso, 0.2, 0.0, 0.0)
@@ -498,19 +509,33 @@ func _human_pose() -> void:
 			_ab(b_head, 0.2, 0.05 * sin(t * 0.6), 0.0)
 			_cheat(0.7, 0.25, 0.3, 0.9)
 		"paint":
-			# Facing the easel, brush arm raised up to the canvas, palette held
-			# low in the other hand; the head turns part way to the player.
+			# Facing the easel, brush arm reaching forward-up to the canvas,
+			# palette held low in the other hand; the head turns part way to
+			# the player. The brush goes in the hand nearer the camera so the
+			# reaching arm reads against the body (it stays below the face).
 			var dab := sin(t * 3.2)
 			var dab2 := sin(t * 1.3 + _phase)
-			_sb(b_arm_r, -2.05 + 0.1 * dab, 0.12 * dab2, -0.12)
-			_sb(b_fore_r, -0.25 - 0.2 * dab)
-			_sb(b_arm_l, -0.4, 0.0, 0.28)
-			_sb(b_fore_l, -1.05)
-			_ab(b_head, 0.02, 0.05 * dab2, 0.06 * sin(t * 0.7))
-			_ab(b_torso, 0.08, 0.0, 0.0)
-			var py := _glance(1.15, 0.04, 0.12)
-			_ab(b_arm_r, 0.0, -py, 0.0)
-			_ab(b_arm_l, 0.0, -py, 0.0)
+			var want_left := _cam_a > 0.05
+			if want_left != _brush_left:
+				_brush_left = want_left
+				_update_props()
+			var m := -1.0 if _brush_left else 1.0
+			var bi := b_arm_l if _brush_left else b_arm_r
+			var bf := b_fore_l if _brush_left else b_fore_r
+			var pi_ := b_arm_r if _brush_left else b_arm_l
+			var pf := b_fore_r if _brush_left else b_fore_l
+			_sb(bi, -1.95 + 0.07 * dab, (0.08 + 0.05 * dab2) * m, 0.1 * m)
+			_sb(bf, -0.06 - 0.12 * dab)
+			if _seated():
+				# Perch on the front edge of the stool, leaning in to the canvas.
+				_tgt_pos.z += 0.09 / _s
+			_sb(pi_, -0.42, 0.0, 0.26 * m)
+			_sb(pf, -1.1)
+			_ab(b_head, 0.04, 0.05 * dab2, 0.06 * sin(t * 0.7))
+			_ab(b_torso, 0.16, 0.0, 0.0)
+			var py := _glance(1.2, 0.05, 0.13)
+			_ab(bi, 0.0, -py, 0.0)
+			_ab(pi_, 0.0, -py, 0.0)
 		"talk":
 			var g := sin(t * 2.3 + _phase)
 			_sb(b_arm_r, -0.45 + 0.2 * g, 0.0, -0.15)
@@ -549,7 +574,7 @@ func _human_pose() -> void:
 			_sb(b_fore_r, -0.85 + 0.15 * pl)
 			_ab(b_torso, 0.04)
 			# Head tips back up so the face stays visible from above.
-			_ab(b_head, -0.22, 0.14 * sin(t * 0.7), 0.08 * sin(t * 1.1))
+			_ab(b_head, -0.3, 0.12 * sin(t * 0.7), 0.08 * sin(t * 1.1))
 
 
 func _sit_chair() -> void:
@@ -649,10 +674,12 @@ func _dog_pose() -> void:
 			# Lying on the rug gnawing a chew toy held across the mouth.
 			var ly := _dog_lie()
 			var chew := sin(t * 7.0)
-			_sb(b_head, 0.16 + 0.05 * maxf(0.0, chew), ly + 0.12 * sin(t * 0.9 + _phase), 0.1 * sin(t * 1.7))
+			# Head up and turned to the player so the blaze, both eyes and the
+			# nose read; ears splay out so they frame the face, not cover it.
+			_sb(b_head, -0.04 + 0.05 * maxf(0.0, chew), ly + 0.1 * sin(t * 0.9 + _phase), 0.1 * sin(t * 1.7))
 			_sb(b_tail, -0.9, 0.0, 0.55 * sin(t * 14.0))
-			_sb(b_ear_l, 0.05 * chew, 0.0, 0.1)
-			_sb(b_ear_r, 0.05 * chew, 0.0, -0.1)
+			_sb(b_ear_l, 0.05 * chew, 0.0, 0.3)
+			_sb(b_ear_r, 0.05 * chew, 0.0, -0.3)
 		"bow":
 			var hop := absf(sin(t * 5.0))
 			_sb(b_body, 0.32)
@@ -692,10 +719,10 @@ func _dog_lie() -> float:
 			if r.length() > 0.01 and c.length() > 0.01:
 				r = r.normalized()
 				c = c.normalized()
-				var want := (r * 0.95 + c * 0.3).normalized()
+				var want := (r * 0.95 + c * 0.25).normalized()
 				var want_yaw := atan2(want.x, want.z)
 				_tgt_root_rot.y = wrapf(want_yaw - global_rotation.y, -PI, PI)
-				look_yaw = clampf(wrapf(atan2(c.x, c.z) - want_yaw, -PI, PI), -0.6, 0.6)
+				look_yaw = clampf(wrapf(atan2(c.x, c.z) - want_yaw, -PI, PI), -0.85, 0.85)
 	# A lying dog's anchor sits at its haunches: the chest, paws and head
 	# reach forward (toward the toy) instead of centring on the spot.
 	_tgt_root_pos = Basis(Vector3.UP, _tgt_root_rot.y) * Vector3(0.0, 0.0, 6.0 * vs)
@@ -731,12 +758,16 @@ func _update_props() -> void:
 	var want: Array = (_DOG_PROPS_FOR.get(pose, []) if _dog else _PROPS_FOR.get(_base_pose(), []))
 	for n: String in _props:
 		(_props[n] as Node3D).visible = false
+	var swap := _brush_left and not _dog and _base_pose() == "paint"
 	for entry: Array in want:
 		var pname: String = entry[0]
 		var bone: String = entry[1]
-		if not _props.has(pname):
-			_props[pname] = _make_prop(pname, bone)
-		(_props[pname] as Node3D).visible = true
+		if swap:
+			bone = "fore_l" if bone == "fore_r" else "fore_r"
+		var key := pname + "@" + bone
+		if not _props.has(key):
+			_props[key] = _make_prop(pname, bone)
+		(_props[key] as Node3D).visible = true
 
 
 func _make_prop(pname: String, bone: String) -> MeshInstance3D:

@@ -42,6 +42,8 @@ signal queue_cancel_requested(index: int, slot: int)
 signal relationship_changed(a: String, b: String, value: float)
 ## Two people reached a new relationship level ("Friend", "Good Friend"...).
 signal relationship_level_changed(a: String, b: String, level: String)
+## A member's wishes (Sims 3 wishes / promises) or lifetime happiness changed.
+signal wishes_changed(index: int)
 
 const DAY_NAMES := ["Mon.", "Tue.", "Wed.", "Thu.", "Fri.", "Sat.", "Sun."]
 const SEASONS := ["Spring", "Summer", "Autumn", "Winter"]
@@ -167,6 +169,10 @@ func _ensure_member(m: Dictionary) -> void:
 		m["queue_view"] = []
 	if not m.has("skills"):
 		m["skills"] = {}
+	if not m.has("wishes"):
+		m["wishes"] = []
+	if not m.has("lth"):
+		m["lth"] = 0
 
 
 func set_tasks(list: Array) -> void:
@@ -637,3 +643,87 @@ func game_minutes(delta: float) -> float:
 	if frozen or speed == 0:
 		return 0.0
 	return delta / SECONDS_PER_MINUTE * SPEED_MULT[speed]
+
+
+# =================================================================== wishes
+
+## Promised wishes per member (Sims 3 lets you promise a few at a time).
+const MAX_PROMISED := 2
+
+## A member's wishes: [{id, label, icon, kind, arg, n, have, reward, promised, born}].
+func wishes(i: int) -> Array:
+	if i < 0 or i >= household.size():
+		return []
+	_ensure_member(household[i])
+	return household[i].wishes
+
+
+## Lifetime happiness points earned from fulfilled wishes.
+func lth(i: int) -> int:
+	if i < 0 or i >= household.size():
+		return 0
+	return int(household[i].get("lth", 0))
+
+
+func add_wish(i: int, w: Dictionary) -> void:
+	if i < 0 or i >= household.size():
+		return
+	_ensure_member(household[i])
+	household[i].wishes.append(w)
+	wishes_changed.emit(i)
+
+
+func remove_wish(i: int, id: String) -> void:
+	var list := wishes(i)
+	for k in list.size():
+		if list[k].id == id:
+			list.remove_at(k)
+			wishes_changed.emit(i)
+			return
+
+
+## Promise / un-promise a wish. Returns the new promised state.
+func toggle_promise(i: int, id: String) -> bool:
+	var list := wishes(i)
+	var n := 0
+	for w in list:
+		if w.get("promised", false):
+			n += 1
+	for w in list:
+		if w.id != id:
+			continue
+		if w.get("promised", false):
+			w.promised = false
+		elif n < MAX_PROMISED:
+			w.promised = true
+		else:
+			notify.emit("Only %d promises at a time" % MAX_PROMISED, "star")
+		if w.promised:
+			add_moodlet(i, "hopeful", "Hopeful", "star", 5.0, 0.0, "Promised: %s" % w.label)
+		elif not list.any(func(x): return x.get("promised", false)):
+			remove_moodlet(i, "hopeful")
+		wishes_changed.emit(i)
+		return w.promised
+	return false
+
+
+## A wish came true: lifetime happiness + a moodlet. Returns the points.
+func fulfil_wish(i: int, id: String) -> int:
+	var list := wishes(i)
+	for k in list.size():
+		var w: Dictionary = list[k]
+		if w.id != id:
+			continue
+		var pts := int(w.get("reward", 250))
+		if w.get("promised", false):
+			pts = int(pts * 1.5)
+		household[i].lth = lth(i) + pts
+		list.remove_at(k)
+		var promised: bool = w.get("promised", false)
+		add_moodlet(i, "wish_" + id, "Fulfilled a Wish" if not promised else "Promise Kept!", "star", 15.0 if promised else 8.0, 6.0, w.label)
+		if not list.any(func(x): return x.get("promised", false)):
+			remove_moodlet(i, "hopeful")
+		notify.emit("%s's wish came true: %s  +%d" % [household[i].name, w.label, pts], "star")
+		wishes_changed.emit(i)
+		return pts
+	return 0

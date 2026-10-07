@@ -4,9 +4,9 @@ extends RefCounted
 
 const LOOKS := {
 	"dad": {
-		"body": "big", "skin": Color(1.0, 0.80, 0.66),
-		"hair": Color(0.50, 0.29, 0.15), "hair_style": "shaggy", "beard": "full",
-		"beard_color": Color(0.27, 0.15, 0.08),
+		"body": "big", "skin": Color(1.0, 0.84, 0.72),
+		"hair": Color(0.44, 0.24, 0.12), "hair_style": "shaggy", "beard": "full",
+		"beard_color": Color(0.25, 0.13, 0.07),
 		"brow": Color(0.26, 0.14, 0.08), "eye": Color(0.3, 0.18, 0.1),
 		"top": "plaid", "top_color": Color(0.80, 0.13, 0.12), "top_color2": Color(0.16, 0.05, 0.06),
 		"tee": Color(0.2, 0.2, 0.23), "sleeves": "long", "untucked": true,
@@ -37,8 +37,8 @@ const LOOKS := {
 	},
 	"beagle": {
 		"species": "dog",
-		"tan": Color(0.82, 0.52, 0.25), "saddle": Color(0.50, 0.29, 0.13),
-		"white": Color(0.98, 0.96, 0.92), "ear": Color(0.50, 0.27, 0.11),
+		"tan": Color(0.86, 0.55, 0.26), "saddle": Color(0.34, 0.19, 0.09),
+		"white": Color(0.99, 0.97, 0.93), "ear": Color(0.44, 0.23, 0.09),
 		"collar": Color(0.86, 0.18, 0.18),
 	},
 	# --- Neighbours / townsfolk -------------------------------------------

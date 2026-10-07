@@ -26,20 +26,25 @@ func _lp(cell: Vector3) -> Vector3:
 
 
 func build(parent: Node3D) -> void:
-	treats = _place(parent, "TreatsStall", _treats_stall(), Vector3(-2.6, 0, 0.0), 40.0)
+	# Layout (round 5): FALL TREATS on the left edge, game booth just right
+	# of the central walkway, crafts table bottom-right, striped side stalls
+	# receding along the right side. The walkway from the camera to the
+	# fountain (x -1.5..1.5) stays open cobblestone.
+	treats = _place(parent, "TreatsStall", _treats_stall(), Vector3(-4.9, 0, -2.0), 28.0)
 	var sc := Vector3(TW * 0.5 + 4.5, (SIGN_Y0 + SIGN_Y1) * 0.5 - 0.3, TD + 1.06)
 	_sign(treats, "FALL TREATS", _lp(sc), 0.0031, 0.0)
 	vendor_spot = treats.transform * _lp(Vector3(16.0, 0.0, TD - 14.0))
-	game = _place(parent, "GameStall", _game_stall(), Vector3(2.3, 0, -1.3), -10.0)
-	crafts = _place(parent, "CraftsStall", _crafts_table(), Vector3(5.6, 0, 2.2), -25.0)
-	_place(parent, "RedStall", _side_stall(RED, CREAM, 0), Vector3(6.9, 0, -2.6), -38.0)
-	_place(parent, "BlueStall", _side_stall(BLUE, CREAM, 1), Vector3(9.2, 0, -7.4), -60.0)
+	game = _place(parent, "GameStall", _game_stall(), Vector3(2.6, 0, -3.4), -14.0)
+	crafts = _place(parent, "CraftsStall", _crafts_table(), Vector3(6.4, 0, 1.6), -30.0)
+	_place(parent, "RedStall", _side_stall(RED, CREAM, 0), Vector3(8.4, 0, -7.6), -42.0)
+	_place(parent, "BlueStall", _side_stall(BLUE, CREAM, 1), Vector3(11.6, 0, -12.0), -55.0)
+	_place(parent, "GreenStall", _side_stall(Color("3f8a4a"), CREAM, 2), Vector3(-8.6, 0, -10.5), 50.0)
 	# Chalkboards.
-	var menu := _chalkboard(parent, Vector3(-3.35, 0, 3.15), 22.0, 0.9)
-	K.label(menu, "Apple Cider\n· Pumpkin Pie\n· Pretzels\nCandy Apples", Vector3(-0.1, 0.86, 0.13), 0.00155, Color("f4f1e6"), 0.0, Color(0, 0, 0, 0), 64, HORIZONTAL_ALIGNMENT_LEFT)
-	var hm := _chalkboard(parent, Vector3(5.0, 0, 4.45), -25.0, 0.8)
-	K.label(hm, "HANDMADE", Vector3(0, 0.95, 0.13), 0.0021, Color("f4f1e6"))
-	var gm := _chalkboard(parent, Vector3(3.4, 0, -0.5), -20.0, 0.6)
+	var menu := _chalkboard(parent, Vector3(-4.3, 0, 2.0), 20.0, 1.25)
+	K.label(menu, "Apple Cider\n· Pumpkin Pie\n· Pretzels\nCandy Apples", Vector3(-0.12, 1.2, 0.13), 0.0021, Color("f4f1e6"), 0.0, Color(0, 0, 0, 0), 64, HORIZONTAL_ALIGNMENT_LEFT)
+	var hm := _chalkboard(parent, Vector3(5.3, 0, 4.0), -25.0, 1.0)
+	K.label(hm, "HANDMADE", Vector3(0, 1.18, 0.13), 0.0025, Color("f4f1e6"))
+	var gm := _chalkboard(parent, Vector3(3.9, 0, -2.2), -20.0, 0.6)
 	K.label(gm, "3 TRIES", Vector3(-0.02, 0.62, 0.13), 0.0015, Color("f8e9a0"))
 
 
@@ -128,8 +133,8 @@ func _lantern(vb: VoxelBuilder, x: int, y: int, z: int) -> void:
 
 const TW := 50   # treats stall width (cells)
 const TD := 24   # treats stall depth (cells)
-const SIGN_Y0 := 43
-const SIGN_Y1 := 55
+const SIGN_Y0 := 51
+const SIGN_Y1 := 63
 
 
 func _candy_apple(vb: VoxelBuilder, x: int, y: int, z: int, c := Color("b8141c")) -> void:
@@ -226,11 +231,11 @@ func _treats_stall() -> VoxelBuilder:
 					x += 5
 	# Posts.
 	for px in [0, W - 2]:
-		_post(vb, px, 0, 69)
-		_post(vb, px, D - 4, 63)
+		_post(vb, px, 0, 79)
+		_post(vb, px, D - 4, 72)
 	# Striped awning high above the sign (sign sits fully clear below it,
 	# above the selected sim's bubble).
-	_awning(vb, -2, W + 2, -1, D + 3, 70, 63, RED, CREAM, 4)
+	_awning(vb, -2, W + 2, -1, D + 3, 80, 72, RED, CREAM, 4)
 	# Carved hanging sign below the awning, in front of the posts, on two
 	# short chains (text = Label3D added in build()).
 	var sz := D - 1
@@ -272,10 +277,11 @@ func _treats_stall() -> VoxelBuilder:
 		vb.set_v(Vector3i(W - 5 - i * 3, top + 5, cz), Color("6a4a2a"))
 	# Festoon bulbs under the awning's front edge.
 	for x in range(3, W - 2, 6):
-		vb.set_v(Vector3i(x, 60, D - 3), Color("2c2622"))
-		vb.set_v(Vector3i(x, 59, D - 3), Color("ffd070"), true)
+		vb.set_v(Vector3i(x, 69, D - 3), Color("2c2622"))
+		vb.set_v(Vector3i(x, 68, D - 3), Color("ffd070"), true)
+		vb.set_v(Vector3i(x, 67, D - 3), Color("ffc050"), true)
 	for x in range(0, W):
-		vb.set_v(Vector3i(x, 61, D - 3), Color("3a3530"))
+		vb.set_v(Vector3i(x, 70, D - 3), Color("3a3530"))
 	# Hanging lanterns on the outside of the front posts.
 	_lantern(vb, -5, 26, D - 4)
 	_lantern(vb, W + 1, 26, D - 4)

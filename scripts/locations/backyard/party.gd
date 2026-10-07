@@ -44,16 +44,18 @@ static func light_pools() -> Array:
 		out.append([sp.x, sp.z, 2.0, 0.3])
 	return out
 
+## Table half-length / half-depth in fine cells (cloth edge).
+const TL := 34
+const TD := 12
 ## Seats in table-local cells: Vector3(x, z, unused) — facing is derived in _facing().
 const SEATS := {
-	"far_l": Vector3(-17, -15, 0.0),
-	"far_m": Vector3(1, -15, 0.0),
-	"far_r": Vector3(19, -15, 0.0),
-	"near_l": Vector3(-8, 15, PI),
-	"near_m": Vector3(10, 15, PI),
-	"near_r": Vector3(25, 15, PI),
-	"end_l": Vector3(-36, 0, PI * 0.5),
-	"end_r": Vector3(36, 0, -PI * 0.5),
+	"far_l": Vector3(-21, -16, 0.0),
+	"far_m": Vector3(0, -16, 0.0),
+	"far_r": Vector3(21, -16, 0.0),
+	"near_l": Vector3(-8, 16, PI),
+	"near_r": Vector3(18, 16, PI),
+	"end_l": Vector3(-41, 0, PI * 0.5),
+	"end_r": Vector3(41, 0, -PI * 0.5),
 }
 
 var root: Node3D
@@ -97,8 +99,8 @@ func build(parent: Node3D) -> void:
 	# Glow sprites: fire pit, grill coals, table candles, house lamps + doors.
 	halos.add(PIT_POS + Vector3(0, 0.6, 0), 1.9, Color(1.0, 0.45, 0.12, 0.85))
 	var tb := Transform3D(Basis(Vector3.UP, TABLE_ROT), TABLE_POS)
-	for cx in [-14, 11, 23]:
-		halos.add(tb * Vector3((cx + 1) / 16.0, 0.95, 0.0), 0.6, Color(1.0, 0.65, 0.3, 0.9))
+	for cq in [Vector2(-16, -2), Vector2(6, -1), Vector2(25, 3)]:
+		halos.add(tb * Vector3(cq.x / 16.0, 1.08, cq.y / 16.0), 0.55, Color(1.0, 0.65, 0.3, 0.9))
 	for wx in [50.5 / 16.0, 164.5 / 16.0]:
 		halos.add(Vector3(wx, 2.4, -5.9), 0.9, Color(1.0, 0.7, 0.35, 0.6))
 	for dx in [4.2, 5.8, 7.4, 9.0]:
@@ -121,7 +123,7 @@ func world_seat(key: String) -> Transform3D:
 
 func _facing(s: Vector3) -> float:
 	# Face the table centre line.
-	if absf(s.x) > 30.0:
+	if absf(s.x) > TL:
 		return PI * 0.5 if s.x < 0 else -PI * 0.5
 	return 0.0 if s.y < 0 else PI
 
@@ -152,68 +154,77 @@ func _gingham(u: int, v: int) -> Color:
 func _table() -> void:
 	var vb := VoxelBuilder.new()
 	vb.jitter = 0.04
-	# Legs + apron.
-	for q in [Vector2i(-27, -9), Vector2i(25, -9), Vector2i(-27, 7), Vector2i(25, 7)]:
+	var L := TL
+	var D := TD
+	# Chunky turned legs + apron.
+	for q in [Vector2i(-L + 2, -D + 2), Vector2i(L - 4, -D + 2), Vector2i(-L + 2, D - 4), Vector2i(L - 4, D - 4)]:
 		V.b(vb, q.x, 0, q.y, 2, 11, 2, WOOD_D)
-	V.b(vb, -28, 11, -10, 56, 1, 20, V.wood(WOOD, 0, 2))
-	# Cloth: top + drape.
-	V.b(vb, -29, 12, -11, 58, 1, 22, func(q: Vector3i) -> Color: return _gingham(q.x, q.z))
-	V.b(vb, -29, 8, -11, 58, 4, 1, func(q: Vector3i) -> Color: return _gingham(q.x, q.y))
-	V.b(vb, -29, 8, 10, 58, 4, 1, func(q: Vector3i) -> Color: return _gingham(q.x, q.y))
-	V.b(vb, -29, 8, -11, 1, 4, 22, func(q: Vector3i) -> Color: return _gingham(q.z, q.y))
-	V.b(vb, 28, 8, -11, 1, 4, 22, func(q: Vector3i) -> Color: return _gingham(q.z, q.y))
-	var y := 13
-	# Place settings.
+		V.b(vb, q.x, 3, q.y, 2, 1, 2, V.shade(WOOD_D, 0.8))
+	V.b(vb, -L + 1, 11, -D + 1, L * 2 - 2, 1, D * 2 - 2, V.wood(WOOD, 0, 2))
+	# Wooden top rim shows at the ends; the gingham cloth covers the rest
+	# and drapes over the long sides.
+	V.b(vb, -L, 12, -D, L * 2, 1, D * 2, V.wood(WOOD_L, 0, 2))
+	var cl := L - 4
+	V.b(vb, -cl, 13, -D - 1, cl * 2, 1, D * 2 + 2, func(q: Vector3i) -> Color: return _gingham(q.x, q.z))
+	V.b(vb, -cl, 9, -D - 1, cl * 2, 4, 1, func(q: Vector3i) -> Color: return _gingham(q.x, q.y))
+	V.b(vb, -cl, 9, D, cl * 2, 4, 1, func(q: Vector3i) -> Color: return _gingham(q.x, q.y))
+	var y := 14
+	# Place settings: plate with food, tall amber drink, napkin.
 	for key in SEATS:
 		var s: Vector3 = SEATS[key]
 		var px := int(s.x)
 		var pz := int(s.y)
-		if absf(s.x) > 30.0:
-			px = -24 if s.x < 0 else 23
-			pz = -2
+		if absf(s.x) > L:
+			px = -L + 6 if s.x < 0 else L - 7
+			pz = -1
 		else:
-			pz = -8 if s.y < 0 else 5
+			pz = -D + 4 if s.y < 0 else D - 5
 		_plate(vb, px, y, pz, int(V.hs(px, pz, 1) * 4.0))
-		# Drink.
-		var gx := px + 3
-		var gz := pz + (2 if s.y < 0 else -1)
-		V.b(vb, gx, y, gz, 2, 4, 2, Color("f0a43a"))
-		V.b(vb, gx, y + 4, gz, 2, 1, 2, Color("fff4dc"))
-	# Centre dishes.
-	_bowl(vb, -10, y, -1, Color("6cb04a"), [Color("e2513f"), Color("f7d84a"), Color("8fd05a")])
-	_burger_board(vb, 5, y, -2)
-	_bowl(vb, 17, y, 0, Color("e9c23a"), [Color("f4e04a"), Color("e8b53a")])
-	_burger_board(vb, -19, y, 1)
-	# Corn platter.
-	V.b(vb, 9, y, 2, 6, 1, 4, Color("f6f3ee"))
-	for i in 3:
-		V.b(vb, 10, y + 1, 2 + i, 4, 1, 1, Color("f3d24a") if i != 1 else Color("e8c23a"))
+		var gx := px + 4
+		var gz := pz + (1 if s.y < 0 else -1)
+		if absf(s.x) > L:
+			gx = px
+			gz = pz + 4
+		_glass(vb, gx, y, gz)
+		V.b(vb, px - 4, y, pz - 1, 1, 1, 3, Color("f6f3ee"))
+	# Centre line, left to right.
+	_bowl(vb, -24, y, 0, Color("6cb04a"), [Color("e2513f"), Color("8fd05a"), Color("fbf3ec")])
+	V.b(vb, -17, y, -3, 2, 3, 2, Color("ffcf6e"), true)
+	V.p(vb, -17, y + 3, -3, Color("fff1c4"), true)
+	_burger_board(vb, -12, y, 1)
+	# Lemonade pitcher.
+	V.b(vb, -6, y, -5, 3, 7, 3, Color("f6dc6a"))
+	V.b(vb, -6, y + 7, -5, 3, 1, 3, Color("e9f3f6"))
+	V.b(vb, -7, y + 2, -4, 1, 4, 1, Color("e9f3f6"))
+	V.p(vb, -5, y + 8, -4, Color("ffe14a"))
 	# Watermelon slices.
-	for i in 4:
-		V.b(vb, -4 + i * 3, y, 2, 2, 2, 1, Color("e64a4a"))
-		V.b(vb, -4 + i * 3, y, 3, 2, 1, 1, Color("3c8a3a"))
+	for i in 3:
+		V.b(vb, -7 + i * 3, y, 3, 2, 3, 1, Color("e64a4a"))
+		V.b(vb, -7 + i * 3, y, 4, 2, 1, 1, Color("3c8a3a"))
+		V.p(vb, -7 + i * 3, y + 1, 3, Color("2a2a2a"))
+	# Flower vase centrepiece.
+	V.b(vb, 0, y, -1, 3, 5, 3, Color("8fb7d9"))
+	V.b(vb, 0, y + 5, -1, 3, 1, 3, Color("a8cbe6"))
+	V.blob(vb, Vector3(1.5, y + 8, 0.5), Vector3(3.0, 2.4, 3.0), V.mix([Color("f59cc6"), Color("fbf7f0"), Color("ee7fb4"), Color("e2513f"), Color("5f9e3a")], 3), 0.4, 3)
+	V.b(vb, 5, y, -2, 2, 3, 2, Color("ffcf6e"), true)
+	V.p(vb, 5, y + 3, -2, Color("fff1c4"), true)
+	# Veggie platter.
+	V.b(vb, 8, y, 1, 7, 1, 5, Color("f6f3ee"))
+	V.b(vb, 9, y + 1, 2, 5, 1, 3, V.mix([Color("e2513f"), Color("6cb04a"), Color("f2c22a"), Color("8fd05a"), Color("f07a3a")], 9))
+	# Corn platter.
+	V.b(vb, 8, y, -6, 6, 1, 4, Color("f6f3ee"))
+	for i in 3:
+		V.b(vb, 9, y + 1, -6 + i, 4, 1, 1, Color("f3d24a") if i != 1 else Color("e8c23a"))
+	_burger_board(vb, 18, y, -1)
+	V.b(vb, 24, y, 2, 2, 3, 2, Color("ffcf6e"), true)
+	V.p(vb, 24, y + 3, 2, Color("fff1c4"), true)
+	_bowl(vb, 26, y, -4, Color("e9c23a"), [Color("f4e04a"), Color("e8b53a")])
 	# Ketchup + mustard.
-	V.b(vb, -3, y, 1, 1, 4, 1, Color("d02a24")); V.p(vb, -3, y + 4, 1, Color("f2f2f2"))
-	V.b(vb, -2, y, 1, 1, 4, 1, Color("f2c22a")); V.p(vb, -2, y + 4, 1, Color("f2f2f2"))
-	# Lemonade pitcher with a lemon slice.
-	V.b(vb, -8, y, -4, 3, 6, 3, Color("f6dc6a"))
-	V.b(vb, -8, y + 6, -4, 3, 1, 3, Color("e9f3f6"))
-	V.b(vb, -9, y + 2, -3, 1, 3, 1, Color("e9f3f6"))
-	V.p(vb, -7, y + 7, -3, Color("ffe14a"))
-	# Bread basket + corn on the right half.
-	V.b(vb, 20, y, -5, 5, 2, 3, V.wood(Color("c9944e"), 0, 1))
-	V.b(vb, 20, y + 2, -5, 5, 1, 3, V.mix([Color("e8b56a"), Color("d9a050"), Color("f3cf8a")], 4))
-	V.b(vb, 13, y, -6, 5, 1, 3, Color("f6f3ee"))
-	V.b(vb, 13, y + 1, -5, 4, 1, 1, Color("f3d24a")); V.b(vb, 14, y + 1, -6, 4, 1, 1, Color("e8c23a"))
-	# Extra salad bowl, left half.
-	_bowl(vb, -23, y, -5, Color("6cb04a"), [Color("e2513f"), Color("8fd05a"), Color("fbf3ec")])
-	# Candle jars (glow).
-	for cx in [-14, 11, 23]:
-		V.b(vb, cx, y, -1, 2, 2, 2, Color("ffcf6e"), true)
-		V.p(vb, cx, y + 2, -1, Color("fff1c4"), true)
-	# Flower vase.
-	V.b(vb, -1, y, -3, 2, 4, 2, Color("8fb7d9"))
-	V.blob(vb, Vector3(0, y + 6, -2), Vector3(2.4, 1.8, 2.4), V.mix([Color("f59cc6"), Color("fbf7f0"), Color("ee7fb4"), Color("5f9e3a")], 3), 0.4, 3)
+	V.b(vb, -1, y, 4, 1, 4, 1, Color("d02a24")); V.p(vb, -1, y + 4, 4, Color("f2f2f2"))
+	V.b(vb, 1, y, 4, 1, 4, 1, Color("f2c22a")); V.p(vb, 1, y + 4, 4, Color("f2f2f2"))
+	# Bread basket.
+	V.b(vb, -29, y, -5, 5, 2, 3, V.wood(Color("c9944e"), 0, 1))
+	V.b(vb, -29, y + 2, -5, 5, 1, 3, V.mix([Color("e8b56a"), Color("d9a050"), Color("f3cf8a")], 4))
 	# Chairs.
 	for key in SEATS:
 		var s: Vector3 = SEATS[key]
@@ -221,14 +232,21 @@ func _table() -> void:
 	table_node = V.inst(vb, root, V.SIZE_FINE, TABLE_POS, TABLE_ROT, Vector3.ZERO, true, false, "DinnerTable")
 
 
+func _glass(vb: VoxelBuilder, x: int, y: int, z: int) -> void:
+	V.b(vb, x, y, z, 2, 1, 2, Color("e4ecef"))
+	V.b(vb, x, y + 1, z, 2, 4, 2, func(q: Vector3i) -> Color: return Color("f0a43a").lerp(Color("f7c35a"), V.h1(q, 5)))
+	V.b(vb, x, y + 5, z, 2, 1, 2, Color("fff4dc"))
+
+
 func _plate(vb: VoxelBuilder, x: int, y: int, z: int, food: int) -> void:
 	V.b(vb, x - 2, y, z - 1, 4, 1, 3, Color("f6f3ee"))
 	V.b(vb, x - 1, y, z - 2, 2, 1, 5, Color("f6f3ee"))
 	match food:
 		0:  # burger
-			V.b(vb, x - 1, y + 1, z - 1, 2, 1, 2, Color("6b3a1f"))
-			V.p(vb, x - 1, y + 1, z + 1, Color("6cb04a"))
-			V.b(vb, x - 1, y + 2, z - 1, 2, 1, 2, Color("e0a456"))
+			V.b(vb, x - 1, y + 1, z - 1, 3, 1, 3, Color("e0a456"))
+			V.b(vb, x - 1, y + 2, z - 1, 3, 1, 3, Color("5a2e18"))
+			V.p(vb, x - 1, y + 2, z + 1, Color("6cb04a")); V.p(vb, x + 1, y + 2, z - 1, Color("f2c22a"))
+			V.b(vb, x - 1, y + 3, z - 1, 3, 1, 3, Color("e9b15e"))
 		1:  # corn + salad
 			V.b(vb, x - 2, y + 1, z, 3, 1, 1, Color("f3d24a"))
 			V.p(vb, x + 1, y + 1, z - 1, Color("6cb04a"))
@@ -265,19 +283,20 @@ func _chair(vb: VoxelBuilder, cx: int, cz: int, key: String) -> void:
 	for q in [Vector2i(0, 0), Vector2i(7, 0), Vector2i(0, 7), Vector2i(7, 7)]:
 		V.b(vb, x0 + q.x, 0, z0 + q.y, 1, 6, 1, WOOD_D)
 	V.b(vb, x0, 6, z0, 8, 1, 8, seat)
+	# Low ladder backs (top rail just above the diner's waist) so the seated
+	# guests read over them from the camera.
 	var back_axis_x := key.begins_with("end")
+	var dark := V.shade(WOOD_D, 0.9)
 	if back_axis_x:
 		var bx := x0 if key == "end_l" else x0 + 7
-		V.b(vb, bx, 7, z0, 1, 10, 1, WOOD_D); V.b(vb, bx, 7, z0 + 7, 1, 10, 1, WOOD_D)
-		V.b(vb, bx, 15, z0, 1, 2, 8, seat)
-		for k in 3:
-			V.b(vb, bx, 8, z0 + 2 + k * 2, 1, 7, 1, seat)
+		V.b(vb, bx, 7, z0, 1, 6, 1, dark); V.b(vb, bx, 7, z0 + 7, 1, 6, 1, dark)
+		V.b(vb, bx, 12, z0, 1, 2, 8, seat)
+		V.b(vb, bx, 9, z0 + 1, 1, 1, 6, seat)
 	else:
 		var bz := z0 if cz < 0 else z0 + 7
-		V.b(vb, x0, 7, bz, 1, 10, 1, WOOD_D); V.b(vb, x0 + 7, 7, bz, 1, 10, 1, WOOD_D)
-		V.b(vb, x0, 15, bz, 8, 2, 1, seat)
-		for k in 3:
-			V.b(vb, x0 + 2 + k * 2, 8, bz, 1, 7, 1, seat)
+		V.b(vb, x0, 7, bz, 1, 6, 1, dark); V.b(vb, x0 + 7, 7, bz, 1, 6, 1, dark)
+		V.b(vb, x0, 12, bz, 8, 2, 1, seat)
+		V.b(vb, x0 + 1, 9, bz, 6, 1, 1, seat)
 
 
 # ------------------------------------------------------------------ grill
@@ -336,7 +355,7 @@ func _grill() -> void:
 	# Rises off the right end of the grate (between Jack and the table) and
 	# drifts back, so it never veils his face.
 	smoke.position = Vector3(-0.5, 1.12, 0.0)
-	smoke.amount = 30
+	smoke.amount = 44
 	smoke.lifetime = 3.2
 	smoke.preprocess = 3.2
 	smoke.local_coords = false
@@ -355,8 +374,8 @@ func _grill() -> void:
 	curve.add_point(Vector2(1, 1.6))
 	smoke.scale_amount_curve = curve
 	var grad := Gradient.new()
-	grad.set_color(0, Color(0.92, 0.86, 0.86, 0.42))
-	grad.set_color(1, Color(0.78, 0.72, 0.84, 0.0))
+	grad.set_color(0, Color(0.95, 0.9, 0.88, 0.62))
+	grad.set_color(1, Color(0.8, 0.74, 0.86, 0.0))
 	smoke.color_ramp = grad
 	var bm := BoxMesh.new()
 	bm.size = Vector3.ONE * 0.2

@@ -318,6 +318,18 @@ func _plan_path() -> bool:
 ## (for free will) pick the next best thing straight away.
 func _route_fail(o: Dictionary) -> void:
 	route_fails += 1
+	# The same spot failing again and again: the sim stands somewhere the grid
+	# can't leave (pushed into furniture, off the lot). Sims 3 "reset": pop
+	# onto the nearest open floor.
+	var here: Vector3 = actor.global_position
+	if here.distance_to(_fail_at) < 0.2:
+		_fail_streak += 1
+	else:
+		_fail_streak = 1
+		_fail_at = here
+	if _fail_streak >= 3:
+		_fail_streak = 0
+		unstick()
 	var t = o.get("target")
 	var what := "there"
 	if t != null and is_instance_valid(t):
@@ -339,6 +351,29 @@ func _route_fail(o: Dictionary) -> void:
 
 
 var _fallback_need := false
+var _fail_at := Vector3.INF
+var _fail_streak := 0
+var resets := 0
+
+
+## Move onto the nearest open floor cell of this storey (false if none).
+func unstick() -> bool:
+	var nav = world.nav
+	if nav == null:
+		return false
+	var p: Vector3 = actor.global_position
+	var li: int = nav.level_of(p)
+	var c: Vector2i = nav.nearest_open(li, nav.cell_of(p), 40)
+	if c.x < 0:
+		return false
+	var q: Vector3 = nav.center_of(li, c)
+	resets += 1
+	unreachable.clear()
+	if OS.has_environment("VIMS_PLAYTEST"):
+		print("  reset: %s %s -> %s" % [display_name(), str(p), str(q)])
+	actor.global_position = q
+	Game.show_bubble(actor, {"kind": "emote", "icon": "dots", "id": "say", "ttl": 1.0})
+	return true
 
 
 func is_unreachable(t) -> bool:

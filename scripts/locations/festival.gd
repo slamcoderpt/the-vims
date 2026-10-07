@@ -14,7 +14,12 @@ const Stage := preload("res://scripts/locations/festival/stage.gd")
 const Decor := preload("res://scripts/locations/festival/decor.gd")
 const Crowd := preload("res://scripts/locations/festival/crowd.gd")
 
-const CAMERA := {"target": Vector3(0.5, 1.5, -3.0), "yaw": 0.0, "pitch": 13.0, "distance": 17.0, "fov": 42.0}
+const CAMERA := {"target": Vector3(0.3, 1.2, -4.0), "yaw": 0.0, "pitch": 20.0, "distance": 18.0, "fov": 40.0}
+## Town backdrop is scaled down so the clock tower stays in frame under the
+## steeper (ref-like) camera; hall front lands at z ~ -26.
+const TOWN_SCALE := 0.64
+const STAGE_POS := Vector3(7.4, 0, -14.6)
+const TOWN_POS := Vector3(0.0, 0.0, -4.44)
 
 var stalls
 var stage
@@ -30,12 +35,17 @@ func build() -> void:
 	ground.litter_spots = Trees.spots()
 	ground.build(self)
 	Trees.new().build(self)
+	var town_root := Node3D.new()
+	town_root.name = "Town"
+	town_root.position = TOWN_POS
+	town_root.scale = Vector3.ONE * TOWN_SCALE
+	add_child(town_root)
 	town = Town.new()
-	town.build(self)
+	town.build(town_root)
 	stalls = Stalls.new()
 	stalls.build(self)
 	stage = Stage.new()
-	stage.build(self, Vector3(5.6, 0, -10.6), -14.0)
+	stage.build(self, STAGE_POS, -18.0)
 	decor = Decor.new()
 	decor.build(self)
 	crowd = Crowd.new()
@@ -57,11 +67,11 @@ func _lights() -> void:
 	_add_halos(pts, stage.glow_points, 0.4)
 	_add_halos(pts, decor.glow_points, 0.65)
 	for w: Vector3 in town.window_glows:
-		pts.append([w, 1.0, Color(0.4, 0.26, 0.12, 0.6)])
+		pts.append([TOWN_POS + w * TOWN_SCALE, 1.0 * TOWN_SCALE, Color(0.4, 0.26, 0.12, 0.6)])
 	halos = K.halos(pts)
 	add_child(halos)
 	# A handful of real lights (each costs an extra pass per lit mesh on GL Compatibility).
-	K.light(self, Vector3(-3.0, 1.9, 2.0), Color(1.0, 0.66, 0.36), 1.4, 4.0, 0.7)
+	K.light(self, Vector3(-3.9, 2.3, 0.4), Color(1.0, 0.66, 0.36), 1.5, 4.5, 0.7)
 	K.light(self, stage.node.position + Vector3(0, 3.6, 1.0), Color(1.0, 0.68, 0.4), 1.4, 5.0, 0.6)
 
 

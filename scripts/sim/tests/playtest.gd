@@ -40,7 +40,7 @@ func _run() -> void:
 	var only: Array = []
 	if args.has("only"):
 		only = (args.only as String).split(",")
-	for sec in ["boot", "loop", "money", "unlocks", "mood", "queue", "autonomy", "clock", "gohere", "build", "social", "townies", "travel"]:
+	for sec in ["boot", "loop", "money", "unlocks", "mood", "queue", "autonomy", "meal", "wishes", "clock", "gohere", "build", "social", "townies", "travel"]:
 		if only.is_empty() or sec in only or sec == "boot":
 			await call("_s_" + sec)
 
@@ -418,6 +418,103 @@ func _s_autonomy() -> void:
 	await _shot("autonomy_soak")
 
 
+func _s_meal() -> void:
+	var jack = _agent("Jack")
+	var lily = _agent("Lily")
+	var maya = _agent("Maya")
+	for a in sim.agents:
+		if a:
+			a.cancel_all()
+			for k in a.member.needs:
+				a.member.needs[k] = maxf(a.member.needs[k], 0.75)
+	lily.member.needs.hunger = 0.35
+	maya.member.needs.hunger = 0.9   # not hungry: keeps doing her own thing
+	Game.selected = jack.index
+	Game.speed = 1
+	var stove = _find_it("Stove")
+	_menus.clear()
+	await _tap_world(_it_center(stove))
+	await _frames(3)
+	if _menus.is_empty() or _menus[-1][0] != "Stove":
+		print("  (tap on the stove hit something else: opening its menu directly)")
+		sim.open_object_menu(stove, _cam().unproject_position(_it_center(stove)))
+		await _frames(3)
+	await _choose("Cook")
+	Game.speed = 3
+	await _until_game(func(): return not sim.meal.is_empty(), 150.0)
+	var served: bool = not sim.meal.is_empty()
+	var n0: int = int(sim.meal.get("servings", 0))
+	await _frames(3)
+	var called: bool = lily.order.get("action", {}).get("id", "") == "meal" or lily.queue.any(func(q): return q.get("action", {}).get("id", "") == "meal")
+	_step("cook_serves_meal", served and n0 >= 2 and sim.meal.plates.size() == n0,
+		"Jack cooked -> %s, %d servings on the %s" % [sim.meal.get("dish", "-"), n0, str(sim.meal.table.title) if served else "-"])
+	_step("call_to_meal", called and maya.order.get("action", {}).get("id", "") != "meal",
+		"hungry Lily -> '%s' (%s), full Maya -> '%s'" % [lily.current_label(), lily.phase, maya.current_label()])
+	await _until_game(func(): return lily.phase == "act" and lily.current_label().begins_with("Eat"), 120.0)
+	await _focus(_it_center(sim.meal.table) if not sim.meal.is_empty() else lily.actor.global_position)
+	await _wait(0.3)
+	await _shot("family_meal")
+	var h0: float = lily.member.needs.hunger
+	await _until_game(func(): return lily.phase != "act", 60.0)
+	var left: int = int(sim.meal.get("servings", 0))
+	_step("meal_eaten", lily.member.needs.hunger > h0 + 0.3 and left == n0 - 1 and Game.has_moodlet(lily.index, "good_meal"),
+		"Lily hunger %.2f -> %.2f, servings %d -> %d" % [h0, lily.member.needs.hunger, n0, left])
+	# Leftovers show up in the table's menu for everyone else.
+	if not sim.meal.is_empty():
+		var acts: Array = sim.actions_for(sim.meal.table, maya.member)
+		_step("meal_in_menu", not acts.is_empty() and acts[0].id == "meal", "table menu: %s" % str(acts.map(func(a): return a.label)))
+	sim.clear_meal()
+
+
+func _s_wishes() -> void:
+	var lily = _agent("Lily")
+	var ov = sim.overlay
+	_top_up()
+	sim.roll_wishes()
+	var counts: Array = []
+	for a in sim.agents:
+		if a:
+			counts.append("%s %d" % [a.display_name(), Game.wishes(a.index).size()])
+	var all3: bool = sim.agents.all(func(a): return a == null or Game.wishes(a.index).size() == 3)
+	_step("wishes_rolled", all3, "%s; Lily wishes %s" % [str(counts), str(Game.wishes(lily.index).map(func(w): return w.label))])
+	# A known wish: practise the piano. Promise it from the Wishes tab.
+	var piano = _find_it("Piano")
+	Game.remove_wish(lily.index, Game.wishes(lily.index)[0].id)
+	Game.wishes(lily.index).push_front({"id": "do_practice", "label": "Practise the Piano", "icon": "music", "kind": "do", "arg": "practice",
+		"n": 1, "reward": 250, "promised": false, "born": Game.total_minutes()})
+	Game.selected = lily.index
+	await _frames(4)
+	for h in ov._hits:
+		if h[1] == "wishes":
+			_touch((h[0] as Rect2).get_center())
+			break
+	await _frames(4)
+	for h in ov._hits:
+		if h[1] == "wish" and int(h[2]) == 0:
+			_touch((h[0] as Rect2).get_center())
+			break
+	await _frames(4)
+	var promised: bool = Game.wishes(lily.index)[0].get("promised", false)
+	_step("wish_promise_tap", ov.panel.visible and ov.panel_tab == "wishes" and promised and Game.has_moodlet(lily.index, "hopeful"),
+		"tab=%s promised=%s" % [ov.panel_tab, str(promised)])
+	await _shot("wishes")
+	ov.panel.visible = false
+	var lth0 := Game.lth(lily.index)
+	lily.command({"action": _action_of(piano, lily, "practice"), "target": piano})
+	Game.speed = 3
+	await _until_game(func(): return lily.last_done == "practice" and lily.phase != "act", 150.0)
+	var gone: bool = not Game.wishes(lily.index).any(func(w): return w.id == "do_practice")
+	_step("wish_fulfilled", gone and Game.lth(lily.index) == lth0 + 375 and Game.has_moodlet(lily.index, "wish_do_practice"),
+		"Lily LTH %d -> %d, wishes now %s" % [lth0, Game.lth(lily.index), str(Game.wishes(lily.index).map(func(w): return w.label))])
+
+
+func _action_of(it, ag, id: String) -> Dictionary:
+	for a in sim.actions_for(it, ag.member):
+		if a.get("id", "") == id:
+			return a
+	return {}
+
+
 func _low_needs() -> String:
 	var out: Array = []
 	for m in Game.household:
@@ -574,21 +671,44 @@ func _s_clock() -> void:
 
 func _s_gohere() -> void:
 	var lily = _agent("Lily")
+	_top_up()
 	Game.selected = lily.index
 	await _focus(lily.actor.global_position)
-	var li: int = sim.nav.level_of(lily.actor.global_position)
-	var gc: Vector2i = sim.nav.nearest_open(li, sim.nav.cell_of(lily.actor.global_position + Vector3(1.2, 0, 1.0)))
-	var gp: Vector3 = sim.nav.center_of(li, gc)
+	var nav: NavGrid = sim.nav
+	var lp: Vector3 = lily.actor.global_position
+	var li: int = nav.level_of(lp)
+	var reg: int = nav.entry_region(lp, li)
+	# An open floor cell 1.2..2.5 m away in the room Lily is in, whose screen
+	# point is plain floor (not a sim or an object).
+	var gp := Vector3.INF
+	var cam := _cam()
+	for r in [1.5, 2.0, 1.2, 2.5]:
+		for k in 12:
+			var ang: float = k * TAU / 12.0
+			var c: Vector2i = nav.cell_of(lp + Vector3(cos(ang), 0, sin(ang)) * r)
+			if not nav.is_open(li, c) or nav.region_of(li, c) != reg:
+				continue
+			var p: Vector3 = nav.center_of(li, c)
+			var sp := cam.unproject_position(p)
+			if not _screen_ok(sp) or sim.pick_agent(sp) != null or sim.pick_interactable(sp) != null:
+				continue
+			gp = p
+			break
+		if gp != Vector3.INF:
+			break
+	if gp == Vector3.INF:
+		gp = nav.center_of(li, nav.nearest_open(li, nav.cell_of(lp + Vector3(1.2, 0, 1.0))))
 	await _tap_world(gp)
 	await _frames(2)
 	var go_ok: bool = lily.order.get("action", {}).get("id", "") == "go_here"
-	await _until(func(): return lily.phase == "idle", 20.0)
-	_step("go_here", go_ok and _flat(lily.actor.global_position, gp) < 0.4, "dist to target %.2f" % _flat(lily.actor.global_position, gp))
-
+	await _until_game(func(): return lily.phase == "idle", 60.0)
+	_step("go_here", go_ok and _flat(lily.actor.global_position, gp) < 0.4,
+		"tap -> %s, dist to target %.2f, phase=%s" % ["Go Here" if go_ok else "'%s'" % lily.current_label(), _flat(lily.actor.global_position, gp), lily.phase])
 
 
 func _s_build() -> void:
 	var lily = _agent("Lily")
+	_top_up()
 	Game.selected = lily.index
 	var money_b := Game.money
 	_menus.clear()
@@ -801,6 +921,16 @@ func _s_travel() -> void:
 
 
 # =================================================================== helpers
+
+## A content household (the soak leaves needs low; a starving sim would
+## rightly ignore the next orders).
+func _top_up() -> void:
+	for a in sim.agents:
+		if a:
+			a.cancel_all()
+			for k in a.member.needs:
+				a.member.needs[k] = maxf(a.member.needs[k], 0.75)
+			a.check_needs()
 
 func _step(step_name: String, ok: bool, detail := "") -> void:
 	results.append([step_name, ok])

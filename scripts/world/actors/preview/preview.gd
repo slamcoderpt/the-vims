@@ -204,6 +204,7 @@ func _ready() -> void:
 				var a := SimActor.create(s2[0])
 				a.position = s2[1]
 				add_child(a)
+				a.body_scale = 1.0
 				a.face(s2[2])
 				if s2[4] > 0.0:
 					a.seat_height = s2[4]
@@ -212,7 +213,7 @@ func _ready() -> void:
 					seat.box(c - Vector3i(3, 0, 3), Vector3i(7, h, 7), Color(0.35, 0.35, 0.38))
 				a.set_pose(s2[3])
 			add_child(seat.build_instance(0.0625))
-			rig.apply({"target": Vector3(0.0, 0.6, 0.1), "yaw": 36.0, "pitch": 36.0, "distance": 5.5, "fov": 30.0})
+			rig.apply({"target": Vector3(0.0, 0.6, 0.1), "yaw": 32.0, "pitch": 31.0, "distance": 9.0, "fov": 30.0})
 		"dog4":
 			var x := -3.0
 			for p in ["idle", "sit", "walk", "sleep"]:
@@ -234,6 +235,40 @@ func _ready() -> void:
 				d.set_pose(p)
 				x += 1.5
 			rig.apply({"target": Vector3(0, 0.3, 0), "yaw": 20.0, "pitch": 40.0, "distance": 4.5, "fov": 30.0})
+		"doglie":
+			var specs := [["play", Vector3(-1.4, 0, 0)], ["sleep", Vector3(0.2, 0, 0)], ["idle", Vector3(1.6, 0, 0)], ["sit", Vector3(-0.6, 0, -1.4)], ["walk", Vector3(1.0, 0, -1.4)]]
+			for s3 in specs:
+				var d := SimActor.create("beagle")
+				d.position = s3[1]
+				add_child(d)
+				d.body_scale = 1.0
+				d.face(s3[1] + Vector3(0.3, 0, 0.4))
+				d.set_pose(s3[0])
+			rig.apply({"target": Vector3(0.0, 0.3, -0.5), "yaw": 32.0, "pitch": 31.0, "distance": 8.0, "fov": 32.0})
+		"painter":
+			var x := -2.4
+			for cfg in [[90.0, false], [0.0, false], [130.0, true], [-50.0, true]]:
+				var a := SimActor.create("bunny_girl")
+				a.position = Vector3(x, 0, 0)
+				a.rotation_degrees.y = cfg[0]
+				a.camera_cheat = cfg[1]
+				add_child(a)
+				a.body_scale = 1.0
+				a.seat_height = 0.54
+				a.set_pose("sit_paint")
+				x += 1.6
+			rig.apply({"target": Vector3(0.0, 0.8, 0.0), "yaw": 0.0, "pitch": 12.0, "distance": 8.0, "fov": 30.0})
+		"dadback":
+			var specs := [[Vector3(-0.9, 0, 0), 180.0 + 30.0, "type"], [Vector3(0.9, 0, 0), 20.0, "idle"]]
+			for s4 in specs:
+				var a := SimActor.create("dad")
+				a.position = s4[0]
+				a.rotation_degrees.y = s4[1]
+				add_child(a)
+				a.body_scale = 0.86
+				a.seat_height = 0.63
+				a.set_pose(s4[2])
+			rig.apply({"target": Vector3(0.0, 1.1, 0.0), "yaw": 28.0, "pitch": 34.0, "distance": 6.0, "fov": 30.0})
 		"faces":
 			var x := -2.0
 			for l in ["npc_6", "bunny_girl", "cat_girl", "npc_3", "npc_2"]:

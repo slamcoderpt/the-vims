@@ -15,6 +15,9 @@ const NavConfig := preload("res://scripts/sim/nav_config.gd")
 const BuildMode := preload("res://scripts/sim/build_mode.gd")
 const ShotPresets := preload("res://scripts/core/shot_presets.gd")
 const SimOverlay := preload("res://scripts/sim/ui/sim_overlay.gd")
+const Wishes := preload("res://scripts/sim/wishes.gd")
+## In-game minutes between wish top-ups.
+const WISH_EVERY := 60.0
 
 const TAP_SLOP := 14.0         # px a finger may move and still count as a tap
 const LONG_PRESS := 0.5        # s
@@ -47,6 +50,10 @@ var _select_by_tap := false
 var _frames := 0
 ## Townies socialized with on this lot this visit (for "Meet N Neighbors").
 var met_here := {}
+## A cooked family meal waiting on a table (Sims 3 "Call to Meal"):
+## {table, node, plates: Array, servings, quality, cook, expires}.
+var meal: Dictionary = {}
+var _wish_acc := 0.0
 ## Counters for tests / debugging.
 var stats := {"taps": 0, "menus": 0, "orders": 0, "done": 0, "autonomous": 0}
 
@@ -64,6 +71,7 @@ func _ready() -> void:
 	Game.furniture_changed.connect(_on_furniture_changed)
 	Game.queue_cancel_requested.connect(_on_queue_cancel)
 	Game.relationship_level_changed.connect(_on_rel_level)
+	Game.skill_changed.connect(_on_skill)
 	overlay = SimOverlay.new()
 	overlay.name = "SimOverlay"
 	overlay.hud = main.hud if main else null
@@ -95,6 +103,7 @@ func bind_location(loc: Node3D, p_name: String) -> void:
 	hud = main.hud if main else null
 	_users.clear()
 	_menu_ctx = {}
+	meal = {}
 	for a in agents:
 		if a:
 			a.queue.clear()
@@ -118,6 +127,19 @@ func bind_location(loc: Node3D, p_name: String) -> void:
 	refresh_interactables()
 	build.spawn_saved()
 	_adopt_staged()
+	roll_wishes()
+
+
+func roll_wishes() -> void:
+	_wish_acc = 0.0
+	for ag in agents:
+		if ag:
+			Wishes.roll(self, ag)
+
+
+func _on_skill(i: int, skill: String, level: int) -> void:
+	if i >= 0 and i < agents.size() and agents[i] != null:
+		Wishes.on_skill(agents[i], skill, level)
 
 
 ## Give every non-household person on the lot a townie identity (name,
@@ -163,7 +185,7 @@ func townie_rows(ag, it: Interactable) -> Array:
 	var info := townie_info(tname)
 	var task := ""
 	var rows: Array = []
-	for a in SimActions.actions_for(it, ag.member):
+	for a in actions_for(it, ag.member):
 		if a.get("id", "") in ["chat", "wave"]:
 			task = str(a.get("task", task))
 			continue
@@ -191,6 +213,8 @@ func _on_rel_level(a: String, b: String, level: String) -> void:
 		if i < 0:
 			continue
 		var other: String = b if nm == a else a
+		if i < agents.size() and agents[i] != null:
+			Wishes.on_rel(agents[i], other)
 		if tier >= 1:
 			Game.add_moodlet(i, "new_friend", "Made a Friend" if tier == 1 else ("Close Friends" if tier == 2 else "Best Friends!"), "heart", 10.0 + tier * 4.0, 8.0, "With %s" % other)
 		elif tier <= -1:
@@ -316,6 +340,12 @@ func _process(delta: float) -> void:
 	if location == null or not is_instance_valid(location):
 		return
 	var dm := Game.game_minutes(delta)
+	if not meal.is_empty() and dm > 0.0 and Game.total_minutes() > float(meal.expires):
+		Game.notify.emit("The family meal went cold", "plate")
+		clear_meal()
+	_wish_acc += dm
+	if _wish_acc >= WISH_EVERY:
+		roll_wishes()
 	for ag in agents:
 		if ag:
 			ag.tick(delta, dm)
@@ -587,7 +617,7 @@ func open_object_menu(it: Interactable, screen: Vector2) -> void:
 		# First name only: the menu card is narrow.
 		open_menu("%s · %s" % [tn.get_slice(" ", 0), lvl], townie_rows(sel, it), {"type": "object", "target": it}, screen)
 		return
-	var acts := SimActions.actions_for(it, sel.member)
+	var acts := actions_for(it, sel.member)
 	if acts.is_empty():
 		Game.show_bubble(sel.actor, {"kind": "thought", "icon": "dots", "id": "say", "ttl": 1.6})
 		Game.notify.emit("%s can't use the %s" % [sel.display_name(), it.title], "dots")
@@ -839,8 +869,13 @@ func _box_half(it: Node) -> Vector3:
 
 ## The floor point nearest p that a sim can stand on.
 func _open_spot(p: Vector3) -> Vector3:
-	if nav == null or not nav.in_bounds(p):
+	if nav == null:
 		return p
+	if not nav.in_bounds(p):
+		# Never send anyone off the walkable lot (a dog by the fence...).
+		var m := nav.cs * 0.5
+		p.x = clampf(p.x, nav.ox + m, nav.ox + nav.w * nav.cs - m)
+		p.z = clampf(p.z, nav.oz + m, nav.oz + nav.h * nav.cs - m)
 	var li := nav.level_of(p)
 	var c := nav.nearest_open(li, nav.cell_of(p), 16)
 	if c.x < 0:
@@ -898,7 +933,7 @@ func choose_autonomous(ag) -> Dictionary:
 		var dist := _flat(wp, p) + absf(wp.y - p.y) * 3.0
 		var best_s := 0.1
 		var best_a: Dictionary = {}
-		var acts: Array = townie_rows(ag, it) if townie_of(it) != "" else SimActions.actions_for(it, ag.member)
+		var acts: Array = townie_rows(ag, it) if townie_of(it) != "" else actions_for(it, ag.member)
 		for a in acts:
 			if a.get("mean", false) or a.get("locked", false):
 				continue
@@ -907,7 +942,7 @@ func choose_autonomous(ag) -> Dictionary:
 				# Free will never spends money unless a need is desperate and this fixes it.
 				if not Game.can_afford(cost) or not _desperate_fix(ag, a):
 					continue
-			var s := SimActions.score(a, ag.member, dist) + randf() * 0.05 - busy_pen
+			var s := SimActions.score(a, ag.member, dist) + randf() * 0.05 - busy_pen + Wishes.bias(ag, a)
 			if s > best_s:
 				best_s = s
 				best_a = a
@@ -983,7 +1018,7 @@ func choose_for_need(ag, need: String) -> Dictionary:
 		var busy_pen := 0.3 if (u != null and u != ag and not shareable(it)) else 0.0
 		var wp: Vector3 = it.world_use_spot() if it.use_spot != Vector3.ZERO else it.global_position
 		var dist := _flat(wp, p) + absf(wp.y - p.y) * 3.0
-		for a in SimActions.actions_for(it, ag.member):
+		for a in actions_for(it, ag.member):
 			var gain := float(a.get("needs", {}).get(need, 0.0))
 			if gain <= 0.0:
 				continue
@@ -1000,5 +1035,185 @@ func _desperate_fix(ag, a: Dictionary) -> bool:
 	return low != "" and ag.member.needs[low] < 0.2 and float(a.get("needs", {}).get(low, 0.0)) >= 0.15
 
 
-func on_action_done(_ag, _o: Dictionary) -> void:
+func on_action_done(ag, o: Dictionary) -> void:
 	stats.done += 1
+	var a: Dictionary = o.get("action", {})
+	var it = o.get("target")
+	if a.get("id", "") == "meal":
+		eat_serving()
+	elif is_meal_cook(it, a):
+		serve_meal(ag, a)
+	Wishes.on_action(ag, a, int(ag.last_pay))
+
+
+# =================================================================== family meals
+
+const MEAL_COOKS := ["Fridge", "Stove", "Grill"]
+const MEAL_TABLES := ["Dining Table", "Dinner Table"]
+const MEAL_SPOILS := 8 * 60.0
+
+
+## Object actions for a member, plus "Eat Family Meal" on the table that has one.
+func actions_for(it: Node, member: Dictionary) -> Array:
+	var out := SimActions.actions_for(it, member)
+	if not meal.is_empty() and it == meal.get("table") and member.get("kind", "adult") != "dog" and int(meal.servings) > 0:
+		out.push_front(meal_action())
+	return out
+
+
+func meal_action() -> Dictionary:
+	var q: float = meal.get("quality", 0.0)
+	var a := {"id": "meal", "label": "Eat %s (%d left)" % [meal.get("dish", "Meal"), int(meal.get("servings", 0))], "icon": "plate",
+		"minutes": 25.0, "pose": "sit", "needs": {"hunger": 0.75, "social": 0.1, "fun": 0.03}}
+	if q >= 3.0:
+		a["moodlet"] = ["great_meal", "Delicious Family Meal", "cook", 10.0 + q * 2.0, 5.0]
+	return a
+
+
+## A cooking action that makes a meal for the whole family.
+func is_meal_cook(it, a: Dictionary) -> bool:
+	if it == null or not is_instance_valid(it) or a.get("skill", "") != "Cooking":
+		return false
+	return str(it.title) in MEAL_COOKS
+
+
+## The cook finished: plates go on the nearest table and hungry family come to eat.
+func serve_meal(cook, a: Dictionary) -> void:
+	var table = _meal_table(cook)
+	if table == null:
+		return
+	clear_meal()
+	var humans: Array = agents.filter(func(x): return x != null and x.kind != "dog")
+	var cook_ate := float(a.get("needs", {}).get("hunger", 0.0)) >= 0.5
+	var n := maxi(1, humans.size() - (1 if cook_ate else 0))
+	var q: float = Game.skill_level(cook.index, "Cooking")
+	var dishes := ["Mac & Cheese", "Veggie Stew", "Spaghetti", "Pancakes", "Roast Chicken", "Gourmet Lasagna"]
+	if str(table.title) == "Dinner Table" or str(a.get("label", "")).contains("Burger") or str(a.get("label", "")).contains("Grill"):
+		dishes = ["Hot Dogs", "Burgers", "Burgers", "BBQ Ribs", "BBQ Ribs", "Gourmet Burgers"]
+	var dish: String = dishes[clampi(int(q), 0, dishes.size() - 1)]
+	meal = {"table": table, "servings": n, "quality": q, "cook": cook.display_name(), "dish": dish,
+		"expires": Game.total_minutes() + MEAL_SPOILS, "plates": [], "node": null}
+	_spawn_plates(table, n)
+	Game.notify.emit("%s served %s: %d serving%s on the %s" % [cook.display_name(), dish, n, "" if n == 1 else "s", str(table.title).to_lower()], "plate")
+	cook._say("Dinner's ready!", "plate")
+	stats["meals"] = int(stats.get("meals", 0)) + 1
+	# Call to meal: hungry family drop what free will had them doing.
+	for ag in humans:
+		if ag == cook and cook_ate:
+			continue
+		if float(ag.member.needs.get("hunger", 1.0)) > 0.7:
+			continue
+		if ag.phase != "idle" and (not ag.order.get("auto", false) or ag.order.get("forced", false)):
+			continue
+		if ag.queue.any(func(q2): return not q2.get("auto", false)):
+			continue
+		var o := {"action": meal_action(), "target": table, "auto": true}
+		if ag.phase == "idle":
+			ag.command(o)
+		else:
+			ag.queue.push_front(o)
+			ag.cancel_current()
+		if OS.has_environment("VIMS_PLAYTEST"):
+			print("  call to meal: %s -> %s (%s)" % [ag.display_name(), ag.current_label(), ag.phase])
+
+
+func _meal_table(cook) -> Node:
+	var best = null
+	var bd := INF
+	var p: Vector3 = cook.actor.global_position
+	for it in interactables:
+		if not is_instance_valid(it) or not str(it.title) in MEAL_TABLES:
+			continue
+		var c: Vector3 = it.global_transform * it.look_at_spot
+		var d := _flat(c, p) + absf(c.y - p.y) * 3.0
+		if d < bd:
+			bd = d
+			best = it
+	return best
+
+
+func eat_serving() -> void:
+	if meal.is_empty():
+		return
+	meal.servings = int(meal.servings) - 1
+	var plates: Array = meal.plates
+	if not plates.is_empty():
+		var pl = plates.pop_back()
+		if is_instance_valid(pl):
+			pl.queue_free()
+	if int(meal.servings) <= 0:
+		clear_meal()
+
+
+func clear_meal() -> void:
+	if meal.is_empty():
+		return
+	var nd = meal.get("node")
+	if nd != null and is_instance_valid(nd):
+		nd.queue_free()
+	meal = {}
+
+
+static var _plate_mesh: ArrayMesh
+static var _food_meshes: Array = []
+
+
+func _spawn_plates(table: Node, n: int) -> void:
+	if location == null:
+		return
+	if _plate_mesh == null:
+		var vb := VoxelBuilder.new()
+		vb.jitter = 0.03
+		var white := Color("f4efe6")
+		for x in 7:
+			for z in 7:
+				var dx := absf(x - 3.0)
+				var dz := absf(z - 3.0)
+				if dx + dz > 5.0:
+					continue
+				vb.set_v(Vector3i(x, 0, z), white)
+				if dx + dz >= 4.0 or maxf(dx, dz) >= 3.0:
+					vb.set_v(Vector3i(x, 1, z), white.darkened(0.04))
+		_plate_mesh = vb.build(0.035, Vector3(3.5, 0, 3.5))
+		for cols in [[Color("e9b23a"), Color("f2cf5b"), Color("5ea544")], [Color("b5512e"), Color("d9793c"), Color("6fb34f")], [Color("8a4a2a"), Color("c7843e"), Color("e8d27a")]]:
+			var fb := VoxelBuilder.new()
+			fb.jitter = 0.08
+			for x in range(2, 5):
+				for z in range(2, 5):
+					fb.set_v(Vector3i(x, 1, z), cols[(x + z) % 2])
+			fb.set_v(Vector3i(3, 2, 3), cols[1])
+			fb.set_v(Vector3i(2, 2, 3), cols[2])
+			fb.set_v(Vector3i(4, 1, 2), cols[2])
+			_food_meshes.append(fb.build(0.035, Vector3(3.5, 0, 3.5)))
+	var root := Node3D.new()
+	root.name = "FamilyMeal"
+	location.add_child(root)
+	meal.node = root
+	var half := _box_half(table)
+	var c: Vector3 = table.global_transform * table.look_at_spot
+	var top := c.y + half.y + 0.005
+	var bx: Vector3 = table.global_transform.basis.x.normalized()
+	var bz: Vector3 = table.global_transform.basis.z.normalized()
+	var long_ax := bx if half.x >= half.z else bz
+	var short_ax := bz if half.x >= half.z else bx
+	var ll := maxf(half.x, half.z)
+	var sl := minf(half.x, half.z)
+	var plates: Array = []
+	for k in n:
+		var t := (float(k / 2) + 0.5) / float(maxi(1, (n + 1) / 2)) - 0.5
+		var side := 1.0 if k % 2 == 0 else -1.0
+		var pos := c + long_ax * t * ll * 1.3 + short_ax * side * sl * 0.5
+		pos.y = top
+		var pl := Node3D.new()
+		root.add_child(pl)
+		pl.global_position = pos
+		var mi := MeshInstance3D.new()
+		mi.mesh = _plate_mesh
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		pl.add_child(mi)
+		var fi := MeshInstance3D.new()
+		fi.mesh = _food_meshes[int(meal.get("quality", 0.0)) % _food_meshes.size()]
+		fi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		pl.add_child(fi)
+		plates.append(pl)
+	meal.plates = plates

@@ -8,13 +8,16 @@ const U := 1.0 / 16.0
 
 ## [x, z, banner]
 const LAMPS := [
-	[-1.6, -4.0, true],
-	[1.7, -7.0, true],
-	[-6.4, -5.6, false],
-	[6.6, -15.0, false],
-	[-4.2, -13.5, false],
+	[-2.3, -8.4, true],    # 0 tall lamp left of the walkway (ref: centre-left)
+	[2.6, -10.6, true],    # 1 right of the fountain
+	[-7.2, -3.4, false],   # 2 behind the FALL TREATS stall
+	[5.6, -18.2, false],   # 3 behind the stage
+	[-5.0, -15.5, false],  # 4 back left
+	[5.4, -3.0, false],    # 5 right side, by the game booth
+	[-4.4, -19.0, false],  # 6 far back by the town hall
 ]
-const FOUNTAIN := Vector3(0.0, 0, -8.6)
+const FOUNTAIN := Vector3(0.2, 0, -9.2)
+const FOUNTAIN_SCALE := 1.3
 const LAMP_TOP := 4.2
 const SU := 0.06  # string-light cell size
 
@@ -113,52 +116,46 @@ func _fountain(parent: Node3D) -> void:
 		return c
 	var water := func(q: Vector3i) -> Color:
 		return Color("7fb8d8") if posmod(q.x + q.z * 3, 7) != 0 else Color("a8d4ea")
-	# Chunky tiered fountain: wide basin, thick pedestal, two bowls.
+	# Chunky tiered fountain: wide basin, thick pedestal, two bowls with
+	# water spilling over their rims, a finial spout on top.
 	K.cyl(vb, 0, 0, 0, 26.0, 2, stone)
 	K.cyl(vb, 0, 2, 0, 25.0, 9, stone, false, 21.0)
 	K.cyl(vb, 0, 11, 0, 25.5, 2, Color("b4afa4"), false, 20.5)
 	K.cyl(vb, 0, 2, 0, 21.0, 7, water)
-	# Pedestal and middle bowl.
+	# Pedestal + lower bowl.
 	K.cyl(vb, 0, 9, 0, 6.0, 4, stone)
-	K.cyl(vb, 0, 13, 0, 4.5, 14, stone)
-	K.cyl(vb, 0, 27, 0, 7.0, 2, stone)
-	K.cyl(vb, 0, 29, 0, 12.5, 4, stone, false, 10.0)
-	K.cyl(vb, 0, 29, 0, 10.0, 3, water)
-	K.cyl(vb, 0, 33, 0, 12.8, 1, Color("b4afa4"), false, 10.5)
-	# Upper column + top bowl + finial.
-	K.cyl(vb, 0, 32, 0, 3.0, 10, stone)
-	K.cyl(vb, 0, 42, 0, 7.0, 3, stone, false, 5.0)
-	K.cyl(vb, 0, 42, 0, 5.0, 2, water)
-	K.cyl(vb, 0, 45, 0, 2.0, 5, stone)
-	K.cyl(vb, 0, 50, 0, 3.0, 2, Color("b4afa4"))
-	K.cyl(vb, 0, 52, 0, 1.5, 2, Color("b4afa4"))
-	# Water curtains falling from the bowl rims.
-	for a in 16:
-		var ang := TAU * a / 16.0
-		for r in [12.0, 6.5]:
-			var x := int(round(cos(ang) * r))
-			var z := int(round(sin(ang) * r))
-			var y0 := 29 if r > 8.0 else 42
-			for y in range(8 if r > 8.0 else 33, y0):
-				if K.hs(x, y, z) > 0.55 and posmod(a, 2) == 0:
-					vb.set_v(Vector3i(x, y, z), Color("cfeaf6") if K.hs(z, y, x) > 0.5 else Color("a8d4ea"))
-	# Spray on top.
-	for y in 6:
-		vb.set_v(Vector3i(0, 54 + y, 0), Color("e0f4fc"))
-	vb.set_v(Vector3i(1, 58, 0), Color("e0f4fc"))
-	vb.set_v(Vector3i(-1, 57, 0), Color("e0f4fc"))
-	vb.set_v(Vector3i(0, 58, 1), Color("e0f4fc"))
-	# Mums and pumpkins around the rim.
-	for a in 6:
-		var ang := TAU * a / 6.0 + 0.3
-		var x := cos(ang) * 31.0
-		var z := sin(ang) * 31.0
-		if z > 8.0 and absf(x) < 14.0:
-			continue
-		K.mums(vb, x, 0, z, 4.0, a % 3, a)
-	K.pumpkin(vb, 18, 0, 24, 3.4, 1, 0)
+	K.cyl(vb, 0, 13, 0, 4.5, 16, stone)
+	K.cyl(vb, 0, 29, 0, 8.0, 2, stone)
+	K.cyl(vb, 0, 31, 0, 14.0, 3, stone)
+	K.cyl(vb, 0, 34, 0, 14.5, 2, Color("b4afa4"), false, 12.0)
+	K.cyl(vb, 0, 34, 0, 12.0, 1, water)
+	# Upper stem + small bowl + finial.
+	K.cyl(vb, 0, 35, 0, 3.0, 10, stone)
+	K.cyl(vb, 0, 45, 0, 7.5, 2, stone)
+	K.cyl(vb, 0, 47, 0, 8.0, 2, Color("b4afa4"), false, 6.0)
+	K.cyl(vb, 0, 47, 0, 6.0, 1, water)
+	K.cyl(vb, 0, 48, 0, 2.0, 5, stone)
+	K.cyl(vb, 0, 53, 0, 1.2, 3, Color("a8d4ea"))
+	# Water curtains falling from both bowls (sparse columns).
+	for k in 28:
+		var ang := TAU * k / 28.0
+		var r1 := 14.6
+		var x := int(round(cos(ang) * r1))
+		var z := int(round(sin(ang) * r1))
+		if k % 2 == 0:
+			for y in range(11, 34):
+				if posmod(y + k, 5) != 0:
+					vb.set_v(Vector3i(x, y, z), Color("a8d4ea") if posmod(y, 3) else Color("cfe8f4"))
+	for k in 16:
+		var ang := TAU * (k + 0.5) / 16.0
+		var x := int(round(cos(ang) * 8.4))
+		var z := int(round(sin(ang) * 8.4))
+		for y in range(36, 47):
+			if posmod(y + k, 4) != 0:
+				vb.set_v(Vector3i(x, y, z), Color("b8dcef"))
 	K.pumpkin(vb, -22, 0, 18, 2.8, 2, 2)
-	K.inst(parent, vb, U, FOUNTAIN, 0.0, true, Vector3.ZERO, "Fountain")
+	var fm := K.inst(parent, vb, U, FOUNTAIN, 0.0, true, Vector3.ZERO, "Fountain")
+	fm.scale = Vector3.ONE * FOUNTAIN_SCALE
 
 
 # ------------------------------------------------------------------ string lights
@@ -169,7 +166,7 @@ func _catenary(vb: VoxelBuilder, a: Vector3, b: Vector3, sag: float, bunting := 
 	var cb := b / SU
 	var n := maxi(int((cb - ca).length()), 2)
 	var wire := Color("3a3530")
-	var bulb_every := 8
+	var bulb_every := 6
 	var flag_cols := [Color("e2662a"), Color("f2b33a"), Color("c8401e"), Color("f6efe0"), Color("d8902a")]
 	for i in n + 1:
 		var t := float(i) / n
@@ -177,7 +174,7 @@ func _catenary(vb: VoxelBuilder, a: Vector3, b: Vector3, sag: float, bunting := 
 		p.y -= sin(t * PI) * sag / SU
 		var q := Vector3i(floori(p.x), floori(p.y), floori(p.z))
 		vb.set_v(q, wire)
-		if bulbs and i % bulb_every == 3:
+		if bulbs and i % bulb_every == 3 and i > 2 and i < n - 2:
 			vb.set_v(q + Vector3i(0, -1, 0), Color("2a2622"))
 			vb.set_v(q + Vector3i(0, -2, 0), Color("ffd070"), true)
 			vb.set_v(q + Vector3i(0, -3, 0), Color("ffc050"), true)
@@ -198,20 +195,24 @@ func _strings(parent: Node3D) -> void:
 	var L := []
 	for l: Array in LAMPS:
 		L.append(Vector3(l[0], LAMP_TOP + 0.1, l[1]))
+	var stage_fl := Vector3(4.1, 5.2, -14.2)   # stage truss front-left corner
 	var runs := [
 		# [a, b, sag, bunting]
-		[L[0], Vector3(-3.6, 2.9, 1.4), 0.35, false],
-		[L[0], L[1], 0.5, false],
-		[L[0], L[2], 0.45, false],
-		[L[0], Vector3(5.6, 2.7, 0.0), 0.6, false],
-		[L[1], L[3], 0.4, true],
-		[L[2], L[4], 0.5, false],
-		[L[4], L[1], 0.6, false],
-		[L[2], Vector3(-8.4, 4.4, -1.4), 0.4, false],
-		[L[3], Vector3(10.0, 4.8, -6.0), 0.4, true],
-		[Vector3(7.6, 4.4, -4.6), Vector3(11.5, 3.6, 1.0), 0.4, true],
-		[Vector3(4.2, 3.3, -1.2), Vector3(9.6, 3.0, 1.8), 0.35, true],
-		[Vector3(4.2, 3.3, -1.2), Vector3(6.9, 3.4, -4.2), 0.3, true],
+		[L[0], L[1], 0.5, true],
+		[L[0], L[5], 0.7, false],
+		[L[2], L[0], 0.55, false],
+		[L[2], Vector3(-3.9, 4.2, -0.4), 0.35, false],
+		[L[1], stage_fl, 0.45, false],
+		[L[5], L[1], 0.6, true],
+		[L[5], Vector3(10.6, 3.6, -3.4), 0.4, false],
+		[L[5], Vector3(8.6, 3.2, 1.8), 0.45, true],
+		[L[4], L[0], 0.5, false],
+		[L[4], L[1], 0.8, true],
+		[L[4], L[6], 0.4, false],
+		[L[3], Vector3(11.5, 4.6, -12.0), 0.4, true],
+		[L[3], L[1], 0.6, false],
+		[L[2], Vector3(-10.0, 4.4, -7.0), 0.4, false],
+		[Vector3(-10.0, 4.4, -7.0), L[4], 0.5, true],
 	]
 	for r: Array in runs:
 		_catenary(vb, r[0], r[1], r[2], r[3])
@@ -267,24 +268,24 @@ func _props(parent: Node3D) -> void:
 	var near := VoxelBuilder.new()
 	near.jitter = 0.0
 	var C := 16
-	# Flower barrels (foreground left / right, around the square).
+	# Flower barrels: foreground corners (framing, not blocking) + around the square.
 	var barrels := [
-		[-5.0, 3.9, 0], [-4.1, 4.9, 1], [-6.3, 1.4, 1],
-		[-2.6, -4.6, 2], [2.2, -10.4, 0], [-4.0, -8.6, 1], [4.8, -6.4, 3], [8.0, -1.0, 2],
-		[4.4, 5.3, 1], [2.1, 5.4, 0],
+		[-6.9, 2.6, 0], [-6.0, 3.5, 1], [-7.6, 0.4, 1],
+		[-2.2, -6.2, 2], [2.0, -7.6, 0], [-3.2, -10.6, 1], [3.4, -12.6, 3], [7.4, -2.0, 2],
+		[7.6, 3.4, 1], [2.6, 3.6, 0], [-1.8, -12.8, 2],
 	]
 	var i := 0
 	for b: Array in barrels:
 		_barrel_planter(near, int(b[0] * C), int(b[1] * C), 5.0, b[2], i)
 		i += 1
-	# Ground lanterns.
-	for l in [[-6.0, 4.6], [6.6, 1.6], [1.0, -4.6], [4.7, 2.5], [-4.7, 2.3], [1.45, 4.7], [3.0, 5.9]]:
+	# Ground lanterns (small, along the walkway edges).
+	for l in [[-7.0, 3.6], [-3.3, 2.9], [1.9, 3.1], [6.9, 0.2], [-2.0, -4.2], [1.9, -5.6], [-1.6, -11.6], [2.4, -11.6]]:
 		_ground_lantern(near, int(l[0] * C), int(l[1] * C))
 	# Picnic tables.
-	_picnic_table(near, int(2.4 * C), int(-3.2 * C))
-	_picnic_table(near, int(-4.8 * C), int(-9.6 * C))
+	_picnic_table(near, int(-5.0 * C), int(-8.0 * C))
+	_picnic_table(near, int(3.9 * C), int(-7.2 * C))
 	# Pumpkin piles + hay.
-	var piles := [[-2.75, 4.35], [0.4, -5.2], [3.8, -5.6], [-7.4, -1.0], [8.6, 2.4]]
+	var piles := [[-2.6, 3.4], [-1.4, -5.6], [1.6, -6.3], [-7.4, -1.8], [8.4, 0.2], [-1.9, -9.6], [6.0, -11.6]]
 	var j := 0
 	for p: Array in piles:
 		var px := int(p[0] * C)
@@ -293,8 +294,9 @@ func _props(parent: Node3D) -> void:
 		K.pumpkin(near, px + 7, 0, pz + 3, 2.8, j + 1, j + 1)
 		K.pumpkin(near, px - 4, 0, pz + 6, 2.4, j + 2, j + 3)
 		j += 1
-	K.hay(near, int(-7.6 * C), 0, int(-2.6 * C), 16, 9, 9)
-	K.hay(near, int(-7.4 * C), 9, int(-2.4 * C), 12, 8, 7)
-	K.hay(near, int(7.4 * C), 0, int(-6.6 * C), 16, 9, 9)
-	K.hay(near, int(-0.6 * C), 0, int(-10.6 * C), 16, 9, 9)
+	K.hay(near, int(-7.9 * C), 0, int(-1.0 * C), 16, 9, 9)
+	K.hay(near, int(-7.7 * C), 9, int(-0.8 * C), 12, 8, 7)
+	K.hay(near, int(7.6 * C), 0, int(-5.6 * C), 16, 9, 9)
+	K.hay(near, int(-2.6 * C), 0, int(-6.8 * C), 16, 9, 9)
+	K.hay(near, int(1.4 * C), 0, int(-12.4 * C), 16, 9, 9)
 	K.inst(parent, near, U, Vector3.ZERO, 0.0, true, Vector3.ZERO, "SquareProps")

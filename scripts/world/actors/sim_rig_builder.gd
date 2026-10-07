@@ -370,7 +370,7 @@ static func _human_head(L: Dictionary, D: Dictionary) -> Dictionary:
 	# Neck.
 	_fill(vb, W / 2 - 2, W / 2 + 1, 0, 0, Dd / 2 - 2, Dd / 2 + 1, _sh(skin, 0.86))
 	# Ears.
-	var ear_skin := _sh(skin, 0.95)
+	var ear_skin := _sh(skin, 0.86)
 	_fill(vb, -1, -1, B + 2, B + 3, Dd / 2 - 1, Dd / 2, ear_skin)
 	_fill(vb, W, W, B + 2, B + 3, Dd / 2 - 1, Dd / 2, ear_skin)
 
@@ -457,11 +457,20 @@ static func _human_head(L: Dictionary, D: Dictionary) -> Dictionary:
 		_fill(vb, 1, W - 2, 0, 0, 3, F + 1, bc)
 		_fill(vb, 2, W - 3, -1, -1, 5, F + 1, bc)
 		_fill(vb, 3, W - 4, -2, -2, 7, F, bc)
-		# Sideburns + cheeks.
+		# Sideburns + cheeks: full height by the ear, lower toward the face
+		# so the cheek, eye and nose still read in profile.
 		for x in [0, W - 1]:
 			for y in range(B, B + 6):
-				for z in range(5, F + 1):
+				for z in range(4, F + 1):
+					if z >= F - 2 and y >= B + 3:
+						continue
 					vb.set_v(Vector3i(x, y, z), bc.call(Vector3i(x, y, z)))
+		# Profile eye: a dark eye voxel on each side just behind the bevelled
+		# face corner, so the dad still has an eye when seen from the side or
+		# back three-quarter (the ref shows him in profile at the desk).
+		for x in [0, W - 1]:
+			vb.set_v(Vector3i(x, E + 1, F - 1), eye_dark)
+			vb.set_v(Vector3i(x, E + 2, F - 1), _sh(skin, 0.9))
 	elif beard == "short":
 		for y in range(B, B + 2):
 			for x in range(0, W):
@@ -540,9 +549,12 @@ static func _human_hair(vb: VoxelBuilder, style: String, hc: Callable, W: int, H
 					var dx := maxf(maxf(-x, x - (W - 1)), 0.0)
 					var dz := maxf(maxf(-z, z - F), 0.0)
 					var dy := maxf(float(y - T), 0.0)
-					var lim := 1.6 + _h(Vector3i(x, y, z), 42) * 1.1
+					# Clumps vary per 2x2 tuft (not per voxel) so the mop has
+					# a few chunky locks instead of a noisy, holey shell.
+					var tuft := Vector3i(floori(x / 2.0), floori(y / 2.0), floori(z / 2.0))
+					var lim := 1.15 + _h(tuft, 42) * 0.9
 					if dy > 0.0:
-						lim = 2.2 + _h(Vector3i(x, 0, z), 43) * 1.3
+						lim = 1.9 + _h(Vector3i(tuft.x, 0, tuft.z), 43) * 0.9 - (0.6 if z < 2 else 0.0)
 					if dx + dz + dy * 0.9 <= lim:
 						vb.set_v(Vector3i(x, y, z), clump.call(Vector3i(x, y, z)))
 		# Fringe swept to one side over the forehead.
@@ -1043,11 +1055,11 @@ static func _in_rbox(p: Vector3i, size: Vector3, n: float, fat := 0.0) -> bool:
 
 
 static func _build_dog(L: Dictionary) -> Dictionary:
-	# Chibi beagle (ref1): big round head with a white blaze running down
-	# into a white muzzle, small black nose, big glossy black eyes, long
-	# brown floppy ears hanging past the jaw, tan body with a darker brown
-	# saddle, white chest/belly/paws, red collar and an upright white-tipped
-	# tail.
+	# Chibi beagle (ref1): big rounded head with a white blaze running down
+	# into a protruding white muzzle, glossy black nose, big black eyes, long
+	# dark-brown floppy ears hanging past the jaw, tan body under a dark
+	# brown saddle "blanket", white chest/belly/paws, red collar and an
+	# upright white-tipped tail. Tuned for a lying 3/4 view from above.
 	var acc := Acc.new()
 	acc.vs = VS
 	var tan: Color = L.get("tan", Color(0.80, 0.47, 0.2))
@@ -1058,183 +1070,198 @@ static func _build_dog(L: Dictionary) -> Dictionary:
 	const LEG := 5
 	const BW := 10
 	const BH := 8
-	const BL := 17
+	const BL := 18
 	const HW := 12
-	const HH := 11
+	const HH := 10
 	const HD := 9
-	var head_j := Vector3(0, LEG + BH - 3, BL * 0.5 - 2.0)
-	var h_origin := Vector3(HW * 0.5, 2.0, 1.0)
-	var eye_d := Vector3(0, 5.0, HD - 1.0)
+	const MZ := 3          # muzzle depth (voxels in front of the face)
+	var head_j := Vector3(0, LEG + BH - 2, BL * 0.5 - 1.5)
+	var h_origin := Vector3(HW * 0.5, 2.0, 2.0)
+	var eye_d := Vector3(0, 3.5, HD - 1.5)
 	acc.bone("root", "", Vector3.ZERO)
 	acc.bone("body", "root", Vector3(0, LEG, 0))
 	acc.bone("head", "body", head_j)
 	acc.bone("eyes", "head", head_j + eye_d)
-	var ear_d := Vector3(HW * 0.5 + 0.5, HH - 5.0, 3.0)
+	var ear_d := Vector3(HW * 0.5 + 0.5, HH - 4.5, 2.0)
 	acc.bone("ear_l", "head", head_j + Vector3(ear_d.x, ear_d.y, ear_d.z))
 	acc.bone("ear_r", "head", head_j + Vector3(-ear_d.x, ear_d.y, ear_d.z))
-	acc.bone("tail", "body", Vector3(0, LEG + BH - 1.5, -BL * 0.5 + 1.5))
-	acc.bone("leg_fl", "body", Vector3(2.5, LEG, BL * 0.5 - 3.0))
-	acc.bone("leg_fr", "body", Vector3(-2.5, LEG, BL * 0.5 - 3.0))
-	acc.bone("leg_bl", "body", Vector3(2.5, LEG, -BL * 0.5 + 3.0))
-	acc.bone("leg_br", "body", Vector3(-2.5, LEG, -BL * 0.5 + 3.0))
+	acc.bone("tail", "body", Vector3(0, LEG + BH - 1.5, -BL * 0.5 + 1.0))
+	acc.bone("leg_fl", "body", Vector3(2.6, LEG + 1, BL * 0.5 - 3.0))
+	acc.bone("leg_fr", "body", Vector3(-2.6, LEG + 1, BL * 0.5 - 3.0))
+	acc.bone("leg_bl", "body", Vector3(2.6, LEG + 1, -BL * 0.5 + 3.5))
+	acc.bone("leg_br", "body", Vector3(-2.6, LEG + 1, -BL * 0.5 + 3.5))
 
 	# Body: x 0..BW-1, y 0..BH-1, z 0..BL-1 (front = +z).
 	var body := VoxelBuilder.new()
-	body.jitter = 0.04
+	body.jitter = 0.03
 	var body_fn := func(p: Vector3i) -> Color:
 		var c := tan
 		var cx := absf(p.x - (BW - 1) * 0.5)
-		# Saddle edge wanders in soft 3-voxel clumps (no per-column stripes).
-		var sad_edge := _h(Vector3i(p.x / 4, 0, p.z / 3), 30)
+		# Saddle edge wanders in soft 2x3 clumps.
+		var wob := int(_h(Vector3i(p.x / 2, 0, p.z / 3), 30) * 2.0)
 		if p.y <= 1 or (p.z >= BL - 4 and p.y <= 5 and cx < 3.6):
 			c = white
-		elif (p.z == BL - 4 or p.z == BL - 3) and p.y >= 3:
+		elif (p.z == BL - 5 or p.z == BL - 4) and p.y >= 4:
 			c = collar
-		elif p.z >= 2 and p.z <= BL - 6 and (p.y >= BH - 1 or (p.y >= BH - 3 and (cx >= 3.5 or p.y == BH - 2) and sad_edge > 0.25 + 0.2 * float(BH - 1 - p.y))):
-			c = saddle.lerp(tan, 0.15 * _h(p, 35))
-		elif p.y == 2 and _h(p, 31) > 0.6:
-			c = white.lerp(tan, 0.4)
-		return _sh(c, 1.0 + (_h(p, 32) - 0.5) * 0.1)
+		elif p.z >= 3 - wob and p.z <= BL - 7 + wob and (p.y >= BH - 2 or (p.y >= BH - 4 + wob and cx >= 3.5)):
+			c = saddle.lerp(tan, 0.12 * _h(p, 35))
+		elif p.y == 2 and _h(p, 31) > 0.55:
+			c = white.lerp(tan, 0.45)
+		return _sh(c, 1.0 + (_h(p, 32) - 0.5) * 0.09)
 	_fill(body, 0, BW - 1, 0, BH - 1, 0, BL - 1, func(p: Vector3i) -> Color:
-		if not _in_rbox(p, Vector3(BW, BH, BL), 4.0, 0.2):
+		if not _in_rbox(p, Vector3(BW, BH, BL), 2.6, 0.35):
 			return Color(0, 0, 0, 0)
 		return body_fn.call(p))
-	# Haunches: rounded bumps over the back legs.
+	# Haunches: rounded tan bumps over the back legs.
 	for sx in [-1, BW]:
-		_fill(body, sx, sx, 1, 4, 1, 5, func(p: Vector3i) -> Color:
-			if (p.y == 4 and (p.z == 1 or p.z == 5)):
+		_fill(body, sx, sx, 1, 5, 1, 6, func(p: Vector3i) -> Color:
+			if (p.y == 5 or p.y == 1) and (p.z == 1 or p.z == 6):
 				return Color(0, 0, 0, 0)
-			return _sh(tan, 0.97 + (_h(p, 38) - 0.5) * 0.1))
-	# Fluffy white chest tuft under the chin + collar tag.
+			return _sh(tan, 0.96 + (_h(p, 38) - 0.5) * 0.1))
+	# Fluffy white chest tuft under the chin + gold collar tag.
 	_fill(body, 3, BW - 4, 1, 4, BL, BL, func(p: Vector3i) -> Color:
 		return _sh(white, 0.98 + (_h(p, 39) - 0.5) * 0.05))
 	body.set_v(Vector3i(BW / 2, 4, BL), Color(0.98, 0.82, 0.3))
+	body.set_v(Vector3i(BW / 2 - 1, 4, BL), Color(0.98, 0.82, 0.3))
 	acc.part("body", body, Vector3(BW * 0.5, 0, BL * 0.5))
 
 	# Head: x 0..HW-1, y 0..HH-1, z 0..HD-1, muzzle in front (z >= HD).
 	var head := VoxelBuilder.new()
-	head.jitter = 0.035
+	head.jitter = 0.03
 	var head_fn := func(p: Vector3i) -> Color:
 		var c := tan
 		var fx := float(p.x) - (HW - 1) * 0.5   # -5.5..5.5
 		var ax := absf(fx)
-		# Blaze: stripe up the middle of the face and over the crown,
-		# widening into white cheeks / jaw below the eyes.
-		if ax < 1.0 and p.y >= 4 and (p.z >= HD - 2 or p.y >= HH - 1 and p.z >= HD - 5):
+		# Blaze: 2-wide stripe up the face and back over the crown, opening
+		# into white cheeks and jaw below the eyes.
+		if ax < 1.0 and p.y >= 3 and (p.z >= HD - 2 or (p.y >= HH - 2 and p.z >= 3)):
 			c = white
-		elif ax < 2.0 and p.y >= 3 and p.y <= 4 and p.z >= HD - 2:
+		elif ax < 2.0 and p.y >= 3 and p.y <= 4 and p.z >= HD - 1:
 			c = white
 		elif p.y <= 2 and p.z >= HD - 3 and ax < 4.0:
 			c = white
-		elif p.y <= 0 and p.z >= 2:
+		elif p.y <= 0 and p.z >= 3:
 			c = white
 		if c == tan:
-			if p.y >= HH - 2:
-				c = _sh(tan, 0.92)
+			if p.y >= HH - 2 and ax >= 2.0:
+				c = _sh(tan, 0.9)
 			elif p.z <= 2:
-				c = _sh(tan, 0.95)
-			if ax >= 4.5 and p.y <= 5:
-				c = _sh(tan, 1.04)
+				c = _sh(tan, 0.94)
 		return _sh(c, 1.0 + (_h(p, 33) - 0.5) * 0.08)
-	# Rounded skull (superellipsoid), flat enough in front for the face.
 	_fill(head, 0, HW - 1, 0, HH - 1, 0, HD - 1, func(p: Vector3i) -> Color:
-		if not _in_rbox(p, Vector3(HW, HH, HD), 2.8, 0.6):
+		if not _in_rbox(p, Vector3(HW, HH, HD), 2.4, 0.55):
 			return Color(0, 0, 0, 0)
 		return head_fn.call(p))
-	# Muzzle: white, 6 wide, 4 tall, sticking out 2, with a nose bridge.
+	# Muzzle: white, 6 wide, 4 tall, MZ deep, rounded front corners.
 	var muz := func(p: Vector3i) -> Color:
-		return _sh(white, 0.99 + (_h(p, 34) - 0.5) * 0.06)
-	_fill(head, 3, HW - 4, 0, 3, HD, HD + 1, muz)
+		return _sh(white, 0.99 + (_h(p, 34) - 0.5) * 0.06 - 0.03 * float(p.z - HD))
+	_fill(head, 3, HW - 4, 0, 3, HD, HD + MZ - 1, muz)
 	_fill(head, 4, HW - 5, 4, 4, HD, HD, muz)
-	head.erase(Vector3i(3, 3, HD + 1))
-	head.erase(Vector3i(HW - 4, 3, HD + 1))
-	head.erase(Vector3i(3, 0, HD + 1))
-	head.erase(Vector3i(HW - 4, 0, HD + 1))
-	# Small glossy black nose capping the top of the muzzle tip.
-	var nose := Color(0.07, 0.05, 0.05)
+	for zz in [HD + MZ - 1]:
+		for cc: Vector3i in [Vector3i(3, 3, zz), Vector3i(HW - 4, 3, zz), Vector3i(3, 0, zz), Vector3i(HW - 4, 0, zz)]:
+			head.erase(cc)
+	# Big glossy black nose capping the muzzle tip.
+	var nose := Color(0.06, 0.04, 0.04)
 	var m0 := HW / 2 - 1
-	_fill(head, m0, m0 + 1, 3, 3, HD, HD + 1, nose)
-	head.set_v(Vector3i(m0, 3, HD + 1), Color(0.2, 0.17, 0.18))
-	# Smile: dark mouth line under the nose.
-	var lip := Color(0.36, 0.22, 0.2)
-	head.set_v(Vector3i(m0, 1, HD + 1), lip)
-	head.set_v(Vector3i(m0 + 1, 1, HD + 1), lip)
-	# Eyes (own bone so they blink): 2 x 2 glossy black with a glint.
+	_fill(head, m0 - 1, m0 + 2, 3, 3, HD + MZ - 2, HD + MZ - 1, nose)
+	head.erase(Vector3i(m0 - 1, 3, HD + MZ - 1))
+	head.erase(Vector3i(m0 + 2, 3, HD + MZ - 1))
+	_fill(head, m0, m0 + 1, 4, 4, HD + MZ - 2, HD + MZ - 2, nose)
+	head.set_v(Vector3i(m0, 3, HD + MZ - 1), Color(0.3, 0.26, 0.27))
+	# Smile: dark line down from the nose and a pink tongue-ish mouth.
+	var lip := Color(0.3, 0.17, 0.15)
+	head.set_v(Vector3i(m0, 2, HD + MZ - 1), lip)
+	head.set_v(Vector3i(m0 + 1, 2, HD + MZ - 1), lip)
+	head.set_v(Vector3i(m0 - 1, 1, HD + MZ - 1), lip)
+	head.set_v(Vector3i(m0 + 2, 1, HD + MZ - 1), lip)
+	head.set_v(Vector3i(m0, 1, HD + MZ - 1), Color(0.92, 0.45, 0.5))
+	head.set_v(Vector3i(m0 + 1, 1, HD + MZ - 1), Color(0.92, 0.45, 0.5))
+	# Eyes (own bone so they blink): 2 x 3 glossy black with a glint, set
+	# either side of the blaze.
 	var eyes := VoxelBuilder.new()
 	eyes.jitter = 0.0
 	for ex: int in [2, HW - 4]:
 		for dx in 2:
-			for ey in [5, 6]:
+			for ey in [4, 5, 6]:
 				var p := Vector3i(ex + dx, ey, HD - 1)
+				if not head.vox.has(p):
+					p.z -= 1
 				head.erase(p)
-				# Closed lid (seen while blinking/sleeping): tan with a dark lash.
-				head.set_v(p - Vector3i(0, 0, 1), Color(0.18, 0.1, 0.07) if ey == 5 else _sh(tan, 0.85))
-				var glint: bool = ey == 6 and dx == 0
-				eyes.set_v(p, Color(0.98, 0.98, 0.96) if glint else Color(0.05, 0.04, 0.04))
-		# Soft brow above each eye.
-		head.set_v(Vector3i(ex, 7, HD - 1), _sh(tan, 0.86))
-		head.set_v(Vector3i(ex + 1, 7, HD - 1), _sh(tan, 0.86))
+				# Closed lid (seen while blinking/sleeping).
+				head.set_v(p - Vector3i(0, 0, 1), Color(0.16, 0.09, 0.06) if ey == 4 else _sh(tan, 0.82))
+				var glint: bool = ey == 6 and dx == (0 if ex < HW / 2 else 1)
+				eyes.set_v(p, Color(1.0, 1.0, 0.98) if glint else Color(0.04, 0.03, 0.03))
+		# Soft dark brow above each eye.
+		head.set_v(Vector3i(ex, 7, HD - 1), _sh(tan, 0.72))
+		head.set_v(Vector3i(ex + 1, 7, HD - 1), _sh(tan, 0.72))
 	acc.part("head", head, h_origin)
 	acc.part("eyes", eyes, h_origin + eye_d)
 
-	# Long floppy ears hanging down the sides of the head past the jaw.
+	# Long floppy ears: 2 thick, 6 wide flaring to 7, hanging past the jaw.
 	var ear := VoxelBuilder.new()
-	ear.jitter = 0.04
-	for y in range(-10, 1):
-		for z in range(0, 6):
-			if (y == 0 or y == -9) and (z == 0 or z == 5):
-				continue
-			if y == -10 and (z <= 1 or z >= 4):
-				continue
+	ear.jitter = 0.03
+	for y in range(-11, 1):
+		var z0 := 0
+		var z1 := 5
+		if y <= -5:
+			z1 = 6
+		if y == 0:
+			z0 = 1
+			z1 = 4
+		if y == -11:
+			z0 = 1
+			z1 = 5
+		for z in range(z0, z1 + 1):
 			for x in range(0, 2):
-				if x == 1 and y <= -6:
+				if x == 1 and y <= -7:
 					continue
 				var c := earc
 				if y >= -1:
-					c = _sh(earc, 1.15)
-				elif y <= -8:
-					c = _sh(earc, 0.82)
-				elif x == 0 and (z == 0 or z == 5):
-					c = _sh(earc, 0.9)
+					c = _sh(earc, 1.12)
+				elif y <= -9:
+					c = _sh(earc, 0.8)
+				elif x == 0 and (z == z0 or z == z1):
+					c = _sh(earc, 0.88)
 				ear.set_v(Vector3i(x, y, z), _sh(c, 1.0 + (_h(Vector3i(x, y, z), 36) - 0.5) * 0.1))
 	acc.part("ear_l", ear, Vector3(0.5, 0.5, 3.0))
 	var ear_r := VoxelBuilder.new()
-	ear_r.jitter = 0.04
+	ear_r.jitter = 0.03
 	for p: Vector3i in ear.vox:
 		ear_r.set_v(Vector3i(1 - p.x, p.y, p.z), ear.vox[p])
 	acc.part("ear_r", ear_r, Vector3(1.5, 0.5, 3.0))
 
-	# Tail: stands up with a forward curl, white tip.
+	# Tail: stands up with a forward curl, saddle base, white tip.
 	var tail := VoxelBuilder.new()
-	tail.jitter = 0.04
-	for y in range(0, 9):
-		var c := white if y >= 7 else (_sh(saddle, 1.1) if y < 3 else tan)
+	tail.jitter = 0.03
+	for y in range(0, 10):
+		var c := white if y >= 7 else (_sh(saddle, 1.05) if y < 3 else tan)
 		var zz := 0 if y < 5 else (1 if y < 8 else 2)
 		_fill(tail, 0, 1, y, y, zz, zz + 1, _sh(c, 1.0 + (_h(Vector3i(0, y, 0), 39) - 0.5) * 0.1))
 	acc.part("tail", tail, Vector3(1, 0, 1))
 
-	# Legs: 3 x LEG x 3 with white socks and a toe row.
+	# Legs: 3 x (LEG+1) x 3; front legs white, hind legs tan with white feet,
+	# a toe row that reads as a paw when stretched forward.
 	for nm in ["leg_fl", "leg_fr", "leg_bl", "leg_br"]:
 		var leg := VoxelBuilder.new()
-		leg.jitter = 0.04
+		leg.jitter = 0.03
 		var front: bool = nm.begins_with("leg_f")
-		_fill(leg, 0, 2, 0, LEG, 0, 2, func(p: Vector3i) -> Color:
+		_fill(leg, 0, 2, 0, LEG + 1, 0, 2, func(p: Vector3i) -> Color:
 			var c := white
 			if not front and p.y >= 2:
 				c = tan
-			elif front and p.y >= LEG - 1:
-				c = white.lerp(tan, 0.3)
+			elif front and p.y >= LEG:
+				c = white.lerp(tan, 0.35)
 			return _sh(c, 1.0 + (_h(p, 37) - 0.5) * 0.08))
 		_fill(leg, 0, 2, 0, 0, 3, 3, _sh(white, 0.95))
-		leg.set_v(Vector3i(1, 0, 3), _sh(white, 0.84))
-		acc.part(nm, leg, Vector3(1.5, LEG + 0.5, 1.5))
+		leg.set_v(Vector3i(1, 0, 3), _sh(white, 0.8))
+		acc.part(nm, leg, Vector3(1.5, LEG + 1.5, 1.5))
 
 	var meta := {
 		"species": "dog", "kind": "dog",
-		"height": (LEG + BH - 3 - 2 + HH) * VS,
+		"height": (LEG + BH - 2 - 2 + HH) * VS,
 		"head_h": (HH - 2) * VS,
 		"leg": LEG * VS,
-		"mouth": Vector3(0, -1.0, HD + 1.0 - h_origin.z) * VS,
+		"mouth": Vector3(0, -1.0, HD + MZ - 1.0 - h_origin.z) * VS,
 	}
 	return acc.finish(meta)
 
@@ -1266,8 +1293,9 @@ static func prop_mesh(pname: String) -> ArrayMesh:
 			_fill(vb, 0, 0, 2, 11, 0, 0, Color(0.85, 0.65, 0.35))
 			_fill(vb, 0, 0, 1, 1, 0, 0, Color(0.8, 0.8, 0.82))
 			_fill(vb, 0, 0, 0, 0, 0, 0, Color(0.3, 0.55, 0.95))
+			vb.set_v(Vector3i(0, -1, 0), Color(0.95, 0.35, 0.45))
 			origin = Vector3(0.5, 9, 0.5)
-			size = 0.025
+			size = 0.034
 		"palette":
 			_fill(vb, 0, 6, 0, 4, 0, 0, Color(0.78, 0.6, 0.38))
 			vb.erase(Vector3i(0, 0, 0))

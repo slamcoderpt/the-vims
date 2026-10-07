@@ -28,6 +28,10 @@ func _ready() -> void:
 	rig.apply(cam)
 	for i in 20:
 		await get_tree().process_frame
+	for k in ["dad", "bunny_girl", "cat_girl", "beagle"]:
+		var a: SimActor = loc.get_actor(k)
+		if a:
+			print("ACT ", k, " pos=", a.global_position, " rot=", rad_to_deg(a.rotation.y), " cam_a=", rad_to_deg(a._cam_a), " s=", a._s, " pose=", a.pose)
 	await RenderingServer.frame_post_draw
 	get_viewport().get_texture().get_image().save_png(out)
 	print("PREVIEW_SAVED ", out)
