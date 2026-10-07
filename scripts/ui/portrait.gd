@@ -33,14 +33,43 @@ void fragment() {
 	vec3 fg = t.rgb / max(t.a, 0.001);
 	// A touch more saturation + contrast so skin stays warm, not chalky.
 	float l = dot(fg, vec3(0.299, 0.587, 0.114));
-	fg = clamp(mix(vec3(l), fg, 1.18), 0.0, 1.0);
-	fg = clamp((fg - 0.5) * 1.06 + 0.5, 0.0, 1.0);
+	fg = clamp(mix(vec3(l), fg, 1.04), 0.0, 1.0);
+	fg = clamp((fg - 0.5) * 1.03 + 0.5, 0.0, 1.0);
 	vec3 c = mix(bg, fg, t.a);
 	vec2 p = (UV - 0.5) * rect_size;
 	vec2 q = abs(p) - (rect_size * 0.5 - vec2(radius));
 	float d = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - radius;
 	float a = clamp(0.5 - d, 0.0, 1.0);
 	COLOR = vec4(c, a);
+}
+"""
+
+## Studio bust material: the sim's own vertex colours (AO baked in), lit by
+## a fixed soft front key in view space instead of the scene lights. Faces
+## pointing at the lens get full, even light; tops a touch brighter, sides a
+## gentle step darker, so the voxels read as clean pixel-art blocks (ref cards)
+## instead of muddy angled shading.
+const BUST_SHADER := """
+shader_type spatial;
+render_mode unshaded, cull_back, shadows_disabled;
+uniform float side_shade = 0.8;
+uniform float top_lift = 1.06;
+uniform float bottom_shade = 0.62;
+uniform float gain = 1.04;
+void fragment() {
+	vec3 c = COLOR.rgb;
+	vec3 lin = c;
+	if (!OUTPUT_IS_SRGB) {
+		lin = mix(pow((c + vec3(0.055)) / 1.055, vec3(2.4)), c / 12.92, step(c, vec3(0.04045)));
+	}
+	vec3 n = normalize(NORMAL);
+	float front = clamp(n.z, 0.0, 1.0);
+	float up = clamp(n.y, 0.0, 1.0);
+	float down = clamp(-n.y, 0.0, 1.0);
+	float side = abs(n.x);
+	float k = front + up * top_lift + down * bottom_shade + side * side_shade;
+	k /= max(front + up + down + side, 0.001);
+	ALBEDO = lin * k * gain;
 }
 """
 
@@ -55,6 +84,7 @@ const BG_TINTS := {
 }
 
 static var _shader: Shader
+static var _bust_mat: ShaderMaterial
 
 var index := 0
 var member: Dictionary = {}
@@ -83,10 +113,10 @@ var _plane_h := 1.0
 
 ## Framing (fractions of the head height neck->top-of-hat), tuned so the face
 ## fills the card like the refs.
-const PERSON_YAW := -10.0
-const PERSON_PITCH := -4.0
-const DOG_YAW := -14.0
-const DOG_PITCH := -9.0
+const PERSON_YAW := 0.0
+const PERSON_PITCH := 0.0
+const DOG_YAW := 42.0
+const DOG_PITCH := -6.0
 
 
 func _ready() -> void:
@@ -179,9 +209,10 @@ func _build_viewport() -> void:
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color = Color("ffe9d6")
 	env.ambient_light_energy = 0.42
-	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
-	env.tonemap_exposure = 0.92
-	env.tonemap_white = 3.0
+	# The bust material is unshaded: keep the tonemap linear so the sims'
+	# authored colours come through as-is (no filmic wash).
+	env.tonemap_mode = Environment.TONE_MAPPER_LINEAR
+	env.tonemap_exposure = 1.0
 	var we := WorldEnvironment.new()
 	we.environment = env
 	_vp.add_child(we)
@@ -234,9 +265,10 @@ func _spawn_actor() -> void:
 	if "camera_cheat" in a:
 		a.set("camera_cheat", false)
 	_vp.add_child(a)
+	_apply_bust_material(a)
 	var dog: bool = member.get("kind", "") == "dog"
 	if a.has_method("set_pose"):
-		a.set_pose("sit" if dog else "idle")
+		a.set_pose("idle")
 	# Let the actor build its meshes and snap into its pose, then freeze it:
 	# a portrait is a still (eyes open, no idle sway), rendered on demand.
 	for i in 3:
@@ -261,6 +293,17 @@ func _spawn_actor() -> void:
 	_frame_camera()
 
 
+func _apply_bust_material(a: Node3D) -> void:
+	if _bust_mat == null:
+		var sh := Shader.new()
+		sh.code = BUST_SHADER
+		_bust_mat = ShaderMaterial.new()
+		_bust_mat.shader = sh
+	for n in a.find_children("*", "GeometryInstance3D", true, false):
+		(n as GeometryInstance3D).material_override = _bust_mat
+		(n as GeometryInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+
+
 ## The idle pose sways the head / hips by a per-instance random phase, so a
 ## frozen frame can catch the head turned away. Square the spine and head up
 ## (keep only the pitch) so every portrait looks straight down the lens.
@@ -274,7 +317,7 @@ func _neutralize_pose() -> void:
 			continue
 		var i := int(v)
 		var e: Vector3 = sk.get_bone_pose_rotation(i).get_euler()
-		var keep_pitch := e.x if bn in ["b_head", "b_body"] else 0.0
+		var keep_pitch := e.x if bn == "b_body" else 0.0
 		sk.set_bone_pose_rotation(i, Quaternion.from_euler(Vector3(keep_pitch, 0.0, 0.0)))
 	var eb = _actor.get("b_eyes")
 	if eb != null and int(eb) >= 0:
@@ -338,10 +381,10 @@ func _frame_camera(measure := false) -> void:
 		if _measured.size != Vector2.ZERO and not measure:
 			top = minf(_measured.end.y, top)
 			top = maxf(top, skull_top)
-		var w_frac := 0.7 if kid else 0.62
+		var w_frac := 0.8 if kid else 0.84
 		view_h = head_w / w_frac / aspect
 		var top_m := 0.0 if kid else 0.045
-		var chin_frac := 0.76 if kid else 0.64
+		var chin_frac := 0.8 if kid else 0.74
 		if (top - chin) > (chin_frac - top_m) * view_h:
 			view_h = (top - chin) / (chin_frac - top_m)
 		cy = top + view_h * top_m - view_h * 0.5
@@ -351,7 +394,7 @@ func _frame_camera(measure := false) -> void:
 			cy = (top + chin) * 0.5
 	else:
 		var pts := PackedVector3Array()
-		if sk is Skeleton3D and hb >= 0:
+		if false:
 			var vs := 0.05
 			var g := _bone_xf(sk, hb)
 			# Pet close-up: head, ears and chest (front legs' tops), so the
@@ -382,13 +425,13 @@ func _frame_camera(measure := false) -> void:
 			maxx = maxf(maxx, d.dot(right))
 			miny = minf(miny, d.dot(up))
 			maxy = maxf(maxy, d.dot(up))
-		if _measured.size != Vector2.ZERO and not measure and not dog:
+		if _measured.size != Vector2.ZERO and not measure:
 			minx = _measured.position.x
 			maxx = _measured.end.x
 			miny = _measured.position.y
 			maxy = _measured.end.y
 		cx = (minx + maxx) * 0.5
-		if dog and sk is Skeleton3D and hb >= 0:
+		if false:
 			# Centre on the face, not on the whole silhouette.
 			var fc: Vector3 = _bone_xf(sk, hb) * (Vector3(0, 2.0, 6.0) * 0.05) - origin
 			cx = fc.dot(right)
@@ -397,7 +440,7 @@ func _frame_camera(measure := false) -> void:
 			maxx = cx + half
 		var w := maxx - minx
 		var h := maxy - miny
-		view_h = maxf(h * (1.1 if dog else 1.14), w * (1.2 if dog else 1.12) / aspect)
+		view_h = maxf(h * (1.12 if dog else 1.14), w * (1.1 if dog else 1.12) / aspect)
 		cy = (maxy + miny) * 0.5 + h * 0.01
 		if measure:
 			view_h *= 1.9

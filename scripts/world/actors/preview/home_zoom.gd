@@ -11,6 +11,15 @@ func _ready() -> void:
 		elif a.begins_with("--cam="):
 			var v := a.substr(6).split(",")
 			cam = {"target": Vector3(float(v[0]), float(v[1]), float(v[2])), "yaw": float(v[3]), "pitch": float(v[4]), "distance": float(v[5]), "fov": float(v[6])}
+		elif a.begins_with("--look="):
+			# Keep the home_day preset camera POSITION, aim at a new target with a narrower fov.
+			var v := a.substr(7).split(",")
+			var pc: Dictionary = preload("res://scripts/core/shot_presets.gd").PRESETS["home_day"].camera
+			var r := Basis.from_euler(Vector3(deg_to_rad(-pc.pitch), deg_to_rad(pc.yaw), 0))
+			var P: Vector3 = pc.target + r * Vector3(0, 0, pc.distance)
+			var T := Vector3(float(v[0]), float(v[1]), float(v[2]))
+			var d := P - T
+			cam = {"target": T, "yaw": rad_to_deg(atan2(d.x, d.z)), "pitch": rad_to_deg(asin(d.y / d.length())), "distance": d.length(), "fov": float(v[3])}
 	Game.frozen = true
 	Game.season = 1
 	Game.set_time(1, 14, 16)
